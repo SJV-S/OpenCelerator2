@@ -1,0 +1,385 @@
+/**
+ * Trace Styles Configuration
+ *
+ * This module handles:
+ * - Reading and writing trace configuration objects
+ * - Syncing trace configs with HTML form inputs
+ * - Series configuration UI management
+ * - Aggregation block management (adding/removing config blocks)
+ */
+
+import { chartState, defaultCorrectTraceConfig, defaultErrorTraceConfig, defaultTimingTraceConfig, defaultMiscOneTraceConfig, defaultMiscTwoTraceConfig } from '../chartState.js';
+import { createToast } from '../util/toaster.js';
+import { eventBus, EVENTS } from '../eventBus.js';
+
+// ============================================================================
+// TRACE CONFIGURATION UI
+// ============================================================================
+
+function updateCounterLabels() {
+    // Get the first available aggregation config for each series for UI labels
+    const getFirstConfig = (seriesName) => {
+        const configs = chartState.traceStyles[seriesName];
+        const firstAggType = Object.keys(configs)[0];
+        return configs[firstAggType];
+    };
+
+    document.getElementById('correct-series-label').textContent = getFirstConfig('correct').seriesName;
+    document.getElementById('incorrect-series-label').textContent = getFirstConfig('incorrect').seriesName;
+    document.getElementById('misc1-series-label').textContent = getFirstConfig('misc1').seriesName;
+    document.getElementById('misc2-series-label').textContent = getFirstConfig('misc2').seriesName;
+    document.getElementById('timing-series-label').textContent = getFirstConfig('timing').seriesName;
+}
+
+function updateTraceConfig(seriesName, newConfig) {
+    // Update "raw" aggregation config by default for now
+    // TODO: In future, allow UI to select which aggregation to update
+    const configObj = chartState.traceStyles[seriesName]["raw"];
+    Object.assign(configObj, newConfig);
+}
+
+function initializeSeriesInputs(seriesName) {
+    // Initialize all aggregation blocks for this series from chartState
+    const container = document.getElementById(`${seriesName}-blocks-container`);
+    if (!container) return;
+
+    // Get all aggregation configs for this series
+    const aggConfigs = chartState.traceStyles[seriesName];
+
+    // Get all existing blocks
+    const blocks = Array.from(container.querySelectorAll('.agg-config-block'));
+
+    // For each aggregation type in the config, ensure there's a block
+    Object.entries(aggConfigs).forEach(([aggType, config], index) => {
+        let block = blocks[index];
+
+        // If we need more blocks than exist, we'll just use the first block for now
+        // The user can add more blocks manually
+        if (!block) return;
+
+        // Set the aggregation type
+        const aggSelect = block.querySelector('.agg-type-select');
+        if (aggSelect) {
+            aggSelect.value = aggType;
+            block.dataset.agg = aggType;
+        }
+
+        // Set common fields
+        const seriesNameInput = block.querySelector('.series-name-input');
+        const showLineInput = block.querySelector('.show-line-input');
+        const lineWidthInput = block.querySelector('.line-width-input');
+        const lineColorInput = block.querySelector('.line-color-input');
+
+        if (seriesNameInput) seriesNameInput.value = config.seriesName;
+        if (showLineInput) showLineInput.checked = config.showLine;
+        if (lineWidthInput) lineWidthInput.value = config.lineWidth;
+        if (lineColorInput) lineColorInput.value = config.lineColor;
+
+        // Set series-specific fields
+        if (seriesName === 'incorrect') {
+            const textSizeInput = block.querySelector('.text-size-input');
+            const markerColorInput = block.querySelector('.marker-color-input');
+            if (textSizeInput) textSizeInput.value = config.textSize;
+            if (markerColorInput) markerColorInput.value = config.markerColor;
+        } else if (seriesName === 'timing') {
+            const markerSizeInput = block.querySelector('.marker-size-input');
+            const markerColorInput = block.querySelector('.marker-color-input');
+            if (markerSizeInput) markerSizeInput.value = config.markerSize;
+            if (markerColorInput) markerColorInput.value = config.markerColor;
+        } else if (seriesName === 'correct') {
+            const markerSizeInput = block.querySelector('.marker-size-input');
+            const markerFaceColorInput = block.querySelector('.marker-face-color-input');
+            const markerEdgeColorInput = block.querySelector('.marker-edge-color-input');
+            if (markerSizeInput) markerSizeInput.value = config.markerSize;
+            if (markerFaceColorInput) markerFaceColorInput.value = config.markerFaceColor;
+            if (markerEdgeColorInput) markerEdgeColorInput.value = config.markerEdgeColor;
+        } else {
+            const markerSizeInput = block.querySelector('.marker-size-input');
+            const markerSymbolInput = block.querySelector('.marker-symbol-input');
+            const markerFaceColorInput = block.querySelector('.marker-face-color-input');
+            const markerEdgeColorInput = block.querySelector('.marker-edge-color-input');
+            if (markerSizeInput) markerSizeInput.value = config.markerSize;
+            if (markerSymbolInput) markerSymbolInput.value = config.markerSymbol;
+            if (markerFaceColorInput) markerFaceColorInput.value = config.markerFaceColor;
+            if (markerEdgeColorInput) markerEdgeColorInput.value = config.markerEdgeColor;
+        }
+    });
+}
+
+function initializeAllSeriesInputs() {
+    Object.keys(chartState.traceStyles).forEach(initializeSeriesInputs);
+}
+
+function applyTraceConfig(seriesName) {
+    // Read configuration from all blocks for this series
+    const container = document.getElementById(`${seriesName}-blocks-container`);
+    if (!container) return;
+
+    const blocks = container.querySelectorAll('.agg-config-block');
+
+    // Clear existing configs and rebuild from blocks
+    chartState.traceStyles[seriesName] = {};
+
+    blocks.forEach(block => {
+        const aggType = block.querySelector('.agg-type-select')?.value || 'raw';
+
+        const config = {
+            seriesName: block.querySelector('.series-name-input')?.value || seriesName,
+            showLine: block.querySelector('.show-line-input')?.checked ?? true,
+            lineWidth: parseFloat(block.querySelector('.line-width-input')?.value) || 0.7,
+            lineColor: block.querySelector('.line-color-input')?.value || '#000000'
+        };
+
+        // Add series-specific fields
+        if (seriesName === 'incorrect') {
+            config.textSize = parseInt(block.querySelector('.text-size-input')?.value) || 20;
+            config.markerColor = block.querySelector('.marker-color-input')?.value || '#000000';
+        } else if (seriesName === 'timing') {
+            config.markerSize = parseInt(block.querySelector('.marker-size-input')?.value) || 30;
+            config.markerColor = block.querySelector('.marker-color-input')?.value || '#000000';
+        } else if (seriesName === 'correct') {
+            config.markerSize = parseInt(block.querySelector('.marker-size-input')?.value) || 8;
+            config.markerSymbol = 'circle';
+            config.markerFaceColor = block.querySelector('.marker-face-color-input')?.value || '#000000';
+            config.markerEdgeColor = block.querySelector('.marker-edge-color-input')?.value || '#000000';
+        } else {
+            config.markerSize = parseInt(block.querySelector('.marker-size-input')?.value) || 8;
+            config.markerSymbol = block.querySelector('.marker-symbol-input')?.value || 'circle';
+            config.markerFaceColor = block.querySelector('.marker-face-color-input')?.value || '#000000';
+            config.markerEdgeColor = block.querySelector('.marker-edge-color-input')?.value || '#000000';
+        }
+
+        // Store this config under its aggregation type
+        chartState.traceStyles[seriesName][aggType] = config;
+    });
+
+    updateCounterLabels();
+    eventBus.emit(EVENTS.DATA_CHART_REFRESH);
+    eventBus.emit(EVENTS.UI_LEGEND_RENDER);
+    createToast({ message: `${seriesName} configurations updated.`, duration: 2000 });
+}
+
+function resetTraceConfig(seriesName) {
+    // Reset to default "raw" aggregation only
+    const defaultsMap = {
+        correct: defaultCorrectTraceConfig,
+        incorrect: defaultErrorTraceConfig,
+        timing: defaultTimingTraceConfig,
+        misc1: defaultMiscOneTraceConfig,
+        misc2: defaultMiscTwoTraceConfig
+    };
+
+    // Reset traceStyles to have only "raw" aggregation
+    chartState.traceStyles[seriesName] = {
+        "raw": { ...defaultsMap[seriesName] }
+    };
+
+    // Remove all blocks except the first one
+    const container = document.getElementById(`${seriesName}-blocks-container`);
+    if (container) {
+        const blocks = Array.from(container.querySelectorAll('.agg-config-block'));
+        // Remove all but the first block
+        blocks.slice(1).forEach(block => block.remove());
+    }
+
+    // Re-initialize the remaining block
+    initializeSeriesInputs(seriesName);
+    updateCounterLabels();
+    eventBus.emit(EVENTS.DATA_CHART_REFRESH);
+    eventBus.emit(EVENTS.UI_LEGEND_RENDER);
+    createToast({ message: `${seriesName} reset to defaults.`, duration: 2000 });
+}
+
+function toggleLineWidth(seriesName) {
+    // This function is now handled per-block in the event listeners
+    // Left as a no-op for compatibility
+}
+
+function initializeLineWidthToggles() {
+    // Toggle line width inputs for all blocks across all series
+    document.querySelectorAll('.agg-config-block').forEach(block => {
+        const showLineCheckbox = block.querySelector('.show-line-input');
+        const lineWidthInput = block.querySelector('.line-width-input');
+
+        if (showLineCheckbox && lineWidthInput) {
+            const lineWidthContainer = lineWidthInput.parentElement;
+            const lineWidthLabel = lineWidthContainer?.querySelector('label');
+
+            const updateState = () => {
+                lineWidthInput.disabled = !showLineCheckbox.checked;
+                if (showLineCheckbox.checked) {
+                    lineWidthInput.classList.remove('opacity-50', 'cursor-not-allowed');
+                    if (lineWidthLabel) lineWidthLabel.classList.remove('opacity-50');
+                } else {
+                    lineWidthInput.classList.add('opacity-50', 'cursor-not-allowed');
+                    if (lineWidthLabel) lineWidthLabel.classList.add('opacity-50');
+                }
+            };
+
+            // Initialize state
+            updateState();
+
+            // Add event listener
+            showLineCheckbox.addEventListener('change', updateState);
+        }
+    });
+}
+
+function switchSeriesTab(seriesName) {
+    // Hide all series config panels
+    document.querySelectorAll('.series-config-panel').forEach(panel => {
+        panel.style.display = 'none';
+    });
+
+    // Remove active styling from all series sub-tabs
+    document.querySelectorAll('.series-subtab').forEach(button => {
+        button.classList.remove('border-[#6ad1e3]', 'bg-gray-50');
+        button.classList.add('border-transparent');
+    });
+
+    // Show selected series config panel
+    document.getElementById(seriesName + '-series-config').style.display = 'block';
+
+    // Add active styling to selected sub-tab
+    const activeButton = document.querySelector(`[data-series-tab="${seriesName}"]`);
+    if (activeButton) {
+        activeButton.classList.remove('border-transparent');
+        activeButton.classList.add('border-[#6ad1e3]', 'bg-gray-50');
+    }
+}
+
+// ============================================================================
+// AGGREGATION BLOCK MANAGEMENT
+// ============================================================================
+
+/**
+ * Add a new aggregation configuration block for a series
+ * @param {string} seriesName - Name of the series (correct, incorrect, timing, misc1, misc2)
+ */
+function addAggregationBlock(seriesName) {
+    const container = document.getElementById(`${seriesName}-blocks-container`);
+    if (!container) return;
+
+    // Check if all aggregation types are already in use
+    const usedAggs = Array.from(container.querySelectorAll('.agg-config-block .agg-type-select'))
+        .map(select => select.value);
+
+    const availableAggs = ['raw', 'mean', 'median', 'min', 'max', 'first', 'last'];
+
+    // If all aggregation types are used, don't allow adding more blocks
+    if (usedAggs.length >= availableAggs.length) {
+        return;
+    }
+
+    // Get the first block as a template
+    const templateBlock = container.querySelector('.agg-config-block');
+    if (!templateBlock) return;
+
+    // Clone the template block
+    const newBlock = templateBlock.cloneNode(true);
+
+    // Reset the aggregation type to a default unused value
+    const aggSelect = newBlock.querySelector('.agg-type-select');
+    if (aggSelect) {
+        // Find an unused aggregation type
+        const unusedAgg = availableAggs.find(agg => !usedAggs.includes(agg));
+
+        if (unusedAgg) {
+            aggSelect.value = unusedAgg;
+            newBlock.dataset.agg = unusedAgg;
+        }
+    }
+
+    // Add the new block to the container
+    container.appendChild(newBlock);
+
+    // Re-attach line width toggle for the new block's checkbox
+    const showLineCheckbox = newBlock.querySelector('.show-line-input');
+    if (showLineCheckbox) {
+        showLineCheckbox.addEventListener('change', (e) => {
+            const seriesName = e.currentTarget.dataset.seriesToggle;
+            if (seriesName) {
+                toggleLineWidth(seriesName);
+            }
+        });
+    }
+
+    // Update button visibility for both + and - buttons
+    updateButtonVisibility(seriesName);
+}
+
+/**
+ * Update the visibility of add and remove buttons based on available aggregation types
+ * @param {string} seriesName - Name of the series
+ */
+function updateButtonVisibility(seriesName) {
+    const container = document.getElementById(`${seriesName}-blocks-container`);
+    const addButton = document.querySelector(`.add-block-btn[data-series="${seriesName}"]`);
+
+    if (!container) return;
+
+    const blocks = container.querySelectorAll('.agg-config-block');
+    const availableAggs = ['raw', 'mean', 'median', 'min', 'max', 'first', 'last'];
+
+    // Hide/show the + button based on whether all aggregation types are used
+    if (addButton) {
+        if (blocks.length >= availableAggs.length) {
+            addButton.style.display = 'none';
+        } else {
+            addButton.style.display = 'flex';
+        }
+    }
+
+    // Hide/show the - buttons based on whether there's only one block
+    blocks.forEach(block => {
+        const removeButton = block.querySelector('.remove-block-btn');
+        if (removeButton) {
+            if (blocks.length <= 1) {
+                removeButton.style.display = 'none';
+            } else {
+                removeButton.style.display = 'flex';
+            }
+        }
+    });
+}
+
+/**
+ * Remove an aggregation configuration block
+ * @param {HTMLElement} block - The block element to remove
+ */
+function removeAggregationBlock(block) {
+    const container = block.parentElement;
+
+    // Don't allow removing the last block (this shouldn't happen since button is hidden)
+    const remainingBlocks = container.querySelectorAll('.agg-config-block');
+    if (remainingBlocks.length <= 1) {
+        return;
+    }
+
+    // Get the series name from the block before removing it
+    const seriesName = block.dataset.series;
+
+    // Remove the block
+    block.remove();
+
+    // Update button visibility (may need to show + button and update - buttons)
+    if (seriesName) {
+        updateButtonVisibility(seriesName);
+    }
+}
+
+// ============================================================================
+// EXPORTS
+// ============================================================================
+
+export {
+    initializeAllSeriesInputs,
+    applyTraceConfig,
+    resetTraceConfig,
+    switchSeriesTab,
+    toggleLineWidth,
+    initializeLineWidthToggles,
+    addAggregationBlock,
+    updateButtonVisibility,
+    removeAggregationBlock
+};

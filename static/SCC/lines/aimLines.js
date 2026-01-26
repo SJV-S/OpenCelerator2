@@ -1,0 +1,976 @@
+/**
+ * aimLines.js
+ * Handles aim line drawing functionality for the chart (horizontal and diagonal)
+ *
+ * Two-phase drawing process:
+ * 1. Click to place first point
+ * 2. Click to place second point
+ * 3. Add text label at center of line
+ *
+ * Modes:
+ * - Horizontal: Draw horizontal line at clicked y-value
+ * - Diagonal: Draw diagonal line from first click to second click
+ */
+
+import { chartState } from '../chartState.js';
+import { createToast, createTextInputDialog, createConfirmToast, removeToast } from '../util/toaster.js';
+import { xPositionToDate } from '../util/dates.js';
+import { aimLineMetadata, removeLine } from './allLines.js';
+import { icons } from '../util/icons.js';
+import { applySvgCursor, restoreCursor } from '../util/cursorIcon.js';
+import { eventBus, EVENTS } from '../eventBus.js';
+
+// Aim line drawing state (ephemeral UI state)
+var aimLineState = {
+    active: false,              // Whether aim line mode is active
+    direction: null,            // 'horizontal' or 'diagonal'
+    currentPhase: 0,            // Current phase (0=inactive, 1=first click, 2=second click, 3=text)
+    clickHandler: null,         // Reference to click handler function
+    touchHandler: null,         // Reference to touch handler function
+    x1: null,                   // X coordinate of first point
+    y1: null,                   // Y coordinate of first point
+    x2: null,                   // X coordinate of second point
+    y2: null,                   // Y coordinate of second point
+    tempShapes: [],            // Track temporary shape indices
+    tempDotIndex: null,        // Index of temporary dot marker at first click
+    textInputOverlay: null,    // Reference to text input overlay element
+    tempAnnotationIndex: null, // Index of annotation awaiting save confirmation
+    saveToast: null,           // Reference to save confirmation toast element
+    modeToast: null,           // Reference to "Aim mode" toaster element
+    previousDragMode: null     // Store previous dragmode to restore later
+};
+
+/**
+ * Activates aim line drawing mode
+ * @param {string} direction - 'horizontal' or 'diagonal'
+ */
+function activateAimLineMode(direction) {
+    console.log(`%c[AIM LINE] Activating aim line mode: ${direction}`, 'color: blue; font-weight: bold');
+
+    const chartDiv = document.getElementById('chart');
+
+    if (!chartDiv) {
+        console.error('[AIM LINE] Chart div not found!');
+        return;
+    }
+
+    if (!chartDiv._fullLayout) {
+        console.error('[AIM LINE] Chart not fully initialized!');
+        return;
+    }
+
+    // Deactivate any other active drawing modes
+    eventBus.emit(EVENTS.MODE_ALL_DEACTIVATE);
+
+    aimLineState.active = true;
+    aimLineState.direction = direction;
+    aimLineState.currentPhase = 1;
+    aimLineState.x1 = null;
+    aimLineState.y1 = null;
+    aimLineState.x2 = null;
+    aimLineState.y2 = null;
+    aimLineState.tempShapes = [];
+
+    // Store current dragmode and disable panning
+    aimLineState.previousDragMode = chartDiv.layout.dragmode;
+    Plotly.relayout(chartDiv, {
+        dragmode: false
+    });
+
+    // Create click/tap handler
+    aimLineState.clickHandler = function(event) {
+        console.log('[AIM LINE] Click detected!', event);
+        handleAimLineDrawClick(event, chartDiv);
+    };
+
+    aimLineState.touchHandler = function(event) {
+        console.log('[AIM LINE] Touch detected!', event);
+        // Prevent default to avoid triggering click as well
+        event.preventDefault();
+
+        // Convert touch event to have similar properties as mouse event
+        if (event.touches && event.touches.length > 0) {
+            const touch = event.touches[0];
+            const syntheticEvent = {
+                clientX: touch.clientX,
+                clientY: touch.clientY,
+                preventDefault: () => event.preventDefault()
+            };
+            handleAimLineDrawClick(syntheticEvent, chartDiv);
+        }
+    };
+
+    // Add click and touch listeners to chart
+    chartDiv.addEventListener('click', aimLineState.clickHandler);
+    chartDiv.addEventListener('touchstart', aimLineState.touchHandler);
+
+    // Apply crosshairs cursor
+    applySvgCursor(chartDiv, icons.otherCrosshairs, {size: 32, hotspotX: 16, hotspotY: 16});
+
+    // Show "Aim mode" toaster on the left
+    showAimModeToaster(1);
+
+    console.log('%c[AIM LINE] Aim line mode activated - Phase 1: Click to place first point', 'color: green; font-weight: bold');
+    console.log('[AIM LINE] Current state:', aimLineState);
+}
+
+/**
+ * Deactivates aim line drawing mode
+ */
+function deactivateAimLineMode() {
+    console.log('Deactivating aim line mode');
+
+    const chartDiv = document.getElementById('chart');
+
+    // Remove click listener
+    if (aimLineState.clickHandler) {
+        chartDiv.removeEventListener('click', aimLineState.clickHandler);
+    }
+
+    // Remove touch listener
+    if (aimLineState.touchHandler) {
+        chartDiv.removeEventListener('touchstart', aimLineState.touchHandler);
+    }
+
+    // Remove text input overlay if it exists
+    removeToast('aim-text-input-overlay');
+    aimLineState.textInputOverlay = null;
+
+    // Remove save toast if it exists
+    if (aimLineState.saveToast) {
+        aimLineState.saveToast.remove();
+        aimLineState.saveToast = null;
+    }
+
+    // Remove mode toast if it exists
+    removeToast('toast-top-left');
+    aimLineState.modeToast = null;
+
+    // Remove temporary dot marker if it exists
+    removeTempDot(chartDiv);
+
+    // Remove any non-finalized lines and annotations ONLY if we're still in drawing phase
+    // Don't remove if phase is 0 (already deactivated/finalized)
+    if (aimLineState.currentPhase > 0) {
+        removeAimShapes(chartDiv);
+        removeAimAnnotation(chartDiv);
+    }
+
+    // Restore previous dragmode (re-enable panning)
+    if (aimLineState.previousDragMode !== null) {
+        Plotly.relayout(chartDiv, {
+            dragmode: aimLineState.previousDragMode
+        });
+        aimLineState.previousDragMode = null;
+    }
+
+    // Restore default cursor
+    restoreCursor(chartDiv);
+
+    // Reset state
+    aimLineState.active = false;
+    aimLineState.direction = null;
+    aimLineState.currentPhase = 0;
+    aimLineState.clickHandler = null;
+    aimLineState.touchHandler = null;
+    aimLineState.x1 = null;
+    aimLineState.y1 = null;
+    aimLineState.x2 = null;
+    aimLineState.y2 = null;
+    aimLineState.tempShapes = [];
+    aimLineState.tempDotIndex = null;
+    aimLineState.tempAnnotationIndex = null;
+
+    console.log('Aim line mode deactivated');
+}
+
+/**
+ * Handles click events during aim line drawing
+ * @param {MouseEvent} event - Click event
+ * @param {HTMLElement} chartDiv - Chart container element
+ */
+function handleAimLineDrawClick(event, chartDiv) {
+    // Get click coordinates relative to the plot area
+    const coords = getPlotCoordinatesForAimLine(event, chartDiv);
+
+    if (!coords) {
+        console.warn('Could not get plot coordinates');
+        return;
+    }
+
+    console.log(`Phase ${aimLineState.currentPhase} click at data coordinates:`, coords);
+
+    if (aimLineState.currentPhase === 1) {
+        handleFirstClick(chartDiv, coords);
+    } else if (aimLineState.currentPhase === 2) {
+        handleSecondClick(chartDiv, coords);
+    }
+}
+
+/**
+ * Rounds y-value to nearest value from [0.01, 0.1, 1, 10, 100, 500]
+ * @param {number} yValue - Raw y value
+ * @returns {number} Rounded y value
+ */
+function roundYValue(yValue) {
+    const allowedValues = [0.01, 0.1, 1, 10, 100, 500];
+
+    // Find the closest allowed value
+    let closest = allowedValues[0];
+    let minDiff = Math.abs(yValue - closest);
+
+    for (let i = 1; i < allowedValues.length; i++) {
+        const diff = Math.abs(yValue - allowedValues[i]);
+        if (diff < minDiff) {
+            minDiff = diff;
+            closest = allowedValues[i];
+        }
+    }
+
+    return closest;
+}
+
+/**
+ * Converts pixel coordinates to plot data coordinates
+ * @param {MouseEvent} event - Mouse event
+ * @param {HTMLElement} chartDiv - Chart container element
+ * @returns {Object|null} Object with x and y data coordinates, or null
+ */
+function getPlotCoordinatesForAimLine(event, chartDiv) {
+    if (!chartDiv._fullLayout) {
+        console.warn('Chart not fully initialized');
+        return null;
+    }
+
+    const xaxis = chartDiv._fullLayout.xaxis;
+    const yaxis = chartDiv._fullLayout.yaxis;
+
+    if (!xaxis || !yaxis) {
+        console.warn('Axes not found');
+        return null;
+    }
+
+    // Get the chart bounding box
+    const bbox = chartDiv.getBoundingClientRect();
+
+    // Get plot area dimensions using Plotly's internal properties
+    const plotAreaLeft = xaxis._offset;
+    const plotAreaWidth = xaxis._length;
+    const plotAreaTop = yaxis._offset;
+    const plotAreaHeight = yaxis._length;
+
+    // Calculate pixel position within plot area
+    const xPixelInPlotArea = event.clientX - bbox.left - plotAreaLeft;
+    const yPixelInPlotArea = event.clientY - bbox.top - plotAreaTop;
+
+    // Get current visible range
+    const visibleXMin = xaxis.range[0];
+    const visibleXMax = xaxis.range[1];
+    const visibleYMin = yaxis.range[0];
+    const visibleYMax = yaxis.range[1];
+
+    // Check if y-axis is logarithmic
+    const isLogY = yaxis.type === 'log';
+
+    // Calculate data coordinates (note: y is inverted for screen coordinates)
+    let xValue = visibleXMin + (xPixelInPlotArea / plotAreaWidth) * (visibleXMax - visibleXMin);
+
+    // Round x-value to nearest number divisible by 7
+    xValue = Math.round(xValue / 7) * 7;
+
+    // For log scale, the range is in log10 space, so we need to convert back
+    let yValue;
+    if (isLogY) {
+        // Y-axis range is in log10 space (e.g., -3 to 3 for 0.001 to 1000)
+        const logYValue = visibleYMax - (yPixelInPlotArea / plotAreaHeight) * (visibleYMax - visibleYMin);
+        yValue = Math.pow(10, logYValue);
+    } else {
+        yValue = visibleYMax - (yPixelInPlotArea / plotAreaHeight) * (visibleYMax - visibleYMin);
+    }
+
+    // NO rounding for y-value - aim lines should allow precise placement
+
+    return { x: xValue, y: yValue };
+}
+
+/**
+ * Phase 1: Handles first click to establish starting point
+ * @param {HTMLElement} chartDiv - Chart container element
+ * @param {Object} coords - Data coordinates {x, y}
+ */
+function handleFirstClick(chartDiv, coords) {
+    console.log(`First click at x=${coords.x}, y=${coords.y}`);
+
+    // Store the first point
+    aimLineState.x1 = coords.x;
+    aimLineState.y1 = coords.y;
+
+    // Add temporary dot marker at first click location
+    addTempDot(chartDiv, coords.x, coords.y);
+
+    // Move to phase 2
+    aimLineState.currentPhase = 2;
+
+    // Update toaster to show phase 2
+    updateAimModeToaster(2);
+
+    console.log(`Phase 2: Click to place endpoint for ${aimLineState.direction} line`);
+}
+
+/**
+ * Phase 2: Handles second click to draw the line
+ * @param {HTMLElement} chartDiv - Chart container element
+ * @param {Object} coords - Data coordinates {x, y}
+ */
+function handleSecondClick(chartDiv, coords) {
+    console.log(`Second click at x=${coords.x}, y=${coords.y}`);
+
+    // Check if x2 <= x1, if so reset to phase 1
+    if (coords.x <= aimLineState.x1) {
+        console.log(`Invalid second click: x2 (${coords.x}) <= x1 (${aimLineState.x1}). Resetting to phase 1.`);
+
+        // Remove the current dot
+        removeTempDot(chartDiv);
+
+        // Reset to phase 1 and clear coordinates
+        aimLineState.currentPhase = 1;
+        aimLineState.x1 = null;
+        aimLineState.y1 = null;
+        aimLineState.x2 = null;
+        aimLineState.y2 = null;
+
+        // Update toaster back to phase 1
+        updateAimModeToaster(1);
+
+        console.log('Reset complete. Click to place first point again.');
+        return;
+    }
+
+    if (aimLineState.direction === 'horizontal') {
+        drawHorizontalAimLine(chartDiv, coords);
+    } else if (aimLineState.direction === 'diagonal') {
+        drawDiagonalAimLine(chartDiv, coords);
+    }
+}
+
+/**
+ * Draws a horizontal aim line
+ * @param {HTMLElement} chartDiv - Chart container element
+ * @param {Object} coords - Data coordinates {x, y} from second click
+ */
+function drawHorizontalAimLine(chartDiv, coords) {
+    // Remove the temporary dot first
+    removeTempDot(chartDiv);
+
+    // For horizontal line: use y from first click, x from both clicks
+    const yValue = aimLineState.y1;
+    const x1 = Math.min(aimLineState.x1, coords.x);
+    const x2 = Math.max(aimLineState.x1, coords.x);
+
+    // Store for later use
+    aimLineState.x2 = x2;
+    aimLineState.y2 = yValue;
+
+    console.log(`Drawing horizontal line at y=${yValue} from x=${x1} to x=${x2}`);
+
+    // Create horizontal line shape
+    const lineShape = {
+        type: 'line',
+        x0: x1,
+        y0: yValue,
+        x1: x2,
+        y1: yValue,
+        xref: 'x',
+        yref: 'y',
+        line: {
+            color: 'blue',
+            width: 2
+        }
+    };
+
+    // Get current shapes
+    const currentShapes = chartDiv.layout.shapes || [];
+
+    // Add the line
+    const shapeIndex = currentShapes.length;
+    aimLineState.tempShapes.push(shapeIndex);
+
+    Plotly.relayout(chartDiv, {
+        shapes: [...currentShapes, lineShape]
+    });
+
+    // Move to phase 3 - show text input
+    aimLineState.currentPhase = 3;
+
+    // Update toaster to show phase 3
+    updateAimModeToaster(3);
+
+    showAimTextInput(chartDiv);
+    console.log('Phase 3: Enter text label');
+}
+
+/**
+ * Draws a diagonal aim line
+ * @param {HTMLElement} chartDiv - Chart container element
+ * @param {Object} coords - Data coordinates {x, y} from second click
+ */
+function drawDiagonalAimLine(chartDiv, coords) {
+    // Remove the temporary dot first
+    removeTempDot(chartDiv);
+
+    // Store second point
+    aimLineState.x2 = coords.x;
+    aimLineState.y2 = coords.y;
+
+    console.log(`Drawing diagonal line from (${aimLineState.x1}, ${aimLineState.y1}) to (${aimLineState.x2}, ${aimLineState.y2})`);
+
+    // Create diagonal line shape
+    const lineShape = {
+        type: 'line',
+        x0: aimLineState.x1,
+        y0: aimLineState.y1,
+        x1: aimLineState.x2,
+        y1: aimLineState.y2,
+        xref: 'x',
+        yref: 'y',
+        line: {
+            color: 'blue',
+            width: 2
+        }
+    };
+
+    // Get current shapes
+    const currentShapes = chartDiv.layout.shapes || [];
+
+    // Add the line
+    const shapeIndex = currentShapes.length;
+    aimLineState.tempShapes.push(shapeIndex);
+
+    Plotly.relayout(chartDiv, {
+        shapes: [...currentShapes, lineShape]
+    });
+
+    // Move to phase 3 - show text input
+    aimLineState.currentPhase = 3;
+
+    // Update toaster to show phase 3
+    updateAimModeToaster(3);
+
+    showAimTextInput(chartDiv);
+    console.log('Phase 3: Enter text label');
+}
+
+/**
+ * Phase 3: Shows text input overlay for user to enter label
+ * @param {HTMLElement} chartDiv - Chart container element
+ */
+function showAimTextInput(chartDiv) {
+    createTextInputDialog({
+        id: 'aim-text-input-overlay',
+        title: 'Enter Aim Line Text',
+        placeholder: 'Enter label...',
+        borderColor: '#6ad1e3',
+        onSubmit: (text) => {
+            addAimTextLabel(chartDiv, text);
+        },
+        onCancel: () => {
+            removeAimShapes(chartDiv);
+            deactivateAimLineMode();
+        },
+        stateRef: {
+            state: aimLineState,
+            key: 'textInputOverlay'
+        }
+    });
+}
+
+/**
+ * Adds text label annotation to the chart at the center of the line
+ * @param {HTMLElement} chartDiv - Chart container element
+ * @param {string} text - Label text
+ */
+function addAimTextLabel(chartDiv, text) {
+    // Remove text input overlay
+    removeToast('aim-text-input-overlay');
+    aimLineState.textInputOverlay = null;
+
+    // If text is empty, skip annotation creation
+    if (!text || text.trim() === '') {
+        console.log('No text provided, skipping annotation');
+        aimLineState.tempAnnotationIndex = null;
+
+        // Update toaster to show phase 4
+        updateAimModeToaster(4);
+
+        showAimSaveConfirmationToast(chartDiv);
+        return;
+    }
+
+    // Handle log scale for y-axis - need to calculate center differently
+    const yaxis = chartDiv._fullLayout.yaxis;
+    const isLogY = yaxis.type === 'log';
+
+    // Calculate center point of the line
+    const centerX = (aimLineState.x1 + aimLineState.x2) / 2;
+
+    // For log scale, center is the geometric mean (average in log space)
+    // For linear scale, center is the arithmetic mean
+    let centerY, annotationY;
+    if (isLogY) {
+        // Geometric mean: sqrt(y1 * y2) = 10^((log10(y1) + log10(y2)) / 2)
+        const logY1 = Math.log10(aimLineState.y1);
+        const logY2 = Math.log10(aimLineState.y2);
+        annotationY = (logY1 + logY2) / 2;
+        centerY = Math.pow(10, annotationY);
+    } else {
+        centerY = (aimLineState.y1 + aimLineState.y2) / 2;
+        annotationY = centerY;
+    }
+
+    console.log(`Adding aim text label: "${text}" at center (${centerX}, ${centerY})`);
+    console.log(`  Annotation Y (log10 if log scale): ${annotationY}`);
+
+    // Calculate angle for diagonal lines (in screen space to match visual slope)
+    let textAngle = 0;
+    if (aimLineState.direction === 'diagonal') {
+        const xaxis = chartDiv._fullLayout.xaxis;
+
+        // Calculate change in data coordinates (x is always linear)
+        const dx_data = aimLineState.x2 - aimLineState.x1;
+
+        // For y, use log space if log scale
+        let dy_data;
+        if (isLogY) {
+            dy_data = Math.log10(aimLineState.y2) - Math.log10(aimLineState.y1);
+        } else {
+            dy_data = aimLineState.y2 - aimLineState.y1;
+        }
+
+        // Get axis ranges and pixel dimensions
+        const xRange = xaxis.range[1] - xaxis.range[0];
+        const yRange = yaxis.range[1] - yaxis.range[0];
+        const plotWidth = xaxis._length;
+        const plotHeight = yaxis._length;
+
+        // Convert to pixel space
+        const dx_pixels = (dx_data / xRange) * plotWidth;
+        const dy_pixels = (dy_data / yRange) * plotHeight;
+
+        // Calculate angle (negate dy because screen y increases downward)
+        textAngle = Math.atan2(-dy_pixels, dx_pixels) * (180 / Math.PI);
+
+        console.log(`  Diagonal line angle: ${textAngle} degrees`);
+        console.log(`    Data: dx=${dx_data}, dy=${dy_data}`);
+        console.log(`    Pixels: dx=${dx_pixels}, dy=${dy_pixels}`);
+    }
+
+    // Create annotation for the text label
+    const annotation = {
+        x: centerX,
+        y: annotationY,  // Use log10 value for log scale
+        xref: 'x',
+        yref: 'y',
+        text: text,
+        showarrow: false,
+        font: {
+            color: 'blue',
+            size: 12,
+            family: 'Arial, sans-serif'
+        },
+        bgcolor: 'rgba(255, 255, 255, 1.0)',
+        bordercolor: 'blue',
+        borderwidth: 1,
+        borderpad: 4,
+        textangle: textAngle,  // Tilt text for diagonal lines
+        xanchor: 'center',
+        yanchor: 'bottom',  // Anchor to bottom so text sits above the line
+        yshift: 5  // Shift text 5 pixels above the line
+    };
+
+    // Get current annotations
+    const currentAnnotations = chartDiv.layout.annotations || [];
+
+    // Add the annotation
+    Plotly.relayout(chartDiv, {
+        annotations: [...currentAnnotations, annotation]
+    });
+
+    // Store annotation index for potential removal
+    aimLineState.tempAnnotationIndex = currentAnnotations.length;
+
+    // Update toaster to show phase 4
+    updateAimModeToaster(4);
+
+    // Show save confirmation toast
+    showAimSaveConfirmationToast(chartDiv);
+
+    console.log('Aim line drawn, awaiting save confirmation');
+}
+
+/**
+ * Shows a toast notification asking user to confirm saving the line
+ * @param {HTMLElement} chartDiv - Chart container element
+ */
+function showAimSaveConfirmationToast(chartDiv) {
+    createConfirmToast({
+        id: 'aim-save-toast',
+        message: 'Save line?',
+        borderColor: '#6ad1e3',
+        onYes: () => {
+            finalizeAimLine(chartDiv);
+            removeToast('aim-save-toast');
+            aimLineState.saveToast = null;
+            deactivateAimLineMode();
+        },
+        onNo: () => {
+            removeAimShapes(chartDiv);
+            removeAimAnnotation(chartDiv);
+            removeToast('aim-save-toast');
+            aimLineState.saveToast = null;
+            deactivateAimLineMode();
+        },
+        stateRef: {
+            state: aimLineState,
+            key: 'saveToast'
+        }
+    });
+}
+
+/**
+ * Finalizes the aim line by changing colors from blue to black
+ * @param {HTMLElement} chartDiv - Chart container element
+ */
+function finalizeAimLine(chartDiv) {
+    const lineId = Date.now();
+    const lineName = `aim-${lineId}`;
+
+    let shapes = [...(chartDiv.layout.shapes || [])];
+    for (const index of aimLineState.tempShapes) {
+        if (shapes[index]) {
+            shapes[index] = {
+                ...shapes[index],
+                name: lineName,
+                line: {
+                    ...shapes[index].line,
+                    color: chartState.lineStyles.aim.color,
+                    width: chartState.lineStyles.aim.width
+                }
+            };
+        }
+    }
+
+    let annotations = [...(chartDiv.layout.annotations || [])];
+    const annotationText = annotations[aimLineState.tempAnnotationIndex]?.text || '';
+    if (aimLineState.tempAnnotationIndex !== null && annotations[aimLineState.tempAnnotationIndex]) {
+        annotations[aimLineState.tempAnnotationIndex] = {
+            ...annotations[aimLineState.tempAnnotationIndex],
+            name: lineName,
+            font: {
+                ...annotations[aimLineState.tempAnnotationIndex].font,
+                color: chartState.lineStyles.aim.color
+            },
+            bordercolor: chartState.lineStyles.aim.color
+        };
+    }
+
+    Plotly.relayout(chartDiv, { shapes, annotations });
+
+    const metadata = aimLineMetadata(
+        aimLineState.direction,
+        xPositionToDate(aimLineState.x1),
+        aimLineState.y1,
+        xPositionToDate(aimLineState.x2),
+        aimLineState.y2,
+        annotationText,
+        aimLineState.tempShapes,
+        aimLineState.tempAnnotationIndex
+    );
+    metadata.id = lineId;
+    chartState.AimLines[lineId] = metadata;
+
+    aimLineState.tempShapes = [];
+    aimLineState.tempAnnotationIndex = null;
+}
+
+/**
+ * Removes the temporary annotation from the chart
+ * @param {HTMLElement} chartDiv - Chart container element
+ */
+function removeAimAnnotation(chartDiv) {
+    if (aimLineState.tempAnnotationIndex === null) {
+        return;
+    }
+
+    console.log('Removing aim annotation at index:', aimLineState.tempAnnotationIndex);
+
+    // Get current annotations
+    let annotations = [...(chartDiv.layout.annotations || [])];
+
+    // Remove the annotation
+    annotations.splice(aimLineState.tempAnnotationIndex, 1);
+
+    // Update layout
+    Plotly.relayout(chartDiv, {
+        annotations: annotations
+    });
+}
+
+/**
+ * Removes temporary aim shapes from the chart
+ * @param {HTMLElement} chartDiv - Chart container element
+ */
+function removeAimShapes(chartDiv) {
+    if (aimLineState.tempShapes.length === 0) {
+        return;
+    }
+
+    console.log('Removing aim shapes:', aimLineState.tempShapes);
+
+    // Get current shapes
+    let currentShapes = chartDiv.layout.shapes || [];
+
+    // Remove shapes in reverse order to maintain indices
+    const indicesToRemove = [...aimLineState.tempShapes].sort((a, b) => b - a);
+
+    for (const index of indicesToRemove) {
+        currentShapes.splice(index, 1);
+    }
+
+    // Update layout
+    Plotly.relayout(chartDiv, {
+        shapes: currentShapes
+    });
+}
+
+/**
+ * Removes an aim line by its lineName (e.g., "aim-456")
+ * @param {string} lineName - Name of the line (format: "aim-{id}")
+ * @returns {boolean} True if successful, false otherwise
+ */
+function removeAimLineById(lineName) {
+    // Extract ID from lineName (format: "aim-456" -> 456)
+    const lineId = parseInt(lineName.split('-')[1]);
+    if (isNaN(lineId)) {
+        console.error(`[REMOVE AIM LINE] Invalid lineName format: ${lineName}`);
+        return false;
+    }
+
+    return removeLine('AimLines', lineId);
+}
+
+/**
+ * Handles click events on aim lines
+ * @param {string} lineName - Name of the clicked line (e.g., "aim-456")
+ */
+function handleAimLineClick(lineName) {
+    console.log(`[AIM LINE CLICK] Aim line clicked: ${lineName}`);
+
+    // Show toaster with Remove button, auto-dismiss after 3 seconds
+    createToast({
+        id: 'aim-line-click-toaster',
+        message: `Aim line: ${lineName}`,
+        buttons: [
+            {
+                label: 'Remove',
+                onClick: () => {
+                    console.log(`[AIM LINE CLICK] Remove clicked for ${lineName}`);
+                    removeAimLineById(lineName);
+                    removeToast('aim-line-click-toaster');
+                },
+                type: 'secondary'
+            }
+        ],
+        layout: 'horizontal',
+        duration: 3000  // Auto-dismiss after 3 seconds
+    });
+}
+
+/**
+ * Shows "Aim mode" toaster on the left side with step indicator
+ * @param {number} phase - Current phase (1 or 2)
+ */
+function showAimModeToaster(phase) {
+    const stepText = getPhaseStepText(phase);
+    aimLineState.modeToast = createToast({
+        message: `Aim mode - ${stepText}`,
+        buttons: [
+            {
+                label: 'Cancel',
+                onClick: () => {
+                    deactivateAimLineMode();
+                },
+                type: 'secondary'
+            }
+        ],
+        layout: 'horizontal',
+        borderColor: '#6ad1e3',
+        position: 'top-left'
+    });
+}
+
+/**
+ * Updates the aim mode toaster with new phase information
+ * @param {number} phase - Current phase (1 or 2)
+ */
+function updateAimModeToaster(phase) {
+    // Remove existing toaster
+    removeToast('toast-top-left');
+
+    // Show new toaster with updated phase
+    showAimModeToaster(phase);
+}
+
+/**
+ * Gets descriptive text for the current phase
+ * @param {number} phase - Current phase (1, 2, 3, or 4)
+ * @returns {string} Step description
+ */
+function getPhaseStepText(phase) {
+    if (phase === 1) {
+        return 'Step 1 of 4: Place starting point';
+    } else if (phase === 2) {
+        return 'Step 2 of 4: Place target';
+    } else if (phase === 3) {
+        return 'Step 3 of 4: Enter text label';
+    } else if (phase === 4) {
+        return 'Step 4 of 4: Save confirmation';
+    }
+    return '';
+}
+
+/**
+ * Adds a temporary dot marker at the first click position
+ * @param {HTMLElement} chartDiv - Chart container element
+ * @param {number} x - X coordinate in data space
+ * @param {number} y - Y coordinate in data space
+ */
+function addTempDot(chartDiv, x, y) {
+    console.log(`Adding temporary dot at (${x}, ${y})`);
+
+    const xaxis = chartDiv._fullLayout.xaxis;
+    const yaxis = chartDiv._fullLayout.yaxis;
+    const isLogY = yaxis.type === 'log';
+
+    // Convert data coordinates to pixel coordinates
+    const xPixel = xaxis._offset + ((x - xaxis.range[0]) / (xaxis.range[1] - xaxis.range[0])) * xaxis._length;
+
+    let yPixel;
+    if (isLogY) {
+        const logY = Math.log10(y);
+        yPixel = yaxis._offset + (1 - ((logY - yaxis.range[0]) / (yaxis.range[1] - yaxis.range[0]))) * yaxis._length;
+    } else {
+        yPixel = yaxis._offset + (1 - ((y - yaxis.range[0]) / (yaxis.range[1] - yaxis.range[0]))) * yaxis._length;
+    }
+
+    // Create SVG circle element
+    const svgLayer = chartDiv.querySelector('.plotly .gridlayer');
+    if (!svgLayer) {
+        console.error('Could not find SVG layer');
+        return;
+    }
+
+    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    circle.setAttribute('cx', xPixel);
+    circle.setAttribute('cy', yPixel);
+    circle.setAttribute('r', 8);
+    circle.setAttribute('fill', 'blue');
+    circle.setAttribute('stroke', 'blue');
+    circle.setAttribute('stroke-width', 2);
+    circle.setAttribute('opacity', 0.8);
+    circle.setAttribute('id', 'aim-temp-dot');
+
+    svgLayer.appendChild(circle);
+    aimLineState.tempDotIndex = 'svg-dot';
+
+    console.log(`Temporary SVG dot added at pixel (${xPixel}, ${yPixel})`);
+}
+
+/**
+ * Removes the temporary dot marker
+ * @param {HTMLElement} chartDiv - Chart container element
+ */
+function removeTempDot(chartDiv) {
+    if (aimLineState.tempDotIndex === null) {
+        return;
+    }
+
+    console.log('Removing temporary dot');
+
+    // Remove SVG circle element
+    const dot = document.getElementById('aim-temp-dot');
+    if (dot) {
+        dot.remove();
+    }
+
+    aimLineState.tempDotIndex = null;
+}
+
+/**
+ * Toggle visibility of all aim lines
+ * @param {boolean} visible - Whether aim lines should be visible
+ */
+function setAimLineVisibility(visible) {
+    const chartDiv = document.getElementById('chart');
+    if (!chartDiv) return;
+
+    const shapes = chartDiv.layout.shapes || [];
+    const annotations = chartDiv.layout.annotations || [];
+    let updated = false;
+
+    // Update shapes with names starting with 'aim-'
+    const updatedShapes = shapes.map(s => {
+        if (s.name && s.name.startsWith('aim-')) {
+            updated = true;
+            return { ...s, visible };
+        }
+        return s;
+    });
+
+    // Update annotations with names starting with 'aim-'
+    const updatedAnnotations = annotations.map(a => {
+        if (a.name && a.name.startsWith('aim-')) {
+            updated = true;
+            return { ...a, visible };
+        }
+        return a;
+    });
+
+    if (updated) {
+        Plotly.relayout(chartDiv, { shapes: updatedShapes, annotations: updatedAnnotations });
+    }
+}
+
+/**
+ * Initialize subscriptions for this module
+ * Called by main.js coordinator
+ */
+function init() {
+    // Subscribe to aim line click events from lineClickHandler
+    eventBus.subscribe(EVENTS.LINE_AIM_CLICKED, (data) => {
+        handleAimLineClick(data.lineName);
+    }, true);
+
+    // Subscribe to mode activation events from navigation
+    eventBus.subscribe(EVENTS.MODE_AIM_ACTIVATE, (data) => {
+        activateAimLineMode(data.direction);
+    }, true);
+
+    // Subscribe to mode deactivation events from other drawing modes
+    eventBus.subscribe(EVENTS.MODE_ALL_DEACTIVATE, () => {
+        if (aimLineState.active) {
+            deactivateAimLineMode();
+        }
+    });
+
+    // Subscribe to line visibility changes from legend
+    eventBus.subscribe(EVENTS.LINE_VISIBILITY_CHANGED, (data) => {
+        if (data.lineType === 'aim') {
+            setAimLineVisibility(data.visible);
+        }
+    }, true);
+}
+
+// Export functions for ES modules
+export { activateAimLineMode, deactivateAimLineMode, handleAimLineClick, init };
+
+console.log('aimLines.js loaded');

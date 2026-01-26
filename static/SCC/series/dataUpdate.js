@@ -1,0 +1,356 @@
+/**
+ * Data Tab - Display and edit raw chart data
+ *
+ * This module handles:
+ * - Loading data from chartState.series for a selected date
+ * - Displaying data in an editable table
+ * - Updating data when user makes changes
+ */
+
+import { chartState } from '../chartState.js';
+import { eventBus, EVENTS } from '../eventBus.js';
+import { createToast, createConfirmToast } from '../util/toaster.js';
+
+// Track current state
+let currentDataForDate = [];
+let currentTimestampIndex = 0;
+
+/**
+ * Load and display data for the selected date
+ */
+export function loadDataForDate() {
+    const dateInput = document.getElementById('data-entry-date');
+    if (!dateInput) return;
+
+    const selectedDate = new Date(dateInput.value);
+    selectedDate.setHours(0, 0, 0, 0);
+
+    // Get start and end of the selected day (in seconds)
+    const startOfDay = Math.floor(selectedDate.getTime() / 1000);
+    const endOfDay = startOfDay + (24 * 60 * 60);
+
+    // Filter data for this date (preserve NaN for non-observations)
+    currentDataForDate = [];
+    for (let i = 0; i < chartState.series.timestamps.length; i++) {
+        const timestamp = chartState.series.timestamps[i];
+        if (timestamp >= startOfDay && timestamp < endOfDay) {
+            currentDataForDate.push({
+                index: i,
+                timestamp: timestamp,
+                corrects: chartState.series.corrects[i],
+                errors: chartState.series.errors[i],
+                timing: chartState.series.timing[i],
+                misc1: chartState.series.misc1[i],
+                misc2: chartState.series.misc2[i]
+            });
+        }
+    }
+
+    // Reset to first entry
+    currentTimestampIndex = 0;
+
+    // Render the current entry
+    renderCurrentEntry();
+}
+
+/**
+ * Adjust which timestamp entry is shown
+ * @param {number} offset - -1 for previous, +1 for next
+ */
+export function adjustTimestamp(offset) {
+    if (currentDataForDate.length === 0) return;
+
+    currentTimestampIndex += offset;
+
+    // Wrap around
+    if (currentTimestampIndex < 0) {
+        currentTimestampIndex = currentDataForDate.length - 1;
+    } else if (currentTimestampIndex >= currentDataForDate.length) {
+        currentTimestampIndex = 0;
+    }
+
+    renderCurrentEntry();
+}
+
+/**
+ * Render the currently selected entry
+ */
+function renderCurrentEntry() {
+    const container = document.getElementById('data-entry-block');
+    const timestampSelector = document.getElementById('timestamp-selector-container');
+    const timestampDisplay = document.getElementById('current-timestamp-display');
+
+    if (!container) return;
+
+    // Clear existing content
+    container.innerHTML = '';
+
+    if (currentDataForDate.length === 0) {
+        // Hide timestamp selector and show "no data" message
+        if (timestampSelector) timestampSelector.style.display = 'none';
+        container.innerHTML = '<div class="px-3 py-8 text-center text-gray-500 italic">No data available for this date</div>';
+        return;
+    }
+
+    // Show timestamp selector
+    if (timestampSelector) timestampSelector.style.display = 'block';
+
+    // Grey out timestamp arrows if only one entry
+    const timestampPrevBtn = document.querySelector('[data-action="adjust-timestamp"][data-offset="-1"]');
+    const timestampNextBtn = document.querySelector('[data-action="adjust-timestamp"][data-offset="1"]');
+    const singleEntry = currentDataForDate.length === 1;
+
+    if (timestampPrevBtn) {
+        timestampPrevBtn.disabled = singleEntry;
+        timestampPrevBtn.style.opacity = singleEntry ? '0.3' : '1';
+        timestampPrevBtn.style.cursor = singleEntry ? 'not-allowed' : 'pointer';
+    }
+    if (timestampNextBtn) {
+        timestampNextBtn.disabled = singleEntry;
+        timestampNextBtn.style.opacity = singleEntry ? '0.3' : '1';
+        timestampNextBtn.style.cursor = singleEntry ? 'not-allowed' : 'pointer';
+    }
+
+    // Get current entry
+    const point = currentDataForDate[currentTimestampIndex];
+
+    // Convert timestamp to readable time
+    const date = new Date(point.timestamp * 1000);
+    const timeString = date.toLocaleTimeString('en-US', { hour12: false });
+
+    // Update timestamp display
+    if (timestampDisplay) {
+        timestampDisplay.textContent = `${timeString} (${currentTimestampIndex + 1} of ${currentDataForDate.length})`;
+    }
+
+    // Timing is stored in chartState.series.timing[] as total MINUTES
+    // Convert back to hours, minutes, seconds for display
+    const totalMinutes = point.timing;
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = Math.floor(totalMinutes % 60);
+    const seconds = Math.round((totalMinutes % 1) * 60);
+
+    // Display values - empty string for NaN (non-observations)
+    const correctsValue = isNaN(point.corrects) ? '' : point.corrects;
+    const errorsValue = isNaN(point.errors) ? '' : point.errors;
+    const misc1Value = isNaN(point.misc1) ? '' : point.misc1;
+    const misc2Value = isNaN(point.misc2) ? '' : point.misc2;
+    const hoursValue = isNaN(hours) ? '' : hours;
+    const minutesValue = isNaN(minutes) ? '' : minutes;
+    const secondsValue = isNaN(seconds) ? '' : seconds;
+
+    const block = document.createElement('div');
+    block.dataset.index = point.index;
+
+    block.innerHTML = `
+        <div class="p-4 sm:p-6 w-full max-w-sm mx-auto">
+            <!-- Corrects and Errors -->
+            <div class="mb-6 grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-600 mb-2 text-center">Corrects</label>
+                    <input type="text" inputmode="numeric" pattern="[0-9]*"
+                           value="${correctsValue}"
+                           class="w-full px-3 py-3 text-lg border-2 border-gray-300 rounded focus:outline-none transition-colors text-center"
+                           data-field="corrects"
+                           placeholder=""
+                           oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-600 mb-2 text-center">Errors</label>
+                    <input type="text" inputmode="numeric" pattern="[0-9]*"
+                           value="${errorsValue}"
+                           class="w-full px-3 py-3 text-lg border-2 border-gray-300 rounded focus:outline-none transition-colors text-center"
+                           data-field="errors"
+                           placeholder=""
+                           oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+                </div>
+            </div>
+
+            <!-- Misc1 and Misc2 -->
+            <div class="mb-6 grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-600 mb-2 text-center">Misc1</label>
+                    <input type="text" inputmode="numeric" pattern="[0-9]*"
+                           value="${misc1Value}"
+                           class="w-full px-3 py-3 text-lg border-2 border-gray-300 rounded focus:outline-none transition-colors text-center"
+                           data-field="misc1"
+                           placeholder=""
+                           oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-600 mb-2 text-center">Misc2</label>
+                    <input type="text" inputmode="numeric" pattern="[0-9]*"
+                           value="${misc2Value}"
+                           class="w-full px-3 py-3 text-lg border-2 border-gray-300 rounded focus:outline-none transition-colors text-center"
+                           data-field="misc2"
+                           placeholder=""
+                           oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+                </div>
+            </div>
+
+            <!-- Timing -->
+            <div class="mb-6">
+                <label class="block text-sm font-semibold text-gray-600 mb-2 text-center">Timing</label>
+                <div class="grid grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1 text-center">Hour</label>
+                        <input type="text" inputmode="numeric" pattern="[0-9]*"
+                               value="${hoursValue}"
+                               class="w-full px-2 py-3 text-lg border-2 border-gray-300 rounded focus:outline-none transition-colors text-center"
+                               data-field="hours"
+                               placeholder=""
+                               oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1 text-center">Min</label>
+                        <input type="text" inputmode="numeric" pattern="[0-9]*"
+                               value="${minutesValue}"
+                               class="w-full px-2 py-3 text-lg border-2 border-gray-300 rounded focus:outline-none transition-colors text-center"
+                               data-field="minutes"
+                               placeholder=""
+                               oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1 text-center">Sec</label>
+                        <input type="text" inputmode="numeric" pattern="[0-9]*"
+                               value="${secondsValue}"
+                               class="w-full px-2 py-3 text-lg border-2 border-gray-300 rounded focus:outline-none transition-colors text-center"
+                               data-field="seconds"
+                               placeholder=""
+                               oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    container.appendChild(block);
+}
+
+/**
+ * Update the current entry with values from the input fields
+ */
+export function updateCurrentEntry() {
+    if (currentDataForDate.length === 0) return;
+
+    const point = currentDataForDate[currentTimestampIndex];
+    const container = document.getElementById('data-entry-block');
+    if (!container) return;
+
+    // Get values from input fields (same as dataEntry.js - allow NaN for non-entries)
+    const corrects = parseInt(container.querySelector('[data-field="corrects"]').value);
+    const errors = parseInt(container.querySelector('[data-field="errors"]').value);
+    const misc1 = parseInt(container.querySelector('[data-field="misc1"]').value);
+    const misc2 = parseInt(container.querySelector('[data-field="misc2"]').value);
+    const hours = parseInt(container.querySelector('[data-field="hours"]').value);
+    const minutes = parseInt(container.querySelector('[data-field="minutes"]').value);
+    const seconds = parseInt(container.querySelector('[data-field="seconds"]').value);
+
+    // Convert timing back to total minutes (same as dataEntry.js)
+    const timingMinutes = (hours || 0) * 60 + (minutes || 0) + (seconds || 0) / 60;
+
+    // Update chartState.series at the original index
+    const dataIndex = point.index;
+    chartState.series.corrects[dataIndex] = corrects;
+    chartState.series.errors[dataIndex] = errors;
+    chartState.series.misc1[dataIndex] = misc1;
+    chartState.series.misc2[dataIndex] = misc2;
+    chartState.series.timing[dataIndex] = timingMinutes;
+
+    // Update local copy
+    currentDataForDate[currentTimestampIndex].corrects = corrects;
+    currentDataForDate[currentTimestampIndex].errors = errors;
+    currentDataForDate[currentTimestampIndex].misc1 = misc1;
+    currentDataForDate[currentTimestampIndex].misc2 = misc2;
+    currentDataForDate[currentTimestampIndex].timing = timingMinutes;
+
+    // Refresh the chart to show updated data
+    eventBus.emit(EVENTS.DATA_CHART_REFRESH);
+
+    // Show success toast
+    createToast({
+        message: 'Entry updated successfully',
+        duration: 2000,
+        position: 'top-right'
+    });
+
+    console.log('Entry updated at index:', dataIndex);
+}
+
+/**
+ * Delete the current entry
+ */
+export function deleteCurrentEntry() {
+    if (currentDataForDate.length === 0) return;
+
+    const point = currentDataForDate[currentTimestampIndex];
+    const date = new Date(point.timestamp * 1000);
+    const timeString = date.toLocaleTimeString('en-US', { hour12: false });
+
+    // Show confirmation toast
+    createConfirmToast({
+        message: `Delete entry at ${timeString}?`,
+        yesLabel: 'Delete',
+        noLabel: 'Cancel',
+        primaryColor: '#ef4444',  // Red color for delete action
+        position: 'top-right',
+        onYes: () => {
+            const dataIndex = point.index;
+
+            // Remove from chartState.series
+            chartState.series.timestamps.splice(dataIndex, 1);
+            chartState.series.corrects.splice(dataIndex, 1);
+            chartState.series.errors.splice(dataIndex, 1);
+            chartState.series.timing.splice(dataIndex, 1);
+            chartState.series.misc1.splice(dataIndex, 1);
+            chartState.series.misc2.splice(dataIndex, 1);
+
+            // Remove from local array
+            currentDataForDate.splice(currentTimestampIndex, 1);
+
+            // Adjust indices in remaining local data (since we removed an item from chartState.series)
+            for (let i = 0; i < currentDataForDate.length; i++) {
+                if (currentDataForDate[i].index > dataIndex) {
+                    currentDataForDate[i].index--;
+                }
+            }
+
+            // Adjust current index if needed
+            if (currentTimestampIndex >= currentDataForDate.length && currentDataForDate.length > 0) {
+                currentTimestampIndex = currentDataForDate.length - 1;
+            }
+
+            // Re-render
+            renderCurrentEntry();
+
+            // Refresh the chart to show updated data
+            eventBus.emit(EVENTS.DATA_CHART_REFRESH);
+
+            // Show success toast
+            createToast({
+                message: 'Entry deleted successfully',
+                duration: 2000,
+                position: 'top-right'
+            });
+
+            console.log('Entry deleted at index:', dataIndex);
+        },
+        onNo: () => {
+            // User cancelled - do nothing
+            console.log('Delete cancelled');
+        }
+    });
+}
+
+/**
+ * Initialize event subscriptions
+ */
+export function init() {
+    eventBus.subscribe(EVENTS.NAV_TAB_SWITCH, (data) => {
+        if (data.tab === 'data') {
+            loadDataForDate();
+        }
+    }, true);
+}
+
+console.log('dataUpdate.js loaded');

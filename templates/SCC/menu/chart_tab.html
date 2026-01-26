@@ -1,0 +1,43 @@
+<div class="p-4 sm:p-8 md:p-10 w-full max-w-6xl mx-auto">
+    <!-- Date Section -->
+    <div class="mb-8">
+        <label class="block text-sm font-semibold text-gray-600 mb-2 text-center" for="other-date">Sunday Start Date</label>
+        <div class="flex items-center gap-2 max-w-md mx-auto">
+            <div class="flex-1 relative">
+                <input type="date" id="other-date" class="absolute opacity-0 pointer-events-none">
+                <div id="other-date-display" class="px-4 py-3 text-lg border-2 border-gray-300 rounded transition-colors text-center cursor-pointer hover:bg-gray-50 active:bg-gray-100" onclick="document.getElementById('other-date').showPicker()">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Grid Toggle -->
+    <div class="mb-8">
+        <div class="flex flex-col items-center gap-4">
+            <div class="flex items-center justify-center gap-3">
+                <label class="text-sm font-semibold text-gray-600" for="grid-toggle">Grid</label>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="grid-toggle" class="sr-only peer" checked>
+                    <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#6ad1e3]"></div>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Legend Toggle -->
+    <div class="mb-8">
+        <div class="flex items-center justify-center gap-3">
+            <label class="text-sm font-semibold text-gray-600" for="legend-toggle">Legend</label>
+            <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="legend-toggle" class="sr-only peer" checked>
+                <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#6ad1e3]"></div>
+            </label>
+            <select id="legend-position" class="px-3 py-2 text-sm border-2 border-gray-300 rounded focus:outline-none focus:border-[#6ad1e3] transition-colors bg-white disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-200 disabled:cursor-not-allowed">
+                <option value="top-right">Top Right</option>
+                <option value="top-left">Top Left</option>
+                <option value="bottom-right">Bottom Right</option>
+                <option value="bottom-left">Bottom Left</option>
+            </select>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,403 @@
+<div class="px-4 pb-4 w-full max-w-4xl mx-auto">
+    <!-- Sub-Tab Menu -->
+    <div class="flex flex-wrap justify-center gap-2 mb-4 border-b-2 border-gray-300 pb-2">
+            <button class="series-subtab px-4 py-2 text-sm font-semibold text-gray-700 border-b-2 border-[#6ad1e3] bg-gray-50 rounded-t" data-series-tab="correct">Correct</button>
+            <button class="series-subtab px-4 py-2 text-sm font-semibold text-gray-700 border-b-2 border-transparent hover:bg-gray-50 rounded-t" data-series-tab="incorrect">Incorrect</button>
+            <button class="series-subtab px-4 py-2 text-sm font-semibold text-gray-700 border-b-2 border-transparent hover:bg-gray-50 rounded-t" data-series-tab="timing">Timing</button>
+            <button class="series-subtab px-4 py-2 text-sm font-semibold text-gray-700 border-b-2 border-transparent hover:bg-gray-50 rounded-t" data-series-tab="misc1">Misc1</button>
+            <button class="series-subtab px-4 py-2 text-sm font-semibold text-gray-700 border-b-2 border-transparent hover:bg-gray-50 rounded-t" data-series-tab="misc2">Misc2</button>
+        </div>
+
+        <!-- Correct Trace Config -->
+        <div id="correct-series-config" class="series-config-panel relative">
+            <!-- Container for all config blocks -->
+            <div id="correct-blocks-container" class="space-y-4 mb-4">
+                <!-- Default "raw" aggregation block -->
+                <div class="agg-config-block border-2 border-gray-300 rounded-lg p-4 sm:p-6 relative" data-series="correct" data-agg="raw">
+                    <!-- Minus button in top-right corner -->
+                    <button class="remove-block-btn absolute top-2 right-2 w-8 h-8 bg-red-500 text-white rounded-full hover:bg-red-600 flex items-center justify-center font-bold text-lg" title="Remove this block">−</button>
+
+                    <div class="space-y-3 sm:space-y-4">
+                        <!-- Series Name and Aggregation Type on same row -->
+                        <div class="grid grid-cols-2 gap-3 sm:gap-4">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Series Name</label>
+                                <input type="text" class="series-name-input w-full px-3 py-2 border-2 border-gray-300 rounded focus:outline-none" value="correct">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Aggregation Type</label>
+                                <select class="agg-type-select w-full px-3 py-2 border-2 border-gray-300 rounded focus:outline-none">
+                                    <option value="raw" selected>Raw</option>
+                                    <option value="mean">Mean</option>
+                                    <option value="median">Median</option>
+                                    <option value="min">Min</option>
+                                    <option value="max">Max</option>
+                                    <option value="first">First</option>
+                                    <option value="last">Last</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-3 gap-3 sm:gap-4">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Marker Size</label>
+                                <input type="number" class="marker-size-input w-full px-3 py-2 border-2 border-gray-300 rounded focus:outline-none" value="8" min="1" max="50">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Line Width</label>
+                                <input type="number" class="line-width-input w-full px-3 py-2 border-2 border-gray-300 rounded focus:outline-none" value="0.7" step="0.1" min="0" max="10">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Connecting lines</label>
+                                <label class="relative inline-flex items-center cursor-pointer mt-2">
+                                    <input type="checkbox" class="show-line-input sr-only peer" checked data-series-toggle="correct">
+                                    <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#6ad1e3]"></div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-3 gap-3 sm:gap-4 items-end">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Line Color</label>
+                                <input type="color" class="line-color-input w-full h-10 px-1 py-1 border-2 border-gray-300 rounded focus:outline-none cursor-pointer" value="#000000">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Marker Face Color</label>
+                                <input type="color" class="marker-face-color-input w-full h-10 px-1 py-1 border-2 border-gray-300 rounded focus:outline-none cursor-pointer" value="#000000">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Marker Edge Color</label>
+                                <input type="color" class="marker-edge-color-input w-full h-10 px-1 py-1 border-2 border-gray-300 rounded focus:outline-none cursor-pointer" value="#000000">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Apply and Reset buttons (outside of blocks) -->
+            <div class="flex gap-3">
+                <button class="flex-1 px-6 py-2 bg-[#6ad1e3] text-white font-semibold rounded hover:opacity-90 active:opacity-80 transition-colors" data-action="apply-correct-trace">Apply</button>
+                <button class="flex-1 px-6 py-2 bg-gray-400 text-white font-semibold rounded hover:opacity-90 active:opacity-80 transition-colors" data-action="reset-trace-correct">Reset to Default</button>
+            </div>
+
+            <!-- Floating plus button -->
+            <button class="add-block-btn fixed bottom-8 right-8 w-14 h-14 bg-[#6ad1e3] text-white rounded-full hover:bg-opacity-90 shadow-lg flex items-center justify-center font-bold text-2xl z-50" data-series="correct" title="Add new aggregation block">+</button>
+        </div>
+
+        <!-- Incorrect Trace Config -->
+        <div id="incorrect-series-config" class="series-config-panel relative" style="display: none;">
+            <!-- Container for all config blocks -->
+            <div id="incorrect-blocks-container" class="space-y-4 mb-4">
+                <!-- Default "raw" aggregation block -->
+                <div class="agg-config-block border-2 border-gray-300 rounded-lg p-4 sm:p-6 relative" data-series="incorrect" data-agg="raw">
+                    <!-- Minus button in top-right corner -->
+                    <button class="remove-block-btn absolute top-2 right-2 w-8 h-8 bg-red-500 text-white rounded-full hover:bg-red-600 flex items-center justify-center font-bold text-lg" title="Remove this block">−</button>
+
+                    <div class="space-y-3 sm:space-y-4">
+                        <!-- Series Name and Aggregation Type on same row -->
+                        <div class="grid grid-cols-2 gap-3 sm:gap-4">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Series Name</label>
+                                <input type="text" class="series-name-input w-full px-3 py-2 border-2 border-gray-300 rounded focus:outline-none" value="incorrect">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Aggregation Type</label>
+                                <select class="agg-type-select w-full px-3 py-2 border-2 border-gray-300 rounded focus:outline-none">
+                                    <option value="raw" selected>Raw</option>
+                                    <option value="mean">Mean</option>
+                                    <option value="median">Median</option>
+                                    <option value="min">Min</option>
+                                    <option value="max">Max</option>
+                                    <option value="first">First</option>
+                                    <option value="last">Last</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-3 gap-3 sm:gap-4">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Text Size</label>
+                                <input type="number" class="text-size-input w-full px-3 py-2 border-2 border-gray-300 rounded focus:outline-none" value="20" min="6" max="100">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Line Width</label>
+                                <input type="number" class="line-width-input w-full px-3 py-2 border-2 border-gray-300 rounded focus:outline-none" value="0.7" step="0.1" min="0" max="10">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Show Line</label>
+                                <label class="relative inline-flex items-center cursor-pointer mt-2">
+                                    <input type="checkbox" class="show-line-input sr-only peer" checked data-series-toggle="incorrect">
+                                    <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#6ad1e3]"></div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3 sm:gap-4 items-end">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Line Color</label>
+                                <input type="color" class="line-color-input w-full h-10 px-1 py-1 border-2 border-gray-300 rounded focus:outline-none cursor-pointer" value="#000000">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Marker Color</label>
+                                <input type="color" class="marker-color-input w-full h-10 px-1 py-1 border-2 border-gray-300 rounded focus:outline-none cursor-pointer" value="#000000">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Apply and Reset buttons (outside of blocks) -->
+            <div class="flex gap-3">
+                <button class="flex-1 px-6 py-2 bg-[#6ad1e3] text-white font-semibold rounded hover:opacity-90 active:opacity-80 transition-colors" data-action="apply-incorrect-trace">Apply</button>
+                <button class="flex-1 px-6 py-2 bg-gray-400 text-white font-semibold rounded hover:opacity-90 active:opacity-80 transition-colors" data-action="reset-trace-incorrect">Reset to Default</button>
+            </div>
+
+            <!-- Floating plus button -->
+            <button class="add-block-btn fixed bottom-8 right-8 w-14 h-14 bg-[#6ad1e3] text-white rounded-full hover:bg-opacity-90 shadow-lg flex items-center justify-center font-bold text-2xl z-50" data-series="incorrect" title="Add new aggregation block">+</button>
+        </div>
+
+        <!-- Timing Trace Config -->
+        <div id="timing-series-config" class="series-config-panel relative" style="display: none;">
+            <div id="timing-blocks-container" class="space-y-4 mb-4">
+                <div class="agg-config-block border-2 border-gray-300 rounded-lg p-4 sm:p-6 relative" data-series="timing" data-agg="raw">
+                    <button class="remove-block-btn absolute top-2 right-2 w-8 h-8 bg-red-500 text-white rounded-full hover:bg-red-600 flex items-center justify-center font-bold text-lg" title="Remove this block">−</button>
+
+                    <div class="space-y-3 sm:space-y-4">
+                        <!-- Series Name and Aggregation Type on same row -->
+                        <div class="grid grid-cols-2 gap-3 sm:gap-4">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Series Name</label>
+                                <input type="text" class="series-name-input w-full px-3 py-2 border-2 border-gray-300 rounded focus:outline-none" value="Timing">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Aggregation Type</label>
+                                <select class="agg-type-select w-full px-3 py-2 border-2 border-gray-300 rounded focus:outline-none">
+                                    <option value="raw" selected>Raw</option>
+                                    <option value="mean">Mean</option>
+                                    <option value="median">Median</option>
+                                    <option value="min">Min</option>
+                                    <option value="max">Max</option>
+                                    <option value="first">First</option>
+                                    <option value="last">Last</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-3 gap-3 sm:gap-4">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Marker Size</label>
+                                <input type="number" class="marker-size-input w-full px-3 py-2 border-2 border-gray-300 rounded focus:outline-none" value="30" min="1" max="50">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Line Width</label>
+                                <input type="number" class="line-width-input w-full px-3 py-2 border-2 border-gray-300 rounded focus:outline-none" value="0.7" step="0.1" min="0" max="10">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Show Line</label>
+                                <label class="relative inline-flex items-center cursor-pointer mt-2">
+                                    <input type="checkbox" class="show-line-input sr-only peer" data-series-toggle="timing">
+                                    <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#6ad1e3]"></div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3 sm:gap-4 items-end">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Line Color</label>
+                                <input type="color" class="line-color-input w-full h-10 px-1 py-1 border-2 border-gray-300 rounded focus:outline-none cursor-pointer" value="#000000">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Marker Color</label>
+                                <input type="color" class="marker-color-input w-full h-10 px-1 py-1 border-2 border-gray-300 rounded focus:outline-none cursor-pointer" value="#000000">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex gap-3">
+                <button class="flex-1 px-6 py-2 bg-[#6ad1e3] text-white font-semibold rounded hover:opacity-90 active:opacity-80 transition-colors" data-action="apply-timing-trace">Apply</button>
+                <button class="flex-1 px-6 py-2 bg-gray-400 text-white font-semibold rounded hover:opacity-90 active:opacity-80 transition-colors" data-action="reset-trace-timing">Reset to Default</button>
+            </div>
+
+            <button class="add-block-btn fixed bottom-8 right-8 w-14 h-14 bg-[#6ad1e3] text-white rounded-full hover:bg-opacity-90 shadow-lg flex items-center justify-center font-bold text-2xl z-50" data-series="timing" title="Add new aggregation block">+</button>
+        </div>
+
+        <!-- MiscOne Trace Config -->
+        <div id="misc1-series-config" class="series-config-panel relative" style="display: none;">
+            <div id="misc1-blocks-container" class="space-y-4 mb-4">
+                <div class="agg-config-block border-2 border-gray-300 rounded-lg p-4 sm:p-6 relative" data-series="misc1" data-agg="raw">
+                    <button class="remove-block-btn absolute top-2 right-2 w-8 h-8 bg-red-500 text-white rounded-full hover:bg-red-600 flex items-center justify-center font-bold text-lg" title="Remove this block">−</button>
+
+                    <div class="space-y-3 sm:space-y-4">
+                        <!-- Series Name and Aggregation Type on same row -->
+                        <div class="grid grid-cols-2 gap-3 sm:gap-4">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Series Name</label>
+                                <input type="text" class="series-name-input w-full px-3 py-2 border-2 border-gray-300 rounded focus:outline-none" value="MiscOne">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Aggregation Type</label>
+                                <select class="agg-type-select w-full px-3 py-2 border-2 border-gray-300 rounded focus:outline-none">
+                                    <option value="raw" selected>Raw</option>
+                                    <option value="mean">Mean</option>
+                                    <option value="median">Median</option>
+                                    <option value="min">Min</option>
+                                    <option value="max">Max</option>
+                                    <option value="first">First</option>
+                                    <option value="last">Last</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3 sm:gap-4">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Line Width</label>
+                                <input type="number" class="line-width-input w-full px-3 py-2 border-2 border-gray-300 rounded focus:outline-none" value="0.7" step="0.1" min="0" max="10">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Show Line</label>
+                                <label class="relative inline-flex items-center cursor-pointer mt-2">
+                                    <input type="checkbox" class="show-line-input sr-only peer" checked data-series-toggle="misc1">
+                                    <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#6ad1e3]"></div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3 sm:gap-4">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Marker Symbol</label>
+                                <select class="marker-symbol-input w-full px-3 py-2 border-2 border-gray-300 rounded focus:outline-none">
+                                    <option value="circle">Circle</option>
+                                    <option value="square" selected>Square</option>
+                                    <option value="diamond">Diamond</option>
+                                    <option value="cross">Cross</option>
+                                    <option value="x">X</option>
+                                    <option value="triangle-up">Triangle Up</option>
+                                    <option value="triangle-down">Triangle Down</option>
+                                    <option value="star">Star</option>
+                                    <option value="hexagon">Hexagon</option>
+                                    <option value="pentagon">Pentagon</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Marker Size</label>
+                                <input type="number" class="marker-size-input w-full px-3 py-2 border-2 border-gray-300 rounded focus:outline-none" value="8" min="1" max="50">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-3 gap-3 sm:gap-4 items-end">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Line Color</label>
+                                <input type="color" class="line-color-input w-full h-10 px-1 py-1 border-2 border-gray-300 rounded focus:outline-none cursor-pointer" value="#000000">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Marker Face Color</label>
+                                <input type="color" class="marker-face-color-input w-full h-10 px-1 py-1 border-2 border-gray-300 rounded focus:outline-none cursor-pointer" value="#FFA500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Marker Edge Color</label>
+                                <input type="color" class="marker-edge-color-input w-full h-10 px-1 py-1 border-2 border-gray-300 rounded focus:outline-none cursor-pointer" value="#000000">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex gap-3">
+                <button class="flex-1 px-6 py-2 bg-[#6ad1e3] text-white font-semibold rounded hover:opacity-90 active:opacity-80 transition-colors" data-action="apply-misc1-trace">Apply</button>
+                <button class="flex-1 px-6 py-2 bg-gray-400 text-white font-semibold rounded hover:opacity-90 active:opacity-80 transition-colors" data-action="reset-trace-misc1">Reset to Default</button>
+            </div>
+
+            <button class="add-block-btn fixed bottom-8 right-8 w-14 h-14 bg-[#6ad1e3] text-white rounded-full hover:bg-opacity-90 shadow-lg flex items-center justify-center font-bold text-2xl z-50" data-series="misc1" title="Add new aggregation block">+</button>
+        </div>
+
+        <!-- MiscTwo Trace Config -->
+        <div id="misc2-series-config" class="series-config-panel relative" style="display: none;">
+            <div id="misc2-blocks-container" class="space-y-4 mb-4">
+                <div class="agg-config-block border-2 border-gray-300 rounded-lg p-4 sm:p-6 relative" data-series="misc2" data-agg="raw">
+                    <button class="remove-block-btn absolute top-2 right-2 w-8 h-8 bg-red-500 text-white rounded-full hover:bg-red-600 flex items-center justify-center font-bold text-lg" title="Remove this block">−</button>
+
+                    <div class="space-y-3 sm:space-y-4">
+                        <!-- Series Name and Aggregation Type on same row -->
+                        <div class="grid grid-cols-2 gap-3 sm:gap-4">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Series Name</label>
+                                <input type="text" class="series-name-input w-full px-3 py-2 border-2 border-gray-300 rounded focus:outline-none" value="MiscTwo">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Aggregation Type</label>
+                                <select class="agg-type-select w-full px-3 py-2 border-2 border-gray-300 rounded focus:outline-none">
+                                    <option value="raw" selected>Raw</option>
+                                    <option value="mean">Mean</option>
+                                    <option value="median">Median</option>
+                                    <option value="min">Min</option>
+                                    <option value="max">Max</option>
+                                    <option value="first">First</option>
+                                    <option value="last">Last</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3 sm:gap-4">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Line Width</label>
+                                <input type="number" class="line-width-input w-full px-3 py-2 border-2 border-gray-300 rounded focus:outline-none" value="0.7" step="0.1" min="0" max="10">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Show Line</label>
+                                <label class="relative inline-flex items-center cursor-pointer mt-2">
+                                    <input type="checkbox" class="show-line-input sr-only peer" checked data-series-toggle="misc2">
+                                    <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#6ad1e3]"></div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3 sm:gap-4">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Marker Symbol</label>
+                                <select class="marker-symbol-input w-full px-3 py-2 border-2 border-gray-300 rounded focus:outline-none">
+                                    <option value="circle">Circle</option>
+                                    <option value="square">Square</option>
+                                    <option value="diamond">Diamond</option>
+                                    <option value="cross">Cross</option>
+                                    <option value="x">X</option>
+                                    <option value="triangle-up" selected>Triangle Up</option>
+                                    <option value="triangle-down">Triangle Down</option>
+                                    <option value="star">Star</option>
+                                    <option value="hexagon">Hexagon</option>
+                                    <option value="pentagon">Pentagon</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Marker Size</label>
+                                <input type="number" class="marker-size-input w-full px-3 py-2 border-2 border-gray-300 rounded focus:outline-none" value="8" min="1" max="50">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-3 gap-3 sm:gap-4 items-end">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Line Color</label>
+                                <input type="color" class="line-color-input w-full h-10 px-1 py-1 border-2 border-gray-300 rounded focus:outline-none cursor-pointer" value="#000000">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Marker Face Color</label>
+                                <input type="color" class="marker-face-color-input w-full h-10 px-1 py-1 border-2 border-gray-300 rounded focus:outline-none cursor-pointer" value="#FF0000">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Marker Edge Color</label>
+                                <input type="color" class="marker-edge-color-input w-full h-10 px-1 py-1 border-2 border-gray-300 rounded focus:outline-none cursor-pointer" value="#000000">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex gap-3">
+                <button class="flex-1 px-6 py-2 bg-[#6ad1e3] text-white font-semibold rounded hover:opacity-90 active:opacity-80 transition-colors" data-action="apply-misc2-trace">Apply</button>
+                <button class="flex-1 px-6 py-2 bg-gray-400 text-white font-semibold rounded hover:opacity-90 active:opacity-80 transition-colors" data-action="reset-trace-misc2">Reset to Default</button>
+            </div>
+
+            <button class="add-block-btn fixed bottom-8 right-8 w-14 h-14 bg-[#6ad1e3] text-white rounded-full hover:bg-opacity-90 shadow-lg flex items-center justify-center font-bold text-2xl z-50" data-series="misc2" title="Add new aggregation block">+</button>
+        </div>
+</div>
