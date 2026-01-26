@@ -44,7 +44,7 @@ def index():
 
     for template_name, chart_window_days in sorted_templates:
         # Load template to get margin values
-        filepath = f'chart_templates/{template_name}'
+        filepath = f'charts/layouts/{template_name}'
         with open(filepath, 'r') as f:
             template_data = json.load(f)
 
@@ -77,7 +77,7 @@ def index():
         best_template = min(chart_configs.keys(), key=lambda k: chart_configs[k])
 
     # Load the selected template
-    filepath = f'chart_templates/{best_template}'
+    filepath = f'charts/layouts/{best_template}'
     with open(filepath, 'r') as f:
         fig_json = f.read()
 

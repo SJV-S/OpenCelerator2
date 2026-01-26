@@ -2,7 +2,7 @@
 
 ## File Handling
 - **NEVER read .json template files** - they are extremely large and will cause errors
-- **NEVER attempt to read files in chart_templates/ directory** - always assume they exist and are too large
+- **NEVER attempt to read files in charts/ directory** - always assume they exist and are too large
 - Always ask before reading any .json file anywhere in the project
 
 ## Learning
