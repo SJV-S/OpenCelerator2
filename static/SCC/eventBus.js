@@ -63,7 +63,13 @@ export const EVENTS = {
 
     // Misc Series Events
     MISC_SERIES_ADDED: 'misc:series_added',
-    MISC_SERIES_REMOVED: 'misc:series_removed'
+    MISC_SERIES_REMOVED: 'misc:series_removed',
+
+    // Fan Events
+    FAN_VISIBILITY_CHANGED: 'fan:visibility_changed',
+
+    // Chart Settings Events
+    CHART_PANNING_ENABLED_CHANGED: 'chart:panning_enabled_changed'
 };
 class EventBus {
     constructor(name = 'EventBus') {

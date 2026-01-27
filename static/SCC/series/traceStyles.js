@@ -184,6 +184,16 @@ function applyTraceConfig(seriesName) {
     });
 
     updateCounterLabels();
+
+    // Update tab button text for misc series
+    if (isMiscSeries) {
+        const tabButton = document.querySelector(`[data-series-tab="${seriesName}"]`);
+        const rawConfig = chartState.traceStyles.misc[seriesName]?.raw;
+        if (tabButton && rawConfig?.seriesName) {
+            tabButton.textContent = rawConfig.seriesName;
+        }
+    }
+
     eventBus.emit(EVENTS.DATA_CHART_REFRESH);
     eventBus.emit(EVENTS.UI_LEGEND_RENDER);
     createToast({ message: `${seriesName} configurations updated.`, duration: 2000 });
@@ -225,6 +235,16 @@ function resetTraceConfig(seriesName) {
     // Re-initialize the remaining block
     initializeSeriesInputs(seriesName);
     updateCounterLabels();
+
+    // Update tab button text for misc series
+    if (isMiscSeries) {
+        const tabButton = document.querySelector(`[data-series-tab="${seriesName}"]`);
+        const rawConfig = chartState.traceStyles.misc[seriesName]?.raw;
+        if (tabButton && rawConfig?.seriesName) {
+            tabButton.textContent = rawConfig.seriesName;
+        }
+    }
+
     eventBus.emit(EVENTS.DATA_CHART_REFRESH);
     eventBus.emit(EVENTS.UI_LEGEND_RENDER);
     createToast({ message: `${seriesName} reset to defaults.`, duration: 2000 });
@@ -424,7 +444,9 @@ eventBus.subscribe(EVENTS.MISC_SERIES_ADDED, ({ id, index }) => {
     const tabButton = document.createElement('button');
     tabButton.className = 'series-subtab px-4 py-2 text-sm font-semibold text-gray-700 border-b-2 border-transparent hover:bg-gray-50 rounded-t';
     tabButton.dataset.seriesTab = id;
-    tabButton.textContent = `Misc ${index + 1}`;
+    // Use custom series name if available, otherwise default
+    const config = chartState.traceStyles.misc[id]?.raw;
+    tabButton.textContent = config?.seriesName || `Misc ${index + 1}`;
     tabButton.addEventListener('click', () => switchSeriesTab(id));
     tabContainer.insertBefore(tabButton, addBtn);
 
@@ -443,8 +465,7 @@ eventBus.subscribe(EVENTS.MISC_SERIES_ADDED, ({ id, index }) => {
         blocksContainer.id = `${id}-blocks-container`;
     }
 
-    // Set values from chartState config
-    const config = chartState.traceStyles.misc[id]?.raw;
+    // Set values from chartState config (config already declared above)
     if (config) {
         const nameInput = panel.querySelector('.series-name-input');
         if (nameInput) nameInput.value = config.seriesName;

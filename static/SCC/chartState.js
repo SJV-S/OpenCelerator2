@@ -159,7 +159,7 @@ export const chartState = {
 
     // Chart identification
     chartType: 'Daily',
-    minuteChart: false,
+    minuteChart: true,
     chartName: 'Unnamed',
     hasTimestamps: true, // If true, xValues are timestamps that need conversion; if false, xValues are direct x-positions
     startDate: TEST_DATA.startDate, // The Sunday before/at earliest data point (only used when hasTimestamps is true)

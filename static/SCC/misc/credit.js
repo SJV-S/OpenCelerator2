@@ -24,6 +24,18 @@ function renderCredits() {
     if (container) {
         container.innerHTML = '';
 
+        // Pad container to match chart's plot area margins
+        const chartDiv = document.getElementById('chart');
+        if (chartDiv && chartDiv.layout) {
+            const layout = chartDiv.layout;
+            const marginLeft = layout.margin?.l || 0;
+            const marginRight = layout.margin?.r || 0;
+
+            container.style.paddingLeft = `${marginLeft}px`;
+            container.style.paddingRight = `${marginRight}px`;
+            container.style.boxSizing = 'border-box';
+        }
+
         const wrapper = document.createElement('div');
         wrapper.className = 'credit-display';
 

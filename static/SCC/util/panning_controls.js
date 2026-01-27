@@ -1,3 +1,5 @@
+import { eventBus, EVENTS } from '../eventBus.js';
+
 // Chart boundary configuration
 const CHART_MARGIN = 0.2;
 const CHART_X_MIN = -CHART_MARGIN;
@@ -29,6 +31,11 @@ function setupPanConstraints(plotDiv, maxWindowWidth, chartType) {
 
     let isProgrammaticUpdate = false;
     let defaultWindowWidth = MAX_WINDOW_WIDTH;
+
+    // Subscribe to panning enabled/disabled changes
+    eventBus.subscribe(EVENTS.CHART_PANNING_ENABLED_CHANGED, (enabled) => {
+        Plotly.relayout(plotDiv, { 'xaxis.fixedrange': !enabled });
+    }, true);
 
     plotDiv.on('plotly_relayout', function(eventData) {
         // Ignore events triggered by our own updates

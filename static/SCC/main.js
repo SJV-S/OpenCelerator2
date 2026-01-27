@@ -53,7 +53,7 @@ import { init as aimLinesInit } from './lines/aimLines.js';
 import { init as cutLinesInit } from './lines/cutLines.js';
 import { init as celLineInit } from './lines/celLine.js';
 import { initGridToggle } from './misc/grid.js';
-import { injectCelerationFan, initFanDrag } from './misc/celerationFan.js';
+import { injectCelerationFan, initFanDrag, init as celerationFanInit } from './misc/celerationFan.js';
 import { toggleLegend, renderCustomLegend, init as customLegendInit } from './misc/customLegend.js';
 import { setupPanConstraints } from './util/panning_controls.js';
 import { resizeChartByHeight, CHART_CONFIG } from './util/resize_chart/resize-chart.js';
@@ -204,6 +204,7 @@ document.addEventListener('DOMContentLoaded', () => {
     celLineInit();
     customLegendInit();
     crosshairInit();
+    celerationFanInit();
     console.log('Main.js: Event bus subscriptions initialized');
 
     // Initialize icons in buttons with data-icon attributes
@@ -393,6 +394,19 @@ function setupEventListeners() {
         });
     }
 
+    // Celeration fan toggle
+    const fanToggle = document.getElementById('fan-toggle');
+    if (fanToggle) {
+        // Initialize checkbox state from chartState
+        fanToggle.checked = chartState.fanVisible;
+
+        fanToggle.addEventListener('change', (e) => {
+            eventBus.emit(EVENTS.FAN_VISIBILITY_CHANGED, { visible: e.target.checked });
+            // Blur the checkbox so spacebar can be used for navigation
+            e.target.blur();
+        });
+    }
+
     // Chart name input
     const chartNameInput = document.getElementById('chart-name');
     if (chartNameInput) {
@@ -419,6 +433,8 @@ function setupEventListeners() {
                     const windowInput = document.getElementById('chart-window');
                     if (windowInput) windowInput.value = value;
                 }
+                // Disable panning if capacity equals window
+                eventBus.emit(EVENTS.CHART_PANNING_ENABLED_CHANGED, chartState.chartCapacity !== chartState.chartWindow);
             }
         });
     }
@@ -437,6 +453,8 @@ function setupEventListeners() {
                 chartState.chartWindow = chartState.chartCapacity;
                 e.target.value = chartState.chartCapacity;
             }
+            // Disable panning if capacity equals window
+            eventBus.emit(EVENTS.CHART_PANNING_ENABLED_CHANGED, chartState.chartCapacity !== chartState.chartWindow);
         });
     }
 

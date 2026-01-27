@@ -33,10 +33,21 @@ function refreshChart() {
     removeAllToasts();
 
     // Convert timestamps to x-positions
-    const xPositions = timestampsToXPositions(chartState.series.xValues);
+    const allX = timestampsToXPositions(chartState.series.xValues);
+    const allFreq = calculateFrequencies();
 
-    // Calculate frequencies from raw data
-    const frequencies = calculateFrequencies();
+    // Filter out points exceeding chart capacity
+    const valid = allX.map(x => x <= chartState.chartCapacity);
+    const m = (arr) => arr.filter((_, i) => valid[i]);
+    const xPositions = m(allX);
+    const frequencies = {
+        corrects: m(allFreq.corrects),
+        errors: m(allFreq.errors),
+        correctsFloor: m(allFreq.correctsFloor),
+        errorsFloor: m(allFreq.errorsFloor),
+        misc: Object.fromEntries(Object.entries(allFreq.misc).map(([k, v]) => [k, m(v)])),
+        miscFloor: Object.fromEntries(Object.entries(allFreq.miscFloor).map(([k, v]) => [k, m(v)]))
+    };
 
     // Create all frequency traces (segmented by line cuts)
     const dataTraces = createFrequencyTraces(xPositions, frequencies, timestampsToXPositions);

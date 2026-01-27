@@ -78,6 +78,7 @@
  */
 
 import { chartState } from '../chartState.js';
+import { eventBus, EVENTS } from '../eventBus.js';
 
 const CEL_VALUES = [16, 4, 2, 1.4, 1, 1/1.4, 1/2, 1/4, 1/16];
 const LABELS = ['×16', '×4', '×2', '×1.4', '×1', '÷1.4', '÷2', '÷4', '÷16'];
@@ -236,8 +237,7 @@ export function generateFanElements(layout, isMinuteChart, chartType) {
 }
 
 export function injectCelerationFan(plotData, isMinuteChart, chartType) {
-    const plotWidth = plotData.layout.width - plotData.layout.margin.l - plotData.layout.margin.r;
-    const extraMargin = Math.round(plotWidth * 0.18);
+    const extraMargin = isMinuteChart ? 90 : 60;
 
     if (isMinuteChart) {
         plotData.layout.margin.l += extraMargin;
@@ -283,6 +283,16 @@ export function toggleCelerationFan(visible) {
     visible ? addCelerationFan() : removeCelerationFan();
 }
 
+/**
+ * Initialize fan module - subscribe to events
+ * Called by main.js coordinator
+ */
+export function init() {
+    eventBus.subscribe(EVENTS.FAN_VISIBILITY_CHANGED, (data) => {
+        toggleCelerationFan(data.visible);
+    }, true);
+}
+
 // =============================================================================
 // DRAGGABLE FAN
 // =============================================================================
@@ -291,7 +301,7 @@ let dragState = {
     isDragging: false,
     startX: 0,
     startY: 0,
-    fanGroup: null  // SVG group containing fan elements
+    fanElements: null  // Cached SVG elements for the fan (lines, rect, annotations)
 };
 
 /**
