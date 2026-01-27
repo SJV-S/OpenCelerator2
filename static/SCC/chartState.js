@@ -41,27 +41,56 @@ export const defaultTimingTraceConfig = Object.freeze({
     markerColor: 'black'
 });
 
-export const defaultMiscOneTraceConfig = Object.freeze({
-    seriesName: 'MiscOne',
-    showLine: true,
-    lineWidth: 0.7,
-    lineColor: 'black',
-    markerSize: 8,
-    markerSymbol: 'square',
-    markerFaceColor: 'orange',
-    markerEdgeColor: 'black'
-});
+// ============================================================================
+// Dynamic Misc Series Configuration
+// ============================================================================
 
-export const defaultMiscTwoTraceConfig = Object.freeze({
-    seriesName: 'MiscTwo',
-    showLine: true,
-    lineWidth: 0.7,
-    lineColor: 'black',
-    markerSize: 8,
-    markerSymbol: 'triangle-up',
-    markerFaceColor: 'red',
-    markerEdgeColor: 'black'
-});
+export const MAX_MISC_SERIES = 10;
+
+// Color and symbol arrays for cycling through misc series appearances
+export const MISC_COLORS = Object.freeze([
+    '#FFA500', // orange
+    '#FF0000', // red
+    '#00AA00', // green
+    '#0000FF', // blue
+    '#FF00FF', // magenta
+    '#00CCCC', // cyan
+    '#800080', // purple
+    '#008080', // teal
+    '#FFD700', // gold
+    '#8B4513'  // saddle brown
+]);
+
+export const MISC_SYMBOLS = Object.freeze([
+    'square',
+    'triangle-up',
+    'diamond',
+    'star',
+    'hexagon',
+    'pentagon',
+    'cross',
+    'triangle-down',
+    'hexagon2',
+    'octagon'
+]);
+
+/**
+ * Create a default trace config for a misc series based on its index
+ * @param {number} index - 0-based index for color/symbol cycling
+ * @returns {Object} Trace configuration object
+ */
+export function createMiscTraceConfig(index) {
+    return {
+        seriesName: `Misc ${index + 1}`,
+        showLine: true,
+        lineWidth: 0.7,
+        lineColor: 'black',
+        markerSize: 8,
+        markerSymbol: MISC_SYMBOLS[index % MISC_SYMBOLS.length],
+        markerFaceColor: MISC_COLORS[index % MISC_COLORS.length],
+        markerEdgeColor: 'black'
+    };
+}
 
 // ============================================================================
 // Line Styling Constants (Defaults - Read-only)
@@ -124,8 +153,7 @@ export const chartState = {
         corrects: TEST_DATA.corrects,
         errors: TEST_DATA.errors,
         timing: TEST_DATA.timing,
-        misc1: [],      // Y values for misc1
-        misc2: []       // Y values for misc2
+        misc: {}        // Dynamic misc series, keyed by ID (misc1, misc2, etc.)
     },
 
     // Chart identification
@@ -178,14 +206,7 @@ export const chartState = {
                 color: 'orange',
                 width: 2,
             },
-            misc1: {
-                color: 'orange',
-                width: 2,
-            },
-            misc2: {
-                color: 'orange',
-                width: 2,
-            }
+            misc: {}    // Dynamic misc series trend styles, keyed by ID
         }
     },
 
@@ -200,12 +221,7 @@ export const chartState = {
         timing: {
             "raw": { ...defaultTimingTraceConfig }
         },
-        misc1: {
-            "raw": { ...defaultMiscOneTraceConfig }
-        },
-        misc2: {
-            "raw": { ...defaultMiscTwoTraceConfig }
-        }
+        misc: {}    // Dynamic misc series trace styles, keyed by ID
     },
 
     // Credit information

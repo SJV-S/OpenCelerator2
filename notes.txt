@@ -2,3 +2,5 @@
 To-do
 * Date selection need to be redesigned, as one scrolls it is trying to also select the dates, and it's difficult to go far back in time in terms of years
 * Check angel for all the chars, the c unit may not be correct
+* We need to note when the user does something really computationally demanding, like adding 100 data series
+* Re-implement the rounding used in OpenCelerator

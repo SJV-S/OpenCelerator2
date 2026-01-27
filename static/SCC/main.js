@@ -208,8 +208,8 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeAllSeriesInputs();
     initializeLineWidthToggles();
 
-    // Initialize button visibility for all series
-    ['correct', 'incorrect', 'timing', 'misc1', 'misc2'].forEach(seriesName => {
+    // Initialize button visibility for fixed series
+    ['correct', 'incorrect', 'timing'].forEach(seriesName => {
         updateButtonVisibility(seriesName);
     });
 
@@ -312,13 +312,11 @@ function setupEventListeners() {
         submitCreditBtn.addEventListener('click', submitCredit);
     }
 
-    // Series trace config apply buttons
+    // Series trace config apply buttons (fixed series only - misc handled dynamically)
     const traceApplyActions = {
         'apply-correct-trace': () => applyTraceConfig('correct'),
         'apply-incorrect-trace': () => applyTraceConfig('incorrect'),
-        'apply-timing-trace': () => applyTraceConfig('timing'),
-        'apply-misc1-trace': () => applyTraceConfig('misc1'),
-        'apply-misc2-trace': () => applyTraceConfig('misc2')
+        'apply-timing-trace': () => applyTraceConfig('timing')
     };
 
     Object.entries(traceApplyActions).forEach(([action, handler]) => {
@@ -327,6 +325,22 @@ function setupEventListeners() {
             element.addEventListener('click', handler);
         }
     });
+
+    // Add Series button
+    const addSeriesBtn = document.querySelector('[data-action="add-misc-series"]');
+    if (addSeriesBtn) {
+        addSeriesBtn.addEventListener('click', () => {
+            import('./series/miscSeries.js').then(({ addMiscSeries, canAddMiscSeries }) => {
+                if (!canAddMiscSeries()) {
+                    import('./util/toaster.js').then(({ createToast }) => {
+                        createToast({ message: 'Maximum of 10 misc series reached.', duration: 3000 });
+                    });
+                    return;
+                }
+                addMiscSeries();
+            });
+        });
+    }
 
     // Series trace config reset buttons
     document.querySelectorAll('[data-action^="reset-trace-"]').forEach(button => {

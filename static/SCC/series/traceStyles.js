@@ -8,7 +8,8 @@
  * - Aggregation block management (adding/removing config blocks)
  */
 
-import { chartState, defaultCorrectTraceConfig, defaultErrorTraceConfig, defaultTimingTraceConfig, defaultMiscOneTraceConfig, defaultMiscTwoTraceConfig } from '../chartState.js';
+import { chartState, defaultCorrectTraceConfig, defaultErrorTraceConfig, defaultTimingTraceConfig, createMiscTraceConfig } from '../chartState.js';
+import { getMiscSeriesIds } from './miscSeries.js';
 import { createToast } from '../util/toaster.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 
@@ -18,17 +19,27 @@ import { eventBus, EVENTS } from '../eventBus.js';
 
 function updateCounterLabels() {
     // Get the first available aggregation config for each series for UI labels
-    const getFirstConfig = (seriesName) => {
-        const configs = chartState.traceStyles[seriesName];
+    const getFirstConfig = (seriesName, isMisc = false) => {
+        const configs = isMisc
+            ? chartState.traceStyles.misc[seriesName]
+            : chartState.traceStyles[seriesName];
+        if (!configs) return null;
         const firstAggType = Object.keys(configs)[0];
         return configs[firstAggType];
     };
 
     document.getElementById('correct-series-label').textContent = getFirstConfig('correct').seriesName;
     document.getElementById('incorrect-series-label').textContent = getFirstConfig('incorrect').seriesName;
-    document.getElementById('misc1-series-label').textContent = getFirstConfig('misc1').seriesName;
-    document.getElementById('misc2-series-label').textContent = getFirstConfig('misc2').seriesName;
     document.getElementById('timing-series-label').textContent = getFirstConfig('timing').seriesName;
+
+    // Update labels for dynamic misc series
+    getMiscSeriesIds().forEach(miscId => {
+        const label = document.getElementById(`${miscId}-series-label`);
+        const config = getFirstConfig(miscId, true);
+        if (label && config) {
+            label.textContent = config.seriesName;
+        }
+    });
 }
 
 function updateTraceConfig(seriesName, newConfig) {
@@ -43,8 +54,13 @@ function initializeSeriesInputs(seriesName) {
     const container = document.getElementById(`${seriesName}-blocks-container`);
     if (!container) return;
 
-    // Get all aggregation configs for this series
-    const aggConfigs = chartState.traceStyles[seriesName];
+    // Get all aggregation configs for this series (handle nested misc structure)
+    const isMiscSeries = seriesName.startsWith('misc');
+    const aggConfigs = isMiscSeries
+        ? chartState.traceStyles.misc[seriesName]
+        : chartState.traceStyles[seriesName];
+
+    if (!aggConfigs) return;
 
     // Get all existing blocks
     const blocks = Array.from(container.querySelectorAll('.agg-config-block'));
@@ -107,7 +123,10 @@ function initializeSeriesInputs(seriesName) {
 }
 
 function initializeAllSeriesInputs() {
-    Object.keys(chartState.traceStyles).forEach(initializeSeriesInputs);
+    // Initialize fixed series
+    ['correct', 'incorrect', 'timing'].forEach(initializeSeriesInputs);
+    // Initialize dynamic misc series
+    getMiscSeriesIds().forEach(initializeSeriesInputs);
 }
 
 function applyTraceConfig(seriesName) {
@@ -117,8 +136,15 @@ function applyTraceConfig(seriesName) {
 
     const blocks = container.querySelectorAll('.agg-config-block');
 
+    // Check if this is a misc series
+    const isMiscSeries = seriesName.startsWith('misc');
+
     // Clear existing configs and rebuild from blocks
-    chartState.traceStyles[seriesName] = {};
+    if (isMiscSeries) {
+        chartState.traceStyles.misc[seriesName] = {};
+    } else {
+        chartState.traceStyles[seriesName] = {};
+    }
 
     blocks.forEach(block => {
         const aggType = block.querySelector('.agg-type-select')?.value || 'raw';
@@ -150,7 +176,11 @@ function applyTraceConfig(seriesName) {
         }
 
         // Store this config under its aggregation type
-        chartState.traceStyles[seriesName][aggType] = config;
+        if (isMiscSeries) {
+            chartState.traceStyles.misc[seriesName][aggType] = config;
+        } else {
+            chartState.traceStyles[seriesName][aggType] = config;
+        }
     });
 
     updateCounterLabels();
@@ -164,15 +194,25 @@ function resetTraceConfig(seriesName) {
     const defaultsMap = {
         correct: defaultCorrectTraceConfig,
         incorrect: defaultErrorTraceConfig,
-        timing: defaultTimingTraceConfig,
-        misc1: defaultMiscOneTraceConfig,
-        misc2: defaultMiscTwoTraceConfig
+        timing: defaultTimingTraceConfig
     };
 
-    // Reset traceStyles to have only "raw" aggregation
-    chartState.traceStyles[seriesName] = {
-        "raw": { ...defaultsMap[seriesName] }
-    };
+    // Check if this is a misc series
+    const isMiscSeries = seriesName.startsWith('misc');
+
+    if (isMiscSeries) {
+        // Extract the number from miscN and create default config
+        const num = parseInt(seriesName.slice(4));
+        const index = num - 1;
+        chartState.traceStyles.misc[seriesName] = {
+            "raw": createMiscTraceConfig(index)
+        };
+    } else {
+        // Reset traceStyles to have only "raw" aggregation
+        chartState.traceStyles[seriesName] = {
+            "raw": { ...defaultsMap[seriesName] }
+        };
+    }
 
     // Remove all blocks except the first one
     const container = document.getElementById(`${seriesName}-blocks-container`);
@@ -367,6 +407,91 @@ function removeAggregationBlock(block) {
         updateButtonVisibility(seriesName);
     }
 }
+
+// ============================================================================
+// EVENT SUBSCRIPTIONS
+// ============================================================================
+
+eventBus.subscribe(EVENTS.MISC_SERIES_ADDED, ({ id, index }) => {
+    const tabContainer = document.getElementById('series-tab-container');
+    const panelContainer = document.getElementById('misc-panels-container');
+    const template = document.getElementById('misc-series-template');
+
+    if (!tabContainer || !panelContainer || !template) return;
+
+    // Create tab button
+    const addBtn = tabContainer.querySelector('[data-action="add-misc-series"]');
+    const tabButton = document.createElement('button');
+    tabButton.className = 'series-subtab px-4 py-2 text-sm font-semibold text-gray-700 border-b-2 border-transparent hover:bg-gray-50 rounded-t';
+    tabButton.dataset.seriesTab = id;
+    tabButton.textContent = `Misc ${index + 1}`;
+    tabButton.addEventListener('click', () => switchSeriesTab(id));
+    tabContainer.insertBefore(tabButton, addBtn);
+
+    // Clone and configure panel from template
+    const panel = template.content.firstElementChild.cloneNode(true);
+    panel.id = `${id}-series-config`;
+
+    // Update data-series attributes
+    panel.querySelectorAll('[data-series="misc-template"]').forEach(el => {
+        el.dataset.series = id;
+    });
+
+    // Update blocks container ID
+    const blocksContainer = panel.querySelector('.misc-blocks-container');
+    if (blocksContainer) {
+        blocksContainer.id = `${id}-blocks-container`;
+    }
+
+    // Set values from chartState config
+    const config = chartState.traceStyles.misc[id]?.raw;
+    if (config) {
+        const nameInput = panel.querySelector('.series-name-input');
+        if (nameInput) nameInput.value = config.seriesName;
+
+        const symbolInput = panel.querySelector('.marker-symbol-input');
+        if (symbolInput) symbolInput.value = config.markerSymbol;
+
+        const faceColorInput = panel.querySelector('.marker-face-color-input');
+        if (faceColorInput) faceColorInput.value = config.markerFaceColor;
+    }
+
+    // Wire up buttons
+    panel.querySelector('.apply-misc-btn')?.addEventListener('click', () => applyTraceConfig(id));
+    panel.querySelector('.reset-misc-btn')?.addEventListener('click', () => resetTraceConfig(id));
+    panel.querySelector('.delete-misc-btn')?.addEventListener('click', () => {
+        import('./miscSeries.js').then(({ removeMiscSeries }) => {
+            removeMiscSeries(id);
+        });
+    });
+    panel.querySelector('.add-block-btn')?.addEventListener('click', () => addAggregationBlock(id));
+    panel.querySelectorAll('.remove-block-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => removeAggregationBlock(e.target.closest('.agg-config-block')));
+    });
+
+    panelContainer.appendChild(panel);
+    updateButtonVisibility(id);
+
+    eventBus.emit(EVENTS.DATA_CHART_REFRESH);
+    eventBus.emit(EVENTS.UI_LEGEND_RENDER);
+}, true);
+
+eventBus.subscribe(EVENTS.MISC_SERIES_REMOVED, ({ id }) => {
+    // Remove tab button
+    const tabButton = document.querySelector(`[data-series-tab="${id}"]`);
+    if (tabButton) tabButton.remove();
+
+    // Remove config panel
+    const panel = document.getElementById(`${id}-series-config`);
+    if (panel) panel.remove();
+
+    // Switch to correct tab if needed
+    const activePanel = document.querySelector('.series-config-panel[style*="display: block"]');
+    if (!activePanel) switchSeriesTab('correct');
+
+    eventBus.emit(EVENTS.DATA_CHART_REFRESH);
+    eventBus.emit(EVENTS.UI_LEGEND_RENDER);
+}, true);
 
 // ============================================================================
 // EXPORTS

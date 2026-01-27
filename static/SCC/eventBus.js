@@ -59,7 +59,11 @@ export const EVENTS = {
 
     // UI Events
     UI_LEGEND_RENDER: 'ui:legend_render',
-    UI_TRACE_STYLE_CHANGED: 'ui:trace_style_changed'
+    UI_TRACE_STYLE_CHANGED: 'ui:trace_style_changed',
+
+    // Misc Series Events
+    MISC_SERIES_ADDED: 'misc:series_added',
+    MISC_SERIES_REMOVED: 'misc:series_removed'
 };
 class EventBus {
     constructor(name = 'EventBus') {

@@ -34,15 +34,19 @@ export function loadDataForDate() {
     for (let i = 0; i < chartState.series.timestamps.length; i++) {
         const timestamp = chartState.series.timestamps[i];
         if (timestamp >= startOfDay && timestamp < endOfDay) {
-            currentDataForDate.push({
+            const entry = {
                 index: i,
                 timestamp: timestamp,
                 corrects: chartState.series.corrects[i],
                 errors: chartState.series.errors[i],
                 timing: chartState.series.timing[i],
-                misc1: chartState.series.misc1[i],
-                misc2: chartState.series.misc2[i]
+                misc: {}
+            };
+            // Load dynamic misc series data
+            Object.keys(chartState.series.misc).forEach(miscId => {
+                entry.misc[miscId] = chartState.series.misc[miscId][i];
             });
+            currentDataForDate.push(entry);
         }
     }
 
@@ -133,11 +137,37 @@ function renderCurrentEntry() {
     // Display values - empty string for NaN (non-observations)
     const correctsValue = isNaN(point.corrects) ? '' : point.corrects;
     const errorsValue = isNaN(point.errors) ? '' : point.errors;
-    const misc1Value = isNaN(point.misc1) ? '' : point.misc1;
-    const misc2Value = isNaN(point.misc2) ? '' : point.misc2;
     const hoursValue = isNaN(hours) ? '' : hours;
     const minutesValue = isNaN(minutes) ? '' : minutes;
     const secondsValue = isNaN(seconds) ? '' : seconds;
+
+    // Get sorted misc series IDs
+    const miscIds = Object.keys(chartState.series.misc).sort((a, b) =>
+        parseInt(a.slice(4)) - parseInt(b.slice(4))
+    );
+
+    // Generate misc fields HTML
+    let miscFieldsHtml = '';
+    if (miscIds.length > 0) {
+        miscFieldsHtml = '<div class="mb-6 grid grid-cols-2 gap-4">';
+        miscIds.forEach(miscId => {
+            const config = chartState.traceStyles.misc[miscId]?.raw;
+            const label = config?.seriesName || miscId;
+            const value = isNaN(point.misc[miscId]) ? '' : point.misc[miscId];
+            miscFieldsHtml += `
+                <div>
+                    <label class="block text-sm font-semibold text-gray-600 mb-2 text-center">${label}</label>
+                    <input type="text" inputmode="numeric" pattern="[0-9]*"
+                           value="${value}"
+                           class="w-full px-3 py-3 text-lg border-2 border-gray-300 rounded focus:outline-none transition-colors text-center"
+                           data-field="${miscId}"
+                           placeholder=""
+                           oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+                </div>
+            `;
+        });
+        miscFieldsHtml += '</div>';
+    }
 
     const block = document.createElement('div');
     block.dataset.index = point.index;
@@ -166,27 +196,8 @@ function renderCurrentEntry() {
                 </div>
             </div>
 
-            <!-- Misc1 and Misc2 -->
-            <div class="mb-6 grid grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-semibold text-gray-600 mb-2 text-center">Misc1</label>
-                    <input type="text" inputmode="numeric" pattern="[0-9]*"
-                           value="${misc1Value}"
-                           class="w-full px-3 py-3 text-lg border-2 border-gray-300 rounded focus:outline-none transition-colors text-center"
-                           data-field="misc1"
-                           placeholder=""
-                           oninput="this.value=this.value.replace(/[^0-9]/g,'')">
-                </div>
-                <div>
-                    <label class="block text-sm font-semibold text-gray-600 mb-2 text-center">Misc2</label>
-                    <input type="text" inputmode="numeric" pattern="[0-9]*"
-                           value="${misc2Value}"
-                           class="w-full px-3 py-3 text-lg border-2 border-gray-300 rounded focus:outline-none transition-colors text-center"
-                           data-field="misc2"
-                           placeholder=""
-                           oninput="this.value=this.value.replace(/[^0-9]/g,'')">
-                </div>
-            </div>
+            <!-- Dynamic Misc Series -->
+            ${miscFieldsHtml}
 
             <!-- Timing -->
             <div class="mb-6">
@@ -240,8 +251,6 @@ export function updateCurrentEntry() {
     // Get values from input fields (same as dataEntry.js - allow NaN for non-entries)
     const corrects = parseInt(container.querySelector('[data-field="corrects"]').value);
     const errors = parseInt(container.querySelector('[data-field="errors"]').value);
-    const misc1 = parseInt(container.querySelector('[data-field="misc1"]').value);
-    const misc2 = parseInt(container.querySelector('[data-field="misc2"]').value);
     const hours = parseInt(container.querySelector('[data-field="hours"]').value);
     const minutes = parseInt(container.querySelector('[data-field="minutes"]').value);
     const seconds = parseInt(container.querySelector('[data-field="seconds"]').value);
@@ -253,15 +262,21 @@ export function updateCurrentEntry() {
     const dataIndex = point.index;
     chartState.series.corrects[dataIndex] = corrects;
     chartState.series.errors[dataIndex] = errors;
-    chartState.series.misc1[dataIndex] = misc1;
-    chartState.series.misc2[dataIndex] = misc2;
     chartState.series.timing[dataIndex] = timingMinutes;
+
+    // Update dynamic misc series
+    Object.keys(chartState.series.misc).forEach(miscId => {
+        const input = container.querySelector(`[data-field="${miscId}"]`);
+        if (input) {
+            const value = parseInt(input.value);
+            chartState.series.misc[miscId][dataIndex] = value;
+            currentDataForDate[currentTimestampIndex].misc[miscId] = value;
+        }
+    });
 
     // Update local copy
     currentDataForDate[currentTimestampIndex].corrects = corrects;
     currentDataForDate[currentTimestampIndex].errors = errors;
-    currentDataForDate[currentTimestampIndex].misc1 = misc1;
-    currentDataForDate[currentTimestampIndex].misc2 = misc2;
     currentDataForDate[currentTimestampIndex].timing = timingMinutes;
 
     // Refresh the chart to show updated data
@@ -302,8 +317,11 @@ export function deleteCurrentEntry() {
             chartState.series.corrects.splice(dataIndex, 1);
             chartState.series.errors.splice(dataIndex, 1);
             chartState.series.timing.splice(dataIndex, 1);
-            chartState.series.misc1.splice(dataIndex, 1);
-            chartState.series.misc2.splice(dataIndex, 1);
+
+            // Remove from dynamic misc series
+            Object.keys(chartState.series.misc).forEach(miscId => {
+                chartState.series.misc[miscId].splice(dataIndex, 1);
+            });
 
             // Remove from local array
             currentDataForDate.splice(currentTimestampIndex, 1);

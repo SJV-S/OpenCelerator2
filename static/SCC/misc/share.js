@@ -83,17 +83,22 @@ function exportDataToCSV() {
     }
 
     try {
-        // Check if misc1 or misc2 have any integer data
-        const hasMisc1Data = chartState.series.misc1.some(val => Number.isInteger(val));
-        const hasMisc2Data = chartState.series.misc2.some(val => Number.isInteger(val));
+        // Find misc series that have integer data
+        const miscSeriesWithData = Object.entries(chartState.series.misc)
+            .filter(([id, data]) => data && data.some(val => Number.isInteger(val)))
+            .map(([id]) => id)
+            .sort((a, b) => parseInt(a.slice(4)) - parseInt(b.slice(4)));
 
         // Prepare CSV data
         let csvContent = '';
 
         // Add header row based on which series have data
         csvContent += 'Date,Corrects,Errors,Minutes';
-        if (hasMisc1Data) csvContent += ',Misc1';
-        if (hasMisc2Data) csvContent += ',Misc2';
+        miscSeriesWithData.forEach(miscId => {
+            const config = chartState.traceStyles.misc[miscId]?.raw;
+            const name = config?.seriesName || miscId;
+            csvContent += `,${name}`;
+        });
         csvContent += '\n';
 
         // Get the length of timestamps array
@@ -130,14 +135,10 @@ function exportDataToCSV() {
 
             let row = `${dateStr},${correct},${error},${timing}`;
 
-            if (hasMisc1Data) {
-                const misc1 = formatValue(chartState.series.misc1[i]);
-                row += `,${misc1}`;
-            }
-            if (hasMisc2Data) {
-                const misc2 = formatValue(chartState.series.misc2[i]);
-                row += `,${misc2}`;
-            }
+            miscSeriesWithData.forEach(miscId => {
+                const val = formatValue(chartState.series.misc[miscId][i]);
+                row += `,${val}`;
+            });
 
             csvContent += row + '\n';
         }

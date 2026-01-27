@@ -26,22 +26,14 @@ const visibilityState = {};
 function getLegendItems() {
     const items = [];
 
-    Object.entries(chartState.traceStyles).forEach(([seriesKey, aggConfigs]) => {
-        // Skip misc1 and misc2 if they have no integer data
-        if (seriesKey === 'misc1' || seriesKey === 'misc2') {
-            const dataArray = chartState.series[seriesKey];
-            // Check if there's at least one integer value
-            const hasIntegerData = dataArray && dataArray.some(val => Number.isInteger(val));
-            if (!hasIntegerData) {
-                return; // Skip this series
-            }
-        }
+    // Process fixed series (correct, incorrect, timing)
+    ['correct', 'incorrect', 'timing'].forEach(seriesKey => {
+        const aggConfigs = chartState.traceStyles[seriesKey];
+        if (!aggConfigs) return;
 
-        // Create a legend item for EACH aggregation config
         Object.entries(aggConfigs).forEach(([aggType, config]) => {
             const uniqueKey = `${seriesKey}_${aggType}`;
 
-            // Initialize visibility state if not present
             if (visibilityState[uniqueKey] === undefined) {
                 visibilityState[uniqueKey] = true;
             }
@@ -52,6 +44,30 @@ function getLegendItems() {
                 visible: visibilityState[uniqueKey],
                 config: config,
                 baseSeriesKey: seriesKey
+            });
+        });
+    });
+
+    // Process dynamic misc series
+    Object.entries(chartState.traceStyles.misc).forEach(([miscId, aggConfigs]) => {
+        // Skip if no integer data
+        const dataArray = chartState.series.misc[miscId];
+        const hasIntegerData = dataArray && dataArray.some(val => Number.isInteger(val));
+        if (!hasIntegerData) return;
+
+        Object.entries(aggConfigs).forEach(([aggType, config]) => {
+            const uniqueKey = `${miscId}_${aggType}`;
+
+            if (visibilityState[uniqueKey] === undefined) {
+                visibilityState[uniqueKey] = true;
+            }
+
+            items.push({
+                seriesKey: uniqueKey,
+                displayName: config.seriesName,
+                visible: visibilityState[uniqueKey],
+                config: config,
+                baseSeriesKey: miscId
             });
         });
     });
@@ -312,12 +328,11 @@ function updatePlotlyTraceVisibility(seriesKey, visible) {
     const seriesNameMap = {
         'correct': 'corrects',
         'incorrect': 'errors',
-        'timing': 'timing',
-        'misc1': 'misc1',
-        'misc2': 'misc2'
+        'timing': 'timing'
     };
 
-    const targetSeriesName = seriesNameMap[baseKey];
+    // For misc series, the baseKey IS the seriesName (misc1, misc2, etc.)
+    const targetSeriesName = seriesNameMap[baseKey] || baseKey;
     const traceIndices = [];
 
     // Find all traces for this specific series AND aggregation type

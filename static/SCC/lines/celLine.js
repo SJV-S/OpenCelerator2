@@ -482,12 +482,11 @@ function getDataInRangeForSeries(x1, x2, baseKey) {
     const seriesNameMap = {
         'correct': 'corrects',
         'incorrect': 'errors',
-        'timing': 'timing',
-        'misc1': 'misc1',
-        'misc2': 'misc2'
+        'timing': 'timing'
     };
 
-    const targetSeriesName = seriesNameMap[baseKey];
+    // For misc series, the baseKey IS the seriesName (misc1, misc2, etc.)
+    const targetSeriesName = seriesNameMap[baseKey] || baseKey;
     const xValues = [];
     const yValues = [];
 

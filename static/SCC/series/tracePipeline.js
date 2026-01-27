@@ -84,32 +84,7 @@ function timingFloorTrace(xValues, yValues, config) {
     };
 }
 
-function miscOneTrace(xValues, yValues, config) {
-    return {
-        x: xValues,
-        y: yValues,
-        mode: config.showLine ? 'lines+markers' : 'markers',
-        line: {
-            color: config.lineColor,
-            width: config.lineWidth
-        },
-        marker: {
-            symbol: config.markerSymbol,
-            size: config.markerSize,
-            color: config.markerFaceColor,
-            line: {
-                color: config.markerEdgeColor,
-                width: 1
-            }
-        },
-        name: config.seriesName,
-        connectgaps: true,
-        hoverinfo: 'none',
-        hovertemplate: '%{y}'
-    };
-}
-
-function miscTwoTrace(xValues, yValues, config) {
+function miscTrace(xValues, yValues, config) {
     return {
         x: xValues,
         y: yValues,
@@ -152,15 +127,8 @@ function errorsFloorTrace(xValues, yValues, config) {
     return trace;
 }
 
-function misc1FloorTrace(xValues, yValues, config) {
-    const trace = miscOneTrace(xValues, yValues, config);
-    trace.mode = trace.mode.replace('lines+', '').replace('+lines', '');
-    trace.showlegend = false;
-    return trace;
-}
-
-function misc2FloorTrace(xValues, yValues, config) {
-    const trace = miscTwoTrace(xValues, yValues, config);
+function miscFloorTrace(xValues, yValues, config) {
+    const trace = miscTrace(xValues, yValues, config);
     trace.mode = trace.mode.replace('lines+', '').replace('+lines', '');
     trace.showlegend = false;
     return trace;
@@ -258,23 +226,15 @@ function isBelowFloor(freq, timing) {
 function calculateFrequencies() {
     const timingMinutes = chartState.series.timing;
 
-    // Calculate raw frequencies
+    // Calculate raw frequencies for fixed series
     const correctsFreqRaw = chartState.series.corrects.map((count, i) => count / timingMinutes[i]);
     const errorsFreqRaw = chartState.series.errors.map((count, i) => count / timingMinutes[i]);
-    const misc1FreqRaw = chartState.series.misc1.map((count, i) => count / timingMinutes[i]);
-    const misc2FreqRaw = chartState.series.misc2.map((count, i) => count / timingMinutes[i]);
 
     // Create original frequency arrays (below-floor values set to NaN)
     const correctsFreq = correctsFreqRaw.map((freq, i) =>
         isBelowFloor(freq, timingMinutes[i]) ? NaN : freq
     );
     const errorsFreq = errorsFreqRaw.map((freq, i) =>
-        isBelowFloor(freq, timingMinutes[i]) ? NaN : freq
-    );
-    const misc1Freq = misc1FreqRaw.map((freq, i) =>
-        isBelowFloor(freq, timingMinutes[i]) ? NaN : freq
-    );
-    const misc2Freq = misc2FreqRaw.map((freq, i) =>
         isBelowFloor(freq, timingMinutes[i]) ? NaN : freq
     );
 
@@ -285,23 +245,28 @@ function calculateFrequencies() {
     const errorsFloor = errorsFreqRaw.map((freq, i) =>
         isBelowFloor(freq, timingMinutes[i]) ? placeBelowFloor(freq, timingMinutes[i]) : NaN
     );
-    const misc1Floor = misc1FreqRaw.map((freq, i) =>
-        isBelowFloor(freq, timingMinutes[i]) ? placeBelowFloor(freq, timingMinutes[i]) : NaN
-    );
-    const misc2Floor = misc2FreqRaw.map((freq, i) =>
-        isBelowFloor(freq, timingMinutes[i]) ? placeBelowFloor(freq, timingMinutes[i]) : NaN
-    );
 
-    return {
+    const result = {
         corrects: correctsFreq,
         errors: errorsFreq,
-        misc1: misc1Freq,
-        misc2: misc2Freq,
         correctsFloor: correctsFloor,
         errorsFloor: errorsFloor,
-        misc1Floor: misc1Floor,
-        misc2Floor: misc2Floor
+        misc: {},
+        miscFloor: {}
     };
+
+    // Calculate frequencies for dynamic misc series
+    Object.entries(chartState.series.misc).forEach(([miscId, data]) => {
+        const miscFreqRaw = data.map((count, i) => count / timingMinutes[i]);
+        result.misc[miscId] = miscFreqRaw.map((freq, i) =>
+            isBelowFloor(freq, timingMinutes[i]) ? NaN : freq
+        );
+        result.miscFloor[miscId] = miscFreqRaw.map((freq, i) =>
+            isBelowFloor(freq, timingMinutes[i]) ? placeBelowFloor(freq, timingMinutes[i]) : NaN
+        );
+    });
+
+    return result;
 }
 
 /**
@@ -417,22 +382,15 @@ function createFloorShadowTraces(xPositions, frequencies) {
         floorShadowTraces.push(trace);
     });
 
-    // MISC1 FLOOR SHADOW
-    Object.entries(chartState.traceStyles.misc1).forEach(([aggType, config]) => {
-        const aggregatedFloor = applyAggregation(frequencies.misc1Floor, aggType);
+    // MISC FLOOR SHADOWS (dynamic)
+    Object.entries(chartState.traceStyles.misc).forEach(([miscId, aggConfigs]) => {
+        Object.entries(aggConfigs).forEach(([aggType, config]) => {
+            const aggregatedFloor = applyAggregation(frequencies.miscFloor[miscId], aggType);
 
-        const trace = misc1FloorTrace(xPositions, aggregatedFloor, config);
-        trace.meta = {seriesName: 'misc1FloorShadow', aggType: aggType};
-        floorShadowTraces.push(trace);
-    });
-
-    // MISC2 FLOOR SHADOW
-    Object.entries(chartState.traceStyles.misc2).forEach(([aggType, config]) => {
-        const aggregatedFloor = applyAggregation(frequencies.misc2Floor, aggType);
-
-        const trace = misc2FloorTrace(xPositions, aggregatedFloor, config);
-        trace.meta = {seriesName: 'misc2FloorShadow', aggType: aggType};
-        floorShadowTraces.push(trace);
+            const trace = miscFloorTrace(xPositions, aggregatedFloor, config);
+            trace.meta = {seriesName: `${miscId}FloorShadow`, aggType: aggType};
+            floorShadowTraces.push(trace);
+        });
     });
 
     return floorShadowTraces;
@@ -487,27 +445,17 @@ function createFrequencyTraces(xPositions, frequencies, timestampsToXPositions) 
         });
     });
 
-    // MISC1
-    Object.entries(chartState.traceStyles.misc1).forEach(([aggType, config]) => {
-        const aggregatedFreq = applyAggregation(frequencies.misc1, aggType);
-        const segments = createSegments(xPositions, aggregatedFreq, cutXPositions, 'misc1');
+    // MISC (dynamic)
+    Object.entries(chartState.traceStyles.misc).forEach(([miscId, aggConfigs]) => {
+        Object.entries(aggConfigs).forEach(([aggType, config]) => {
+            const aggregatedFreq = applyAggregation(frequencies.misc[miscId], aggType);
+            const segments = createSegments(xPositions, aggregatedFreq, cutXPositions, miscId);
 
-        segments.forEach(seg => {
-            const trace = miscOneTrace(seg.x, seg.y, config);
-            trace.meta = {seriesName: seg.seriesName, aggType: aggType};
-            dataTraces.push(trace);
-        });
-    });
-
-    // MISC2
-    Object.entries(chartState.traceStyles.misc2).forEach(([aggType, config]) => {
-        const aggregatedFreq = applyAggregation(frequencies.misc2, aggType);
-        const segments = createSegments(xPositions, aggregatedFreq, cutXPositions, 'misc2');
-
-        segments.forEach(seg => {
-            const trace = miscTwoTrace(seg.x, seg.y, config);
-            trace.meta = {seriesName: seg.seriesName, aggType: aggType};
-            dataTraces.push(trace);
+            segments.forEach(seg => {
+                const trace = miscTrace(seg.x, seg.y, config);
+                trace.meta = {seriesName: seg.seriesName, aggType: aggType};
+                dataTraces.push(trace);
+            });
         });
     });
 
@@ -523,12 +471,10 @@ export {
     correctsTrace,
     errorTrace,
     timingFloorTrace,
-    miscOneTrace,
-    miscTwoTrace,
+    miscTrace,
     correctsFloorTrace,
     errorsFloorTrace,
-    misc1FloorTrace,
-    misc2FloorTrace,
+    miscFloorTrace,
     // Aggregation and frequency logic
     applyAggregation,
     timingToFrequency,
