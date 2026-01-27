@@ -52,28 +52,43 @@ function generateMiscInputs() {
 /**
  * Submit a new data entry from the counter form
  * Emits: DATA_ENTRY_SUBMITTED, DATA_CHART_REFRESH
+ *
+ * For minute charts: validates timing input and calculates timing in minutes
+ * For non-minute charts: skips timing validation and uses timing of 1
  */
 function submitEntry() {
     const entryDate = document.getElementById('entry-date').value;
     const corrects = parseInt(document.getElementById('corrects').value);
     const incorrects = parseInt(document.getElementById('incorrects').value);
-    const hours = parseInt(document.getElementById('hours').value);
-    const minutes = parseInt(document.getElementById('minutes').value);
-    const seconds = parseInt(document.getElementById('seconds').value);
 
-    // Validation: At least one timing field must have an integer value
-    const hasHours = !isNaN(hours) && hours >= 0;
-    const hasMinutes = !isNaN(minutes) && minutes >= 0;
-    const hasSeconds = !isNaN(seconds) && seconds >= 0;
+    let timingMinutes;
 
-    const timingLabel = document.getElementById('timing-series-label');
+    if (chartState.minuteChart) {
+        // Minute chart: validate and calculate timing
+        const hours = parseInt(document.getElementById('hours').value);
+        const minutes = parseInt(document.getElementById('minutes').value);
+        const seconds = parseInt(document.getElementById('seconds').value);
 
-    if (!hasHours && !hasMinutes && !hasSeconds) {
-        timingLabel.style.color = '#ef4444';
-        return;
+        // Validation: At least one timing field must have an integer value
+        const hasHours = !isNaN(hours) && hours >= 0;
+        const hasMinutes = !isNaN(minutes) && minutes >= 0;
+        const hasSeconds = !isNaN(seconds) && seconds >= 0;
+
+        const timingLabel = document.getElementById('timing-series-label');
+
+        if (!hasHours && !hasMinutes && !hasSeconds) {
+            timingLabel.style.color = '#ef4444';
+            return;
+        }
+
+        timingLabel.style.color = '';
+
+        // Calculate total timing in minutes
+        timingMinutes = (hours || 0) * 60 + (minutes || 0) + (seconds || 0) / 60;
+    } else {
+        // Non-minute chart: use timing of 1 (raw counts)
+        timingMinutes = 1;
     }
-
-    timingLabel.style.color = '';
 
     // Emit event to hide counter - navigation subscribes to this
     eventBus.emit(EVENTS.DATA_ENTRY_SUBMITTED);
@@ -83,9 +98,6 @@ function submitEntry() {
     const selectedDate = new Date(entryDate);
     selectedDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
     const timestamp = Math.floor(selectedDate.getTime() / 1000);
-
-    // Calculate total timing in minutes
-    const timingMinutes = (hours || 0) * 60 + (minutes || 0) + (seconds || 0) / 60;
 
     // Append data points to fixed series arrays
     chartState.series.xValues.push(timestamp);
@@ -141,6 +153,14 @@ function init() {
 
     // Generate initial misc inputs
     generateMiscInputs();
+
+    // Hide timing section for non-minute charts
+    if (!chartState.minuteChart) {
+        const timingSection = document.getElementById('timing-series-label')?.closest('.mb-6, .lg\\:mb-3');
+        if (timingSection) {
+            timingSection.style.display = 'none';
+        }
+    }
 }
 
 export {

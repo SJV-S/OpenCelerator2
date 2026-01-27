@@ -222,9 +222,16 @@ function isBelowFloor(freq, timing) {
 
 /**
  * Calculate frequencies for all data types from raw counts and timing
+ *
+ * For minute charts: frequency = count / timing
+ * For non-minute charts: uses timing of 1 (frequency = count), but floor logic
+ * still applies to handle zero counts (placed at 0.75 below floor of 1)
  */
 function calculateFrequencies() {
-    const timingMinutes = chartState.series.timing;
+    // Non-minute charts use timing of 1 for all points (raw counts, but floor still works for zeros)
+    const timingMinutes = chartState.minuteChart
+        ? chartState.series.timing
+        : chartState.series.timing.map(() => 1);
 
     // Calculate raw frequencies for fixed series
     const correctsFreqRaw = chartState.series.corrects.map((count, i) => count / timingMinutes[i]);
@@ -321,8 +328,15 @@ function createSegments(xArray, yArray, cutXPositions, seriesName) {
  * Create timing traces (no segmenting, no floor shadows)
  * Loops through all aggregation keys for timing series
  * Returns array of timing traces
+ *
+ * Note: Returns empty array for non-minute charts (timing floor not displayed)
  */
 function createTimingTraces(xPositions) {
+    // Non-minute charts don't display timing floor
+    if (!chartState.minuteChart) {
+        return [];
+    }
+
     const timingTraces = [];
     const timingFrequencies = timingToFrequency(chartState.series.timing);
 

@@ -386,6 +386,17 @@ function setupEventListeners() {
         });
     }
 
+    // Chart name input
+    const chartNameInput = document.getElementById('chart-name');
+    if (chartNameInput) {
+        // Initialize input from chartState
+        chartNameInput.value = chartState.chartName !== 'Unnamed' ? chartState.chartName : '';
+
+        chartNameInput.addEventListener('input', (e) => {
+            chartState.chartName = e.target.value.trim() || 'Unnamed';
+        });
+    }
+
     // Add block buttons - handle adding new aggregation blocks
     document.querySelectorAll('.add-block-btn').forEach(button => {
         button.addEventListener('click', (e) => {
