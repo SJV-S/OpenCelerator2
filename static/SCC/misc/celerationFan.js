@@ -1,7 +1,49 @@
 /**
  * Celeration Fan Module
  *
- * Implements the exact formulas from the celeration fan documentation.
+ * Implements the standard celeration fan - a visual reference showing standard rates
+ * of change (×16 to ÷16) as 9 lines radiating from a common center point.
+ *
+ * =============================================================================
+ * CRITICAL IMPLEMENTATION NOTES
+ * =============================================================================
+ *
+ * 1. MARGIN EXPANSION (Clipping Prevention)
+ * -----------------------------------------
+ * The fan is positioned OUTSIDE the plot area (in the margins). Plotly clips any
+ * shapes or annotations that fall outside the plot boundaries by default.
+ *
+ * Solution: Expand the margin BEFORE calling Plotly.newPlot(). The injectCelerationFan()
+ * function adds extra margin space (18% of plot width) to the left (minute charts) or
+ * right (non-minute charts), then positions the fan within this expanded margin.
+ *
+ * This MUST happen before initial render - attempting to add the fan after render
+ * will result in clipped/invisible elements.
+ *
+ * 2. TEXT-LINE ALIGNMENT (Plotly Bounding Box Bug Workaround)
+ * -----------------------------------------------------------
+ * Problem: Text labels at intermediate angles (±17°, ±34°, ±51°) misalign from their
+ * lines, while extreme angles (±68°) align correctly.
+ *
+ * Root cause: When showarrow=false, Plotly rotates the text first, then calculates
+ * anchors on the EXPANDED bounding box. At intermediate angles, both sin and cos
+ * contribute significantly, maximizing bounding box expansion and causing offset.
+ * This is a known Plotly bug (GitHub Issue #1258, open since December 2016).
+ *
+ * Solution (two parts):
+ *
+ *   a) INVISIBLE ARROW TECHNIQUE: Use showarrow=true with ax=0, ay=0, and
+ *      arrowcolor='rgba(0,0,0,0)'. This changes Plotly's behavior to anchor first,
+ *      THEN rotate around that anchor - keeping text exactly where specified.
+ *
+ *   b) VISUAL ANGLE CALCULATION: The text rotation angle must match the line's
+ *      visual appearance on screen, not the data-space angle. On a semi-log chart
+ *      with non-square aspect ratio, these differ. Calculate the visual angle from
+ *      paper-space line endpoints multiplied by actual pixel dimensions:
+ *
+ *        visualAngle = atan2((p1.y - p0.y) * plotHeight, (p1.x - p0.x) * plotWidth)
+ *
+ * =============================================================================
  */
 
 import { chartState } from '../chartState.js';
@@ -40,6 +82,10 @@ export function generateFanElements(layout, isMinuteChart, chartType) {
     const unit = UNITS[chartType] || 7;
     const periodLabel = PERIOD_LABELS[chartType] || 'per week';
 
+    // Calculate plot area dimensions for visual angle calculation
+    const plotWidth = layout.width - layout.margin.l - layout.margin.r;
+    const plotHeight = layout.height - layout.margin.t - layout.margin.b;
+
     // Fan center in DATA coordinates
     const xMid = isMinuteChart ? xMax * -0.22 : xMax * 1.04;
     const yMid = isMinuteChart ? 0.01 : 1000;
@@ -51,7 +97,7 @@ export function generateFanElements(layout, isMinuteChart, chartType) {
     const annotations = [];
 
     CEL_VALUES.forEach((cel, i) => {
-        // Step 1: Angle
+        // Step 1: Angle (data-space, for line endpoint calculation)
         const angleDeg = getAngleDegrees(cel);
         const angleRad = angleDeg * Math.PI / 180;
 
@@ -64,13 +110,20 @@ export function generateFanElements(layout, isMinuteChart, chartType) {
         const p0 = toPaper(xMid, yMid, xMin, xMax, yMinLog, yMaxLog);
         const p1 = toPaper(xEnd, yEnd, xMin, xMax, yMinLog, yMaxLog);
 
+        // Calculate VISUAL angle from paper coords + aspect ratio
+        // This is the actual angle the line appears at on screen
+        const visualAngleDeg = Math.atan2(
+            (p1.y - p0.y) * plotHeight,
+            (p1.x - p0.x) * plotWidth
+        ) * (180 / Math.PI);
+
         shapes.push({
             type: 'line',
             name: `fan-line-${i}`,
             x0: p0.x, y0: p0.y,
             x1: p1.x, y1: p1.y,
             xref: 'paper', yref: 'paper',
-            line: { color: FAN_COLOR, width: 1 }
+            line: { color: FAN_COLOR, width: 1.25 }
         });
 
         // Step 3: Text position - SAME FORMULA, extended dx
@@ -81,7 +134,10 @@ export function generateFanElements(layout, isMinuteChart, chartType) {
 
         const pText = toPaper(textX, textY, xMin, xMax, yMinLog, yMaxLog);
 
-        // Step 4: Text angle = line angle
+        // Step 4: Use VISUAL angle for text rotation
+        // Use invisible arrow technique to fix Plotly's bounding box rotation problem
+        // With showarrow: true, Plotly anchors first THEN rotates (correct behavior)
+        // With showarrow: false, Plotly rotates first THEN anchors on expanded bbox (broken)
         annotations.push({
             name: `fan-label-${i}`,
             x: pText.x,
@@ -89,33 +145,34 @@ export function generateFanElements(layout, isMinuteChart, chartType) {
             xref: 'paper',
             yref: 'paper',
             text: `<b>${LABELS[i]}</b>`,
-            showarrow: false,
-            font: { size: 10, color: FAN_COLOR },
-            textangle: -angleDeg,
+            showarrow: true,
+            ax: 0,
+            ay: 0,
+            arrowcolor: 'rgba(0,0,0,0)',
+            font: { size: 10, color: FAN_COLOR, weight: 'bold' },
+            textangle: -visualAngleDeg,
             xanchor: 'center',
-            yanchor: 'center'
+            yanchor: 'middle'
         });
     });
 
-    // Header above fan
-    const topDx = lineLength * Math.cos(getAngleDegrees(16) * Math.PI / 180) * 0.5;
-    const headerX = xMid + topDx;
-    const headerY = yMid * 22;
+    // Header above fan - centered on midpoint of horizontal ×1 line
+    const headerX = xMid + lineLength / 2;
+    const headerY = yMid * 15;
     const pHeader = toPaper(headerX, headerY, xMin, xMax, yMinLog, yMaxLog);
     annotations.push({
         name: 'fan-header',
         x: pHeader.x, y: pHeader.y,
         xref: 'paper', yref: 'paper',
-        text: '<b>Standard<br>celeration</b>',
+        text: '<b>Standard<br>change</b>',
         showarrow: false,
         font: { size: 11, color: FAN_COLOR },
         xanchor: 'center', yanchor: 'bottom'
     });
 
-    // Period below fan
-    const bottomDx = lineLength * Math.cos(getAngleDegrees(1/16) * Math.PI / 180) * 0.5;
-    const periodX = xMid + bottomDx;
-    const periodY = yMid / 22;
+    // Period below fan - centered on midpoint of horizontal ×1 line
+    const periodX = xMid + lineLength / 2;
+    const periodY = yMid / 15;
     const pPeriod = toPaper(periodX, periodY, xMin, xMax, yMinLog, yMaxLog);
     annotations.push({
         name: 'fan-period',
