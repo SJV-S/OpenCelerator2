@@ -184,6 +184,23 @@ export function generateFanElements(layout, isMinuteChart, chartType) {
         xanchor: 'center', yanchor: 'top'
     });
 
+    // Transparent hit-area rectangle for easier dragging
+    // Calculate bounds from fan origin to line endpoints, header to period
+    const p0 = toPaper(xMid, yMid, xMin, xMax, yMinLog, yMaxLog);
+    const pEnd = toPaper(xMid + lineLength * 1.3, yMid, xMin, xMax, yMinLog, yMaxLog); // Extended for labels
+    const hitPad = 0.03; // Extra padding
+    shapes.push({
+        type: 'rect',
+        name: 'fan-hitarea',
+        x0: p0.x - hitPad,
+        y0: pPeriod.y - hitPad,
+        x1: pEnd.x + hitPad,
+        y1: pHeader.y + hitPad,
+        xref: 'paper', yref: 'paper',
+        fillcolor: 'rgba(0,0,0,0)',
+        line: { width: 0 }
+    });
+
     return { shapes, annotations };
 }
 
@@ -233,4 +250,201 @@ export function addCelerationFan() {
 
 export function toggleCelerationFan(visible) {
     visible ? addCelerationFan() : removeCelerationFan();
+}
+
+// =============================================================================
+// DRAGGABLE FAN
+// =============================================================================
+
+let dragState = {
+    isDragging: false,
+    startX: 0,
+    startY: 0,
+    fanGroup: null  // SVG group containing fan elements
+};
+
+/**
+ * Convert pixel coordinates to paper coordinates
+ */
+function pixelToPaper(chartDiv, pixelX, pixelY) {
+    const layout = chartDiv.layout;
+    const bbox = chartDiv.getBoundingClientRect();
+
+    const plotLeft = bbox.left + layout.margin.l;
+    const plotRight = bbox.right - layout.margin.r;
+    const plotTop = bbox.top + layout.margin.t;
+    const plotBottom = bbox.bottom - layout.margin.b;
+
+    const plotWidth = plotRight - plotLeft;
+    const plotHeight = plotBottom - plotTop;
+
+    const paperX = (pixelX - plotLeft) / plotWidth;
+    const paperY = 1 - (pixelY - plotTop) / plotHeight;
+
+    return { x: paperX, y: paperY };
+}
+
+/**
+ * Check if a paper coordinate point is within the fan's hit-area rectangle
+ */
+function isPointOnFan(chartDiv, paperX, paperY) {
+    const layout = chartDiv.layout;
+    const hitArea = (layout.shapes || []).find(s => s.name === 'fan-hitarea');
+
+    if (!hitArea) return false;
+
+    return paperX >= hitArea.x0 && paperX <= hitArea.x1 &&
+           paperY >= hitArea.y0 && paperY <= hitArea.y1;
+}
+
+/**
+ * Get indices of fan shapes and annotations in layout arrays
+ */
+function getFanIndices(chartDiv) {
+    const layout = chartDiv.layout;
+    const shapeIndices = [];
+    const annotationIndices = [];
+
+    (layout.shapes || []).forEach((shape, i) => {
+        if (shape.name?.startsWith('fan-')) {
+            shapeIndices.push(i);
+        }
+    });
+
+    (layout.annotations || []).forEach((ann, i) => {
+        if (ann.name?.startsWith('fan-')) {
+            annotationIndices.push(i);
+        }
+    });
+
+    return { shapeIndices, annotationIndices };
+}
+
+/**
+ * Get Plotly's SVG elements for the fan
+ */
+function getFanSvgElements(chartDiv) {
+    const { shapeIndices, annotationIndices } = getFanIndices(chartDiv);
+    const elements = [];
+
+    // Find the layer-above shapelayer (where paper-coordinate shapes go)
+    const aboveLayer = chartDiv.querySelector('.layer-above .shapelayer');
+    if (aboveLayer) {
+        // Grab all shapes from this layer - they should all be fan shapes
+        aboveLayer.querySelectorAll('path, rect').forEach(el => {
+            elements.push(el);
+        });
+    }
+
+    // Get annotation groups by index
+    const annotations = chartDiv.querySelectorAll('.annotation');
+    annotationIndices.forEach(i => {
+        if (annotations[i]) elements.push(annotations[i]);
+    });
+
+    return elements;
+}
+
+/**
+ * Update fan position in Plotly data
+ */
+function updateFanPosition(chartDiv, dx, dy) {
+    const layout = chartDiv.layout;
+    const updates = {};
+
+    (layout.shapes || []).forEach((shape, i) => {
+        if (shape.name?.startsWith('fan-')) {
+            updates[`shapes[${i}].x0`] = shape.x0 + dx;
+            updates[`shapes[${i}].y0`] = shape.y0 + dy;
+            updates[`shapes[${i}].x1`] = shape.x1 + dx;
+            updates[`shapes[${i}].y1`] = shape.y1 + dy;
+        }
+    });
+
+    (layout.annotations || []).forEach((ann, i) => {
+        if (ann.name?.startsWith('fan-')) {
+            updates[`annotations[${i}].x`] = ann.x + dx;
+            updates[`annotations[${i}].y`] = ann.y + dy;
+        }
+    });
+
+    Plotly.relayout(chartDiv, updates);
+}
+
+function handleMouseDown(e) {
+    const chartDiv = document.getElementById('chart');
+    if (!chartDiv?.layout || !chartState.fanVisible) return;
+
+    const paper = pixelToPaper(chartDiv, e.clientX, e.clientY);
+
+    if (isPointOnFan(chartDiv, paper.x, paper.y)) {
+        dragState.isDragging = true;
+        dragState.startX = e.clientX;
+        dragState.startY = e.clientY;
+
+        // Get and cache the actual Plotly SVG elements
+        dragState.fanElements = getFanSvgElements(chartDiv);
+
+        chartDiv.style.cursor = 'grabbing';
+        e.preventDefault();
+    }
+}
+
+function handleMouseMove(e) {
+    if (!dragState.isDragging || !dragState.fanElements) return;
+
+    // Apply CSS transform to actual Plotly elements (fast)
+    const dx = e.clientX - dragState.startX;
+    const dy = e.clientY - dragState.startY;
+    const transform = `translate(${dx}px, ${dy}px)`;
+
+    dragState.fanElements.forEach(el => {
+        el.style.transform = transform;
+    });
+}
+
+function handleMouseUp(e) {
+    if (dragState.isDragging) {
+        dragState.isDragging = false;
+
+        const chartDiv = document.getElementById('chart');
+
+        // Clear CSS transforms
+        if (dragState.fanElements) {
+            dragState.fanElements.forEach(el => {
+                el.style.transform = '';
+            });
+            dragState.fanElements = null;
+        }
+
+        if (chartDiv) {
+            chartDiv.style.cursor = '';
+
+            // Calculate delta in paper coords and update Plotly once
+            const paperStart = pixelToPaper(chartDiv, dragState.startX, dragState.startY);
+            const paperEnd = pixelToPaper(chartDiv, e.clientX, e.clientY);
+            const dx = paperEnd.x - paperStart.x;
+            const dy = paperEnd.y - paperStart.y;
+
+            if (dx !== 0 || dy !== 0) {
+                updateFanPosition(chartDiv, dx, dy);
+            }
+        }
+    }
+}
+
+/**
+ * Initialize fan drag functionality - call after chart is created
+ */
+export function initFanDrag() {
+    const chartDiv = document.getElementById('chart');
+    if (!chartDiv) return;
+
+    chartDiv.removeEventListener('mousedown', handleMouseDown);
+    document.removeEventListener('mousemove', handleMouseMove);
+    document.removeEventListener('mouseup', handleMouseUp);
+
+    chartDiv.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
 }

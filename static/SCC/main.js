@@ -53,7 +53,7 @@ import { init as aimLinesInit } from './lines/aimLines.js';
 import { init as cutLinesInit } from './lines/cutLines.js';
 import { init as celLineInit } from './lines/celLine.js';
 import { initGridToggle } from './misc/grid.js';
-import { injectCelerationFan } from './misc/celerationFan.js';
+import { injectCelerationFan, initFanDrag } from './misc/celerationFan.js';
 import { toggleLegend, renderCustomLegend, init as customLegendInit } from './misc/customLegend.js';
 import { setupPanConstraints } from './util/panning_controls.js';
 import { resizeChartByHeight, CHART_CONFIG } from './util/resize_chart/resize-chart.js';
@@ -95,6 +95,9 @@ export function initializeChart(plotData, maxWindowWidth) {
     });
 
     setupPanConstraints(chartDiv, maxWindowWidth, chartState.chartType);
+
+    // Initialize draggable fan
+    initFanDrag();
 
     // Observe container for resize (fullscreen, viewport changes)
     if (chartContainer) {
