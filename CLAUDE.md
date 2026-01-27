@@ -1,5 +1,47 @@
 # Project Rules
 
+## Codebase Overview
+
+**Single-Case Chart (SCC) Application** - A behavioral data visualization tool displaying time-series data (correct/incorrect responses, timing) on logarithmic charts with analytical line drawing tools.
+
+**Stack**: Flask 3.0 backend + ES6 JavaScript modules + Plotly.js 2.35 + Tailwind CSS
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `app.py` | Flask server, routes (`/`, `/chart/<type>/<minute_type>`), template selection |
+| `static/SCC/main.js` | Entry point, chart initialization, event listener setup |
+| `static/SCC/chartState.js` | Centralized state (series data, line objects, styles, credits) |
+| `static/SCC/eventBus.js` | Pub/sub system for module communication |
+| `static/SCC/navigation.js` | Tab switching, counter overlay, keyboard shortcuts |
+| `static/SCC/series/dataEntry.js` | Form submission, appends data to series |
+| `static/SCC/series/replot.js` | Orchestrates chart refresh via tracePipeline |
+| `static/SCC/series/tracePipeline.js` | Data aggregation, Plotly trace creation |
+| `static/SCC/series/traceStyles.js` | Trace appearance config |
+| `static/SCC/series/miscSeries.js` | Dynamic misc series management (max 10) |
+| `static/SCC/lines/*.js` | Phase/aim/cut/celeration line drawing |
+| `static/SCC/util/dates.js` | Date math, timestamp ↔ X-position conversion |
+| `static/SCC/util/toaster.js` | Toast notifications and dialogs |
+| `templates/SCC/chart.html` | Main chart page |
+| `templates/SCC/menu/*.html` | 7 sidebar tabs (counter, data, credit, lines, series, chart, share) |
+
+### Data Flow
+1. Flask renders `chart.html` with Jinja: `{{ plot_json }}`, `{{ chart_type }}`
+2. `main.js` initializes chart with `Plotly.newPlot()`
+3. User submits data via `dataEntry.js` → emits `DATA_ENTRY_SUBMITTED`
+4. `replot.js` subscribes → builds traces via `tracePipeline.js` → `Plotly.react()`
+
+### Chart Types
+- Daily, Weekly, Monthly, Yearly, FrequencyCollections
+- Each has minute/count variants and resize logic in `util/resize_chart/`
+
+### Line Types
+- **Phase lines**: Vertical + horizontal + text label (3-phase drawing)
+- **Aim lines**: Horizontal/diagonal trend lines
+- **Cut lines**: Vertical segment boundaries for aggregation
+- **Celeration lines**: Log-scale trend analysis
+
 ## File Handling
 - **NEVER read .json template files** - they are extremely large and will cause errors
 - **NEVER attempt to read files in charts/ directory** - always assume they exist and are too large
