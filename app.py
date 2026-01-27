@@ -4,11 +4,33 @@ import math
 
 app = Flask(__name__)
 
+# Templates organized by chart type
+# Format: {template_filename: window_size_in_weeks}
 chart_configs = {
-    'daily_minute_280x_28w_template.json': 28,
-    'daily_minute_280x_56w_template.json': 56,
-    'daily_minute_280x_42w_template.json': 42,
-    'daily_minute_280x_140w_template.json': 140
+    'Daily': {
+        'dir': 'daily',
+        'templates': {f'daily_280x_{d}d_template.json': d for d in range(28, 141, 14)}
+    },
+    'Weekly': {
+        'dir': 'weekly',
+        'templates': {f'weekly_200x_{w}w_template.json': w for w in list(range(8, 100, 8)) + [100]}
+    },
+    'Monthly': {
+        'dir': 'monthly',
+        'templates': {f'monthly_240x_{m}m_template.json': m for m in range(24, 121, 24)}
+    },
+    'Yearly': {
+        'dir': 'yearly',
+        'templates': {f'yearly_200x_{y}y_template.json': y for y in range(20, 101, 20)}
+    },
+    'Timing': {
+        'dir': 'daily',  # Uses daily templates
+        'templates': {'daily_280x_140d_template.json': 140}
+    },
+    'FrequencyCollections': {
+        'dir': 'frequency_collections',
+        'templates': {'frequency_collections_10cols_7pts_template.json': 10}
+    }
 }
 
 def check_chart_width_by_height(container_height, chart_window_in_days, margin_t, margin_b, margin_l, margin_r):
@@ -28,30 +50,48 @@ def check_chart_width_by_height(container_height, chart_window_in_days, margin_t
 
 @app.route('/')
 def index():
+    return render_template('SCC/menu_page.html')
+
+
+@app.route('/chart/<chart_type>/<minute_type>')
+def chart(chart_type, minute_type):
+    # Validate chart type
+    if chart_type not in chart_configs:
+        return f"Unknown chart type: {chart_type}", 404
+
+    # Validate minute type
+    if minute_type not in ('minute', 'count'):
+        return f"Unknown minute type: {minute_type}", 404
+
+    # Get config for this chart type
+    config = chart_configs[chart_type]
+    templates = config['templates']
+    chart_dir = config['dir']
+
     # Get container dimensions from query parameters
     container_width = request.args.get('width', type=float)
     container_height = request.args.get('height', type=float)
 
     # If dimensions not provided, render initial page that will redirect with dimensions
     if container_width is None or container_height is None:
-        return render_template('SCC/chart.html', initial_load=True)
+        return render_template('SCC/chart.html', initial_load=True, chart_type=chart_type, minute_type=minute_type)
 
     # Calculate required width for each template and find best fit
-    # Sort templates by chart window days (descending) to check largest first
-    sorted_templates = sorted(chart_configs.items(), key=lambda x: x[1], reverse=True)
+    # Sort templates by window size (descending) to check largest first
+    sorted_templates = sorted(templates.items(), key=lambda x: x[1], reverse=True)
 
     best_template = None
 
-    for template_name, chart_window_days in sorted_templates:
+    for template_name, chart_window_weeks in sorted_templates:
         # Load template to get margin values
-        filepath = f'charts/layouts/{template_name}'
+        filepath = f'charts/layouts/{minute_type}/{chart_dir}/{template_name}'
         with open(filepath, 'r') as f:
             template_data = json.load(f)
 
         margin = template_data['layout']['margin']
         required_width = check_chart_width_by_height(
             container_height,
-            chart_window_days,
+            chart_window_weeks,
             margin['t'],
             margin['b'],
             margin['l'],
@@ -59,7 +99,7 @@ def index():
         )
 
         print(f"Template: {template_name}")
-        print(f"  Chart window days: {chart_window_days}")
+        print(f"  Chart window weeks: {chart_window_weeks}")
         print(f"  Required width: {required_width:.2f}")
         print(f"  Container width: {container_width:.2f}")
         print(f"  Fits: {required_width <= container_width}")
@@ -74,20 +114,22 @@ def index():
 
     # Fallback to smallest template if none fit
     if best_template is None:
-        best_template = min(chart_configs.keys(), key=lambda k: chart_configs[k])
+        best_template = min(templates.keys(), key=lambda k: templates[k])
 
     # Load the selected template
-    filepath = f'charts/layouts/{best_template}'
+    filepath = f'charts/layouts/{minute_type}/{chart_dir}/{best_template}'
     with open(filepath, 'r') as f:
         fig_json = f.read()
 
     # Get chart viewport variable
-    max_window_width = chart_configs[best_template] + 0.4
+    max_window_width = templates[best_template] + 0.4
 
     return render_template('SCC/chart.html',
                          plot_json=fig_json,
                          max_window_width=max_window_width,
-                         initial_load=False)
+                         initial_load=False,
+                         chart_type=chart_type,
+                         minute_type=minute_type)
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

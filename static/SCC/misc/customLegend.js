@@ -11,6 +11,7 @@
 import { chartState } from '../chartState.js';
 import { icons } from '../util/icons.js';
 import { eventBus, EVENTS } from '../eventBus.js';
+import { toggleGrid } from './grid.js';
 
 // Visibility state tracked independently from Plotly
 // Each unique series_aggType combination has its own visibility state
@@ -130,7 +131,8 @@ function createLinesSection() {
     const lineTypes = [
         { key: 'aim', label: 'Aim', icon: icons.aimDiagonal(20, false) },
         { key: 'phase', label: 'Phase', icon: icons.phaseTextTop(20, false) },
-        { key: 'change', label: 'Change', icon: icons.otherCeleration(20) }
+        { key: 'change', label: 'Change', icon: icons.otherCeleration(20) },
+        { key: 'grid', label: 'Grid', icon: icons.grid(20) }
     ];
 
     lineTypes.forEach(lineType => {
@@ -163,7 +165,7 @@ function createLinesSection() {
 }
 
 /**
- * Toggle visibility for a line type (phase, aim, change)
+ * Toggle visibility for a line type (phase, aim, change, grid)
  * @param {string} lineType - Line type identifier
  */
 function toggleLineVisibility(lineType) {
@@ -177,6 +179,12 @@ function toggleLineVisibility(lineType) {
         } else {
             legendItem.classList.add('legend-item-hidden');
         }
+    }
+
+    // Handle grid specially - call toggleGrid directly
+    if (lineType === 'grid') {
+        toggleGrid(chartState.lineVisibility[lineType]);
+        return;
     }
 
     // Emit event for line modules to handle visibility

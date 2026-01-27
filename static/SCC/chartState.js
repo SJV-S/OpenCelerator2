@@ -151,7 +151,8 @@ export const chartState = {
     lineVisibility: {
         phase: true,
         aim: true,
-        change: true
+        change: true,
+        grid: true
     },
 
     // Line styling

@@ -1,6 +1,6 @@
 {% extends "SCC/base.html" %}
 
-{% block title %}Daily Chart{% endblock %}
+{% block title %}{{ chart_type }} Chart{% endblock %}
 
 {% block content %}
     <div id="chart" style="position: relative;">
@@ -54,12 +54,12 @@
         // Initial load: redirect with container dimensions
         const width = window.innerWidth;
         const height = window.innerHeight;
-        window.location.href = `/?width=${width}&height=${height}`;
+        window.location.href = `/chart/{{ chart_type }}/{{ minute_type }}?width=${width}&height=${height}`;
         {% else %}
         // On refresh: reset URL to recapture current dimensions
         const navEntry = performance.getEntriesByType('navigation')[0];
         if (navEntry && navEntry.type === 'reload') {
-            window.location.href = '/';
+            window.location.href = '/chart/{{ chart_type }}/{{ minute_type }}';
         } else {
             // Template selected: render chart
             var plotData = {{ plot_json | safe }};
@@ -67,9 +67,13 @@
 
             // Template variables
             var maxWindowWidth = {{ max_window_width }};
+            var chartType = '{{ chart_type }}';
+
+            // Clean URL (remove width/height params)
+            history.replaceState(null, '', '/chart/{{ chart_type }}/{{ minute_type }}');
 
             // Initialize chart with template data
-            initializeChart(plotData, maxWindowWidth);
+            initializeChart(plotData, maxWindowWidth, chartType);
         }
         {% endif %}
     </script>

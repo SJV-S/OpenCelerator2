@@ -1,9 +1,16 @@
 // Chart boundary configuration
 const CHART_MARGIN = 0.2;
 const CHART_X_MIN = -CHART_MARGIN;
-const CHART_X_MAX = 280 + CHART_MARGIN;
-const SNAP_INTERVAL = 7;
 const DEFAULT_MAX_WINDOW_WIDTH = 28.4;  // Default maximum allowed window width
+
+// Chart-type specific configuration
+const CHART_CONFIG = {
+    Daily:    { xMax: 280, snapInterval: 7 },
+    Weekly:   { xMax: 200, snapInterval: 4 },
+    Monthly:  { xMax: 240, snapInterval: 6 },
+    Yearly:   { xMax: 200, snapInterval: 5 },
+    FrequencyCollections: { xMax: 280, snapInterval: 7 },
+};
 
 // Helper function to snap to nearest multiple of interval
 function snapToNearest(value, interval) {
@@ -11,9 +18,14 @@ function snapToNearest(value, interval) {
 }
 
 // Constrain panning to x-axis range
-function setupPanConstraints(plotDiv, maxWindowWidth) {
+function setupPanConstraints(plotDiv, maxWindowWidth, chartType) {
     // Use provided value or fall back to default
     const MAX_WINDOW_WIDTH = maxWindowWidth || DEFAULT_MAX_WINDOW_WIDTH;
+
+    // Get chart-type specific config
+    const config = CHART_CONFIG[chartType] || CHART_CONFIG.Daily;
+    const CHART_X_MAX = config.xMax + CHART_MARGIN;
+    const SNAP_INTERVAL = config.snapInterval;
 
     let isProgrammaticUpdate = false;
     let defaultWindowWidth = MAX_WINDOW_WIDTH;

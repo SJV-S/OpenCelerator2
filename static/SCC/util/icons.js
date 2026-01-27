@@ -130,5 +130,15 @@ export const icons = {
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="${size}" height="${size}">
             <path d="M5 7L10 12L15 7" stroke="black" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
+    `,
+
+    // Grid icon for legend
+    grid: (size = 20) => `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+            <line x1="8" y1="3" x2="8" y2="21"/>
+            <line x1="16" y1="3" x2="16" y2="21"/>
+            <line x1="3" y1="8" x2="21" y2="8"/>
+            <line x1="3" y1="16" x2="21" y2="16"/>
+        </svg>
     `
 };

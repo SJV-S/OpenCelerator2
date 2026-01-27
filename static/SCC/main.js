@@ -50,10 +50,14 @@ import { init as phaseLinesInit } from './lines/phaseLines.js';
 import { init as aimLinesInit } from './lines/aimLines.js';
 import { init as cutLinesInit } from './lines/cutLines.js';
 import { init as celLineInit } from './lines/celLine.js';
-import { toggleGrid, initGridToggle } from './misc/grid.js';
+import { initGridToggle } from './misc/grid.js';
 import { toggleLegend, renderCustomLegend, init as customLegendInit } from './misc/customLegend.js';
-import { setupPanConstraints } from './panning_controls.js';
-import { resizeChartByHeight } from './resize-daily.js';
+import { setupPanConstraints } from './util/panning_controls.js';
+import { resizeChartByHeight } from './util/resize_chart/resize-daily.js';
+import { resizeWeeklyChartByHeight } from './util/resize_chart/resize-weekly.js';
+import { resizeMonthlyChartByHeight } from './util/resize_chart/resize-monthly.js';
+import { resizeYearlyChartByHeight } from './util/resize_chart/resize-yearly.js';
+import { resizeFrequencyCollectionsChartByHeight } from './util/resize_chart/resize-frequency-collections.js';
 import { showInitialMenuHint } from './util/tooltip.js';
 import { icons } from './util/icons.js';
 import { initializeShareTab } from './misc/share.js';
@@ -66,12 +70,29 @@ import { initializeShareTab } from './misc/share.js';
  * Initialize the chart with server-rendered data
  * @param {Object} plotData - Plot data from Jinja template
  * @param {number} maxWindowWidth - Max window width from template
+ * @param {string} chartType - Chart type selected by user
  */
-export function initializeChart(plotData, maxWindowWidth) {
+export function initializeChart(plotData, maxWindowWidth, chartType) {
+    // Set chart type from URL parameter
+    chartState.chartType = chartType;
+
+    // Determine minute chart from template y-axis title
+    const yAxisTitle = plotData.layout?.yaxis?.title?.text || '';
+    chartState.minuteChart = yAxisTitle.toUpperCase().includes('MINUTE');
     const chartDiv = document.getElementById('chart');
 
-    // Resize chart
-    plotData = resizeChartByHeight(plotData, window.innerHeight);
+    // Resize chart based on chart type
+    if (chartType === 'Weekly') {
+        plotData = resizeWeeklyChartByHeight(plotData, window.innerHeight);
+    } else if (chartType === 'Monthly') {
+        plotData = resizeMonthlyChartByHeight(plotData, window.innerHeight);
+    } else if (chartType === 'Yearly') {
+        plotData = resizeYearlyChartByHeight(plotData, window.innerHeight);
+    } else if (chartType === 'FrequencyCollections') {
+        plotData = resizeFrequencyCollectionsChartByHeight(plotData, window.innerHeight);
+    } else {
+        plotData = resizeChartByHeight(plotData, window.innerHeight);
+    }
 
     // Create chart
     Plotly.newPlot(chartDiv, plotData.data, plotData.layout, {
@@ -80,7 +101,7 @@ export function initializeChart(plotData, maxWindowWidth) {
         doubleClick: false
     });
 
-    setupPanConstraints(chartDiv, maxWindowWidth);
+    setupPanConstraints(chartDiv, maxWindowWidth, chartType);
 
     // Initialize startDate to the most recent Sunday at midnight
     if (!chartState.startDate) {
@@ -321,16 +342,6 @@ function setupEventListeners() {
     const otherDateInput = document.getElementById('other-date');
     if (otherDateInput) {
         otherDateInput.addEventListener('change', handleOtherDateChange);
-    }
-
-    // Grid toggle
-    const gridToggle = document.getElementById('grid-toggle');
-    if (gridToggle) {
-        gridToggle.addEventListener('change', (e) => {
-            toggleGrid(e.target.checked);
-            // Blur the checkbox so spacebar can be used for navigation
-            e.target.blur();
-        });
     }
 
     // Legend toggle
