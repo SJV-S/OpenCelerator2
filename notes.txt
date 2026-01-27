@@ -7,4 +7,5 @@ To-do
 * Legend doesn't scale with chart size
 * Sometimes it zooms in, in a way that breaks the chart dimensions and requires a refresh to undo
 * Changing the start date on non-daily chart is currently buggy, likely because somewhere in the code, there's an assumption about us still using the daily chart
+* Phase lines don't land where I click
 *

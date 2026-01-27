@@ -1,6 +1,34 @@
-// Store original shapes for grid restoration
-let originalShapes = null;
+// Store grid shapes (the ones we hide) for restoration
+let gridShapes = null;
 let gridVisible = true;
+
+/**
+ * Check if a shape should be kept when hiding grid
+ */
+function isNonGridShape(shape) {
+    // Keep if name contains 'spine' or 'tick'
+    if (shape.name && (shape.name.indexOf('spine') !== -1 || shape.name.indexOf('tick') !== -1)) {
+        return true;
+    }
+
+    // Keep bottom spine (no name, yref='paper', y < 0)
+    if (!shape.name && shape.yref === 'paper' && shape.y0 < 0) {
+        return true;
+    }
+
+    // Keep fan shapes and user-drawn lines
+    if (shape.name && (
+        shape.name.startsWith('fan-') ||
+        shape.name.startsWith('phase-') ||
+        shape.name.startsWith('aim-') ||
+        shape.name.startsWith('cut-') ||
+        shape.name.startsWith('cel-')
+    )) {
+        return true;
+    }
+
+    return false;
+}
 
 /**
  * Remove grid but keep spines
@@ -15,19 +43,7 @@ export function rmGrid() {
     const shapes = chartDiv.layout.shapes || [];
     console.log(`Found ${shapes.length} shapes`);
 
-    const keepShapes = shapes.filter(shape => {
-        // Keep if name contains 'spine' or 'tick'
-        if (shape.name && (shape.name.indexOf('spine') !== -1 || shape.name.indexOf('tick') !== -1)) {
-            return true;
-        }
-
-        // Keep bottom spine (no name, yref='paper', y < 0)
-        if (!shape.name && shape.yref === 'paper' && shape.y0 < 0) {
-            return true;
-        }
-
-        return false;
-    });
+    const keepShapes = shapes.filter(isNonGridShape);
 
     Plotly.relayout(chartDiv, {shapes: keepShapes});
     console.log(`Kept ${keepShapes.length} shapes`);
@@ -47,31 +63,21 @@ export function toggleGrid(show) {
     const shapes = chartDiv.layout.shapes || [];
 
     if (show) {
-        // Restore grid - show all shapes
-        if (originalShapes !== null) {
-            Plotly.relayout(chartDiv, {shapes: originalShapes});
+        // Restore grid - add back grid shapes to current shapes
+        if (gridShapes !== null && gridShapes.length > 0) {
+            // Get current non-grid shapes (fan, user lines, etc.)
+            const currentNonGridShapes = shapes.filter(isNonGridShape);
+            // Combine with stored grid shapes
+            const restoredShapes = [...gridShapes, ...currentNonGridShapes];
+            Plotly.relayout(chartDiv, {shapes: restoredShapes});
             console.log('Grid restored');
         }
         gridVisible = true;
     } else {
-        // Hide grid - store original shapes and filter
-        if (originalShapes === null) {
-            originalShapes = [...shapes];
-        }
-
-        const keepShapes = shapes.filter(shape => {
-            // Keep if name contains 'spine' or 'tick'
-            if (shape.name && (shape.name.indexOf('spine') !== -1 || shape.name.indexOf('tick') !== -1)) {
-                return true;
-            }
-
-            // Keep bottom spine (no name, yref='paper', y < 0)
-            if (!shape.name && shape.yref === 'paper' && shape.y0 < 0) {
-                return true;
-            }
-
-            return false;
-        });
+        // Hide grid - store grid shapes and keep only non-grid shapes
+        // Grid shapes are anything that's NOT a non-grid shape
+        gridShapes = shapes.filter(shape => !isNonGridShape(shape));
+        const keepShapes = shapes.filter(isNonGridShape);
 
         Plotly.relayout(chartDiv, {shapes: keepShapes});
         console.log('Grid hidden');
@@ -80,12 +86,13 @@ export function toggleGrid(show) {
 }
 
 /**
- * Initialize the grid toggle - store original shapes
+ * Initialize the grid toggle - store grid shapes for potential restoration
  */
 export function initGridToggle() {
     const chartDiv = document.getElementById('chart');
     if (chartDiv && chartDiv.layout && chartDiv.layout.shapes) {
-        originalShapes = [...chartDiv.layout.shapes];
+        // Store only the grid shapes (not non-grid shapes like fan, user lines)
+        gridShapes = chartDiv.layout.shapes.filter(shape => !isNonGridShape(shape));
         gridVisible = true;
         console.log('Grid toggle initialized');
     }

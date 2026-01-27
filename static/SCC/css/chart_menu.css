@@ -31,6 +31,14 @@
     flex-shrink: 0;
 }
 
+/* Hide credit tab on desktop (credits visible on chart area) */
+@media (min-width: 1024px) {
+    .chart-menu-tab-btn[data-tab="credit"],
+    #credit-content {
+        display: none !important;
+    }
+}
+
 .chart-menu-tab-btn {
     padding: 0.75rem 1rem;
     font-size: 1rem;
@@ -234,6 +242,36 @@
     }
 }
 
+/* ===== MOBILE CREDIT DISPLAY ===== */
+#credit-content.chart-menu-tab-pane.active {
+    display: flex;
+    height: 100%;
+}
+
+.credit-tab-mobile {
+    height: 100%;
+    width: 100%;
+    padding: 0 !important;
+    container-type: size;
+}
+
+.mobile-credit-display {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    gap: 10cqw;
+    height: 100%;
+    width: 100%;
+}
+
+.mobile-credit-line {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    white-space: nowrap;
+    font-size: min(25cqw, 1.5cqh);
+}
+
 /* ===== ICON BUTTON GROUP (Lines Tab Specific) ===== */
 .chart-menu-icon-group {
     display: flex;
@@ -385,4 +423,81 @@
     #credit-container {
         display: none;
     }
+}
+
+/* ===== CROSSHAIR INFO PANEL ===== */
+.crosshair-panel {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.crosshair-panel {
+    width: 100%;
+}
+
+.crosshair-title {
+    font-size: 14px;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+.crosshair-info {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 20px;
+    line-height: 1.5;
+    min-height: 100px;
+    padding: 5px;
+}
+
+.crosshair-section {
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid #ccc;
+}
+
+.crosshair-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.crosshair-heading {
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.crosshair-row {
+    display: flex;
+    gap: 10px;
+    padding: 2px 0;
+}
+
+.crosshair-label {
+    flex-shrink: 0;
+}
+
+.crosshair-value {
+    color: #555;
+}
+
+.crosshair-data {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.crosshair-data-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.crosshair-data-header {
+    font-weight: 700;
+}
+
+.crosshair-data-agg {
+    font-size: 11px;
 }

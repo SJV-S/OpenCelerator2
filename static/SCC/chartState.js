@@ -189,6 +189,9 @@ export const chartState = {
         grid: true
     },
 
+    // Celeration fan visibility
+    fanVisible: true,
+
     // Line styling
     lineStyles: {
         phase: {

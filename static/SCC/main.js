@@ -30,7 +30,7 @@ import {
 import { refreshChart, init as replotInit } from './series/replot.js';
 import { updateChartDateLabels, updateDateDisplay, adjustDateInput, initializeDateInput } from './util/dates.js';
 import { initStartDateControls } from './util/startDateControls.js';
-import { submitCredit, loadCreditData, renderCredits, init as creditInit } from './misc/credit.js';
+import { renderCredits, init as creditInit } from './misc/credit.js';
 import { loadDataForDate, adjustTimestamp, updateCurrentEntry, deleteCurrentEntry, init as dataUpdateInit } from './series/dataUpdate.js';
 import {
     showCounter,
@@ -53,12 +53,14 @@ import { init as aimLinesInit } from './lines/aimLines.js';
 import { init as cutLinesInit } from './lines/cutLines.js';
 import { init as celLineInit } from './lines/celLine.js';
 import { initGridToggle } from './misc/grid.js';
+import { injectCelerationFan } from './misc/celerationFan.js';
 import { toggleLegend, renderCustomLegend, init as customLegendInit } from './misc/customLegend.js';
 import { setupPanConstraints } from './util/panning_controls.js';
 import { resizeChartByHeight, CHART_CONFIG } from './util/resize_chart/resize-chart.js';
 import { showInitialMenuHint } from './util/tooltip.js';
 import { icons } from './util/icons.js';
 import { initializeShareTab } from './misc/share.js';
+import { init as crosshairInit } from './util/crosshair.js';
 
 // ============================================================================
 // CHART INITIALIZATION
@@ -81,6 +83,9 @@ export function initializeChart(plotData, maxWindowWidth) {
 
     // Resize chart based on chart type
     plotData = resizeChartByHeight(plotData, containerHeight, chartState.chartType);
+
+    // Inject celeration fan into plotData BEFORE initial render (avoids clipping)
+    plotData = injectCelerationFan(plotData, chartState.minuteChart, chartState.chartType);
 
     // Create chart
     Plotly.newPlot(chartDiv, plotData.data, plotData.layout, {
@@ -195,6 +200,7 @@ document.addEventListener('DOMContentLoaded', () => {
     cutLinesInit();
     celLineInit();
     customLegendInit();
+    crosshairInit();
     console.log('Main.js: Event bus subscriptions initialized');
 
     // Initialize icons in buttons with data-icon attributes
@@ -314,12 +320,6 @@ function setupEventListeners() {
     const deleteDataBtn = document.querySelector('[data-action="delete-data"]');
     if (deleteDataBtn) {
         deleteDataBtn.addEventListener('click', deleteCurrentEntry);
-    }
-
-    // Credit
-    const submitCreditBtn = document.querySelector('[data-action="submit-credit"]');
-    if (submitCreditBtn) {
-        submitCreditBtn.addEventListener('click', submitCredit);
     }
 
     // Series trace config apply buttons (fixed series only - misc handled dynamically)
