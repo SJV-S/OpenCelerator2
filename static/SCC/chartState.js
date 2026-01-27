@@ -224,19 +224,10 @@ export const chartState = {
         misc: {}    // Dynamic misc series trace styles, keyed by ID
     },
 
-    // Credit information
+    // Credit information (two display rows)
     credits: {
-        supervisor: '',
-        performer: '',
-        timer: '',
-        counted: '',
-        advisor: '',
-        organization: '',
-        manager: '',
-        counter: '',
-        charter: '',
-        room: '',
-        notes: ''
+        0: 'SUPERVISOR: ________________    PERFORMER: ________________       TIMER: ________________     COUNTED: ________________     ADVISOR: ________________',
+        1: 'ORGANIZATION: ________________     MANAGER: ________________     COUNTER: ________________     CHARTER: ________________     ROOM: ________________'
     }
 };
 

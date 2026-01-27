@@ -11,8 +11,7 @@ function resizeFrequencyCollectionsChartByHeight(chartJson, containerHeight) {
     const y = {min: 0.001 * 0.69, max: 1000};
     const xmax = Math.round(chartJson.layout.xaxis.range[1]);
     const deg = 34;
-    // User specified: unit = 10 for frequency collections
-    const unit = 10;
+    const unit = 7;
     const yaxis_px = height - (margin.t + margin.b);
     const y_axis = Math.log10(y.max) - Math.log10(y.min);
     const delta_y = Math.log10(2 ** (xmax / unit));
@@ -22,6 +21,7 @@ function resizeFrequencyCollectionsChartByHeight(chartJson, containerHeight) {
 
     chartJson.layout.height = height;
     chartJson.layout.width = width;
+    chartJson.layout.dragmode = 'pan';  // Ensure pan mode, not zoom
 
     // Scaling factors (base height 675)
     const generalFontScale = height * 0.017;

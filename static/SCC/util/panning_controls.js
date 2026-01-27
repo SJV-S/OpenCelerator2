@@ -9,7 +9,7 @@ const CHART_CONFIG = {
     Weekly:   { xMax: 200, snapInterval: 4 },
     Monthly:  { xMax: 240, snapInterval: 6 },
     Yearly:   { xMax: 200, snapInterval: 5 },
-    FrequencyCollections: { xMax: 280, snapInterval: 7 },
+    FrequencyCollections: { xMax: 70, snapInterval: 7 },  // 10 columns * 7 points
 };
 
 // Helper function to snap to nearest multiple of interval

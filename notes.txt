@@ -5,3 +5,4 @@ To-do
 * We need to note when the user does something really computationally demanding, like adding 100 data series
 * Re-implement the rounding used in OpenCelerator
 * Legend doesn't scale with chart size
+* Sometimes it zooms in, in a way that breaks the chart dimensions and requires a refresh to undo
