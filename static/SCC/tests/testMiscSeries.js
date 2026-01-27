@@ -163,7 +163,7 @@ function testDataArrayInitialization() {
     console.log('\n--- Test: Data Array Initialization ---');
 
     // Get current timestamps length
-    const dataLength = chartState.series.timestamps.length;
+    const dataLength = chartState.series.xValues.length;
 
     // Add a new series
     const id = addMiscSeries();

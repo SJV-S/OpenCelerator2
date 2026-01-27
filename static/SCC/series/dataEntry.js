@@ -88,7 +88,7 @@ function submitEntry() {
     const timingMinutes = (hours || 0) * 60 + (minutes || 0) + (seconds || 0) / 60;
 
     // Append data points to fixed series arrays
-    chartState.series.timestamps.push(timestamp);
+    chartState.series.xValues.push(timestamp);
     chartState.series.corrects.push(corrects);
     chartState.series.errors.push(incorrects);
     chartState.series.timing.push(timingMinutes);

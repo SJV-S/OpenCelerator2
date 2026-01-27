@@ -21,7 +21,6 @@ function resizeFrequencyCollectionsChartByHeight(chartJson, containerHeight) {
 
     chartJson.layout.height = height;
     chartJson.layout.width = width;
-    chartJson.layout.dragmode = 'pan';  // Ensure pan mode, not zoom
 
     // Scaling factors (base height 675)
     const generalFontScale = height * 0.017;

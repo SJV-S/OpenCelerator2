@@ -31,8 +31,8 @@ export function loadDataForDate() {
 
     // Filter data for this date (preserve NaN for non-observations)
     currentDataForDate = [];
-    for (let i = 0; i < chartState.series.timestamps.length; i++) {
-        const timestamp = chartState.series.timestamps[i];
+    for (let i = 0; i < chartState.series.xValues.length; i++) {
+        const timestamp = chartState.series.xValues[i];
         if (timestamp >= startOfDay && timestamp < endOfDay) {
             const entry = {
                 index: i,
@@ -313,7 +313,7 @@ export function deleteCurrentEntry() {
             const dataIndex = point.index;
 
             // Remove from chartState.series
-            chartState.series.timestamps.splice(dataIndex, 1);
+            chartState.series.xValues.splice(dataIndex, 1);
             chartState.series.corrects.splice(dataIndex, 1);
             chartState.series.errors.splice(dataIndex, 1);
             chartState.series.timing.splice(dataIndex, 1);

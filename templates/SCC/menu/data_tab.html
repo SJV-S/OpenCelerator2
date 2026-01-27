@@ -1,15 +1,15 @@
-<div class="p-4 sm:p-6 w-full max-w-4xl mx-auto">
+<div class="p-4 sm:p-6 lg:p-1 w-full max-w-4xl lg:max-w-none mx-auto lg:mx-0">
     <!-- Plot Date Selection Section -->
-    <div class="mb-6">
+    <div class="mb-6 lg:mb-4">
         <label class="block text-sm font-semibold text-gray-600 mb-2 text-center" for="data-entry-date">Plot Date</label>
-        <div class="flex items-center gap-2 max-w-sm mx-auto">
-            <button type="button" data-action="adjust-data-date" data-offset="-1" class="px-3 py-3 text-lg font-bold text-black border-2 border-gray-300 rounded hover:bg-gray-100 active:bg-gray-200 transition-colors flex items-center justify-center">
+        <div class="flex items-center gap-2 max-w-sm lg:max-w-full mx-auto">
+            <button type="button" data-action="adjust-data-date" data-offset="-1" class="px-3 py-3 lg:px-2 lg:py-2 text-lg font-bold text-black border-2 border-gray-300 rounded hover:bg-gray-100 active:bg-gray-200 transition-colors flex items-center justify-center">
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M12 4L6 10L12 16" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
             </button>
-            <input type="date" id="data-entry-date" class="flex-1 px-3 py-3 text-lg border-2 border-gray-300 rounded focus:outline-none transition-colors date-centered text-center">
-            <button type="button" data-action="adjust-data-date" data-offset="1" class="px-3 py-3 text-lg font-bold text-black border-2 border-gray-300 rounded hover:bg-gray-100 active:bg-gray-200 transition-colors flex items-center justify-center">
+            <input type="date" id="data-entry-date" class="flex-1 px-3 py-3 lg:px-2 lg:py-2 text-lg lg:text-base border-2 border-gray-300 rounded focus:outline-none transition-colors date-centered text-center">
+            <button type="button" data-action="adjust-data-date" data-offset="1" class="px-3 py-3 lg:px-2 lg:py-2 text-lg font-bold text-black border-2 border-gray-300 rounded hover:bg-gray-100 active:bg-gray-200 transition-colors flex items-center justify-center">
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M8 4L14 10L8 16" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
@@ -18,16 +18,16 @@
     </div>
 
     <!-- Timestamp Selector -->
-    <div class="mb-6" id="timestamp-selector-container" style="display: none;">
+    <div class="mb-6 lg:mb-4" id="timestamp-selector-container" style="display: none;">
         <label class="block text-sm font-semibold text-gray-600 mb-2 text-center">Entry Timestamp</label>
-        <div class="flex items-center gap-2 max-w-sm mx-auto">
-            <button type="button" data-action="adjust-timestamp" data-offset="-1" class="px-3 py-3 text-lg font-bold text-black border-2 border-gray-300 rounded hover:bg-gray-100 active:bg-gray-200 transition-colors flex items-center justify-center">
+        <div class="flex items-center gap-2 max-w-sm lg:max-w-full mx-auto">
+            <button type="button" data-action="adjust-timestamp" data-offset="-1" class="px-3 py-3 lg:px-2 lg:py-2 text-lg font-bold text-black border-2 border-gray-300 rounded hover:bg-gray-100 active:bg-gray-200 transition-colors flex items-center justify-center">
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M12 4L6 10L12 16" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
             </button>
-            <div id="current-timestamp-display" class="flex-1 px-3 py-3 text-lg border-2 border-gray-300 rounded text-center bg-gray-50"></div>
-            <button type="button" data-action="adjust-timestamp" data-offset="1" class="px-3 py-3 text-lg font-bold text-black border-2 border-gray-300 rounded hover:bg-gray-100 active:bg-gray-200 transition-colors flex items-center justify-center">
+            <div id="current-timestamp-display" class="flex-1 px-3 py-3 lg:px-2 lg:py-2 text-lg lg:text-base border-2 border-gray-300 rounded text-center bg-gray-50"></div>
+            <button type="button" data-action="adjust-timestamp" data-offset="1" class="px-3 py-3 lg:px-2 lg:py-2 text-lg font-bold text-black border-2 border-gray-300 rounded hover:bg-gray-100 active:bg-gray-200 transition-colors flex items-center justify-center">
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M8 4L14 10L8 16" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
@@ -38,12 +38,12 @@
     <!-- Data Entry Block -->
     <div id="data-entry-block">
         <!-- Single data block will be populated by JavaScript -->
-        <div class="px-3 py-8 text-center text-gray-500 italic">No data available for this date</div>
+        <div class="px-3 py-8 lg:py-4 text-center text-gray-500 italic">No data available for this date</div>
     </div>
 
     <!-- Update and Delete Buttons -->
-    <div class="mt-6 max-w-sm mx-auto grid grid-cols-2 gap-4">
-        <button class="py-4 text-lg font-bold text-white rounded hover:opacity-90 active:opacity-80 transition-colors bg-[#6ad1e3]" data-action="update-data">Update</button>
-        <button class="py-4 text-lg font-bold text-white rounded hover:opacity-90 active:opacity-80 transition-colors bg-red-500" data-action="delete-data">Delete</button>
+    <div class="mt-6 lg:mt-4 max-w-sm lg:max-w-full mx-auto grid grid-cols-2 gap-4 lg:gap-2">
+        <button class="py-4 lg:py-2 text-lg lg:text-base font-bold text-white rounded hover:opacity-90 active:opacity-80 transition-colors bg-[#6ad1e3]" data-action="update-data">Update</button>
+        <button class="py-4 lg:py-2 text-lg lg:text-base font-bold text-white rounded hover:opacity-90 active:opacity-80 transition-colors bg-red-500" data-action="delete-data">Delete</button>
     </div>
 </div>

@@ -29,7 +29,7 @@ chart_configs = {
     },
     'FrequencyCollections': {
         'dir': 'frequency_collections',
-        'templates': {'frequency_collections_10cols_7pts_template.json': 10}
+        'templates': {f'frequency_collections_{c}cols_7pts_template.json': c * 7 for c in range(6, 11)}
     }
 }
 

@@ -47,7 +47,7 @@ export function addMiscSeries() {
     const index = num - 1;
 
     // Initialize empty data array (same length as other series, filled with NaN)
-    const dataLength = chartState.series.timestamps.length;
+    const dataLength = chartState.series.xValues.length;
     chartState.series.misc[id] = new Array(dataLength).fill(NaN);
 
     // Initialize trace styles

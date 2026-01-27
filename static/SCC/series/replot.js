@@ -33,7 +33,7 @@ function refreshChart() {
     removeAllToasts();
 
     // Convert timestamps to x-positions
-    const xPositions = timestampsToXPositions(chartState.series.timestamps);
+    const xPositions = timestampsToXPositions(chartState.series.xValues);
 
     // Calculate frequencies from raw data
     const frequencies = calculateFrequencies();

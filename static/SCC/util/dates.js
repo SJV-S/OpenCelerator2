@@ -54,16 +54,24 @@ function calculateStartDate(dates) {
 }
 
 /**
- * Convert timestamps to x-position coordinates based on days from start_date.
- * @param {Array<number>} timestamps - Array of Unix timestamps in seconds
- * @returns {Array<number>} Array of x-position coordinates (days from start_date)
+ * Convert x-values to x-position coordinates for chart rendering.
+ * - If chartState.hasTimestamps is true: converts timestamps to days from startDate
+ * - If chartState.hasTimestamps is false: returns x-positions as-is
+ * @param {Array<number>} xValues - Array of Unix timestamps (seconds) or direct x-positions
+ * @returns {Array<number>} Array of x-position coordinates
  */
-function timestampsToXPositions(timestamps) {
-    if (!timestamps || timestamps.length === 0) {
+function timestampsToXPositions(xValues) {
+    if (!xValues || xValues.length === 0) {
         return [];
     }
 
-    const dates = timestamps.map(timestamp => {
+    // If not using timestamps, return x-positions as-is
+    if (!chartState.hasTimestamps) {
+        return [...xValues];
+    }
+
+    // Convert timestamps to dates
+    const dates = xValues.map(timestamp => {
         const dt = new Date(timestamp * 1000);
         return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
     });

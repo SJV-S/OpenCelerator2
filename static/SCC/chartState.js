@@ -149,7 +149,8 @@ const TEST_DATA = (() => {
 export const chartState = {
     // Raw data series (append-only arrays, all same length)
     series: {
-        timestamps: TEST_DATA.timestamps,
+        // X-axis values: either timestamps (converted to positions) or direct x-positions
+        xValues: TEST_DATA.timestamps,
         corrects: TEST_DATA.corrects,
         errors: TEST_DATA.errors,
         timing: TEST_DATA.timing,
@@ -160,7 +161,8 @@ export const chartState = {
     chartType: 'Daily',
     minuteChart: true,
     chartName: 'Unnamed',
-    startDate: TEST_DATA.startDate, // The Sunday before/at earliest data point
+    hasTimestamps: true, // If true, xValues are timestamps that need conversion; if false, xValues are direct x-positions
+    startDate: TEST_DATA.startDate, // The Sunday before/at earliest data point (only used when hasTimestamps is true)
 
     // Legend configuration
     legend: {

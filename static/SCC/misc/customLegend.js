@@ -245,42 +245,44 @@ function renderCustomLegend() {
         chartDiv.appendChild(container);
     }
 
-    // Position legend based on chartState using pixel coordinates from plotly layout
+    // Position legend at the chart's plot area corners
     const position = chartState.legend.position;
 
-    // Get Plotly layout coordinates
-    if (chartDiv._fullLayout && chartDiv._fullLayout.xaxis && chartDiv._fullLayout.yaxis) {
+    // Get the actual plot area bounding box from Plotly
+    if (chartDiv._fullLayout) {
         const layout = chartDiv._fullLayout;
-        const plotArea = {
-            left: layout.margin.l,
-            right: layout.width - layout.margin.r,
-            top: layout.margin.t,
-            bottom: layout.height - layout.margin.b
-        };
 
-        // Position based on setting - anchor top-right corner of legend to plot area corner
+        // Plot area corners in pixels (relative to chart div)
+        const plotLeft = layout.margin.l;
+        const plotRight = layout.width - layout.margin.r;
+        const plotTop = layout.margin.t;
+        const plotBottom = layout.height - layout.margin.b;
+
         container.style.position = 'absolute';
 
+        // Position legend at plot area corners with small offset
+        const offset = 8;
+
         if (position === 'top-right') {
-            container.style.top = plotArea.top + 'px';
-            container.style.right = (layout.width - plotArea.right) + 'px';
-            container.style.left = 'auto';
+            container.style.top = (plotTop + offset) + 'px';
+            container.style.left = (plotRight - container.offsetWidth - offset) + 'px';
+            container.style.right = 'auto';
             container.style.bottom = 'auto';
         } else if (position === 'top-left') {
-            container.style.top = plotArea.top + 'px';
-            container.style.left = plotArea.left + 'px';
+            container.style.top = (plotTop + offset) + 'px';
+            container.style.left = (plotLeft + offset) + 'px';
             container.style.right = 'auto';
             container.style.bottom = 'auto';
         } else if (position === 'bottom-right') {
-            container.style.bottom = (layout.height - plotArea.bottom) + 'px';
-            container.style.right = (layout.width - plotArea.right) + 'px';
-            container.style.left = 'auto';
-            container.style.top = 'auto';
-        } else if (position === 'bottom-left') {
-            container.style.bottom = (layout.height - plotArea.bottom) + 'px';
-            container.style.left = plotArea.left + 'px';
+            container.style.top = (plotBottom - container.offsetHeight - offset) + 'px';
+            container.style.left = (plotRight - container.offsetWidth - offset) + 'px';
             container.style.right = 'auto';
-            container.style.top = 'auto';
+            container.style.bottom = 'auto';
+        } else if (position === 'bottom-left') {
+            container.style.top = (plotBottom - container.offsetHeight - offset) + 'px';
+            container.style.left = (plotLeft + offset) + 'px';
+            container.style.right = 'auto';
+            container.style.bottom = 'auto';
         }
     }
 

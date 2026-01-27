@@ -102,7 +102,7 @@ function exportDataToCSV() {
         csvContent += '\n';
 
         // Get the length of timestamps array
-        const dataLength = chartState.series.timestamps.length;
+        const dataLength = chartState.series.xValues.length;
 
         if (dataLength === 0) {
             createToast({
@@ -122,7 +122,7 @@ function exportDataToCSV() {
         // Iterate through each data point
         for (let i = 0; i < dataLength; i++) {
             // Convert Unix timestamp to human-readable date/time (ISO format without commas)
-            const timestamp = chartState.series.timestamps[i];
+            const timestamp = chartState.series.xValues[i];
             let dateStr = '';
             if (timestamp) {
                 const date = new Date(timestamp * 1000);

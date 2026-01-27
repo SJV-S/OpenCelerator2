@@ -71,10 +71,10 @@ function switchTab(tabName) {
         content.style.display = 'none';
     });
 
-    // Remove active styling from all tabs
+    // Remove active styling from all tabs (reset to transparent)
     document.querySelectorAll('.tab-button').forEach(button => {
-        button.classList.remove('border-[#6ad1e3]', 'bg-gray-50');
-        button.classList.add('border-transparent');
+        button.classList.remove('bg-[#6ad1e3]');
+        button.classList.add('bg-transparent');
     });
 
     // Show selected tab content
@@ -82,8 +82,8 @@ function switchTab(tabName) {
 
     // Add active styling to selected tab
     const activeButton = document.querySelector(`[data-tab="${tabName}"]`);
-    activeButton.classList.remove('border-transparent');
-    activeButton.classList.add('border-[#6ad1e3]', 'bg-gray-50');
+    activeButton.classList.remove('bg-transparent');
+    activeButton.classList.add('bg-[#6ad1e3]');
 
     // Emit tab switch event - subscribers load data as needed
     eventBus.emit(EVENTS.NAV_TAB_SWITCH, { tab: tabName });

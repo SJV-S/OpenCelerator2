@@ -63,6 +63,15 @@ Example format:
 - Function Y defined in script.js → attached to window object → callable from inline HTML onclick handlers
 - Data Z sent from client via fetch() → received in Flask route → processed → returned in JSON response → parsed in .then() → accessible in JavaScript
 
+## CSS Styling
+
+**Always use Tailwind CSS classes** - this project uses Tailwind as the primary styling approach. Vanilla CSS in `<style>` blocks should only be used for:
+- Plotly/chart-specific positioning that Tailwind can't handle
+- Complex selectors or pseudo-elements not available in Tailwind
+- Third-party library overrides
+
+For responsive design, use Tailwind breakpoint prefixes (`sm:`, `md:`, `lg:`, `xl:`) directly in HTML classes rather than writing `@media` queries in vanilla CSS.
+
 ## Event Bus Architecture
 
 This project uses a centralized event bus (`static/SCC/eventBus.js`) for module communication. **Always follow this pattern:**
