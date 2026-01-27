@@ -133,6 +133,17 @@ function setStartDate(newStartDate) {
 }
 
 /**
+ * Update timing section visibility based on chart type
+ * Called after chartState.minuteChart is set
+ */
+function updateTimingVisibility() {
+    const timingSection = document.getElementById('timing-series-label')?.parentElement;
+    if (timingSection) {
+        timingSection.style.display = chartState.minuteChart ? '' : 'none';
+    }
+}
+
+/**
  * Initialize subscriptions for this module
  * Called by main.js coordinator
  */
@@ -153,20 +164,13 @@ function init() {
 
     // Generate initial misc inputs
     generateMiscInputs();
-
-    // Hide timing section for non-minute charts
-    if (!chartState.minuteChart) {
-        const timingSection = document.getElementById('timing-series-label')?.closest('.mb-6, .lg\\:mb-3');
-        if (timingSection) {
-            timingSection.style.display = 'none';
-        }
-    }
 }
 
 export {
     submitEntry,
     setStartDate,
     generateMiscInputs,
+    updateTimingVisibility,
     init
 };
 

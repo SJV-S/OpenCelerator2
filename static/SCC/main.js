@@ -13,6 +13,7 @@ import { eventBus, EVENTS } from './eventBus.js';
 import {
     submitEntry,
     setStartDate,
+    updateTimingVisibility,
     init as dataEntryInit
 } from './series/dataEntry.js';
 import {
@@ -70,25 +71,21 @@ import { initializeShareTab } from './misc/share.js';
  * Initialize the chart with server-rendered data
  * @param {Object} plotData - Plot data from Jinja template
  * @param {number} maxWindowWidth - Max window width from template
- * @param {string} chartType - Chart type selected by user
  */
-export function initializeChart(plotData, maxWindowWidth, chartType) {
-    // Set chart type from URL parameter
-    chartState.chartType = chartType;
+export function initializeChart(plotData, maxWindowWidth) {
+    // Update UI based on chartState.minuteChart (already set in chartState.js)
+    updateTimingVisibility();
 
-    // Determine minute chart from template y-axis title
-    const yAxisTitle = plotData.layout?.yaxis?.title?.text || '';
-    chartState.minuteChart = yAxisTitle.toUpperCase().includes('MINUTE');
     const chartDiv = document.getElementById('chart');
 
     // Resize chart based on chart type
-    if (chartType === 'Weekly') {
+    if (chartState.chartType === 'Weekly') {
         plotData = resizeWeeklyChartByHeight(plotData, window.innerHeight);
-    } else if (chartType === 'Monthly') {
+    } else if (chartState.chartType === 'Monthly') {
         plotData = resizeMonthlyChartByHeight(plotData, window.innerHeight);
-    } else if (chartType === 'Yearly') {
+    } else if (chartState.chartType === 'Yearly') {
         plotData = resizeYearlyChartByHeight(plotData, window.innerHeight);
-    } else if (chartType === 'FrequencyCollections') {
+    } else if (chartState.chartType === 'FrequencyCollections') {
         plotData = resizeFrequencyCollectionsChartByHeight(plotData, window.innerHeight);
     } else {
         plotData = resizeChartByHeight(plotData, window.innerHeight);
@@ -101,7 +98,7 @@ export function initializeChart(plotData, maxWindowWidth, chartType) {
         doubleClick: false
     });
 
-    setupPanConstraints(chartDiv, maxWindowWidth, chartType);
+    setupPanConstraints(chartDiv, maxWindowWidth, chartState.chartType);
 
     // Initialize startDate to the most recent Sunday at midnight
     if (!chartState.startDate) {
@@ -394,6 +391,42 @@ function setupEventListeners() {
 
         chartNameInput.addEventListener('input', (e) => {
             chartState.chartName = e.target.value.trim() || 'Unnamed';
+        });
+    }
+
+    // Chart capacity input
+    const chartCapacityInput = document.getElementById('chart-capacity');
+    if (chartCapacityInput) {
+        chartCapacityInput.value = chartState.chartCapacity;
+
+        chartCapacityInput.addEventListener('change', (e) => {
+            const value = parseInt(e.target.value);
+            if (value > 0) {
+                chartState.chartCapacity = value;
+                // Ensure window doesn't exceed capacity
+                if (chartState.chartWindow > value) {
+                    chartState.chartWindow = value;
+                    const windowInput = document.getElementById('chart-window');
+                    if (windowInput) windowInput.value = value;
+                }
+            }
+        });
+    }
+
+    // Chart window input
+    const chartWindowInput = document.getElementById('chart-window');
+    if (chartWindowInput) {
+        chartWindowInput.value = chartState.chartWindow;
+
+        chartWindowInput.addEventListener('change', (e) => {
+            const value = parseInt(e.target.value);
+            if (value > 0 && value <= chartState.chartCapacity) {
+                chartState.chartWindow = value;
+            } else if (value > chartState.chartCapacity) {
+                // Cap at capacity
+                chartState.chartWindow = chartState.chartCapacity;
+                e.target.value = chartState.chartCapacity;
+            }
         });
     }
 

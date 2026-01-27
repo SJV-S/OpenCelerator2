@@ -72,13 +72,12 @@
 
             // Template variables
             var maxWindowWidth = {{ max_window_width }};
-            var chartType = '{{ chart_type }}';
 
             // Clean URL (remove width/height params)
             history.replaceState(null, '', '/chart/{{ chart_type }}/{{ minute_type }}');
 
             // Initialize chart with template data
-            initializeChart(plotData, maxWindowWidth, chartType);
+            initializeChart(plotData, maxWindowWidth);
         }
         {% endif %}
     </script>
