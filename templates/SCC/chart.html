@@ -3,7 +3,7 @@
 {% block title %}{{ chart_type }} Chart{% endblock %}
 
 {% block content %}
-    <!-- Chart area wrapper - shifts right on desktop for sidebar -->
+    <!-- Chart area wrapper - shifts right on desktop for menu -->
     <div id="chart-area">
         <div id="chart" style="position: relative;">
             <div id="custom-legend" style="display: none;"></div>
@@ -55,9 +55,9 @@
 
         {% if initial_load %}
         // Initial load: redirect with container dimensions
-        // Account for sidebar on desktop (1024px+ screens)
-        const sidebarWidth = window.innerWidth >= 1024 ? Math.max(280, Math.min(window.innerWidth * 0.25, 400)) : 0;
-        const width = window.innerWidth - sidebarWidth;
+        // Account for menu on desktop (1024px+ screens)
+        const menuWidth = window.innerWidth >= 1024 ? Math.max(280, Math.min(window.innerWidth * 0.25, 400)) : 0;
+        const width = window.innerWidth - menuWidth;
         const height = window.innerHeight;
         window.location.href = `/chart/{{ chart_type }}/{{ minute_type }}?width=${width}&height=${height}`;
         {% else %}

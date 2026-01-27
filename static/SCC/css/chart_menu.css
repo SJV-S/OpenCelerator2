@@ -1,0 +1,336 @@
+/*
+ * Chart Menu Styles
+ * Unified styling for the chart menu (overlay on mobile, fixed panel on desktop)
+ * Uses vanilla CSS with percentage-based scaling
+ */
+
+/* ===== MENU CONTAINER ===== */
+@media (min-width: 1024px) {
+    #counter-overlay {
+        display: flex !important;
+        flex-direction: row;
+        position: fixed !important;
+        left: 0;
+        top: 0;
+        width: 25vw;
+        min-width: 280px;
+        max-width: 400px;
+        height: 100vh;
+        background-color: white;
+        box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+        z-index: 1000;
+    }
+}
+
+/* ===== TAB BUTTONS PANEL ===== */
+.chart-menu-tabs {
+    display: flex;
+    flex-direction: column;
+    background-color: white;
+    border-right: 1px solid #d1d5db;
+    flex-shrink: 0;
+}
+
+.chart-menu-tab-btn {
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+    font-weight: 400;
+    color: black;
+    background-color: transparent;
+    border: none;
+    text-align: left;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.chart-menu-tab-btn:hover {
+    background-color: #96deeb;
+}
+
+.chart-menu-tab-btn.active {
+    background-color: #6ad1e3;
+}
+
+/* ===== TAB CONTENT PANEL ===== */
+.chart-menu-content {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 5%;
+    box-sizing: border-box;
+}
+
+.chart-menu-tab-pane {
+    display: none;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.chart-menu-tab-pane.active {
+    display: block;
+}
+
+/* ===== FORM ELEMENTS ===== */
+.chart-menu-content input,
+.chart-menu-content select,
+.chart-menu-content textarea {
+    width: 100%;
+    max-width: 100%;
+    padding: 0.5rem;
+    font-size: 0.875rem;
+    border: 2px solid #d1d5db;
+    border-radius: 0.25rem;
+    box-sizing: border-box;
+}
+
+.chart-menu-content input:focus,
+.chart-menu-content select:focus,
+.chart-menu-content textarea:focus {
+    outline: none;
+    border-color: #6ad1e3;
+}
+
+.chart-menu-content label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #4b5563;
+    margin-bottom: 0.25rem;
+}
+
+.chart-menu-content h2 {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 0.5rem;
+    text-align: center;
+}
+
+/* ===== BUTTONS ===== */
+.chart-menu-content button {
+    font-size: 0.875rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    transition: opacity 0.15s ease;
+}
+
+.chart-menu-content button:hover {
+    opacity: 0.9;
+}
+
+.chart-menu-btn-primary {
+    width: 100%;
+    padding: 0.625rem;
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: white;
+    background-color: #6ad1e3;
+    border: none;
+    border-radius: 0.25rem;
+}
+
+.chart-menu-btn-danger {
+    width: 100%;
+    padding: 0.625rem;
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: white;
+    background-color: #ef4444;
+    border: none;
+    border-radius: 0.25rem;
+}
+
+/* ===== ICON BUTTONS (Lines Tab) ===== */
+.chart-menu-icon-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #d1d5db;
+    border-radius: 0.5rem;
+    background-color: white;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+    padding: 0.5rem;
+}
+
+.chart-menu-icon-btn:hover {
+    background-color: #f9fafb;
+}
+
+.chart-menu-icon-btn:active {
+    background-color: #f3f4f6;
+}
+
+.chart-menu-icon-btn svg {
+    width: 5rem;
+    height: 5rem;
+}
+
+@media (min-width: 640px) {
+    .chart-menu-icon-btn svg {
+        width: 7rem;
+        height: 7rem;
+    }
+}
+
+@media (min-width: 1024px) {
+    .chart-menu-icon-btn svg {
+        width: 5rem;
+        height: 5rem;
+    }
+}
+
+/* ===== GRID LAYOUTS ===== */
+.chart-menu-grid-2 {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+    width: 100%;
+}
+
+.chart-menu-grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+    width: 100%;
+}
+
+.chart-menu-flex-row {
+    display: flex;
+    flex-direction: row;
+    gap: 0.5rem;
+    justify-content: center;
+    align-items: center;
+}
+
+.chart-menu-flex-col {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+/* ===== SPACING ===== */
+.chart-menu-section {
+    margin-bottom: 1rem;
+}
+
+.chart-menu-section:last-child {
+    margin-bottom: 0;
+}
+
+/* ===== TAB INNER WRAPPER ===== */
+.chart-menu-tab-inner {
+    width: 100%;
+    padding: 1rem;
+    box-sizing: border-box;
+}
+
+@media (min-width: 1024px) {
+    .chart-menu-tab-inner {
+        padding: 0;
+    }
+}
+
+/* ===== ICON BUTTON GROUP (Lines Tab Specific) ===== */
+.chart-menu-icon-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2rem;
+    width: 100%;
+}
+
+@media (min-width: 1024px) {
+    .chart-menu-icon-group {
+        gap: 1rem;
+    }
+}
+
+.chart-menu-icon-group-row {
+    display: flex;
+    flex-direction: row;
+    gap: 1rem;
+    justify-content: center;
+}
+
+@media (min-width: 1024px) {
+    .chart-menu-icon-group-row {
+        gap: 1rem;
+    }
+}
+
+.chart-menu-icon-category {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.chart-menu-icon-category h2 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0;
+    text-align: center;
+}
+
+@media (min-width: 1024px) {
+    .chart-menu-icon-category h2 {
+        font-size: 0.875rem;
+    }
+}
+
+/* ===== DATE INPUT WITH ARROWS ===== */
+.chart-menu-date-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+}
+
+.chart-menu-date-row input {
+    flex: 1;
+    text-align: center;
+}
+
+.chart-menu-date-btn {
+    padding: 0.5rem;
+    background-color: white;
+    border: 2px solid #d1d5db;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.chart-menu-date-btn:hover {
+    background-color: #f3f4f6;
+}
+
+.chart-menu-date-btn svg {
+    width: 1rem;
+    height: 1rem;
+}
+
+/* ===== CHART AREA OFFSET ===== */
+@media (min-width: 1024px) {
+    #chart-area {
+        margin-left: max(280px, min(25vw, 400px));
+        width: calc(100vw - max(280px, min(25vw, 400px)));
+        height: 100vh;
+        overflow: hidden;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+}
+
+@media (max-width: 1023px) {
+    #chart-area {
+        width: 100vw;
+    }
+}

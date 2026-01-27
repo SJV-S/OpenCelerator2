@@ -66,24 +66,27 @@ function hideCounter() {
  * Mechanism: Function attached to window object, called from template buttons
  */
 function switchTab(tabName) {
-    // Hide all tab contents
-    document.querySelectorAll('.tab-content').forEach(content => {
-        content.style.display = 'none';
+    // Hide all tab contents - remove active class
+    document.querySelectorAll('.chart-menu-tab-pane').forEach(content => {
+        content.classList.remove('active');
     });
 
-    // Remove active styling from all tabs (reset to transparent)
-    document.querySelectorAll('.tab-button').forEach(button => {
-        button.classList.remove('bg-[#6ad1e3]');
-        button.classList.add('bg-transparent');
+    // Remove active styling from all tab buttons
+    document.querySelectorAll('.chart-menu-tab-btn').forEach(button => {
+        button.classList.remove('active');
     });
 
-    // Show selected tab content
-    document.getElementById(tabName + '-content').style.display = 'block';
+    // Show selected tab content - add active class
+    const activeContent = document.getElementById(tabName + '-content');
+    if (activeContent) {
+        activeContent.classList.add('active');
+    }
 
-    // Add active styling to selected tab
+    // Add active styling to selected tab button
     const activeButton = document.querySelector(`[data-tab="${tabName}"]`);
-    activeButton.classList.remove('bg-transparent');
-    activeButton.classList.add('bg-[#6ad1e3]');
+    if (activeButton) {
+        activeButton.classList.add('active');
+    }
 
     // Emit tab switch event - subscribers load data as needed
     eventBus.emit(EVENTS.NAV_TAB_SWITCH, { tab: tabName });

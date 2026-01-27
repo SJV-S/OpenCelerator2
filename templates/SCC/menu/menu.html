@@ -1,37 +1,37 @@
 <!-- Menu overlay -->
-<div id="counter-overlay" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: white; z-index: 1000; display: none; flex-direction: row;">
-    <!-- Tabs (Left Sidebar) -->
-    <div class="flex flex-col border-r border-gray-300 bg-white">
-        <button class="tab-button px-4 py-3 text-base font-normal text-black bg-[#6ad1e3] hover:bg-[#96deeb] text-left whitespace-nowrap" data-tab="counter">Counter</button>
-        <button class="tab-button px-4 py-3 text-base font-normal text-black bg-transparent hover:bg-[#96deeb] text-left whitespace-nowrap" data-tab="data">Data</button>
-        <button class="tab-button px-4 py-3 text-base font-normal text-black bg-transparent hover:bg-[#96deeb] text-left whitespace-nowrap" data-tab="credit">Credit</button>
-        <button class="tab-button px-4 py-3 text-base font-normal text-black bg-transparent hover:bg-[#96deeb] text-left whitespace-nowrap" data-tab="lines">Lines</button>
-        <button class="tab-button px-4 py-3 text-base font-normal text-black bg-transparent hover:bg-[#96deeb] text-left whitespace-nowrap" data-tab="series">Series</button>
-        <button class="tab-button px-4 py-3 text-base font-normal text-black bg-transparent hover:bg-[#96deeb] text-left whitespace-nowrap" data-tab="chart">Chart</button>
-        <button class="tab-button px-4 py-3 text-base font-normal text-black bg-transparent hover:bg-[#96deeb] text-left whitespace-nowrap" data-tab="share">Share</button>
+<div id="counter-overlay" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: white; z-index: 1000; flex-direction: row;">
+    <!-- Tabs -->
+    <div class="chart-menu-tabs">
+        <button class="chart-menu-tab-btn active" data-tab="counter">Counter</button>
+        <button class="chart-menu-tab-btn" data-tab="data">Data</button>
+        <button class="chart-menu-tab-btn" data-tab="credit">Credit</button>
+        <button class="chart-menu-tab-btn" data-tab="lines">Lines</button>
+        <button class="chart-menu-tab-btn" data-tab="series">Series</button>
+        <button class="chart-menu-tab-btn" data-tab="chart">Chart</button>
+        <button class="chart-menu-tab-btn" data-tab="share">Share</button>
     </div>
 
     <!-- Tab Content -->
-    <div id="sidebar-content" class="flex-1 overflow-y-auto overflow-x-hidden lg:p-2">
-        <div id="counter-content" class="tab-content flex justify-center items-start min-h-full py-4 lg:block lg:py-0">
+    <div id="chart-menu-content" class="chart-menu-content">
+        <div id="counter-content" class="chart-menu-tab-pane active">
             {% include 'SCC/menu/counter_tab.html' %}
         </div>
-        <div id="data-content" class="tab-content flex justify-center items-start min-h-full py-4 lg:block lg:py-0" style="display: none;">
+        <div id="data-content" class="chart-menu-tab-pane">
             {% include 'SCC/menu/data_tab.html' %}
         </div>
-        <div id="credit-content" class="tab-content flex justify-center items-start min-h-full py-4 lg:block lg:py-0" style="display: none;">
+        <div id="credit-content" class="chart-menu-tab-pane">
             {% include 'SCC/menu/credit_tab.html' %}
         </div>
-        <div id="lines-content" class="tab-content flex justify-center items-center min-h-full lg:block" style="display: none;">
+        <div id="lines-content" class="chart-menu-tab-pane">
             {% include 'SCC/menu/lines_tab.html' %}
         </div>
-        <div id="series-content" class="tab-content flex justify-center items-start min-h-full py-4 lg:block lg:py-0" style="display: none;">
+        <div id="series-content" class="chart-menu-tab-pane">
             {% include 'SCC/menu/series_tab.html' %}
         </div>
-        <div id="chart-content" class="tab-content flex justify-center items-start min-h-full py-4 lg:block lg:py-0" style="display: none;">
+        <div id="chart-content" class="chart-menu-tab-pane">
             {% include 'SCC/menu/chart_tab.html' %}
         </div>
-        <div id="share-content" class="tab-content flex justify-center items-start min-h-full py-4 lg:block lg:py-0" style="display: none;">
+        <div id="share-content" class="chart-menu-tab-pane">
             {% include 'SCC/menu/share_tab.html' %}
         </div>
     </div>

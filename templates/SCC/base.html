@@ -9,6 +9,8 @@
 
     <!-- Main ES Module entry point - loads all other modules -->
     <script type="module" src="{{ url_for('static', filename='SCC/main.js') }}"></script>
+    <!-- Sidebar styles -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='SCC/css/chart_menu.css') }}">
     <style>
         html, body {
             height: 100%;
@@ -111,93 +113,6 @@
         #custom-legend:hover .legend-lines-section,
         #custom-legend.touched .legend-lines-section {
             display: flex;
-        }
-
-        /* Desktop sidebar layout */
-        @media (min-width: 1024px) {
-            #counter-overlay {
-                display: flex !important;
-                position: fixed !important;
-                width: 25vw !important;
-                min-width: 280px !important;
-                max-width: 400px !important;
-                height: 100vh !important;
-                box-shadow: 2px 0 8px rgba(0,0,0,0.1);
-            }
-
-            /* Scale down all content in tabs */
-            #sidebar-content {
-                font-size: 12px;
-                padding: 0.5rem !important;
-            }
-
-            #sidebar-content .tab-content > div {
-                padding: 0.5rem !important;
-                margin: 0 !important;
-                max-width: none !important;
-            }
-
-            #sidebar-content input,
-            #sidebar-content select {
-                font-size: 12px !important;
-                padding: 4px 6px !important;
-                max-width: 100% !important;
-            }
-
-            #sidebar-content button {
-                font-size: 12px !important;
-                padding: 6px 8px !important;
-            }
-
-            #sidebar-content label {
-                font-size: 11px !important;
-            }
-
-            #sidebar-content h2 {
-                font-size: 13px !important;
-            }
-
-            /* Scale down icons in lines tab */
-            #sidebar-content button[data-icon] svg {
-                width: 3rem !important;
-                height: 3rem !important;
-            }
-
-            #sidebar-content button[data-icon] {
-                padding: 0.5rem !important;
-            }
-
-            #sidebar-content .grid {
-                gap: 4px !important;
-            }
-
-            #sidebar-content .mb-6,
-            #sidebar-content .mb-8 {
-                margin-bottom: 8px !important;
-            }
-
-            #sidebar-content .gap-4,
-            #sidebar-content .gap-6,
-            #sidebar-content .gap-8 {
-                gap: 4px !important;
-            }
-
-            #chart-area {
-                margin-left: max(280px, min(25vw, 400px));
-                width: calc(100vw - max(280px, min(25vw, 400px)));
-                height: 100vh;
-                overflow: hidden;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-            }
-        }
-
-        /* Mobile: keep overlay behavior */
-        @media (max-width: 1023px) {
-            #chart-area {
-                width: 100vw;
-            }
         }
 
         {% block extra_style %}{% endblock %}

@@ -1,13 +1,13 @@
 /**
  * SVG icon definitions for the application
  * Icons accept optional size parameter - if provided, uses fixed width/height
- * If not provided, uses responsive Tailwind classes
+ * If not provided, uses 100% to fill container (CSS controls actual size)
  */
 
 // Helper to generate size attributes
 const sizeAttrs = (size) => size
     ? `width="${size}" height="${size}"`
-    : 'class="w-16 h-16 sm:w-28 sm:h-28 md:w-32 md:h-32"';
+    : 'width="100%" height="100%"';
 
 export const icons = {
     phaseTextTop: (size = null, showText = true) => `
