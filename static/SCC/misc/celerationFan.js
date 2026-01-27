@@ -43,6 +43,37 @@
  *
  *        visualAngle = atan2((p1.y - p0.y) * plotHeight, (p1.x - p0.x) * plotWidth)
  *
+ * 3. DRAGGABLE FAN (Performance-Optimized)
+ * ----------------------------------------
+ * Problem: Calling Plotly.relayout() on every mouse move causes severe CPU load,
+ * even with throttling. The chart becomes unusable.
+ *
+ * Solution: Use CSS transforms on Plotly's actual SVG elements during drag, then
+ * call Plotly.relayout() ONCE on mouseup to sync the data model.
+ *
+ *   - On mousedown: Cache references to the fan's SVG elements
+ *   - On mousemove: Apply CSS transform: translate(dx, dy) to cached elements
+ *   - On mouseup: Clear transforms, call Plotly.relayout() once with new positions
+ *
+ * This approach moves the actual rendered elements (not a preview/ghost), giving
+ * smooth visual feedback with zero Plotly overhead during drag.
+ *
+ * 4. SVG ELEMENT SELECTION (Finding Fan Elements)
+ * -----------------------------------------------
+ * Problem: Plotly doesn't expose shape names in the SVG DOM. We need to identify
+ * which SVG elements belong to the fan vs. template shapes (ticks, spines, etc.).
+ *
+ * Key insight: Fan shapes are added AFTER template shapes via injectCelerationFan(),
+ * so they appear at the END of the layout.shapes array and thus at the END of the
+ * SVG elements in .layer-above .shapelayer.
+ *
+ * Solution: Count fan shapes (shapeIndices.length), then select the LAST N elements
+ * from the shapelayer:
+ *
+ *   const allShapes = aboveLayer.querySelectorAll('path, rect');
+ *   const startIndex = allShapes.length - numFanShapes;
+ *   // Select elements from startIndex to end
+ *
  * =============================================================================
  */
 
@@ -322,18 +353,25 @@ function getFanIndices(chartDiv) {
 
 /**
  * Get Plotly's SVG elements for the fan
+ *
+ * Fan shapes are added AFTER template shapes via injectCelerationFan(),
+ * so they appear at the END of the SVG element list in layer-above.
  */
 function getFanSvgElements(chartDiv) {
     const { shapeIndices, annotationIndices } = getFanIndices(chartDiv);
     const elements = [];
 
-    // Find the layer-above shapelayer (where paper-coordinate shapes go)
+    // Find the layer-above shapelayer
     const aboveLayer = chartDiv.querySelector('.layer-above .shapelayer');
     if (aboveLayer) {
-        // Grab all shapes from this layer - they should all be fan shapes
-        aboveLayer.querySelectorAll('path, rect').forEach(el => {
-            elements.push(el);
-        });
+        const allShapes = aboveLayer.querySelectorAll('path, rect');
+        const numFanShapes = shapeIndices.length;
+
+        // Fan shapes are at the END - select last N elements
+        const startIndex = allShapes.length - numFanShapes;
+        for (let i = startIndex; i < allShapes.length; i++) {
+            if (allShapes[i]) elements.push(allShapes[i]);
+        }
     }
 
     // Get annotation groups by index
@@ -386,7 +424,11 @@ function handleMouseDown(e) {
         dragState.fanElements = getFanSvgElements(chartDiv);
 
         chartDiv.style.cursor = 'grabbing';
+
+        // Prevent Plotly's pan from intercepting
         e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
     }
 }
 
@@ -440,11 +482,13 @@ export function initFanDrag() {
     const chartDiv = document.getElementById('chart');
     if (!chartDiv) return;
 
-    chartDiv.removeEventListener('mousedown', handleMouseDown);
+    // Remove existing listeners (in case of re-init)
+    chartDiv.removeEventListener('mousedown', handleMouseDown, true);
     document.removeEventListener('mousemove', handleMouseMove);
     document.removeEventListener('mouseup', handleMouseUp);
 
-    chartDiv.addEventListener('mousedown', handleMouseDown);
+    // Use capture phase for mousedown so we intercept before Plotly's pan handler
+    chartDiv.addEventListener('mousedown', handleMouseDown, true);
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
 }
