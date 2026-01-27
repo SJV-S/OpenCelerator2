@@ -28,8 +28,9 @@ import {
     removeAggregationBlock
 } from './series/traceStyles.js';
 import { refreshChart, init as replotInit } from './series/replot.js';
-import { updateChartDateLabels, handleOtherDateChange, updateDateDisplay, adjustDateInput, initializeDateInput } from './util/dates.js';
-import { submitCredit, loadCreditData, init as creditInit } from './misc/credit.js';
+import { updateChartDateLabels, updateDateDisplay, adjustDateInput, initializeDateInput } from './util/dates.js';
+import { initStartDateControls } from './util/startDateControls.js';
+import { submitCredit, loadCreditData, renderCredits, init as creditInit } from './misc/credit.js';
 import { loadDataForDate, adjustTimestamp, updateCurrentEntry, deleteCurrentEntry, init as dataUpdateInit } from './series/dataUpdate.js';
 import {
     showCounter,
@@ -54,11 +55,7 @@ import { init as celLineInit } from './lines/celLine.js';
 import { initGridToggle } from './misc/grid.js';
 import { toggleLegend, renderCustomLegend, init as customLegendInit } from './misc/customLegend.js';
 import { setupPanConstraints } from './util/panning_controls.js';
-import { resizeChartByHeight } from './util/resize_chart/resize-daily.js';
-import { resizeWeeklyChartByHeight } from './util/resize_chart/resize-weekly.js';
-import { resizeMonthlyChartByHeight } from './util/resize_chart/resize-monthly.js';
-import { resizeYearlyChartByHeight } from './util/resize_chart/resize-yearly.js';
-import { resizeFrequencyCollectionsChartByHeight } from './util/resize_chart/resize-frequency-collections.js';
+import { resizeChartByHeight, CHART_CONFIG } from './util/resize_chart/resize-chart.js';
 import { showInitialMenuHint } from './util/tooltip.js';
 import { icons } from './util/icons.js';
 import { initializeShareTab } from './misc/share.js';
@@ -78,18 +75,12 @@ export function initializeChart(plotData, maxWindowWidth) {
 
     const chartDiv = document.getElementById('chart');
 
+    // Get container height: use #chart-container on desktop, window.innerHeight on mobile
+    const chartContainer = document.getElementById('chart-container');
+    const containerHeight = chartContainer ? chartContainer.clientHeight : window.innerHeight;
+
     // Resize chart based on chart type
-    if (chartState.chartType === 'Weekly') {
-        plotData = resizeWeeklyChartByHeight(plotData, window.innerHeight);
-    } else if (chartState.chartType === 'Monthly') {
-        plotData = resizeMonthlyChartByHeight(plotData, window.innerHeight);
-    } else if (chartState.chartType === 'Yearly') {
-        plotData = resizeYearlyChartByHeight(plotData, window.innerHeight);
-    } else if (chartState.chartType === 'FrequencyCollections') {
-        plotData = resizeFrequencyCollectionsChartByHeight(plotData, window.innerHeight);
-    } else {
-        plotData = resizeChartByHeight(plotData, window.innerHeight);
-    }
+    plotData = resizeChartByHeight(plotData, containerHeight, chartState.chartType);
 
     // Create chart
     Plotly.newPlot(chartDiv, plotData.data, plotData.layout, {
@@ -99,6 +90,32 @@ export function initializeChart(plotData, maxWindowWidth) {
     });
 
     setupPanConstraints(chartDiv, maxWindowWidth, chartState.chartType);
+
+    // Observe container for resize (fullscreen, viewport changes)
+    if (chartContainer) {
+        let resizeTimeout;
+        const resizeObserver = new ResizeObserver((entries) => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                const newHeight = entries[0].contentRect.height * 0.98;
+                const config = CHART_CONFIG[chartState.chartType];
+                const margin = chartDiv.layout.margin;
+                const xmax = Math.round(chartDiv.layout.xaxis.range[1]);
+                const deg = 34;
+                const yaxis_px = newHeight - (margin.t + margin.b);
+                const y_axis = Math.log10(config.yMax) - Math.log10(config.yMin);
+                const delta_y = Math.log10(2 ** (xmax / config.unit));
+                const delta_y_px = (delta_y / y_axis) * yaxis_px;
+                const xaxis_px = delta_y_px / Math.tan((deg * Math.PI) / 180);
+                const newWidth = xaxis_px + (margin.l + margin.r);
+
+                Plotly.relayout(chartDiv, { height: newHeight, width: newWidth });
+                renderCredits();
+                renderCustomLegend();
+            }, 100);
+        });
+        resizeObserver.observe(chartContainer);
+    }
 
     // Initialize startDate to the most recent Sunday at midnight
     if (!chartState.startDate) {
@@ -138,12 +155,8 @@ function initializeDateInputs() {
     // Data tab date input with today's date
     initializeDateInput('data-entry-date');
 
-    // Other tab date input with startDate
-    const otherDateInput = document.getElementById('other-date');
-    if (otherDateInput && chartState.startDate) {
-        otherDateInput.value = chartState.startDate.toISOString().split('T')[0];
-        updateDateDisplay(chartState.startDate);
-    }
+    // Initialize start date controls in Chart tab
+    initStartDateControls();
 }
 
 /**
@@ -348,12 +361,6 @@ function setupEventListeners() {
     });
 
     // Show line toggle checkboxes - now handled in initializeLineWidthToggles() in chartReplot.js
-
-    // Other date change handler
-    const otherDateInput = document.getElementById('other-date');
-    if (otherDateInput) {
-        otherDateInput.addEventListener('change', handleOtherDateChange);
-    }
 
     // Legend toggle
     const legendToggle = document.getElementById('legend-toggle');

@@ -7,13 +7,49 @@
         </div>
     </div>
 
-    <!-- Date Section -->
+    <!-- Start Date Section -->
     <div class="mb-8 lg:mb-4">
-        <label class="block text-sm font-semibold text-gray-600 mb-2 lg:mb-1 text-center" for="other-date">Sunday Start Date</label>
-        <div class="flex items-center gap-2 max-w-md lg:max-w-full mx-auto">
-            <div class="flex-1 relative">
-                <input type="date" id="other-date" class="absolute opacity-0 pointer-events-none">
-                <div id="other-date-display" class="px-4 py-3 lg:px-2 lg:py-2 text-lg lg:text-base border-2 border-gray-300 rounded transition-colors text-center cursor-pointer hover:bg-gray-50 active:bg-gray-100" onclick="document.getElementById('other-date').showPicker()">
+        <label id="start-date-label" class="block text-sm font-semibold text-gray-600 mb-2 lg:mb-1 text-center">Start Date</label>
+
+        <!-- Grouped container with border -->
+        <div class="border-2 border-gray-300 rounded-lg p-4 max-w-md lg:max-w-full mx-auto">
+            <!-- Sunday dropdown (Daily only) -->
+            <div id="start-sunday-row" class="flex items-center justify-between mb-3" style="display: none;">
+                <label class="text-sm text-gray-500">Sunday</label>
+                <div class="flex items-center">
+                    <button type="button" data-action="start-sunday-dec" class="w-12 h-12 flex items-center justify-center bg-gray-100 hover:bg-gray-200 active:bg-gray-300 rounded-l border-2 border-r-0 border-gray-300 text-2xl font-bold text-gray-600">‹</button>
+                    <div id="start-sunday" data-value="" class="w-20 h-12 flex items-center justify-center border-y-2 border-gray-300 text-xl font-medium bg-white"></div>
+                    <button type="button" data-action="start-sunday-inc" class="w-12 h-12 flex items-center justify-center bg-gray-100 hover:bg-gray-200 active:bg-gray-300 rounded-r border-2 border-l-0 border-gray-300 text-2xl font-bold text-gray-600">›</button>
+                </div>
+            </div>
+
+            <!-- Month input (Daily, Weekly) -->
+            <div id="start-month-row" class="flex items-center justify-between mb-3" style="display: none;">
+                <label class="text-sm text-gray-500">Month</label>
+                <div class="flex items-center">
+                    <button type="button" data-action="start-month-dec" class="w-12 h-12 flex items-center justify-center bg-gray-100 hover:bg-gray-200 active:bg-gray-300 rounded-l border-2 border-r-0 border-gray-300 text-2xl font-bold text-gray-600">‹</button>
+                    <div id="start-month" data-value="" class="w-20 h-12 flex items-center justify-center border-y-2 border-gray-300 text-xl font-medium bg-white"></div>
+                    <button type="button" data-action="start-month-inc" class="w-12 h-12 flex items-center justify-center bg-gray-100 hover:bg-gray-200 active:bg-gray-300 rounded-r border-2 border-l-0 border-gray-300 text-2xl font-bold text-gray-600">›</button>
+                </div>
+            </div>
+
+            <!-- Year input (Daily, Weekly, Monthly) -->
+            <div id="start-year-row" class="flex items-center justify-between mb-3" style="display: none;">
+                <label class="text-sm text-gray-500">Year</label>
+                <div class="flex items-center">
+                    <button type="button" data-action="start-year-dec" class="w-12 h-12 flex items-center justify-center bg-gray-100 hover:bg-gray-200 active:bg-gray-300 rounded-l border-2 border-r-0 border-gray-300 text-2xl font-bold text-gray-600">‹</button>
+                    <div id="start-year" data-value="" class="w-20 h-12 flex items-center justify-center border-y-2 border-gray-300 text-xl font-medium bg-white"></div>
+                    <button type="button" data-action="start-year-inc" class="w-12 h-12 flex items-center justify-center bg-gray-100 hover:bg-gray-200 active:bg-gray-300 rounded-r border-2 border-l-0 border-gray-300 text-2xl font-bold text-gray-600">›</button>
+                </div>
+            </div>
+
+            <!-- Decade input (Yearly only) -->
+            <div id="start-decade-row" class="flex items-center justify-between" style="display: none;">
+                <label class="text-sm text-gray-500">Decade</label>
+                <div class="flex items-center">
+                    <button type="button" data-action="start-decade-dec" class="w-12 h-12 flex items-center justify-center bg-gray-100 hover:bg-gray-200 active:bg-gray-300 rounded-l border-2 border-r-0 border-gray-300 text-2xl font-bold text-gray-600">‹</button>
+                    <div id="start-decade" data-value="" class="w-20 h-12 flex items-center justify-center border-y-2 border-gray-300 text-xl font-medium bg-white"></div>
+                    <button type="button" data-action="start-decade-inc" class="w-12 h-12 flex items-center justify-center bg-gray-100 hover:bg-gray-200 active:bg-gray-300 rounded-r border-2 border-l-0 border-gray-300 text-2xl font-bold text-gray-600">›</button>
                 </div>
             </div>
         </div>

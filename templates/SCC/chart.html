@@ -5,9 +5,14 @@
 {% block content %}
     <!-- Chart area wrapper - shifts right on desktop for menu -->
     <div id="chart-area">
-        <div id="chart" style="position: relative;">
-            <div id="custom-legend" style="display: none;"></div>
+        <!-- Top container: holds the chart (80% on desktop, 100% on mobile) -->
+        <div id="chart-container">
+            <div id="chart" style="position: relative;">
+                <div id="custom-legend" style="display: none;"></div>
+            </div>
         </div>
+        <!-- Credit container: reserved space (15% on desktop, hidden on mobile) -->
+        <div id="credit-container"></div>
     </div>
 
     <!-- Menu hint tooltip -->
