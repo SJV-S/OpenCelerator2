@@ -90,9 +90,6 @@
             const urlParams = new URLSearchParams(window.location.search);
             const loadId = urlParams.get('load');
 
-            // Clean URL (remove query params)
-            history.replaceState(null, '', '/chart/{{ chart_type }}/{{ minute_type }}');
-
             async function init() {
                 if (!loadId) {
                     // No chart specified - redirect to menu
