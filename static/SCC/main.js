@@ -62,6 +62,7 @@ import { showInitialMenuHint } from './util/tooltip.js';
 import { icons } from './util/icons.js';
 import { initializeShareTab } from './misc/share.js';
 import { init as crosshairInit } from './util/crosshair.js';
+import { initStorage, saveChart } from './storage/chartStorage.js';
 
 // ============================================================================
 // CHART INITIALIZATION
@@ -199,6 +200,15 @@ document.addEventListener('DOMContentLoaded', () => {
     crosshairInit();
     celerationFanInit();
     console.log('Main.js: Event bus subscriptions initialized');
+
+    // Initialize IndexedDB storage
+    initStorage().then(success => {
+        if (success) {
+            console.log('Main.js: Storage initialized');
+        } else {
+            console.warn('Main.js: Storage initialization failed');
+        }
+    });
 
     // Initialize icons in buttons with data-icon attributes
     document.querySelectorAll('[data-icon]').forEach(button => {
@@ -401,6 +411,7 @@ function setupEventListeners() {
 
         chartNameInput.addEventListener('input', (e) => {
             chartState.chartName = e.target.value.trim() || 'Unnamed';
+            eventBus.emit(EVENTS.CHART_NAME_CHANGED, { name: chartState.chartName });
         });
     }
 
@@ -459,6 +470,18 @@ function setupEventListeners() {
             removeAggregationBlock(block);
         }
     });
+
+    // Save chart button
+    const saveChartBtn = document.querySelector('[data-action="save-chart"]');
+    if (saveChartBtn) {
+        saveChartBtn.addEventListener('click', async () => {
+            const statusEl = document.getElementById('storage-status');
+            const id = await saveChart();
+            if (id && statusEl) {
+                statusEl.textContent = `Saved: ${id}`;
+            }
+        });
+    }
 
     console.log('Event listeners set up');
 }

@@ -248,6 +248,7 @@ export function injectCelerationFan(plotData, isMinuteChart, chartType) {
     // Skip fan on mobile - screen too small
     if (isMobile()) {
         chartState.fanVisible = false;
+        eventBus.emit(EVENTS.FAN_VISIBILITY_CHANGED, { visible: false });
         return plotData;
     }
 
@@ -265,6 +266,7 @@ export function injectCelerationFan(plotData, isMinuteChart, chartType) {
     plotData.layout.shapes = [...(plotData.layout.shapes || []), ...shapes];
     plotData.layout.annotations = [...(plotData.layout.annotations || []), ...annotations];
     chartState.fanVisible = true;
+    eventBus.emit(EVENTS.FAN_VISIBILITY_CHANGED, { visible: true });
 
     return plotData;
 }
@@ -278,6 +280,7 @@ export function removeCelerationFan() {
         annotations: (chartDiv.layout.annotations || []).filter(a => !a.name?.startsWith('fan-'))
     });
     chartState.fanVisible = false;
+    eventBus.emit(EVENTS.FAN_VISIBILITY_CHANGED, { visible: false });
 }
 
 export function addCelerationFan() {
@@ -294,6 +297,7 @@ export function addCelerationFan() {
         annotations: [...(chartDiv.layout.annotations || []), ...annotations]
     });
     chartState.fanVisible = true;
+    eventBus.emit(EVENTS.FAN_VISIBILITY_CHANGED, { visible: true });
 }
 
 export function toggleCelerationFan(visible) {

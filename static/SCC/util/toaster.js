@@ -50,44 +50,69 @@ function createToast(options) {
         messageId = null,
         duration = null,
         stateRef = null,
-        position = 'top-right'
+        position = 'top-right',
+        id: customId = null
     } = options;
 
-    // Generate unique ID for this toast
-    const id = `toast-${position}-${++toastCounter}`;
+    // Use custom ID if provided (replaces existing), otherwise generate unique ID for stacking
+    const id = customId || `toast-${position}-${++toastCounter}`;
 
     // Normalize position for tracking (top-right-secondary uses top-right array)
     const trackingPosition = position === 'top-right-secondary' ? 'top-right' : position;
+
+    // If custom ID provided, remove existing toast with that ID (replacement behavior)
+    if (customId) {
+        removeToast(customId);
+    }
 
     // Create toast container
     const toast = document.createElement('div');
     toast.id = id;
     toast.setAttribute('data-toast', 'true');
 
-    // Determine position styles based on position parameter
-    let positionStyles = '';
-    switch (position) {
-        case 'top-left':
-            positionStyles = 'top: 1vh; left: 1vw;';
-            break;
-        case 'top-right':
-            positionStyles = 'top: 1vh; right: 1vw;';
-            break;
-        case 'top-right-secondary':
-            positionStyles = 'top: 7vh; right: 1vw;';
-            break;
-        case 'bottom-left':
-            positionStyles = 'bottom: 1vh; left: 1vw;';
-            break;
-        case 'bottom-right':
-            positionStyles = 'bottom: 1vh; right: 1vw;';
-            break;
-        default:
-            positionStyles = 'top: 1vh; right: 1vw;';
+    // Calculate stacking offset based on existing toasts
+    const existingToasts = activeToasts[trackingPosition] || [];
+    let stackOffset = 0;
+
+    // Calculate total height of existing toasts for stacking
+    for (const existingId of existingToasts) {
+        const existingToast = document.getElementById(existingId);
+        if (existingToast) {
+            stackOffset += existingToast.offsetHeight + 10; // 10px gap between toasts
+        }
     }
 
-    // Determine if this is a right-side toast for slide-in animation
+    // Add base offset for secondary position
+    const baseOffset = position === 'top-right-secondary' ? 60 : 0; // ~6vh base offset for secondary
+    const totalOffset = stackOffset + baseOffset;
+
+    // Determine position styles based on position parameter
+    let positionStyles = '';
+    const isTopPosition = position.startsWith('top');
+    const verticalProperty = isTopPosition ? 'top' : 'bottom';
+    const verticalValue = `calc(1vh + ${totalOffset}px)`;
+
+    switch (position) {
+        case 'top-left':
+            positionStyles = `${verticalProperty}: ${verticalValue}; left: 1vw;`;
+            break;
+        case 'top-right':
+        case 'top-right-secondary':
+            positionStyles = `${verticalProperty}: ${verticalValue}; right: 1vw;`;
+            break;
+        case 'bottom-left':
+            positionStyles = `${verticalProperty}: ${verticalValue}; left: 1vw;`;
+            break;
+        case 'bottom-right':
+            positionStyles = `${verticalProperty}: ${verticalValue}; right: 1vw;`;
+            break;
+        default:
+            positionStyles = `top: ${verticalValue}; right: 1vw;`;
+    }
+
+    // Determine slide direction based on position
     const isRightSide = position === 'top-right' || position === 'bottom-right' || position === 'top-right-secondary';
+    const slideDirection = isRightSide ? 'calc(100% + 1vw)' : 'calc(-100% - 1vw)';
 
     // Base styles (common to all toasts)
     const baseStyles = `
@@ -101,7 +126,9 @@ function createToast(options) {
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         z-index: 10000;
         font-family: Arial, sans-serif;
-        ${isRightSide ? 'transform: translateX(calc(100% + 1vw)); transition: transform 0.3s ease-out;' : ''}
+        opacity: 0;
+        transform: translateX(${slideDirection});
+        transition: transform 0.3s ease-out, opacity 0.3s ease-out;
     `;
 
     // Layout-specific styles
@@ -159,12 +186,24 @@ function createToast(options) {
     // Append toast to body
     document.body.appendChild(toast);
 
-    // Trigger slide-in animation for right-side toasts
-    if (isRightSide) {
+    // Track this toast for stacking
+    if (!activeToasts[trackingPosition]) {
+        activeToasts[trackingPosition] = [];
+    }
+    activeToasts[trackingPosition].push(id);
+
+    // Store position info on the element for repositioning
+    toast.dataset.trackingPosition = trackingPosition;
+    toast.dataset.isTopPosition = isTopPosition;
+
+    // Trigger slide-in animation after element is in DOM
+    // Use double requestAnimationFrame to ensure styles are applied before transition
+    requestAnimationFrame(() => {
         requestAnimationFrame(() => {
+            toast.style.opacity = '1';
             toast.style.transform = 'translateX(0)';
         });
-    }
+    });
 
     // Store reference if state object provided
     if (stateRef && stateRef.state) {
@@ -297,13 +336,45 @@ function updateToastMessage(messageId, newMessage) {
 }
 
 /**
- * Removes a toast from the DOM by ID
+ * Removes a toast from the DOM by ID and repositions remaining toasts
  * @param {string} id - ID of the toast to remove
  */
 function removeToast(id) {
     const existingToast = document.getElementById(id);
     if (existingToast) {
+        const trackingPosition = existingToast.dataset.trackingPosition;
+        const isTopPosition = existingToast.dataset.isTopPosition === 'true';
+
         existingToast.remove();
+
+        // Remove from tracking and reposition remaining toasts
+        if (trackingPosition && activeToasts[trackingPosition]) {
+            const index = activeToasts[trackingPosition].indexOf(id);
+            if (index > -1) {
+                activeToasts[trackingPosition].splice(index, 1);
+                repositionToasts(trackingPosition, isTopPosition);
+            }
+        }
+    }
+}
+
+/**
+ * Repositions all toasts at a given position after one is removed
+ * @param {string} trackingPosition - The position category ('top-right', 'top-left', etc.)
+ * @param {boolean} isTopPosition - Whether this is a top-aligned position
+ * @private
+ */
+function repositionToasts(trackingPosition, isTopPosition) {
+    const toastIds = activeToasts[trackingPosition] || [];
+    let offset = 0;
+
+    for (const toastId of toastIds) {
+        const toast = document.getElementById(toastId);
+        if (toast) {
+            const verticalProperty = isTopPosition ? 'top' : 'bottom';
+            toast.style[verticalProperty] = `calc(1vh + ${offset}px)`;
+            offset += toast.offsetHeight + 10; // 10px gap
+        }
     }
 }
 
@@ -312,6 +383,10 @@ function removeToast(id) {
  */
 function removeAllToasts() {
     document.querySelectorAll('[data-toast]').forEach(el => el.remove());
+    // Clear all tracking arrays
+    for (const position in activeToasts) {
+        activeToasts[position] = [];
+    }
 }
 
 /**
@@ -327,6 +402,7 @@ function removeAllToasts() {
  */
 function createInfoToast(options) {
     return createToast({
+        id: options.id,
         message: options.message,
         messageId: options.messageId,
         buttons: [
@@ -362,6 +438,7 @@ function createConfirmToast(options) {
     const primaryColor = options.primaryColor || borderColor;
 
     return createToast({
+        id: options.id,
         message: options.message,
         buttons: [
             {

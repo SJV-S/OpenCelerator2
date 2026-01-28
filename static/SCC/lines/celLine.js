@@ -150,9 +150,11 @@ function getAvailableSeriesButtons() {
 function selectSeriesAndEnableDrag(seriesKey) {
     celLineState.selectedSeriesKey = seriesKey;
 
-    // Remove series selection toast (position defaults to top-right)
-    removeToast('toast-top-right');
-    celLineState.seriesSelectionToast = null;
+    // Remove series selection toast using stored reference
+    if (celLineState.seriesSelectionToast) {
+        removeToast(celLineState.seriesSelectionToast.id);
+        celLineState.seriesSelectionToast = null;
+    }
 
     // Enable drag mode
     enableDragMode();
@@ -571,9 +573,14 @@ function removeVerticalGuideLine() {
 }
 
 function cleanupSeriesSelectionMode() {
-    removeToast('toast-top-right-secondary');
-    celLineState.seriesSelectionToast = null;
-    celLineState.toastElement = null;
+    if (celLineState.toastElement) {
+        removeToast(celLineState.toastElement.id);
+        celLineState.toastElement = null;
+    }
+    if (celLineState.seriesSelectionToast) {
+        removeToast(celLineState.seriesSelectionToast.id);
+        celLineState.seriesSelectionToast = null;
+    }
 }
 
 function getDataInRangeForSeries(x1, x2, baseKey) {
@@ -730,6 +737,7 @@ function handleCelLineConfirm(data, baseKey) {
     };
 
     chartState.CelLines[lineId] = metadata;
+    eventBus.emit(EVENTS.LINE_CEL_SAVED, { lineId, metadata });
 
     removeShadeRectangle();
     cleanupSeriesSelectionMode();
@@ -759,13 +767,14 @@ function handleCelLineClick(lineName) {
     }
 
     createToast({
+        id: 'cel-line-click-toaster',
         message: `Celeration: ${metadata.text}`,
         buttons: [
             {
                 label: 'Remove',
                 onClick: () => {
                     removeCelLineById(lineName);
-                    removeToast('toast-top-right');
+                    removeToast('cel-line-click-toaster');
                 },
                 type: 'secondary'
             }

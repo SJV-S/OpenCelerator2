@@ -41,6 +41,11 @@ export const EVENTS = {
     LINE_REMOVE_CLICKABLE: 'line:remove_clickable',
     LINE_VISIBILITY_CHANGED: 'line:visibility_changed',
 
+    // Line Save Events
+    LINE_PHASE_SAVED: 'line:phase_saved',
+    LINE_AIM_SAVED: 'line:aim_saved',
+    LINE_CEL_SAVED: 'line:cel_saved',
+
     // Drawing Mode Events
     MODE_PHASE_ACTIVATE: 'mode:phase_activate',
     MODE_PHASE_DEACTIVATE: 'mode:phase_deactivate',
@@ -71,16 +76,69 @@ export const EVENTS = {
 
     // Chart Settings Events
     CHART_PANNING_ENABLED_CHANGED: 'chart:panning_enabled_changed',
+    CHART_NAME_CHANGED: 'chart:name_changed',
+
+    // Credit Events
+    CREDIT_CHANGED: 'credit:changed',
 
     // Counter Events
     COUNTER_ENTRY_DATE_CHANGED: 'counter:entry_date_changed',
     COUNTER_SHOW: 'counter:show',
-    COUNTER_HIDE: 'counter:hide'
+    COUNTER_HIDE: 'counter:hide',
+
+    // Storage Events
+    STORAGE_CHART_SAVED: 'storage:chart_saved',
+    STORAGE_CHART_LOADED: 'storage:chart_loaded',
+    STORAGE_CHART_DELETED: 'storage:chart_deleted',
+    STORAGE_ERROR: 'storage:error'
 };
+
+/**
+ * Event Categories - Groups of events that share behavior
+ */
+export const EVENT_CATEGORIES = {
+    STATE_MUTATING: 'category:state_mutating'
+};
+
+/**
+ * Maps events to their categories.
+ * When an event in this map is emitted, category subscribers are also notified.
+ */
+const EVENT_CATEGORY_MAP = {
+    // Data mutations
+    [EVENTS.DATA_ENTRY_SUBMITTED]: [EVENT_CATEGORIES.STATE_MUTATING],
+    [EVENTS.DATA_CHART_REFRESH]: [EVENT_CATEGORIES.STATE_MUTATING],
+    [EVENTS.DATA_START_DATE_CHANGED]: [EVENT_CATEGORIES.STATE_MUTATING],
+
+    // Line saves
+    [EVENTS.LINE_PHASE_SAVED]: [EVENT_CATEGORIES.STATE_MUTATING],
+    [EVENTS.LINE_AIM_SAVED]: [EVENT_CATEGORIES.STATE_MUTATING],
+    [EVENTS.LINE_CEL_SAVED]: [EVENT_CATEGORIES.STATE_MUTATING],
+    [EVENTS.LINE_VISIBILITY_CHANGED]: [EVENT_CATEGORIES.STATE_MUTATING],
+
+    // Misc series
+    [EVENTS.MISC_SERIES_ADDED]: [EVENT_CATEGORIES.STATE_MUTATING],
+    [EVENTS.MISC_SERIES_REMOVED]: [EVENT_CATEGORIES.STATE_MUTATING],
+
+    // Fan
+    [EVENTS.FAN_VISIBILITY_CHANGED]: [EVENT_CATEGORIES.STATE_MUTATING],
+
+    // Chart settings
+    [EVENTS.CHART_PANNING_ENABLED_CHANGED]: [EVENT_CATEGORIES.STATE_MUTATING],
+    [EVENTS.CHART_NAME_CHANGED]: [EVENT_CATEGORIES.STATE_MUTATING],
+
+    // Credits
+    [EVENTS.CREDIT_CHANGED]: [EVENT_CATEGORIES.STATE_MUTATING],
+
+    // UI state that persists
+    [EVENTS.UI_TRACE_STYLE_CHANGED]: [EVENT_CATEGORIES.STATE_MUTATING]
+};
+
 class EventBus {
     constructor(name = 'EventBus') {
         this.name = name;
         this.subscribers = new Map();
+        this.categorySubscribers = new Map();
         this.debug = {
             init: false,
             subscribe: false,
@@ -108,6 +166,24 @@ class EventBus {
     }
 
     /**
+     * Subscribe a callback to all events in a category
+     * @param {string} category - Category name from EVENT_CATEGORIES
+     * @param {Function} callback - Function to call when any event in category fires
+     * @param {boolean} hasData - Whether callback expects data parameter (receives { event, data })
+     */
+    subscribeToCategory(category, callback, hasData = false) {
+        if (this.debug.all || this.debug.subscribe) {
+            console.log(`[${this.name}] subscribeToCategory: ${category}`);
+        }
+
+        if (!this.categorySubscribers.has(category)) {
+            this.categorySubscribers.set(category, []);
+        }
+
+        this.categorySubscribers.get(category).push({ callback, hasData });
+    }
+
+    /**
      * Emit an event to all subscribers
      * @param {string} event - Event name from EVENTS catalog
      * @param {*} data - Optional data to pass to subscribers
@@ -120,12 +196,29 @@ class EventBus {
 
         let result = null;
 
+        // Notify direct subscribers
         if (this.subscribers.has(event)) {
             for (const { callback, hasData } of this.subscribers.get(event)) {
                 try {
                     result = hasData ? callback(data) : callback();
                 } catch (error) {
                     console.error(`[${this.name}] Error in ${event}:`, error);
+                }
+            }
+        }
+
+        // Notify category subscribers
+        const categories = EVENT_CATEGORY_MAP[event];
+        if (categories) {
+            for (const category of categories) {
+                if (this.categorySubscribers.has(category)) {
+                    for (const { callback, hasData } of this.categorySubscribers.get(category)) {
+                        try {
+                            result = hasData ? callback({ event, data }) : callback();
+                        } catch (error) {
+                            console.error(`[${this.name}] Error in category ${category} for ${event}:`, error);
+                        }
+                    }
                 }
             }
         }

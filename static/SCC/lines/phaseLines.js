@@ -297,8 +297,10 @@ function deactivatePhaseLineMode() {
     hideArrowControls();
 
     // Remove mode toast if it exists
-    removeToast('toast-top-right-secondary');
-    phaseLineState.modeToast = null;
+    if (phaseLineState.modeToast) {
+        removeToast(phaseLineState.modeToast.id);
+        phaseLineState.modeToast = null;
+    }
 
     // Remove any non-finalized lines and annotations ONLY if we're still in drawing phase
     // Don't remove if phase is 0 (already deactivated/finalized)
@@ -777,6 +779,7 @@ function finalizePhaseLine(chartDiv) {
     );
     metadata.id = lineId;
     chartState.PhaseLines[lineId] = metadata;
+    eventBus.emit(EVENTS.LINE_PHASE_SAVED, { lineId, metadata });
 
     phaseLineState.tempShapes = [];
     phaseLineState.tempAnnotationIndex = null;
@@ -904,7 +907,10 @@ function showPhaseModeToaster(phase) {
  */
 function updatePhaseModeToaster(phase) {
     // Remove existing toaster
-    removeToast('toast-top-right-secondary');
+    if (phaseLineState.modeToast) {
+        removeToast(phaseLineState.modeToast.id);
+        phaseLineState.modeToast = null;
+    }
 
     // Show new toaster with updated phase
     showPhaseModeToaster(phase);

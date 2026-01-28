@@ -108,6 +108,7 @@ function handleBlur(e) {
 
     if (newValue !== originalValues[index]) {
         chartState.credits[index] = newValue;
+        eventBus.emit(EVENTS.CREDIT_CHANGED, { index, value: newValue });
 
         createToast({
             message: 'Credit updated',

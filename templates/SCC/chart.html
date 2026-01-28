@@ -57,6 +57,7 @@
 {% block scripts %}
     <script type="module">
         import { initializeChart } from '/static/SCC/main.js';
+        import { initStorage, loadChart, getActiveChartId } from '/static/SCC/storage/chartStorage.js';
 
         {% if initial_load %}
         // Initial load: redirect with container dimensions
@@ -64,7 +65,11 @@
         const menuWidth = window.innerWidth >= 1024 ? Math.max(280, Math.min(window.innerWidth * 0.25, 400)) : 0;
         const width = window.innerWidth - menuWidth;
         const height = window.innerHeight;
-        window.location.href = `/chart/{{ chart_type }}/{{ minute_type }}?width=${width}&height=${height}`;
+        // Preserve load param if present
+        const urlParams = new URLSearchParams(window.location.search);
+        const loadId = urlParams.get('load');
+        const loadParam = loadId ? `&load=${loadId}` : '';
+        window.location.href = `/chart/{{ chart_type }}/{{ minute_type }}?width=${width}&height=${height}${loadParam}`;
         {% else %}
         // On refresh: reset URL to recapture current dimensions
         const navEntry = performance.getEntriesByType('navigation')[0];
@@ -78,11 +83,27 @@
             // Template variables
             var maxWindowWidth = {{ max_window_width }};
 
-            // Clean URL (remove width/height params)
+            // Check for load param (from menu list) or localStorage (refresh)
+            const urlParams = new URLSearchParams(window.location.search);
+            const loadId = urlParams.get('load') || getActiveChartId();
+
+            // Clean URL (remove query params)
             history.replaceState(null, '', '/chart/{{ chart_type }}/{{ minute_type }}');
 
-            // Initialize chart with template data
-            initializeChart(plotData, maxWindowWidth);
+            async function init() {
+                // If loading a saved chart, load data into chartState FIRST
+                if (loadId) {
+                    await initStorage();
+                    const success = await loadChart(loadId);
+                    if (!success) {
+                        console.warn('Failed to load chart:', loadId);
+                    }
+                }
+                // Now initialize chart (uses chartState data)
+                initializeChart(plotData, maxWindowWidth);
+            }
+
+            init();
         }
         {% endif %}
     </script>

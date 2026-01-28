@@ -147,6 +147,9 @@ const TEST_DATA = (() => {
 // Single state object for all chart data and configuration
 // Note: exported as const, but object properties are mutable
 export const chartState = {
+    // Chart identity
+    id: null,  // UUID assigned on first save
+
     // Raw data series (append-only arrays, all same length)
     series: {
         // X-axis values: either timestamps (converted to positions) or direct x-positions

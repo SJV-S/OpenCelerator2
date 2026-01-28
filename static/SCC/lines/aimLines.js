@@ -143,8 +143,10 @@ function deactivateAimLineMode() {
     }
 
     // Remove mode toast if it exists
-    removeToast('toast-top-right-secondary');
-    aimLineState.modeToast = null;
+    if (aimLineState.modeToast) {
+        removeToast(aimLineState.modeToast.id);
+        aimLineState.modeToast = null;
+    }
 
     // Remove temporary dot marker if it exists
     removeTempDot(chartDiv);
@@ -687,6 +689,7 @@ function finalizeAimLine(chartDiv) {
     );
     metadata.id = lineId;
     chartState.AimLines[lineId] = metadata;
+    eventBus.emit(EVENTS.LINE_AIM_SAVED, { lineId, metadata });
 
     aimLineState.tempShapes = [];
     aimLineState.tempAnnotationIndex = null;
@@ -814,7 +817,10 @@ function showAimModeToaster(phase) {
  */
 function updateAimModeToaster(phase) {
     // Remove existing toaster
-    removeToast('toast-top-right-secondary');
+    if (aimLineState.modeToast) {
+        removeToast(aimLineState.modeToast.id);
+        aimLineState.modeToast = null;
+    }
 
     // Show new toaster with updated phase
     showAimModeToaster(phase);

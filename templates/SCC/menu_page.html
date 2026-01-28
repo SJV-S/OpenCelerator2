@@ -40,6 +40,36 @@
             background: #333;
             color: white;
         }
+        .saved-charts {
+            margin-top: 32px;
+            padding-top: 24px;
+            border-top: 1px solid #ccc;
+        }
+        .saved-charts h3 {
+            margin: 0 0 12px 0;
+            font-size: 14px;
+            color: #666;
+        }
+        .saved-charts select {
+            width: 200px;
+            padding: 8px;
+            font-size: 16px;
+            border: 2px solid #333;
+            border-radius: 4px;
+        }
+        .saved-charts button {
+            padding: 8px 16px;
+            font-size: 16px;
+            border: 2px solid #333;
+            border-radius: 4px;
+            background: white;
+            cursor: pointer;
+            margin-left: 8px;
+        }
+        .saved-charts button:hover {
+            background: #333;
+            color: white;
+        }
     </style>
 </head>
 <body>
@@ -74,6 +104,57 @@
                 <td><a href="/chart/FrequencyCollections/count">Frequency Collections</a></td>
             </tr>
         </table>
+
+        <div class="saved-charts">
+            <h3>Saved Charts</h3>
+            <select id="saved-charts-list">
+                <option value="">-- Select a chart --</option>
+            </select>
+            <button id="load-chart-btn">Load</button>
+        </div>
     </div>
+
+    <script type="module">
+        import { openDB } from '/static/SCC/lib/idb.js';
+
+        const DB_NAME = 'SCC_Charts';
+        const DB_VERSION = 1;
+        const STORE_NAME = 'charts';
+
+        async function loadSavedCharts() {
+            try {
+                const db = await openDB(DB_NAME, DB_VERSION);
+                const all = await db.getAll(STORE_NAME);
+                const select = document.getElementById('saved-charts-list');
+
+                const charts = all.map(chart => ({
+                    id: chart.id,
+                    chartName: chart.metadata.chartName,
+                    chartType: chart.metadata.chartType,
+                    minuteChart: chart.metadata.minuteChart
+                })).sort((a, b) => a.chartName.localeCompare(b.chartName));
+
+                for (const chart of charts) {
+                    const option = document.createElement('option');
+                    option.value = JSON.stringify({ id: chart.id, chartType: chart.chartType, minuteChart: chart.minuteChart });
+                    option.textContent = `${chart.chartName} (${chart.chartType})`;
+                    select.appendChild(option);
+                }
+            } catch (e) {
+                console.log('No saved charts or DB not initialized');
+            }
+        }
+
+        document.getElementById('load-chart-btn').addEventListener('click', () => {
+            const select = document.getElementById('saved-charts-list');
+            if (!select.value) return;
+
+            const { id, chartType, minuteChart } = JSON.parse(select.value);
+            const minuteType = minuteChart ? 'minute' : 'count';
+            window.location.href = `/chart/${chartType}/${minuteType}?load=${id}`;
+        });
+
+        loadSavedCharts();
+    </script>
 </body>
 </html>
