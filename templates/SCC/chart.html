@@ -56,11 +56,8 @@
 
 {% block scripts %}
     <script type="module">
-        import { initializeChart } from '/static/SCC/main.js';
-        import { initStorage, loadChart, loadDraft } from '/static/SCC/storage/chartStorage.js';
-
-        // Load draft from localStorage FIRST (sync) - before DOMContentLoaded
-        loadDraft();
+        import { initializeChart, setupEventListeners } from '/static/SCC/main.js';
+        import { initStorage, loadChart } from '/static/SCC/storage/chartStorage.js';
 
         {% if initial_load %}
         // Initial load: redirect with container dimensions
@@ -97,17 +94,25 @@
             history.replaceState(null, '', '/chart/{{ chart_type }}/{{ minute_type }}');
 
             async function init() {
-                await initStorage();
-
-                if (loadId) {
-                    // Explicit load from menu list - load from IndexedDB
-                    const success = await loadChart(loadId);
-                    if (!success) {
-                        console.warn('Failed to load chart:', loadId);
-                    }
+                if (!loadId) {
+                    // No chart specified - redirect to menu
+                    window.location.href = '/';
+                    return;
                 }
 
-                // Initialize chart (uses chartState data - either loaded or default)
+                await initStorage();
+
+                const success = await loadChart(loadId);
+                if (!success) {
+                    console.warn('Failed to load chart:', loadId);
+                    window.location.href = '/';
+                    return;
+                }
+
+                // Set up event listeners (chartState now populated)
+                setupEventListeners();
+
+                // Initialize chart with loaded data
                 initializeChart(plotData, maxWindowWidth);
             }
 

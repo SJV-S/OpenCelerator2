@@ -115,26 +115,15 @@
     </div>
 
     <script type="module">
-        import { openDB } from '/static/SCC/lib/idb.js';
-
-        const DB_NAME = 'SCC_Charts';
-        const DB_VERSION = 1;
-        const STORE_NAME = 'charts';
+        import { initStorage, createChart, listCharts } from '/static/SCC/storage/chartStorage.js';
 
         async function loadSavedCharts() {
             try {
-                const db = await openDB(DB_NAME, DB_VERSION);
-                const all = await db.getAll(STORE_NAME);
+                await initStorage();
+                const charts = await listCharts();
                 const select = document.getElementById('saved-charts-list');
 
-                const charts = all.map(chart => ({
-                    id: chart.id,
-                    chartName: chart.metadata.chartName,
-                    chartType: chart.metadata.chartType,
-                    minuteChart: chart.metadata.minuteChart
-                })).sort((a, b) => a.chartName.localeCompare(b.chartName));
-
-                for (const chart of charts) {
+                for (const chart of charts.sort((a, b) => a.chartName.localeCompare(b.chartName))) {
                     const option = document.createElement('option');
                     option.value = JSON.stringify({ id: chart.id, chartType: chart.chartType, minuteChart: chart.minuteChart });
                     option.textContent = `${chart.chartName} (${chart.chartType})`;
@@ -154,10 +143,26 @@
             window.location.href = `/chart/${chartType}/${minuteType}?load=${id}`;
         });
 
-        // Clear localStorage draft when clicking "New Chart" links
+        // New Chart links - prompt for name first
         document.querySelectorAll('.menu table a').forEach(link => {
-            link.addEventListener('click', () => {
-                localStorage.removeItem('activeSCCState');
+            link.addEventListener('click', async (e) => {
+                e.preventDefault();
+
+                const name = prompt('Enter chart name:');
+                if (!name || !name.trim()) return;
+
+                // Parse chart type and minute type from href
+                const href = link.getAttribute('href');
+                const match = href.match(/\/chart\/([^/]+)\/(\w+)/);
+                if (!match) return;
+
+                const chartType = match[1];
+                const minuteChart = match[2] === 'minute';
+
+                const id = await createChart(name.trim(), chartType, minuteChart);
+                if (id) {
+                    window.location.href = `${href}?load=${id}`;
+                }
             });
         });
 

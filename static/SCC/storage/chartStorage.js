@@ -1,52 +1,24 @@
 /**
- * Chart Storage - Two-layer persistence for chart data
+ * Chart Storage - IndexedDB persistence for chart data
  *
- * Storage Architecture:
- * ┌─────────────┬───────────────┬─────────────────────────────┬──────────────────────────────┐
- * │ Layer       │ Storage       │ Trigger                     │ Purpose                      │
- * ├─────────────┼───────────────┼─────────────────────────────┼──────────────────────────────┤
- * │ Draft       │ localStorage  │ STATE_MUTATING event        │ Immediate save every change  │
- * │ Backup      │ IndexedDB     │ STATE_MUTATING event        │ Debounced save for sync      │
- * └─────────────┴───────────────┴─────────────────────────────┴──────────────────────────────┘
+ * Architecture:
+ *   - All chart data in IndexedDB
+ *   - No unsaved charts - user must name chart before seeing it
+ *   - Auto-save on every STATE_MUTATING event
  *
- * Save Logic (on STATE_MUTATING event):
- * ┌───────────────┬───────────────────┬──────────────────┐
- * │ chartState.id │ localStorage      │ IndexedDB        │
- * ├───────────────┼───────────────────┼──────────────────┤
- * │ null (new)    │ ✓ (immediate)     │ ✗ (not touched)  │
- * │ UUID (saved)  │ ✓ (immediate)     │ ✓ (debounced)    │
- * └───────────────┴───────────────────┴──────────────────┘
- *
- * ON CHART PAGE LOAD:
- *   1. Check localStorage draft → restore if exists
- *   2. Else check IndexedDB → restore if exists
- *   3. Else use default chartState
- *
- * ON EXPLICIT "SAVE" BUTTON:
- *   1. Generate UUID if chartState.id is null
- *   2. Save to IndexedDB
- *   3. Chart appears in saved charts list
- *   4. Future mutations now save to both localStorage and IndexedDB
- *
- * ON MENU PAGE - "NEW CHART" LINK:
- *   1. Clear localStorage draft
- *   2. Navigate to chart page → loads with defaults
- *
- * ON MENU PAGE - "LOAD" FROM LIST:
- *   1. Load from IndexedDB
- *   2. Overwrites localStorage draft
- *
- * Key insight: Draft/backup prevent data loss automatically.
- * "Save" is for naming/organizing, not preventing loss.
+ * Flow:
+ *   1. Menu page: "New Chart" → prompt name → createChart() → navigate to chart
+ *   2. Chart page: loadChart(id) → auto-saves on mutations
+ *   3. Menu page: "Load Chart" → navigate with ?load=id
  *
  * Usage:
- *   import { initStorage, saveChart, loadChart, listCharts, deleteChart } from './storage/chartStorage.js';
+ *   import { initStorage, createChart, loadChart, listCharts, deleteChart } from './storage/chartStorage.js';
  *
  *   await initStorage();
- *   await saveChart();                    // Save current chart to IndexedDB
- *   await loadChart('chart-id');          // Load chart into chartState
- *   const charts = await listCharts();    // Get all saved charts
- *   await deleteChart('chart-id');        // Delete a chart
+ *   const id = await createChart('My Chart', 'Daily', true);  // Create new chart
+ *   await loadChart('chart-id');                               // Load existing chart
+ *   const charts = await listCharts();                         // Get all saved charts
+ *   await deleteChart('chart-id');                             // Delete a chart
  */
 
 import { openDB } from '../lib/idb.js';
@@ -264,8 +236,6 @@ export async function saveChart(id = null) {
         await db.put(STORE_NAME, data);
 
         console.log(`[Storage] Saved chart: ${chartId}`);
-        saveDraft();  // Keep localStorage in sync
-
         eventBus.emit(EVENTS.STORAGE_CHART_SAVED, { id: chartId, name: data.metadata.chartName });
         return chartId;
     } catch (error) {
@@ -298,7 +268,6 @@ export async function loadChart(id) {
         chartState.id = id;
 
         console.log(`[Storage] Loaded chart: ${id}`);
-        saveDraft();  // Overwrite localStorage with loaded chart
         eventBus.emit(EVENTS.STORAGE_CHART_LOADED, { id, name: data.metadata.chartName });
         return true;
     } catch (error) {
@@ -325,6 +294,7 @@ export async function listCharts() {
             id: chart.id,
             chartName: chart.metadata.chartName,
             chartType: chart.metadata.chartType,
+            minuteChart: chart.metadata.minuteChart,
             updatedAt: chart.metadata.updatedAt,
             createdAt: chart.metadata.createdAt
         })).sort((a, b) => b.updatedAt - a.updatedAt);
@@ -363,49 +333,73 @@ export async function deleteChart(id) {
     }
 }
 
-// ============================================================================
-// localStorage Draft Operations
-// ============================================================================
-
-const DRAFT_KEY = 'activeSCCState';
-
 /**
- * Save current chartState to localStorage as draft
+ * Create a new chart with a name and save to IndexedDB
+ * @param {string} name - Chart name (required)
+ * @param {string} chartType - Chart type (Daily, Weekly, etc.)
+ * @param {boolean} minuteChart - Whether this is a minute chart
+ * @returns {Promise<string|null>} The chart ID or null on failure
  */
-export function saveDraft() {
-    try {
-        const data = serializeChart(chartState.id, chartState);
-        localStorage.setItem(DRAFT_KEY, JSON.stringify(data));
-    } catch (error) {
-        console.error('[Storage] Draft save failed:', error);
+export async function createChart(name, chartType, minuteChart) {
+    if (!db) {
+        console.warn('[Storage] Database not initialized');
+        return null;
     }
-}
 
-/**
- * Load draft from localStorage into chartState
- * @returns {boolean} True if draft existed and was loaded
- */
-export function loadDraft() {
-    try {
-        const json = localStorage.getItem(DRAFT_KEY);
-        if (!json) return false;
-
-        const data = JSON.parse(json);
-        deserializeChart(data);
-        chartState.id = data.id;
-        console.log('[Storage] Loaded draft from localStorage');
-        return true;
-    } catch (error) {
-        console.warn('[Storage] Failed to load draft:', error);
-        return false;
+    if (!name || !name.trim()) {
+        console.warn('[Storage] Chart name required');
+        return null;
     }
-}
 
-/**
- * Clear draft from localStorage
- */
-export function clearDraft() {
-    localStorage.removeItem(DRAFT_KEY);
+    const chartId = crypto.randomUUID();
+    const now = Date.now();
+
+    const data = {
+        id: chartId,
+        metadata: {
+            chartType,
+            minuteChart,
+            chartName: name.trim(),
+            hasTimestamps: false,
+            startDate: null,
+            chartCapacity: 140,
+            chartWindow: 140,
+            createdAt: now,
+            updatedAt: now
+        },
+        series: {
+            xValues: [],
+            corrects: [],
+            errors: [],
+            timing: [],
+            misc: {}
+        },
+        lines: {
+            phaseLines: {},
+            aimLines: {},
+            celLines: {},
+            lineCuts: {}
+        },
+        config: {
+            lineVisibility: { phaseLines: true, aimLines: true, cutLines: true, celLines: true },
+            fanVisible: true,
+            lineStyles: {},
+            traceStyles: {},
+            legend: { show: false, position: 'top-right' },
+            credits: {}
+        }
+    };
+
+    try {
+        await db.put(STORE_NAME, data);
+        console.log(`[Storage] Created chart: ${chartId} (${name})`);
+        eventBus.emit(EVENTS.STORAGE_CHART_SAVED, { id: chartId, name });
+        return chartId;
+    } catch (error) {
+        console.error('[Storage] Create failed:', error);
+        eventBus.emit(EVENTS.STORAGE_ERROR, { operation: 'create', error });
+        return null;
+    }
 }
 
 // ============================================================================
@@ -428,16 +422,15 @@ function debouncedSaveToIndexedDB() {
 }
 
 /**
- * Handle state mutation - save to localStorage immediately, IndexedDB if saved
+ * Handle state mutation - auto-save to IndexedDB
+ * Chart always has an ID (created before user sees it)
  */
 function onStateMutation() {
-    // Always save draft to localStorage
-    saveDraft();
-
-    // Debounced save to IndexedDB only if chart has been explicitly saved
-    if (chartState.id) {
-        debouncedSaveToIndexedDB();
+    if (!chartState.id) {
+        console.warn('[Storage] No chart ID - chart should be created before mutations');
+        return;
     }
+    debouncedSaveToIndexedDB();
 }
 
 /**

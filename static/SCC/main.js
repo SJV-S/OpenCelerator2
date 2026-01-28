@@ -23,9 +23,7 @@ import {
     switchSeriesTab,
     toggleLineWidth,
     initializeLineWidthToggles,
-    addAggregationBlock,
-    updateButtonVisibility,
-    removeAggregationBlock
+    showAddAggregationDialog
 } from './series/traceStyles.js';
 import { refreshChart, init as replotInit } from './series/replot.js';
 import { updateChartDateLabels, updateDateDisplay, adjustDateInput, initializeDateInput } from './util/dates.js';
@@ -62,7 +60,7 @@ import { showInitialMenuHint } from './util/tooltip.js';
 import { icons } from './util/icons.js';
 import { initializeShareTab } from './misc/share.js';
 import { init as crosshairInit } from './util/crosshair.js';
-import { initStorage, saveChart } from './storage/chartStorage.js';
+import { initStorage } from './storage/chartStorage.js';
 
 // ============================================================================
 // CHART INITIALIZATION
@@ -231,13 +229,6 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeAllSeriesInputs();
     initializeLineWidthToggles();
 
-    // Initialize button visibility for fixed series
-    ['correct', 'incorrect', 'timing'].forEach(seriesName => {
-        updateButtonVisibility(seriesName);
-    });
-
-    setupEventListeners();
-
     console.log('Main.js: Application initialized');
 });
 
@@ -245,7 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // EVENT LISTENERS
 // ============================================================================
 
-function setupEventListeners() {
+export function setupEventListeners() {
     // Tab navigation
     document.querySelectorAll('[data-tab]').forEach(button => {
         button.addEventListener('click', (e) => {
@@ -255,10 +246,11 @@ function setupEventListeners() {
     });
 
     // Series subtabs
-    document.querySelectorAll('[data-series-tab]').forEach(button => {
+    document.querySelectorAll('.series-subtab[data-series][data-agg]').forEach(button => {
         button.addEventListener('click', (e) => {
-            const seriesName = e.currentTarget.dataset.seriesTab;
-            switchSeriesTab(seriesName);
+            const seriesName = e.currentTarget.dataset.series;
+            const aggType = e.currentTarget.dataset.agg;
+            switchSeriesTab(seriesName, aggType);
         });
     });
 
@@ -336,18 +328,12 @@ function setupEventListeners() {
         }
     });
 
-    // Add Series button
-    const addSeriesBtn = document.querySelector('[data-action="add-misc-series"]');
-    if (addSeriesBtn) {
-        addSeriesBtn.addEventListener('click', () => {
-            import('./series/miscSeries.js').then(({ addMiscSeries, canAddMiscSeries }) => {
-                if (!canAddMiscSeries()) {
-                    import('./util/toaster.js').then(({ createToast }) => {
-                        createToast({ message: 'Maximum of 10 misc series reached.', duration: 3000 });
-                    });
-                    return;
-                }
-                addMiscSeries();
+    // Add Aggregation button
+    const addAggBtn = document.querySelector('[data-action="add-aggregation"]');
+    if (addAggBtn) {
+        addAggBtn.addEventListener('click', () => {
+            import('./series/traceStyles.js').then(({ showAddAggregationDialog }) => {
+                showAddAggregationDialog();
             });
         });
     }
@@ -452,34 +438,6 @@ function setupEventListeners() {
             }
             // Disable panning if capacity equals window
             eventBus.emit(EVENTS.CHART_PANNING_ENABLED_CHANGED, chartState.chartCapacity !== chartState.chartWindow);
-        });
-    }
-
-    // Add block buttons - handle adding new aggregation blocks
-    document.querySelectorAll('.add-block-btn').forEach(button => {
-        button.addEventListener('click', (e) => {
-            const seriesName = e.currentTarget.dataset.series;
-            addAggregationBlock(seriesName);
-        });
-    });
-
-    // Remove block buttons - use event delegation since blocks are dynamic
-    document.addEventListener('click', (e) => {
-        if (e.target.closest('.remove-block-btn')) {
-            const block = e.target.closest('.agg-config-block');
-            removeAggregationBlock(block);
-        }
-    });
-
-    // Save chart button
-    const saveChartBtn = document.querySelector('[data-action="save-chart"]');
-    if (saveChartBtn) {
-        saveChartBtn.addEventListener('click', async () => {
-            const statusEl = document.getElementById('storage-status');
-            const id = await saveChart();
-            if (id && statusEl) {
-                statusEl.textContent = `Saved: ${id}`;
-            }
         });
     }
 
