@@ -410,38 +410,108 @@ function deleteAggregation(seriesName, aggType) {
 }
 
 /**
- * Show dialog to add new aggregation
+ * Toggle the add aggregation dropdown visibility
  */
-function showAddAggregationDialog() {
-    // Build options for series
-    const seriesOptions = CORE_SERIES.map(s => ({
-        value: s,
-        label: s.charAt(0).toUpperCase() + s.slice(1)
-    }));
+function toggleAddAggDropdown() {
+    const dropdown = document.getElementById('add-agg-dropdown');
+    if (!dropdown) return;
 
-    // For simplicity, use a prompt-based approach
-    // In production, use a proper modal dialog
-    const seriesChoice = prompt('Enter series (correct, incorrect, timing):');
-    if (!seriesChoice || !CORE_SERIES.includes(seriesChoice.toLowerCase())) {
-        if (seriesChoice) createToast({ message: 'Invalid series name.', duration: 3000 });
+    if (dropdown.classList.contains('hidden')) {
+        // Position dropdown near the + button
+        const btn = document.getElementById('add-agg-btn');
+        if (btn) {
+            const rect = btn.getBoundingClientRect();
+            dropdown.style.left = `${rect.right + 5}px`;
+            dropdown.style.top = `${rect.top}px`;
+        }
+        dropdown.classList.remove('hidden');
+
+        // Update available aggregation options based on selected series
+        updateAvailableAggTypes();
+    } else {
+        dropdown.classList.add('hidden');
+    }
+}
+
+/**
+ * Update available aggregation types in dropdown based on selected series
+ */
+function updateAvailableAggTypes() {
+    const seriesSelect = document.getElementById('add-agg-series');
+    const aggSelect = document.getElementById('add-agg-type');
+    if (!seriesSelect || !aggSelect) return;
+
+    const selectedSeries = seriesSelect.value;
+    const usedAggs = getUsedAggregations(selectedSeries);
+
+    // Update options - disable used ones
+    Array.from(aggSelect.options).forEach(option => {
+        option.disabled = usedAggs.includes(option.value);
+    });
+
+    // Select first available option
+    const firstAvailable = Array.from(aggSelect.options).find(opt => !opt.disabled);
+    if (firstAvailable) {
+        aggSelect.value = firstAvailable.value;
+    }
+}
+
+/**
+ * Handle confirm button click in add aggregation dropdown
+ */
+function handleAddAggConfirm() {
+    const seriesSelect = document.getElementById('add-agg-series');
+    const aggSelect = document.getElementById('add-agg-type');
+    const dropdown = document.getElementById('add-agg-dropdown');
+
+    if (!seriesSelect || !aggSelect) return;
+
+    const series = seriesSelect.value;
+    const aggType = aggSelect.value;
+
+    // Check if combination already exists
+    const usedAggs = getUsedAggregations(series);
+    if (usedAggs.includes(aggType)) {
+        createToast({ message: `${series} (${aggType}) already exists.`, duration: 3000 });
         return;
     }
 
-    const usedAggs = getUsedAggregations(seriesChoice.toLowerCase());
-    const availableAggs = AVAILABLE_AGGS.filter(a => !usedAggs.includes(a));
+    addAggregation(series, aggType);
 
-    if (availableAggs.length === 0) {
-        createToast({ message: `All aggregation types already exist for ${seriesChoice}.`, duration: 3000 });
-        return;
+    // Hide dropdown
+    if (dropdown) dropdown.classList.add('hidden');
+}
+
+/**
+ * Initialize add aggregation dropdown handlers
+ */
+function initAddAggDropdown() {
+    const addBtn = document.getElementById('add-agg-btn');
+    const confirmBtn = document.getElementById('add-agg-confirm');
+    const seriesSelect = document.getElementById('add-agg-series');
+    const dropdown = document.getElementById('add-agg-dropdown');
+
+    if (addBtn) {
+        addBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleAddAggDropdown();
+        });
     }
 
-    const aggChoice = prompt(`Enter aggregation type (${availableAggs.join(', ')}):`);
-    if (!aggChoice || !availableAggs.includes(aggChoice.toLowerCase())) {
-        if (aggChoice) createToast({ message: 'Invalid or already used aggregation type.', duration: 3000 });
-        return;
+    if (confirmBtn) {
+        confirmBtn.addEventListener('click', handleAddAggConfirm);
     }
 
-    addAggregation(seriesChoice.toLowerCase(), aggChoice.toLowerCase());
+    if (seriesSelect) {
+        seriesSelect.addEventListener('change', updateAvailableAggTypes);
+    }
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+        if (dropdown && !dropdown.contains(e.target) && e.target.id !== 'add-agg-btn') {
+            dropdown.classList.add('hidden');
+        }
+    });
 }
 
 // ============================================================================
@@ -476,5 +546,5 @@ export {
     initializeLineWidthToggles,
     addAggregation,
     deleteAggregation,
-    showAddAggregationDialog
+    initAddAggDropdown
 };

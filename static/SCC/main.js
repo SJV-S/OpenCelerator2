@@ -23,7 +23,7 @@ import {
     switchSeriesTab,
     toggleLineWidth,
     initializeLineWidthToggles,
-    showAddAggregationDialog
+    initAddAggDropdown
 } from './series/traceStyles.js';
 import { refreshChart, init as replotInit } from './series/replot.js';
 import { updateChartDateLabels, updateDateDisplay, adjustDateInput, initializeDateInput } from './util/dates.js';
@@ -228,6 +228,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize series input controls
     initializeAllSeriesInputs();
     initializeLineWidthToggles();
+    initAddAggDropdown();
 
     console.log('Main.js: Application initialized');
 });
@@ -314,36 +315,25 @@ export function setupEventListeners() {
         deleteDataBtn.addEventListener('click', deleteCurrentEntry);
     }
 
-    // Series trace config apply buttons (fixed series only - misc handled dynamically)
-    const traceApplyActions = {
-        'apply-correct-trace': () => applyTraceConfig('correct'),
-        'apply-incorrect-trace': () => applyTraceConfig('incorrect'),
-        'apply-timing-trace': () => applyTraceConfig('timing')
-    };
-
-    Object.entries(traceApplyActions).forEach(([action, handler]) => {
-        const element = document.querySelector(`[data-action="${action}"]`);
-        if (element) {
-            element.addEventListener('click', handler);
+    // Apply and Reset buttons use event delegation since panels can be dynamic
+    document.addEventListener('click', (e) => {
+        const applyBtn = e.target.closest('[data-action="apply-agg"]');
+        if (applyBtn) {
+            const panel = applyBtn.closest('.series-agg-panel');
+            if (panel) {
+                const seriesName = panel.dataset.series;
+                applyTraceConfig(seriesName);
+            }
         }
-    });
 
-    // Add Aggregation button
-    const addAggBtn = document.querySelector('[data-action="add-aggregation"]');
-    if (addAggBtn) {
-        addAggBtn.addEventListener('click', () => {
-            import('./series/traceStyles.js').then(({ showAddAggregationDialog }) => {
-                showAddAggregationDialog();
-            });
-        });
-    }
-
-    // Series trace config reset buttons
-    document.querySelectorAll('[data-action^="reset-trace-"]').forEach(button => {
-        button.addEventListener('click', (e) => {
-            const seriesName = e.currentTarget.dataset.action.replace('reset-trace-', '');
-            resetTraceConfig(seriesName);
-        });
+        const resetBtn = e.target.closest('[data-action="reset-agg"]');
+        if (resetBtn) {
+            const panel = resetBtn.closest('.series-agg-panel');
+            if (panel) {
+                const seriesName = panel.dataset.series;
+                resetTraceConfig(seriesName);
+            }
+        }
     });
 
     // Show line toggle checkboxes - now handled in initializeLineWidthToggles() in chartReplot.js
