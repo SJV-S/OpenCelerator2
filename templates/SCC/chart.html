@@ -57,7 +57,7 @@
 {% block scripts %}
     <script type="module">
         import { initializeChart } from '/static/SCC/main.js';
-        import { initStorage, loadChart, getActiveChartId } from '/static/SCC/storage/chartStorage.js';
+        import { initStorage, loadChart, loadDraft } from '/static/SCC/storage/chartStorage.js';
 
         {% if initial_load %}
         // Initial load: redirect with container dimensions
@@ -74,7 +74,10 @@
         // On refresh: reset URL to recapture current dimensions
         const navEntry = performance.getEntriesByType('navigation')[0];
         if (navEntry && navEntry.type === 'reload') {
-            window.location.href = '/chart/{{ chart_type }}/{{ minute_type }}';
+            const urlParams = new URLSearchParams(window.location.search);
+            const loadId = urlParams.get('load');
+            const loadParam = loadId ? `?load=${loadId}` : '';
+            window.location.href = `/chart/{{ chart_type }}/{{ minute_type }}${loadParam}`;
         } else {
             // Template selected: render chart
             var plotData = {{ plot_json | safe }};
@@ -83,23 +86,28 @@
             // Template variables
             var maxWindowWidth = {{ max_window_width }};
 
-            // Check for load param (from menu list) or localStorage (refresh)
+            // Check for explicit load param (from menu list)
             const urlParams = new URLSearchParams(window.location.search);
-            const loadId = urlParams.get('load') || getActiveChartId();
+            const loadId = urlParams.get('load');
 
             // Clean URL (remove query params)
             history.replaceState(null, '', '/chart/{{ chart_type }}/{{ minute_type }}');
 
             async function init() {
-                // If loading a saved chart, load data into chartState FIRST
+                await initStorage();
+
                 if (loadId) {
-                    await initStorage();
+                    // Explicit load from menu list - load from IndexedDB
                     const success = await loadChart(loadId);
                     if (!success) {
                         console.warn('Failed to load chart:', loadId);
                     }
+                } else {
+                    // Try to restore from localStorage draft
+                    loadDraft();  // Returns false if no draft, which is fine
                 }
-                // Now initialize chart (uses chartState data)
+
+                // Initialize chart (uses chartState data - either loaded or default)
                 initializeChart(plotData, maxWindowWidth);
             }
 

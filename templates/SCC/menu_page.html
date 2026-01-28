@@ -154,6 +154,13 @@
             window.location.href = `/chart/${chartType}/${minuteType}?load=${id}`;
         });
 
+        // Clear localStorage draft when clicking "New Chart" links
+        document.querySelectorAll('.menu table a').forEach(link => {
+            link.addEventListener('click', () => {
+                localStorage.removeItem('activeSCCState');
+            });
+        });
+
         loadSavedCharts();
     </script>
 </body>

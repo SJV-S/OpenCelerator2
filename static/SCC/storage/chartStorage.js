@@ -50,7 +50,7 @@
  */
 
 import { openDB } from '../lib/idb.js';
-import { eventBus, EVENTS } from '../eventBus.js';
+import { eventBus, EVENTS, EVENT_CATEGORIES } from '../eventBus.js';
 import { chartState } from '../chartState.js';
 
 const DB_NAME = 'SCC_Charts';
@@ -264,7 +264,7 @@ export async function saveChart(id = null) {
         await db.put(STORE_NAME, data);
 
         console.log(`[Storage] Saved chart: ${chartId}`);
-        localStorage.setItem('activeSCCState', chartId);
+        saveDraft();  // Keep localStorage in sync
 
         eventBus.emit(EVENTS.STORAGE_CHART_SAVED, { id: chartId, name: data.metadata.chartName });
         return chartId;
@@ -298,7 +298,7 @@ export async function loadChart(id) {
         chartState.id = id;
 
         console.log(`[Storage] Loaded chart: ${id}`);
-        localStorage.setItem('activeSCCState', id);
+        saveDraft();  // Overwrite localStorage with loaded chart
         eventBus.emit(EVENTS.STORAGE_CHART_LOADED, { id, name: data.metadata.chartName });
         return true;
     } catch (error) {
@@ -363,19 +363,49 @@ export async function deleteChart(id) {
     }
 }
 
+// ============================================================================
+// localStorage Draft Operations
+// ============================================================================
+
+const DRAFT_KEY = 'activeSCCState';
+
 /**
- * Get the active chart ID from localStorage
- * @returns {string|null}
+ * Save current chartState to localStorage as draft
  */
-export function getActiveChartId() {
-    return localStorage.getItem('activeSCCState');
+export function saveDraft() {
+    try {
+        const data = serializeChart(chartState.id, chartState);
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(data));
+    } catch (error) {
+        console.error('[Storage] Draft save failed:', error);
+    }
 }
 
 /**
- * Clear the active chart ID from localStorage
+ * Load draft from localStorage into chartState
+ * @returns {boolean} True if draft existed and was loaded
  */
-export function clearActiveChartId() {
-    localStorage.removeItem('activeSCCState');
+export function loadDraft() {
+    try {
+        const json = localStorage.getItem(DRAFT_KEY);
+        if (!json) return false;
+
+        const data = JSON.parse(json);
+        deserializeChart(data);
+        chartState.id = data.id;
+        console.log('[Storage] Loaded draft from localStorage');
+        return true;
+    } catch (error) {
+        console.warn('[Storage] Failed to load draft:', error);
+        return false;
+    }
+}
+
+/**
+ * Clear draft from localStorage
+ */
+export function clearDraft() {
+    localStorage.removeItem(DRAFT_KEY);
 }
 
 // ============================================================================
@@ -383,9 +413,9 @@ export function clearActiveChartId() {
 // ============================================================================
 
 /**
- * Debounced save - waits for activity to settle before saving
+ * Debounced IndexedDB save - waits for activity to settle
  */
-function debouncedSave() {
+function debouncedSaveToIndexedDB() {
     if (saveTimeout) {
         clearTimeout(saveTimeout);
     }
@@ -398,21 +428,22 @@ function debouncedSave() {
 }
 
 /**
- * Subscribe to chart-modifying events for auto-save
+ * Handle state mutation - save to localStorage immediately, IndexedDB if saved
+ */
+function onStateMutation() {
+    // Always save draft to localStorage
+    saveDraft();
+
+    // Debounced save to IndexedDB only if chart has been explicitly saved
+    if (chartState.id) {
+        debouncedSaveToIndexedDB();
+    }
+}
+
+/**
+ * Subscribe to STATE_MUTATING category for auto-save
  */
 function subscribeToEvents() {
-    // Data changes
-    eventBus.subscribe(EVENTS.DATA_ENTRY_SUBMITTED, debouncedSave);
-    eventBus.subscribe(EVENTS.DATA_START_DATE_CHANGED, debouncedSave);
-
-    // Series changes
-    eventBus.subscribe(EVENTS.MISC_SERIES_ADDED, debouncedSave);
-    eventBus.subscribe(EVENTS.MISC_SERIES_REMOVED, debouncedSave);
-
-    // Style changes
-    eventBus.subscribe(EVENTS.UI_TRACE_STYLE_CHANGED, debouncedSave);
-    eventBus.subscribe(EVENTS.LINE_VISIBILITY_CHANGED, debouncedSave);
-    eventBus.subscribe(EVENTS.FAN_VISIBILITY_CHANGED, debouncedSave);
-
-    console.log('[Storage] Event subscriptions active');
+    eventBus.subscribeToCategory(EVENT_CATEGORIES.STATE_MUTATING, onStateMutation);
+    console.log('[Storage] Subscribed to STATE_MUTATING category');
 }
