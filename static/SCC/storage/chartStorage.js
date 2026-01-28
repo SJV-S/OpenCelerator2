@@ -165,7 +165,7 @@ export async function saveChart(id = null) {
         await db.put(STORE_NAME, data);
 
         console.log(`[Storage] Saved chart: ${chartId}`);
-        eventBus.emit(EVENTS.STORAGE_CHART_SAVED, { id: chartId, name: data.metadata.chartName });
+        eventBus.emit(EVENTS.STORAGE_CHART_SAVED, { id: chartId, name: data.chartName });
         return chartId;
     } catch (error) {
         console.error('[Storage] Save failed:', error);
@@ -198,7 +198,7 @@ export async function loadChart(id) {
         chartState.id = id;
 
         console.log(`[Storage] Loaded chart: ${id}`);
-        eventBus.emit(EVENTS.STORAGE_CHART_LOADED, { id, name: data.metadata.chartName });
+        eventBus.emit(EVENTS.STORAGE_CHART_LOADED, { id, name: data.chartName });
         return true;
     } catch (error) {
         console.error('[Storage] Load failed:', error);
@@ -222,11 +222,11 @@ export async function listCharts() {
 
         return all.map(chart => ({
             id: chart.id,
-            chartName: chart.metadata.chartName,
-            chartType: chart.metadata.chartType,
-            minuteChart: chart.metadata.minuteChart,
-            updatedAt: chart.metadata.updatedAt,
-            createdAt: chart.metadata.createdAt
+            chartName: chart.chartName,
+            chartType: chart.chartType,
+            minuteChart: chart.minuteChart,
+            updatedAt: chart._updatedAt,
+            createdAt: chart._createdAt
         })).sort((a, b) => b.updatedAt - a.updatedAt);
     } catch (error) {
         console.error('[Storage] List failed:', error);
@@ -286,41 +286,17 @@ export async function createChart(name, chartType, minuteChart) {
     startDate.setHours(0, 0, 0, 0);
     const now = Date.now();
 
-    const data = {
-        id: chartId,
-        metadata: {
-            chartType,
-            minuteChart,
-            chartName: name.trim(),
-            hasTimestamps: false,
-            startDate: startDate.toISOString(),
-            chartCapacity: 140,
-            chartWindow: 140,
-            createdAt: now,
-            updatedAt: now
-        },
-        series: {
-            xValues: [],
-            corrects: [],
-            errors: [],
-            timing: [],
-            misc: {}
-        },
-        lines: {
-            phaseLines: {},
-            aimLines: {},
-            celLines: {},
-            lineCuts: {}
-        },
-        config: {
-            lineVisibility: { phaseLines: true, aimLines: true, cutLines: true, celLines: true },
-            fanVisible: true,
-            lineStyles: {},
-            traceStyles: JSON.parse(JSON.stringify(chartState.traceStyles)),
-            legend: { show: false, position: 'top-right' },
-            credits: {}
-        }
-    };
+    const data = serializeChart(chartId, {
+        ...chartState,
+        chartType,
+        minuteChart,
+        chartName: name.trim(),
+        hasTimestamps: false,
+        startDate,
+        chartCapacity: 140,
+        chartWindow: 140,
+        _createdAt: now
+    });
 
     try {
         await db.put(STORE_NAME, data);
