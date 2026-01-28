@@ -124,7 +124,7 @@
                 const select = document.getElementById('saved-charts-list');
                 select.innerHTML = '';
 
-                for (const chart of charts.sort((a, b) => a.chartName.localeCompare(b.chartName))) {
+                for (const chart of charts.sort((a, b) => (a.chartName || '').localeCompare(b.chartName || ''))) {
                     const option = document.createElement('option');
                     option.value = JSON.stringify({ id: chart.id, chartType: chart.chartType, minuteChart: chart.minuteChart });
                     option.textContent = `${chart.chartName} (${chart.chartType})`;
