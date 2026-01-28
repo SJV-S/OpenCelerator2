@@ -77,7 +77,7 @@ function serializeChart(id, state) {
         config: {
             lineVisibility: { ...state.lineVisibility },
             fanVisible: state.fanVisible,
-            lineStyles: JSON.parse(JSON.sringify(state.lineStyles)),
+            lineStyles: JSON.parse(JSON.stringify(state.lineStyles)),
             traceStyles: JSON.parse(JSON.stringify(state.traceStyles)),
             legend: JSON.parse(JSON.stringify(state.legend)),
             credits: { ...state.credits }

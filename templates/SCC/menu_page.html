@@ -122,6 +122,7 @@
                 await initStorage();
                 const charts = await listCharts();
                 const select = document.getElementById('saved-charts-list');
+                select.innerHTML = '';
 
                 for (const chart of charts.sort((a, b) => a.chartName.localeCompare(b.chartName))) {
                     const option = document.createElement('option');
@@ -166,7 +167,7 @@
             });
         });
 
-        loadSavedCharts();
+        window.addEventListener('pageshow', loadSavedCharts);
     </script>
 </body>
 </html>
