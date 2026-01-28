@@ -25,6 +25,7 @@ import { openDB } from '../lib/idb.js';
 import { eventBus, EVENTS, EVENT_CATEGORIES } from '../eventBus.js';
 import { chartState } from '../chartState.js';
 import { findNearestSunday } from '../util/dates.js';
+import { jsonBackwardsCompatibilityCheck } from '../util/jsonBackwardsCompatibility.js';
 
 const DB_NAME = 'SCC_Charts';
 const DB_VERSION = 1;
@@ -46,153 +47,73 @@ function uuid() {
 // ============================================================================
 
 /**
+ * Recursively serialize a value, handling Date and NaN
+ */
+function serializeValue(value) {
+    if (value instanceof Date) {
+        return { __date__: value.toISOString() };
+    }
+    if (typeof value === 'number' && Number.isNaN(value)) {
+        return '__NaN__';
+    }
+    if (Array.isArray(value)) {
+        return value.map(serializeValue);
+    }
+    if (typeof value === 'object' && value !== null) {
+        const result = {};
+        for (const [k, v] of Object.entries(value)) {
+            result[k] = serializeValue(v);
+        }
+        return result;
+    }
+    return value;
+}
+
+/**
  * Convert chartState to a serializable object
- * Handles Date objects and NaN values
  */
 function serializeChart(id, state) {
-    const now = Date.now();
-
-    return {
-        id,
-        metadata: {
-            chartType: state.chartType,
-            minuteChart: state.minuteChart,
-            chartName: state.chartName,
-            hasTimestamps: state.hasTimestamps,
-            startDate: state.startDate instanceof Date
-                ? state.startDate.toISOString()
-                : state.startDate,
-            chartCapacity: state.chartCapacity,
-            chartWindow: state.chartWindow,
-            createdAt: state._createdAt || now,
-            updatedAt: now
-        },
-        series: serializeSeries(state.series),
-        lines: {
-            phaseLines: serializeLines(state.PhaseLines),
-            aimLines: serializeLines(state.AimLines),
-            celLines: serializeLines(state.CelLines),
-            lineCuts: state.LineCuts
-        },
-        config: {
-            lineVisibility: { ...state.lineVisibility },
-            fanVisible: state.fanVisible,
-            lineStyles: JSON.parse(JSON.stringify(state.lineStyles)),
-            traceStyles: JSON.parse(JSON.stringify(state.traceStyles)),
-            legend: JSON.parse(JSON.stringify(state.legend)),
-            credits: { ...state.credits }
-        }
-    };
+    const serialized = serializeValue(state);
+    serialized.id = id;
+    serialized._updatedAt = Date.now();
+    serialized._createdAt = state._createdAt || serialized._updatedAt;
+    return serialized;
 }
 
 /**
- * Serialize series data, converting NaN to null marker
+ * Recursively deserialize a value, restoring Date and NaN
  */
-function serializeSeries(series) {
-    const replaceNaN = (arr) => arr.map(v => Number.isNaN(v) ? '__NaN__' : v);
-
-    const result = {
-        xValues: [...series.xValues],
-        corrects: [...series.corrects],
-        errors: [...series.errors],
-        timing: [...series.timing],
-        misc: {}
-    };
-
-    for (const [key, values] of Object.entries(series.misc)) {
-        result.misc[key] = replaceNaN(values);
+function deserializeValue(value) {
+    if (value === '__NaN__') {
+        return NaN;
     }
-
-    return result;
-}
-
-/**
- * Serialize line objects, converting Date properties to ISO strings
- */
-function serializeLines(lines) {
-    const result = {};
-
-    for (const [id, line] of Object.entries(lines)) {
-        result[id] = {};
-        for (const [key, value] of Object.entries(line)) {
-            if (value instanceof Date) {
-                result[id][key] = { __date__: value.toISOString() };
-            } else {
-                result[id][key] = value;
-            }
+    if (typeof value === 'object' && value !== null && value.__date__) {
+        return new Date(value.__date__);
+    }
+    if (Array.isArray(value)) {
+        return value.map(deserializeValue);
+    }
+    if (typeof value === 'object' && value !== null) {
+        const result = {};
+        for (const [k, v] of Object.entries(value)) {
+            result[k] = deserializeValue(v);
         }
+        return result;
     }
-
-    return result;
+    return value;
 }
 
 /**
  * Restore chartState from a serialized object
  */
 function deserializeChart(data) {
-    // Metadata
-    chartState.chartType = data.metadata.chartType;
-    chartState.minuteChart = data.metadata.minuteChart;
-    chartState.chartName = data.metadata.chartName;
-    chartState.hasTimestamps = data.metadata.hasTimestamps;
-    chartState.startDate = new Date(data.metadata.startDate);
-    chartState.chartCapacity = data.metadata.chartCapacity;
-    chartState.chartWindow = data.metadata.chartWindow;
-    chartState._createdAt = data.metadata.createdAt;
-
-    // Series
-    deserializeSeries(data.series);
-
-    // Lines
-    chartState.PhaseLines = deserializeLines(data.lines.phaseLines);
-    chartState.AimLines = deserializeLines(data.lines.aimLines);
-    chartState.CelLines = deserializeLines(data.lines.celLines);
-    chartState.LineCuts = data.lines.lineCuts || {};
-
-    // Config
-    chartState.lineVisibility = { ...data.config.lineVisibility };
-    chartState.fanVisible = data.config.fanVisible;
-    chartState.lineStyles = JSON.parse(JSON.stringify(data.config.lineStyles));
-    chartState.traceStyles = JSON.parse(JSON.stringify(data.config.traceStyles));
-    chartState.legend = JSON.parse(JSON.stringify(data.config.legend));
-    chartState.credits = { ...data.config.credits };
-}
-
-/**
- * Deserialize series data, converting NaN markers back
- */
-function deserializeSeries(series) {
-    const restoreNaN = (arr) => arr.map(v => v === '__NaN__' ? NaN : v);
-
-    chartState.series.xValues = [...series.xValues];
-    chartState.series.corrects = [...series.corrects];
-    chartState.series.errors = [...series.errors];
-    chartState.series.timing = [...series.timing];
-    chartState.series.misc = {};
-
-    for (const [key, values] of Object.entries(series.misc)) {
-        chartState.series.misc[key] = restoreNaN(values);
-    }
-}
-
-/**
- * Deserialize line objects, converting ISO strings back to Dates
- */
-function deserializeLines(lines) {
-    const result = {};
-
-    for (const [id, line] of Object.entries(lines)) {
-        result[id] = {};
-        for (const [key, value] of Object.entries(line)) {
-            if (value && typeof value === 'object' && value.__date__) {
-                result[id][key] = new Date(value.__date__);
-            } else {
-                result[id][key] = value;
-            }
+    const deserialized = deserializeValue(data);
+    for (const key in deserialized) {
+        if (key !== 'id' && key !== '_updatedAt' && key !== '_createdAt') {
+            chartState[key] = deserialized[key];
         }
     }
-
-    return result;
+    chartState._createdAt = data._createdAt;
 }
 
 // ============================================================================
@@ -272,6 +193,7 @@ export async function loadChart(id) {
             return false;
         }
 
+        jsonBackwardsCompatibilityCheck(data);
         deserializeChart(data);
         chartState.id = id;
 

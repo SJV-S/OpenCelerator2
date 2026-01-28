@@ -32,7 +32,7 @@ import { createToast } from './util/toaster.js';
 import { refreshChart, init as replotInit } from './series/replot.js';
 import { updateChartDateLabels, updateDateDisplay, adjustDateInput, initializeDateInput } from './util/dates.js';
 import { initStartDateControls } from './util/startDateControls.js';
-import { renderCredits, init as creditInit } from './misc/credit.js';
+import { renderCredits, injectCredits, initCreditClick, regenerateCredits, init as creditInit } from './misc/credit.js';
 import { loadDataForDate, adjustTimestamp, updateCurrentEntry, deleteCurrentEntry, init as dataUpdateInit } from './series/dataUpdate.js';
 import {
     showCounter,
@@ -65,7 +65,6 @@ import { icons } from './util/icons.js';
 import { initializeShareTab } from './misc/share.js';
 import { init as crosshairInit } from './util/crosshair.js';
 import { initStorage } from './storage/chartStorage.js';
-import './util/jsonBackwardsCompatibility.js';
 
 // ============================================================================
 // CHART INITIALIZATION
@@ -92,6 +91,9 @@ export function initializeChart(plotData, maxWindowWidth) {
     // Inject celeration fan into plotData BEFORE initial render (avoids clipping)
     plotData = injectCelerationFan(plotData, chartState.minuteChart, chartState.chartType);
 
+    // Inject credit lines into plotData BEFORE initial render (expands bottom margin)
+    plotData = injectCredits(plotData);
+
     // Create chart
     Plotly.newPlot(chartDiv, plotData.data, plotData.layout, {
         displayModeBar: false,
@@ -103,6 +105,9 @@ export function initializeChart(plotData, maxWindowWidth) {
 
     // Initialize draggable fan
     initFanDrag();
+
+    // Initialize credit click handler
+    initCreditClick();
 
     // Observe container for resize (fullscreen, viewport changes)
     if (chartContainer) {
@@ -124,7 +129,7 @@ export function initializeChart(plotData, maxWindowWidth) {
 
                 Plotly.relayout(chartDiv, { height: newHeight, width: newWidth }).then(() => {
                     regenerateFan();
-                    renderCredits();
+                    regenerateCredits();
                     renderCustomLegend();
                 });
             }, 100);

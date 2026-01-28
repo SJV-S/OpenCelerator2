@@ -5,14 +5,12 @@
 {% block content %}
     <!-- Chart area wrapper - shifts right on desktop for menu -->
     <div id="chart-area">
-        <!-- Top container: holds the chart (80% on desktop, 100% on mobile) -->
+        <!-- Chart container: holds the chart (credits rendered as Plotly annotations in bottom margin) -->
         <div id="chart-container">
             <div id="chart" style="position: relative;">
                 <div id="custom-legend" style="display: none;"></div>
             </div>
         </div>
-        <!-- Credit container: reserved space (15% on desktop, hidden on mobile) -->
-        <div id="credit-container"></div>
     </div>
 
     <!-- Menu hint tooltip -->
