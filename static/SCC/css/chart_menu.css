@@ -67,6 +67,8 @@
     overflow-x: hidden;
     padding: 0;
     box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
 }
 
 .chart-menu-tab-pane {
@@ -77,6 +79,7 @@
 
 .chart-menu-tab-pane.active {
     display: block;
+    flex: 1;
 }
 
 /* ===== FORM ELEMENTS ===== */
@@ -524,4 +527,58 @@
 
 .crosshair-data-agg {
     font-size: 11px;
+}
+
+/* ===== SERIES TAB SUB-MENU ===== */
+#series-content.chart-menu-tab-pane.active {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    min-height: 0;
+}
+
+.series-tab-layout {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    flex: 1;
+    min-height: 0;
+}
+
+.series-subtabs {
+    display: flex;
+    flex-direction: column;
+    background-color: white;
+    border-right: 1px solid #d1d5db;
+    flex-shrink: 0;
+    min-width: 80px;
+}
+
+.series-subtab {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 400;
+    color: black;
+    background-color: transparent;
+    border: none;
+    text-align: left;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.series-subtab:hover {
+    background-color: #96deeb;
+}
+
+.series-subtab.active {
+    background-color: #6ad1e3;
+}
+
+.series-content {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 5%;
+    box-sizing: border-box;
 }

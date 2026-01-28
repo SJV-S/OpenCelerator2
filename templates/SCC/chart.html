@@ -59,6 +59,9 @@
         import { initializeChart } from '/static/SCC/main.js';
         import { initStorage, loadChart, loadDraft } from '/static/SCC/storage/chartStorage.js';
 
+        // Load draft from localStorage FIRST (sync) - before DOMContentLoaded
+        loadDraft();
+
         {% if initial_load %}
         // Initial load: redirect with container dimensions
         // Account for menu on desktop (1024px+ screens)
@@ -102,9 +105,6 @@
                     if (!success) {
                         console.warn('Failed to load chart:', loadId);
                     }
-                } else {
-                    // Try to restore from localStorage draft
-                    loadDraft();  // Returns false if no draft, which is fine
                 }
 
                 // Initialize chart (uses chartState data - either loaded or default)

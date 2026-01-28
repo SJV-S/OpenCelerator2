@@ -293,8 +293,7 @@ function switchSeriesTab(seriesName) {
 
     // Remove active styling from all series sub-tabs
     document.querySelectorAll('.series-subtab').forEach(button => {
-        button.classList.remove('border-[#6ad1e3]', 'bg-gray-50');
-        button.classList.add('border-transparent');
+        button.classList.remove('active');
     });
 
     // Show selected series config panel
@@ -303,8 +302,7 @@ function switchSeriesTab(seriesName) {
     // Add active styling to selected sub-tab
     const activeButton = document.querySelector(`[data-series-tab="${seriesName}"]`);
     if (activeButton) {
-        activeButton.classList.remove('border-transparent');
-        activeButton.classList.add('border-[#6ad1e3]', 'bg-gray-50');
+        activeButton.classList.add('active');
     }
 }
 
@@ -442,7 +440,7 @@ eventBus.subscribe(EVENTS.MISC_SERIES_ADDED, ({ id, index }) => {
     // Create tab button
     const addBtn = tabContainer.querySelector('[data-action="add-misc-series"]');
     const tabButton = document.createElement('button');
-    tabButton.className = 'series-subtab px-4 py-2 text-sm font-semibold text-gray-700 border-b-2 border-transparent hover:bg-gray-50 rounded-t';
+    tabButton.className = 'series-subtab';
     tabButton.dataset.seriesTab = id;
     // Use custom series name if available, otherwise default
     const config = chartState.traceStyles.misc[id]?.raw;

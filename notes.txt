@@ -11,3 +11,5 @@ To-do
 * Make sure that minute column is excluded from count on export
 * Maybe a fading or transition phase to spare the user from seeing the credit lines and chart adjust in size
 * Having instructions on both the right and left side is confusing.
+* When adding data points with data entry, it doesn't add the non occurrences under the floor and draws the line from whatever the previous point landed, so a line can go in the wrong direction
+-- A refresh fixes the missing floor data point, but not the line going in the wrong direction
