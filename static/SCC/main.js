@@ -23,8 +23,12 @@ import {
     switchSeriesTab,
     toggleLineWidth,
     initializeLineWidthToggles,
-    initAddAggDropdown
+    addAggregationBlock,
+    removeAggregationBlock,
+    updateButtonVisibility
 } from './series/traceStyles.js';
+import { addMiscSeries, canAddMiscSeries } from './series/miscSeries.js';
+import { createToast } from './util/toaster.js';
 import { refreshChart, init as replotInit } from './series/replot.js';
 import { updateChartDateLabels, updateDateDisplay, adjustDateInput, initializeDateInput } from './util/dates.js';
 import { initStartDateControls } from './util/startDateControls.js';
@@ -61,6 +65,7 @@ import { icons } from './util/icons.js';
 import { initializeShareTab } from './misc/share.js';
 import { init as crosshairInit } from './util/crosshair.js';
 import { initStorage } from './storage/chartStorage.js';
+import './util/jsonBackwardsCompatibility.js';
 
 // ============================================================================
 // CHART INITIALIZATION
@@ -228,7 +233,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize series input controls
     initializeAllSeriesInputs();
     initializeLineWidthToggles();
-    initAddAggDropdown();
+
+    // Initialize button visibility for core series
+    ['correct', 'incorrect', 'timing'].forEach(updateButtonVisibility);
 
     console.log('Main.js: Application initialized');
 });
@@ -247,11 +254,40 @@ export function setupEventListeners() {
     });
 
     // Series subtabs
-    document.querySelectorAll('.series-subtab[data-series][data-agg]').forEach(button => {
+    document.querySelectorAll('.series-subtab[data-series-tab]').forEach(button => {
+        button.addEventListener('click', (e) => {
+            const seriesName = e.currentTarget.dataset.seriesTab;
+            switchSeriesTab(seriesName);
+        });
+    });
+
+    // Add misc series button
+    const addMiscSeriesBtn = document.querySelector('[data-action="add-misc-series"]');
+    if (addMiscSeriesBtn) {
+        addMiscSeriesBtn.addEventListener('click', () => {
+            if (!canAddMiscSeries()) {
+                createToast({ message: 'Maximum of 10 misc series reached.', duration: 3000 });
+                return;
+            }
+            addMiscSeries();
+        });
+    }
+
+    // Add aggregation block buttons (inside each series panel)
+    document.querySelectorAll('.add-block-btn[data-series]').forEach(button => {
         button.addEventListener('click', (e) => {
             const seriesName = e.currentTarget.dataset.series;
-            const aggType = e.currentTarget.dataset.agg;
-            switchSeriesTab(seriesName, aggType);
+            addAggregationBlock(seriesName);
+        });
+    });
+
+    // Remove aggregation block buttons
+    document.querySelectorAll('.remove-block-btn').forEach(button => {
+        button.addEventListener('click', (e) => {
+            const block = e.target.closest('.agg-config-block');
+            if (block) {
+                removeAggregationBlock(block);
+            }
         });
     });
 
@@ -315,24 +351,20 @@ export function setupEventListeners() {
         deleteDataBtn.addEventListener('click', deleteCurrentEntry);
     }
 
-    // Apply and Reset buttons use event delegation since panels can be dynamic
-    document.addEventListener('click', (e) => {
-        const applyBtn = e.target.closest('[data-action="apply-agg"]');
-        if (applyBtn) {
-            const panel = applyBtn.closest('.series-agg-panel');
-            if (panel) {
-                const seriesName = panel.dataset.series;
-                applyTraceConfig(seriesName);
-            }
-        }
+    // Apply and Reset buttons for each series
+    const traceActions = {
+        'apply-correct-trace': () => applyTraceConfig('correct'),
+        'apply-incorrect-trace': () => applyTraceConfig('incorrect'),
+        'apply-timing-trace': () => applyTraceConfig('timing'),
+        'reset-trace-correct': () => resetTraceConfig('correct'),
+        'reset-trace-incorrect': () => resetTraceConfig('incorrect'),
+        'reset-trace-timing': () => resetTraceConfig('timing')
+    };
 
-        const resetBtn = e.target.closest('[data-action="reset-agg"]');
-        if (resetBtn) {
-            const panel = resetBtn.closest('.series-agg-panel');
-            if (panel) {
-                const seriesName = panel.dataset.series;
-                resetTraceConfig(seriesName);
-            }
+    Object.entries(traceActions).forEach(([action, handler]) => {
+        const element = document.querySelector(`[data-action="${action}"]`);
+        if (element) {
+            element.addEventListener('click', handler);
         }
     });
 

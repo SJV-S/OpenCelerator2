@@ -285,10 +285,10 @@ function initializeLineWidthToggles() {
     });
 }
 
-function switchSeriesTab(seriesName, aggType) {
+function switchSeriesTab(seriesName) {
     // Hide all series config panels
-    document.querySelectorAll('.series-agg-panel').forEach(panel => {
-        panel.classList.add('hidden');
+    document.querySelectorAll('.series-config-panel').forEach(panel => {
+        panel.style.display = 'none';
     });
 
     // Remove active styling from all series sub-tabs
@@ -297,221 +297,133 @@ function switchSeriesTab(seriesName, aggType) {
     });
 
     // Show selected series config panel
-    const panelId = `${seriesName}-${aggType}-config`;
-    const panel = document.getElementById(panelId);
-    if (panel) {
-        panel.classList.remove('hidden');
-    }
+    document.getElementById(seriesName + '-series-config').style.display = 'block';
 
     // Add active styling to selected sub-tab
-    const activeButton = document.querySelector(`.series-subtab[data-series="${seriesName}"][data-agg="${aggType}"]`);
+    const activeButton = document.querySelector(`[data-series-tab="${seriesName}"]`);
     if (activeButton) {
         activeButton.classList.add('active');
     }
 }
 
 // ============================================================================
-// AGGREGATION MANAGEMENT (Flat Menu Approach)
+// AGGREGATION BLOCK MANAGEMENT
 // ============================================================================
 
-const AVAILABLE_AGGS = ['raw', 'mean', 'median', 'min', 'max', 'first', 'last'];
-const CORE_SERIES = ['correct', 'incorrect', 'timing'];
-
 /**
- * Get aggregation types already in use for a series
+ * Add a new aggregation configuration block for a series
+ * @param {string} seriesName - Name of the series (correct, incorrect, timing, misc1, misc2)
  */
-function getUsedAggregations(seriesName) {
-    const buttons = document.querySelectorAll(`.series-subtab[data-series="${seriesName}"]`);
-    return Array.from(buttons).map(btn => btn.dataset.agg).filter(Boolean);
-}
+function addAggregationBlock(seriesName) {
+    const container = document.getElementById(`${seriesName}-blocks-container`);
+    if (!container) return;
 
-/**
- * Add a new aggregation for a series
- */
-function addAggregation(seriesName, aggType) {
-    // Check if this combination already exists
-    const existing = document.querySelector(`.series-subtab[data-series="${seriesName}"][data-agg="${aggType}"]`);
-    if (existing) {
-        createToast({ message: `${seriesName} (${aggType}) already exists.`, duration: 3000 });
+    // Check if all aggregation types are already in use
+    const usedAggs = Array.from(container.querySelectorAll('.agg-config-block .agg-type-select'))
+        .map(select => select.value);
+
+    const availableAggs = ['raw', 'mean', 'median', 'min', 'max', 'first', 'last'];
+
+    // If all aggregation types are used, don't allow adding more blocks
+    if (usedAggs.length >= availableAggs.length) {
         return;
     }
 
-    // Get the template for this series type
-    const template = document.getElementById(`${seriesName}-agg-template`);
-    if (!template) {
-        createToast({ message: `No template found for ${seriesName}.`, duration: 3000 });
-        return;
+    // Get the first block as a template
+    const templateBlock = container.querySelector('.agg-config-block');
+    if (!templateBlock) return;
+
+    // Clone the template block
+    const newBlock = templateBlock.cloneNode(true);
+
+    // Reset the aggregation type to a default unused value
+    const aggSelect = newBlock.querySelector('.agg-type-select');
+    if (aggSelect) {
+        // Find an unused aggregation type
+        const unusedAgg = availableAggs.find(agg => !usedAggs.includes(agg));
+
+        if (unusedAgg) {
+            aggSelect.value = unusedAgg;
+            newBlock.dataset.agg = unusedAgg;
+        }
     }
 
-    // Create new menu button
-    const tabContainer = document.getElementById('series-tab-container');
-    const addButton = tabContainer.querySelector('[data-action="add-aggregation"]');
+    // Add the new block to the container
+    container.appendChild(newBlock);
 
-    const newTab = document.createElement('button');
-    newTab.className = 'series-subtab';
-    newTab.dataset.series = seriesName;
-    newTab.dataset.agg = aggType;
-    newTab.textContent = `${seriesName.charAt(0).toUpperCase() + seriesName.slice(1)} (${aggType})`;
-
-    // Insert before the + button
-    tabContainer.insertBefore(newTab, addButton);
-
-    // Clone panel from template
-    const panelClone = template.content.cloneNode(true);
-    const newPanel = panelClone.querySelector('.series-agg-panel');
-    newPanel.id = `${seriesName}-${aggType}-config`;
-    newPanel.dataset.agg = aggType;
-    newPanel.querySelector('.series-name-input').value = `${seriesName} (${aggType})`;
-
-    // Add panel to container
-    document.getElementById('dynamic-agg-panels').appendChild(newPanel);
-
-    // Add click handler for new tab
-    newTab.addEventListener('click', () => {
-        switchSeriesTab(seriesName, aggType);
-    });
-
-    // Add delete handler for new panel
-    const deleteBtn = newPanel.querySelector('[data-action="delete-agg"]');
-    if (deleteBtn) {
-        deleteBtn.addEventListener('click', () => {
-            deleteAggregation(seriesName, aggType);
+    // Re-attach line width toggle for the new block's checkbox
+    const showLineCheckbox = newBlock.querySelector('.show-line-input');
+    if (showLineCheckbox) {
+        showLineCheckbox.addEventListener('change', (e) => {
+            const seriesName = e.currentTarget.dataset.seriesToggle;
+            if (seriesName) {
+                toggleLineWidth(seriesName);
+            }
         });
     }
 
-    // Switch to the new tab
-    switchSeriesTab(seriesName, aggType);
+    // Update button visibility for both + and - buttons
+    updateButtonVisibility(seriesName);
 }
 
 /**
- * Delete an aggregation
+ * Update the visibility of add and remove buttons based on available aggregation types
+ * @param {string} seriesName - Name of the series
  */
-function deleteAggregation(seriesName, aggType) {
-    // Don't allow deleting the last aggregation for a core series
-    const usedAggs = getUsedAggregations(seriesName);
-    if (CORE_SERIES.includes(seriesName) && usedAggs.length <= 1) {
-        createToast({ message: `Cannot delete the last aggregation for ${seriesName}.`, duration: 3000 });
+function updateButtonVisibility(seriesName) {
+    const container = document.getElementById(`${seriesName}-blocks-container`);
+    const addButton = document.querySelector(`.add-block-btn[data-series="${seriesName}"]`);
+
+    if (!container) return;
+
+    const blocks = container.querySelectorAll('.agg-config-block');
+    const availableAggs = ['raw', 'mean', 'median', 'min', 'max', 'first', 'last'];
+
+    // Hide/show the + button based on whether all aggregation types are used
+    if (addButton) {
+        if (blocks.length >= availableAggs.length) {
+            addButton.style.display = 'none';
+        } else {
+            addButton.style.display = 'flex';
+        }
+    }
+
+    // Hide/show the - buttons based on whether there's only one block
+    blocks.forEach(block => {
+        const removeButton = block.querySelector('.remove-block-btn');
+        if (removeButton) {
+            if (blocks.length <= 1) {
+                removeButton.style.display = 'none';
+            } else {
+                removeButton.style.display = 'flex';
+            }
+        }
+    });
+}
+
+/**
+ * Remove an aggregation configuration block
+ * @param {HTMLElement} block - The block element to remove
+ */
+function removeAggregationBlock(block) {
+    const container = block.parentElement;
+
+    // Don't allow removing the last block (this shouldn't happen since button is hidden)
+    const remainingBlocks = container.querySelectorAll('.agg-config-block');
+    if (remainingBlocks.length <= 1) {
         return;
     }
 
-    // Remove the tab
-    const tab = document.querySelector(`.series-subtab[data-series="${seriesName}"][data-agg="${aggType}"]`);
-    if (tab) tab.remove();
+    // Get the series name from the block before removing it
+    const seriesName = block.dataset.series;
 
-    // Remove the panel
-    const panel = document.getElementById(`${seriesName}-${aggType}-config`);
-    if (panel) panel.remove();
+    // Remove the block
+    block.remove();
 
-    // Switch to another tab
-    const remainingTab = document.querySelector('.series-subtab[data-series][data-agg]');
-    if (remainingTab) {
-        switchSeriesTab(remainingTab.dataset.series, remainingTab.dataset.agg);
+    // Update button visibility (may need to show + button and update - buttons)
+    if (seriesName) {
+        updateButtonVisibility(seriesName);
     }
-}
-
-/**
- * Toggle the add aggregation dropdown visibility
- */
-function toggleAddAggDropdown() {
-    const dropdown = document.getElementById('add-agg-dropdown');
-    if (!dropdown) return;
-
-    if (dropdown.classList.contains('hidden')) {
-        // Position dropdown near the + button
-        const btn = document.getElementById('add-agg-btn');
-        if (btn) {
-            const rect = btn.getBoundingClientRect();
-            dropdown.style.left = `${rect.right + 5}px`;
-            dropdown.style.top = `${rect.top}px`;
-        }
-        dropdown.classList.remove('hidden');
-
-        // Update available aggregation options based on selected series
-        updateAvailableAggTypes();
-    } else {
-        dropdown.classList.add('hidden');
-    }
-}
-
-/**
- * Update available aggregation types in dropdown based on selected series
- */
-function updateAvailableAggTypes() {
-    const seriesSelect = document.getElementById('add-agg-series');
-    const aggSelect = document.getElementById('add-agg-type');
-    if (!seriesSelect || !aggSelect) return;
-
-    const selectedSeries = seriesSelect.value;
-    const usedAggs = getUsedAggregations(selectedSeries);
-
-    // Update options - disable used ones
-    Array.from(aggSelect.options).forEach(option => {
-        option.disabled = usedAggs.includes(option.value);
-    });
-
-    // Select first available option
-    const firstAvailable = Array.from(aggSelect.options).find(opt => !opt.disabled);
-    if (firstAvailable) {
-        aggSelect.value = firstAvailable.value;
-    }
-}
-
-/**
- * Handle confirm button click in add aggregation dropdown
- */
-function handleAddAggConfirm() {
-    const seriesSelect = document.getElementById('add-agg-series');
-    const aggSelect = document.getElementById('add-agg-type');
-    const dropdown = document.getElementById('add-agg-dropdown');
-
-    if (!seriesSelect || !aggSelect) return;
-
-    const series = seriesSelect.value;
-    const aggType = aggSelect.value;
-
-    // Check if combination already exists
-    const usedAggs = getUsedAggregations(series);
-    if (usedAggs.includes(aggType)) {
-        createToast({ message: `${series} (${aggType}) already exists.`, duration: 3000 });
-        return;
-    }
-
-    addAggregation(series, aggType);
-
-    // Hide dropdown
-    if (dropdown) dropdown.classList.add('hidden');
-}
-
-/**
- * Initialize add aggregation dropdown handlers
- */
-function initAddAggDropdown() {
-    const addBtn = document.getElementById('add-agg-btn');
-    const confirmBtn = document.getElementById('add-agg-confirm');
-    const seriesSelect = document.getElementById('add-agg-series');
-    const dropdown = document.getElementById('add-agg-dropdown');
-
-    if (addBtn) {
-        addBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            toggleAddAggDropdown();
-        });
-    }
-
-    if (confirmBtn) {
-        confirmBtn.addEventListener('click', handleAddAggConfirm);
-    }
-
-    if (seriesSelect) {
-        seriesSelect.addEventListener('change', updateAvailableAggTypes);
-    }
-
-    // Close dropdown when clicking outside
-    document.addEventListener('click', (e) => {
-        if (dropdown && !dropdown.contains(e.target) && e.target.id !== 'add-agg-btn') {
-            dropdown.classList.add('hidden');
-        }
-    });
 }
 
 // ============================================================================
@@ -519,16 +431,83 @@ function initAddAggDropdown() {
 // ============================================================================
 
 eventBus.subscribe(EVENTS.MISC_SERIES_ADDED, ({ id, index }) => {
-    // Misc series feature disabled - needs rework for flat menu approach
-    // TODO: Implement misc series with the new aggregation-per-menu-item structure
-    console.log('Misc series added:', id, index);
+    const tabContainer = document.getElementById('series-tab-container');
+    const panelContainer = document.getElementById('misc-panels-container');
+    const template = document.getElementById('misc-series-template');
+
+    if (!tabContainer || !panelContainer || !template) return;
+
+    // Create tab button
+    const addBtn = tabContainer.querySelector('[data-action="add-misc-series"]');
+    const tabButton = document.createElement('button');
+    tabButton.className = 'series-subtab';
+    tabButton.dataset.seriesTab = id;
+    // Use custom series name if available, otherwise default
+    const config = chartState.traceStyles.misc[id]?.raw;
+    tabButton.textContent = config?.seriesName || `Misc ${index + 1}`;
+    tabButton.addEventListener('click', () => switchSeriesTab(id));
+    tabContainer.insertBefore(tabButton, addBtn);
+
+    // Clone and configure panel from template
+    const panel = template.content.firstElementChild.cloneNode(true);
+    panel.id = `${id}-series-config`;
+
+    // Update data-series attributes
+    panel.querySelectorAll('[data-series="misc-template"]').forEach(el => {
+        el.dataset.series = id;
+    });
+
+    // Update blocks container ID
+    const blocksContainer = panel.querySelector('.misc-blocks-container');
+    if (blocksContainer) {
+        blocksContainer.id = `${id}-blocks-container`;
+    }
+
+    // Set values from chartState config (config already declared above)
+    if (config) {
+        const nameInput = panel.querySelector('.series-name-input');
+        if (nameInput) nameInput.value = config.seriesName;
+
+        const symbolInput = panel.querySelector('.marker-symbol-input');
+        if (symbolInput) symbolInput.value = config.markerSymbol;
+
+        const faceColorInput = panel.querySelector('.marker-face-color-input');
+        if (faceColorInput) faceColorInput.value = config.markerFaceColor;
+    }
+
+    // Wire up buttons
+    panel.querySelector('.apply-misc-btn')?.addEventListener('click', () => applyTraceConfig(id));
+    panel.querySelector('.reset-misc-btn')?.addEventListener('click', () => resetTraceConfig(id));
+    panel.querySelector('.delete-misc-btn')?.addEventListener('click', () => {
+        import('./miscSeries.js').then(({ removeMiscSeries }) => {
+            removeMiscSeries(id);
+        });
+    });
+    panel.querySelector('.add-block-btn')?.addEventListener('click', () => addAggregationBlock(id));
+    panel.querySelectorAll('.remove-block-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => removeAggregationBlock(e.target.closest('.agg-config-block')));
+    });
+
+    panelContainer.appendChild(panel);
+    updateButtonVisibility(id);
+
     eventBus.emit(EVENTS.DATA_CHART_REFRESH);
     eventBus.emit(EVENTS.UI_LEGEND_RENDER);
 }, true);
 
 eventBus.subscribe(EVENTS.MISC_SERIES_REMOVED, ({ id }) => {
-    // Misc series feature disabled - needs rework for flat menu approach
-    console.log('Misc series removed:', id);
+    // Remove tab button
+    const tabButton = document.querySelector(`[data-series-tab="${id}"]`);
+    if (tabButton) tabButton.remove();
+
+    // Remove config panel
+    const panel = document.getElementById(`${id}-series-config`);
+    if (panel) panel.remove();
+
+    // Switch to correct tab if needed
+    const activePanel = document.querySelector('.series-config-panel[style*="display: block"]');
+    if (!activePanel) switchSeriesTab('correct');
+
     eventBus.emit(EVENTS.DATA_CHART_REFRESH);
     eventBus.emit(EVENTS.UI_LEGEND_RENDER);
 }, true);
@@ -544,7 +523,7 @@ export {
     switchSeriesTab,
     toggleLineWidth,
     initializeLineWidthToggles,
-    addAggregation,
-    deleteAggregation,
-    initAddAggDropdown
+    addAggregationBlock,
+    updateButtonVisibility,
+    removeAggregationBlock
 };
