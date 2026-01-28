@@ -10,6 +10,18 @@
  * - Secondary button: #f3f4f6
  */
 
+// Track active toasts per position for stacking
+const activeToasts = {
+    'top-right': [],
+    'top-right-secondary': [],
+    'top-left': [],
+    'bottom-right': [],
+    'bottom-left': []
+};
+
+// Counter for unique toast IDs
+let toastCounter = 0;
+
 /**
  * Creates and shows a toast notification
  * @param {Object} options - Configuration options
@@ -41,11 +53,11 @@ function createToast(options) {
         position = 'top-right'
     } = options;
 
-    // Auto-generate ID based on position - one toast per corner
-    const id = `toast-${position}`;
+    // Generate unique ID for this toast
+    const id = `toast-${position}-${++toastCounter}`;
 
-    // Remove existing toast at this position if any
-    removeToast(id);
+    // Normalize position for tracking (top-right-secondary uses top-right array)
+    const trackingPosition = position === 'top-right-secondary' ? 'top-right' : position;
 
     // Create toast container
     const toast = document.createElement('div');
@@ -61,6 +73,9 @@ function createToast(options) {
         case 'top-right':
             positionStyles = 'top: 1vh; right: 1vw;';
             break;
+        case 'top-right-secondary':
+            positionStyles = 'top: 7vh; right: 1vw;';
+            break;
         case 'bottom-left':
             positionStyles = 'bottom: 1vh; left: 1vw;';
             break;
@@ -70,6 +85,9 @@ function createToast(options) {
         default:
             positionStyles = 'top: 1vh; right: 1vw;';
     }
+
+    // Determine if this is a right-side toast for slide-in animation
+    const isRightSide = position === 'top-right' || position === 'bottom-right' || position === 'top-right-secondary';
 
     // Base styles (common to all toasts)
     const baseStyles = `
@@ -83,6 +101,7 @@ function createToast(options) {
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         z-index: 10000;
         font-family: Arial, sans-serif;
+        ${isRightSide ? 'transform: translateX(calc(100% + 1vw)); transition: transform 0.3s ease-out;' : ''}
     `;
 
     // Layout-specific styles
@@ -139,6 +158,13 @@ function createToast(options) {
 
     // Append toast to body
     document.body.appendChild(toast);
+
+    // Trigger slide-in animation for right-side toasts
+    if (isRightSide) {
+        requestAnimationFrame(() => {
+            toast.style.transform = 'translateX(0)';
+        });
+    }
 
     // Store reference if state object provided
     if (stateRef && stateRef.state) {

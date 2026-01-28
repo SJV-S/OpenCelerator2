@@ -55,6 +55,7 @@ export const EVENTS = {
     // Navigation Events
     NAV_COUNTER_HIDE: 'nav:counter_hide',
     NAV_TAB_SWITCH: 'nav:tab_switch',
+    NAV_DATA_SUBTAB_SWITCH: 'nav:data_subtab_switch',
     NAV_LINE_CLICKABILITY_TOGGLE: 'nav:line_clickability_toggle',
 
     // UI Events
@@ -69,7 +70,12 @@ export const EVENTS = {
     FAN_VISIBILITY_CHANGED: 'fan:visibility_changed',
 
     // Chart Settings Events
-    CHART_PANNING_ENABLED_CHANGED: 'chart:panning_enabled_changed'
+    CHART_PANNING_ENABLED_CHANGED: 'chart:panning_enabled_changed',
+
+    // Counter Events
+    COUNTER_ENTRY_DATE_CHANGED: 'counter:entry_date_changed',
+    COUNTER_SHOW: 'counter:show',
+    COUNTER_HIDE: 'counter:hide'
 };
 class EventBus {
     constructor(name = 'EventBus') {

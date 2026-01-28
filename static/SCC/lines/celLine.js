@@ -1,16 +1,17 @@
 /**
- * Cel Line Mode - Drag to select x1 to x2 range for placing change lines
+ * Cel Line Mode - Place change/celeration lines on data series
  *
- * When activated:
- * - Shows celeration cursor icon
- * - User holds down mouse/tap and drags to the right
- * - Creates a semi-transparent gray shaded area during drag
- * - On release, shows toast menu to confirm or cancel
+ * UX Flow:
+ * 1. User clicks "add change line" button
+ * 2. Toast shows buttons for available data series
+ * 3. User clicks a series button
+ * 4. Cursor changes to celeration icon, user drags to select range
+ * 5. Line is created using Theil-Sen regression on selected data
  *
  * Emits events instead of calling peer modules directly.
  */
 
-import { createConfirmToast, removeToast, createToast } from '../util/toaster.js';
+import { removeToast, createToast } from '../util/toaster.js';
 import { icons } from '../util/icons.js';
 import { applySvgCursor, restoreCursor } from '../util/cursorIcon.js';
 import { chartState } from '../chartState.js';
@@ -29,18 +30,19 @@ var celLineState = {
     touchStartHandler: null,
     touchMoveHandler: null,
     touchEndHandler: null,
+    guideHandler: null,
     x1: null,
     x2: null,
     shadeShape: null,
     previousDragMode: null,
     toastElement: null,
-    previousLegendShow: null,
-    awaitingSeriesSelection: false,
-    seriesSelectionToast: null
+    seriesSelectionToast: null,
+    selectedSeriesKey: null
 };
 
 /**
  * Activates cel line mode
+ * Step 1: Show toast with buttons for available data series
  */
 function activateCelLineMode() {
     console.log('Activating cel line mode');
@@ -60,11 +62,113 @@ function activateCelLineMode() {
     eventBus.emit(EVENTS.MODE_ALL_DEACTIVATE);
 
     celLineState.active = true;
+    celLineState.selectedSeriesKey = null;
+
+    // Build buttons for available series
+    const seriesButtons = getAvailableSeriesButtons();
+
+    if (seriesButtons.length === 0) {
+        createToast({
+            message: 'No data series available',
+            duration: 2000
+        });
+        celLineState.active = false;
+        return;
+    }
+
+    // Add cancel button
+    seriesButtons.push({
+        label: 'Cancel',
+        onClick: () => {
+            deactivateCelLineMode();
+        },
+        type: 'secondary'
+    });
+
+    // Show toast with series buttons
+    celLineState.seriesSelectionToast = createToast({
+        message: 'Select series:',
+        buttons: seriesButtons,
+        layout: 'horizontal'
+    });
+
+    console.log('Cel line mode activated - awaiting series selection');
+}
+
+/**
+ * Get buttons for available data series
+ */
+function getAvailableSeriesButtons() {
+    const buttons = [];
+
+    // Check fixed series
+    if (chartState.series.corrects && chartState.series.corrects.some(v => v !== null)) {
+        const config = chartState.traceStyles.correct?.raw;
+        buttons.push({
+            label: config?.seriesName || 'Corrects',
+            onClick: () => selectSeriesAndEnableDrag('correct'),
+            type: 'primary'
+        });
+    }
+
+    if (chartState.series.errors && chartState.series.errors.some(v => v !== null)) {
+        const config = chartState.traceStyles.incorrect?.raw;
+        buttons.push({
+            label: config?.seriesName || 'Errors',
+            onClick: () => selectSeriesAndEnableDrag('incorrect'),
+            type: 'primary'
+        });
+    }
+
+    if (chartState.series.timing && chartState.series.timing.some(v => v !== null)) {
+        const config = chartState.traceStyles.timing?.raw;
+        buttons.push({
+            label: config?.seriesName || 'Timing',
+            onClick: () => selectSeriesAndEnableDrag('timing'),
+            type: 'primary'
+        });
+    }
+
+    // Check misc series
+    Object.entries(chartState.series.misc).forEach(([miscId, data]) => {
+        if (data && data.some(v => v !== null)) {
+            const config = chartState.traceStyles.misc[miscId]?.raw;
+            buttons.push({
+                label: config?.seriesName || miscId,
+                onClick: () => selectSeriesAndEnableDrag(miscId),
+                type: 'primary'
+            });
+        }
+    });
+
+    return buttons;
+}
+
+/**
+ * Called when user selects a series from the toast buttons
+ */
+function selectSeriesAndEnableDrag(seriesKey) {
+    celLineState.selectedSeriesKey = seriesKey;
+
+    // Remove series selection toast (position defaults to top-right)
+    removeToast('toast-top-right');
+    celLineState.seriesSelectionToast = null;
+
+    // Enable drag mode
+    enableDragMode();
+}
+
+/**
+ * Called after user selects a series - enables drag mode
+ */
+function enableDragMode() {
+    const chartDiv = document.getElementById('chart');
+    if (!chartDiv) return;
 
     celLineState.previousDragMode = chartDiv.layout.dragmode;
     Plotly.relayout(chartDiv, { dragmode: false });
 
-    applySvgCursor(chartDiv, icons.otherCeleration, {size: 32, hotspotX: 2, hotspotY: 16});
+    applySvgCursor(chartDiv, icons.scatterLine, {size: 32, hotspotX: 16, hotspotY: 16});
 
     celLineState.mouseDownHandler = function(event) {
         handleCelLineMouseDown(event, chartDiv);
@@ -90,10 +194,37 @@ function activateCelLineMode() {
         handleCelLineTouchEnd(event, chartDiv);
     };
 
+    // Guide line follows cursor before dragging starts
+    celLineState.guideHandler = function(event) {
+        if (!celLineState.isDragging) {
+            const coords = getPlotCoordinatesForCelLine(event, chartDiv);
+            if (coords) {
+                updateVerticalGuideLine(coords.x);
+            }
+        }
+    };
+
+    chartDiv.addEventListener('mousemove', celLineState.guideHandler);
     chartDiv.addEventListener('mousedown', celLineState.mouseDownHandler);
     chartDiv.addEventListener('touchstart', celLineState.touchStartHandler, { passive: false });
 
-    console.log('Cel line mode activated');
+    // Show toast with instructions
+    celLineState.toastElement = createToast({
+        message: 'Drag to select range',
+        buttons: [
+            {
+                label: 'Cancel',
+                onClick: () => {
+                    deactivateCelLineMode();
+                },
+                type: 'secondary'
+            }
+        ],
+        layout: 'horizontal',
+        position: 'top-right-secondary'
+    });
+
+    console.log('Drag mode enabled for cel line');
 }
 
 /**
@@ -107,6 +238,7 @@ function deactivateCelLineMode() {
 
     celLineState.active = false;
     celLineState.isDragging = false;
+    celLineState.selectedSeriesKey = null;
 
     if (celLineState.previousDragMode !== null) {
         Plotly.relayout(chartDiv, { dragmode: celLineState.previousDragMode });
@@ -145,8 +277,14 @@ function deactivateCelLineMode() {
         celLineState.touchEndHandler = null;
     }
 
+    if (celLineState.guideHandler) {
+        chartDiv.removeEventListener('mousemove', celLineState.guideHandler);
+        celLineState.guideHandler = null;
+    }
+
     removeShadeRectangle();
-    removeCelLineToast();
+    removeVerticalGuideLine();
+    cleanupSeriesSelectionMode();
 
     celLineState.x1 = null;
     celLineState.x2 = null;
@@ -156,11 +294,7 @@ function deactivateCelLineMode() {
 }
 
 function handleCelLineMouseDown(event, chartDiv) {
-    if (event.target.closest('#cel-line-toast')) {
-        return;
-    }
-
-    if (celLineState.awaitingSeriesSelection && event.target.closest('#custom-legend')) {
+    if (event.target.closest('#cel-drag-toast')) {
         return;
     }
 
@@ -186,6 +320,7 @@ function handleCelLineMouseMove(event, chartDiv) {
     if (coords.x > celLineState.x1) {
         celLineState.x2 = coords.x;
         updateShadeRectangle();
+        updateVerticalGuideLine(coords.x);
     }
 }
 
@@ -198,9 +333,11 @@ function handleCelLineMouseUp(event, chartDiv) {
     document.removeEventListener('mouseup', celLineState.mouseUpHandler);
 
     if (celLineState.x2 && celLineState.x2 > celLineState.x1) {
-        showCelLineToast();
+        // Use pre-selected series to create the line
+        finalizeCelLine();
     } else {
         removeShadeRectangle();
+        removeVerticalGuideLine();
         celLineState.x1 = null;
         celLineState.x2 = null;
     }
@@ -209,7 +346,7 @@ function handleCelLineMouseUp(event, chartDiv) {
 function handleCelLineTouchStart(event, chartDiv) {
     event.preventDefault();
 
-    if (event.target.closest('#cel-line-toast')) {
+    if (event.target.closest('#cel-drag-toast')) {
         return;
     }
 
@@ -240,6 +377,7 @@ function handleCelLineTouchMove(event, chartDiv) {
         if (coords.x > celLineState.x1) {
             celLineState.x2 = coords.x;
             updateShadeRectangle();
+            updateVerticalGuideLine(coords.x);
         }
     }
 }
@@ -252,20 +390,44 @@ function handleCelLineTouchEnd(event, chartDiv) {
     document.removeEventListener('touchmove', celLineState.touchMoveHandler);
     document.removeEventListener('touchend', celLineState.touchEndHandler);
 
-    const changedTouch = event.changedTouches[0];
-    const element = document.elementFromPoint(changedTouch.clientX, changedTouch.clientY);
-
-    if (element && element.closest('#cel-line-toast')) {
-        return;
-    }
-
     if (celLineState.x2 && celLineState.x2 > celLineState.x1) {
-        showCelLineToast();
+        // Use pre-selected series to create the line
+        finalizeCelLine();
     } else {
         removeShadeRectangle();
+        removeVerticalGuideLine();
         celLineState.x1 = null;
         celLineState.x2 = null;
     }
+}
+
+/**
+ * Finalize cel line creation using pre-selected series
+ */
+function finalizeCelLine() {
+    const baseKey = celLineState.selectedSeriesKey;
+    if (!baseKey) {
+        console.error('No series selected');
+        deactivateCelLineMode();
+        return;
+    }
+
+    const data = getDataInRangeForSeries(celLineState.x1, celLineState.x2, baseKey);
+
+    if (!data || data.x.length < 5) {
+        createToast({
+            message: `Need at least 5 data points. Found ${data ? data.x.length : 0}.`,
+            duration: 3000
+        });
+        removeShadeRectangle();
+        removeVerticalGuideLine();
+        celLineState.x1 = null;
+        celLineState.x2 = null;
+        // Stay in drag mode so user can try again
+        return;
+    }
+
+    handleCelLineConfirm(data, baseKey);
 }
 
 function getPlotCoordinatesForCelLine(event, chartDiv) {
@@ -369,108 +531,49 @@ function removeShadeRectangle() {
     celLineState.shadeShape = null;
 }
 
-function showCelLineToast() {
-    createConfirmToast({
-        id: 'cel-line-toast',
-        message: 'Place change line?',
-        onYes: () => {
-            removeCelLineToast();
-            showSeriesSelectionMode();
+function updateVerticalGuideLine(xValue) {
+    const chartDiv = document.getElementById('chart');
+    if (!chartDiv) return;
+
+    const lineShape = {
+        type: 'line',
+        x0: xValue,
+        x1: xValue,
+        y0: 0,
+        y1: 1,
+        xref: 'x',
+        yref: 'paper',
+        opacity: 0.25,
+        line: {
+            color: '#9333ea',
+            width: 3
         },
-        onNo: () => {
-            handleCelLineCancel();
-        },
-        noLabel: 'Cancel',
-        stateRef: {
-            state: celLineState,
-            key: 'toastElement'
-        }
-    });
+        name: 'celline-guide'
+    };
+
+    const currentShapes = chartDiv.layout.shapes || [];
+    const filteredShapes = currentShapes.filter(shape => shape.name !== 'celline-guide');
+    const newShapes = [...filteredShapes, lineShape];
+
+    Plotly.relayout(chartDiv, { shapes: newShapes });
 }
 
-function removeCelLineToast() {
-    removeToast('cel-line-toast');
-    celLineState.toastElement = null;
-}
+function removeVerticalGuideLine() {
+    const chartDiv = document.getElementById('chart');
+    if (!chartDiv) return;
 
-function showSeriesSelectionMode() {
-    celLineState.awaitingSeriesSelection = true;
+    const currentShapes = chartDiv.layout.shapes || [];
+    const newShapes = currentShapes.filter(shape => shape.name !== 'celline-guide');
 
-    celLineState.previousLegendShow = chartState.legend.show;
-    chartState.legend.show = true;
-    eventBus.emit(EVENTS.UI_LEGEND_RENDER);
-
-    celLineState.seriesSelectionToast = createToast({
-        id: 'cel-series-selection-toast',
-        message: 'Step 2: Click a data series in the legend',
-        buttons: [
-            {
-                label: 'Cancel',
-                onClick: () => {
-                    handleCelLineCancel();
-                },
-                type: 'secondary'
-            }
-        ],
-        layout: 'horizontal',
-        position: 'top-left'
-    });
-
-    setupLegendClickHandler();
-}
-
-function setupLegendClickHandler() {
-    const legendItems = document.querySelectorAll('.legend-item');
-
-    legendItems.forEach(item => {
-        const handler = function(event) {
-            if (celLineState.awaitingSeriesSelection) {
-                event.stopPropagation();
-                event.preventDefault();
-
-                const seriesKey = item.dataset.seriesKey;
-                handleSeriesSelection(seriesKey);
-            }
-        };
-
-        item.celLineClickHandler = handler;
-        item.addEventListener('click', handler, true);
-    });
-}
-
-function handleSeriesSelection(seriesKey) {
-    const baseKey = seriesKey.split('_')[0];
-
-    const data = getDataInRangeForSeries(celLineState.x1, celLineState.x2, baseKey);
-
-    if (!data || data.x.length < 5) {
-        alert(`Need at least 5 data points. Found ${data ? data.x.length : 0}.`);
-        handleCelLineCancel();
-        return;
+    if (newShapes.length !== currentShapes.length) {
+        Plotly.relayout(chartDiv, { shapes: newShapes });
     }
-
-    handleCelLineConfirm(data, baseKey);
 }
 
 function cleanupSeriesSelectionMode() {
-    celLineState.awaitingSeriesSelection = false;
-
-    removeToast('toast-top-left');
+    removeToast('toast-top-right-secondary');
     celLineState.seriesSelectionToast = null;
-
-    if (celLineState.previousLegendShow !== null) {
-        chartState.legend.show = celLineState.previousLegendShow;
-        eventBus.emit(EVENTS.UI_LEGEND_RENDER);
-        celLineState.previousLegendShow = null;
-    }
-
-    const legendItems = document.querySelectorAll('.legend-item');
-    legendItems.forEach(item => {
-        if (item.celLineClickHandler) {
-            item.removeEventListener('click', item.celLineClickHandler, true);
-            delete item.celLineClickHandler;
-        }
-    });
+    celLineState.toastElement = null;
 }
 
 function getDataInRangeForSeries(x1, x2, baseKey) {
@@ -635,7 +738,7 @@ function handleCelLineConfirm(data, baseKey) {
 
 function handleCelLineCancel() {
     removeShadeRectangle();
-    removeCelLineToast();
+    removeVerticalGuideLine();
     cleanupSeriesSelectionMode();
 
     celLineState.x1 = null;
@@ -656,14 +759,13 @@ function handleCelLineClick(lineName) {
     }
 
     createToast({
-        id: 'cel-line-click-toaster',
         message: `Celeration: ${metadata.text}`,
         buttons: [
             {
                 label: 'Remove',
                 onClick: () => {
                     removeCelLineById(lineName);
-                    removeToast('cel-line-click-toaster');
+                    removeToast('toast-top-right');
                 },
                 type: 'secondary'
             }

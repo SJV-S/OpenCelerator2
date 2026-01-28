@@ -32,15 +32,10 @@ export function createSvgCursor(svgSource, options = {}) {
  * @param {Object} options - Cursor options
  */
 export function applySvgCursor(container, svgSource, options = {}) {
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = typeof svgSource === 'function' ? svgSource() : svgSource;
-    const svgElement = tempDiv.querySelector('svg');
-    const pathElement = svgElement.querySelector('path');
-    const pathData = pathElement.getAttribute('d');
-    const viewBox = svgElement.getAttribute('viewBox');
-
-    const {size = 32, hotspotX = 16, hotspotY = 16, color = '%23000000'} = options;
-    const cursor = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='${viewBox}' width='${size}' height='${size}'%3E%3Cpath d='${pathData}' fill='${color}'/%3E%3C/svg%3E") ${hotspotX} ${hotspotY}, crosshair`;
+    const {size = 32, hotspotX = 16, hotspotY = 16} = options;
+    const svgString = typeof svgSource === 'function' ? svgSource(size) : svgSource;
+    const encoded = encodeURIComponent(svgString.replace(/\s+/g, ' ').trim());
+    const cursor = `url("data:image/svg+xml,${encoded}") ${hotspotX} ${hotspotY}, crosshair`;
 
     const plotArea = container.querySelector('.plotly .drag');
     if (plotArea) {

@@ -123,7 +123,7 @@ export const DEFAULT_LEGEND_CONFIG = Object.freeze({
 
 // Fake test data - 14 days of data starting from Sunday Jan 11, 2026
 const TEST_DATA = (() => {
-    const baseTimestamp = 1736553600; // Jan 11, 2026 00:00:00 UTC (Sunday)
+    const baseTimestamp = 1768089600; // Jan 11, 2026 00:00:00 UTC (Sunday)
     const dayInSeconds = 86400;
     const timestamps = [];
     const corrects = [];

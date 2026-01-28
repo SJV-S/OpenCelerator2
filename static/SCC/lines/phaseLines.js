@@ -297,7 +297,7 @@ function deactivatePhaseLineMode() {
     hideArrowControls();
 
     // Remove mode toast if it exists
-    removeToast('toast-top-left');
+    removeToast('toast-top-right-secondary');
     phaseLineState.modeToast = null;
 
     // Remove any non-finalized lines and annotations ONLY if we're still in drawing phase
@@ -616,7 +616,7 @@ function drawHorizontalLine(chartDiv, coords) {
 function showTextInput(chartDiv) {
     createTextInputDialog({
         id: 'phase-text-input-overlay',
-        title: 'Enter Phase Text',
+        title: 'Enter Count Marker Text',
         placeholder: 'Enter phase label...',
         borderColor: '#6ad1e3',
         onSubmit: (text) => {
@@ -858,7 +858,7 @@ function handlePhaseLineClick(lineName) {
     // Show toaster with Remove button, auto-dismiss after 3 seconds
     createToast({
         id: 'phase-line-click-toaster',
-        message: `Phase line: ${lineName}`,
+        message: 'Count marker',
         buttons: [
             {
                 label: 'Remove',
@@ -882,7 +882,7 @@ function handlePhaseLineClick(lineName) {
 function showPhaseModeToaster(phase) {
     const stepText = getPhaseStepText(phase);
     phaseLineState.modeToast = createToast({
-        message: `Phase mode - ${stepText}`,
+        message: `Count marker mode - ${stepText}`,
         buttons: [
             {
                 label: 'Cancel',
@@ -894,7 +894,7 @@ function showPhaseModeToaster(phase) {
         ],
         layout: 'horizontal',
         borderColor: '#6ad1e3',
-        position: 'top-left'
+        position: 'top-right-secondary'
     });
 }
 
@@ -904,7 +904,7 @@ function showPhaseModeToaster(phase) {
  */
 function updatePhaseModeToaster(phase) {
     // Remove existing toaster
-    removeToast('toast-top-left');
+    removeToast('toast-top-right-secondary');
 
     // Show new toaster with updated phase
     showPhaseModeToaster(phase);

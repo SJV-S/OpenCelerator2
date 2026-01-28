@@ -12,6 +12,13 @@
 import { chartState } from '../chartState.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 
+// Shape name for the entry date indicator line
+const ENTRY_DATE_INDICATOR_NAME = 'entry-date-indicator';
+
+// Timer for auto-hiding the indicator
+let indicatorTimer = null;
+const INDICATOR_TIMEOUT = 5000; // 5 seconds
+
 /**
  * Generate input fields for all active misc series
  */
@@ -143,6 +150,106 @@ function updateTimingVisibility() {
     }
 }
 
+// ============================================================================
+// ENTRY DATE INDICATOR LINE
+// ============================================================================
+
+/**
+ * Convert a date string (YYYY-MM-DD) to an x-position on the chart
+ * @param {string} dateString - Date in YYYY-MM-DD format
+ * @returns {number} X-position (days from startDate)
+ */
+function dateToXPosition(dateString) {
+    if (!chartState.startDate) return 0;
+
+    const date = new Date(dateString);
+    date.setHours(0, 0, 0, 0);
+
+    const startDate = new Date(chartState.startDate);
+    startDate.setHours(0, 0, 0, 0);
+
+    const daysDiff = Math.floor((date - startDate) / (1000 * 60 * 60 * 24));
+    return daysDiff;
+}
+
+/**
+ * Draw or update the entry date indicator line on the chart
+ * @param {string} dateString - Date in YYYY-MM-DD format
+ */
+function updateEntryDateIndicator(dateString) {
+    const chartDiv = document.getElementById('chart');
+    if (!chartDiv || !chartDiv.layout) return;
+
+    const xPos = dateToXPosition(dateString);
+
+    // Get current shapes, filter out any existing indicator
+    const currentShapes = (chartDiv.layout.shapes || []).filter(
+        shape => shape.name !== ENTRY_DATE_INDICATOR_NAME
+    );
+
+    // Create the new indicator line
+    const indicatorLine = {
+        name: ENTRY_DATE_INDICATOR_NAME,
+        type: 'line',
+        x0: xPos,
+        x1: xPos,
+        y0: 0,
+        y1: 1,
+        yref: 'paper',
+        opacity: 0.25,
+        line: {
+            color: '#9333ea',  // Purple
+            width: 3
+        }
+    };
+
+    // Update the chart with the new shapes
+    Plotly.relayout(chartDiv, {
+        shapes: [...currentShapes, indicatorLine]
+    });
+
+    // Reset timer - clear existing and start new
+    if (indicatorTimer) {
+        clearTimeout(indicatorTimer);
+    }
+    indicatorTimer = setTimeout(() => {
+        removeEntryDateIndicator();
+    }, INDICATOR_TIMEOUT);
+}
+
+/**
+ * Remove the entry date indicator line from the chart
+ */
+function removeEntryDateIndicator() {
+    // Clear timer if running
+    if (indicatorTimer) {
+        clearTimeout(indicatorTimer);
+        indicatorTimer = null;
+    }
+
+    const chartDiv = document.getElementById('chart');
+    if (!chartDiv || !chartDiv.layout) return;
+
+    // Filter out the indicator line
+    const currentShapes = (chartDiv.layout.shapes || []).filter(
+        shape => shape.name !== ENTRY_DATE_INDICATOR_NAME
+    );
+
+    Plotly.relayout(chartDiv, {
+        shapes: currentShapes
+    });
+}
+
+/**
+ * Emit entry date change event based on current input value
+ */
+function emitEntryDateChange() {
+    const entryDateInput = document.getElementById('entry-date');
+    if (entryDateInput && entryDateInput.value) {
+        eventBus.emit(EVENTS.COUNTER_ENTRY_DATE_CHANGED, { date: entryDateInput.value });
+    }
+}
+
 /**
  * Initialize subscriptions for this module
  * Called by main.js coordinator
@@ -164,6 +271,55 @@ function init() {
 
     // Generate initial misc inputs
     generateMiscInputs();
+
+    // ========================================================================
+    // Entry date indicator subscriptions
+    // ========================================================================
+
+    // Show indicator when counter overlay opens
+    eventBus.subscribe(EVENTS.COUNTER_SHOW, () => {
+        const entryDateInput = document.getElementById('entry-date');
+        if (entryDateInput && entryDateInput.value) {
+            updateEntryDateIndicator(entryDateInput.value);
+        }
+    });
+
+    // Hide indicator when counter overlay closes
+    eventBus.subscribe(EVENTS.COUNTER_HIDE, () => {
+        removeEntryDateIndicator();
+    });
+
+    // Handle tab switching - show only on data tab
+    eventBus.subscribe(EVENTS.NAV_TAB_SWITCH, (data) => {
+        if (data.tab === 'data') {
+            const entryDateInput = document.getElementById('entry-date');
+            if (entryDateInput && entryDateInput.value) {
+                updateEntryDateIndicator(entryDateInput.value);
+            }
+        } else {
+            removeEntryDateIndicator();
+        }
+    }, true);
+
+    // Update indicator when entry date changes
+    eventBus.subscribe(EVENTS.COUNTER_ENTRY_DATE_CHANGED, (data) => {
+        updateEntryDateIndicator(data.date);
+    }, true);
+
+    // Set up entry-date input listeners
+    const entryDateInput = document.getElementById('entry-date');
+    if (entryDateInput) {
+        // Listen for direct input changes (calendar picker)
+        entryDateInput.addEventListener('change', emitEntryDateChange);
+    }
+
+    // Listen for arrow button clicks (they adjust the date, then we emit)
+    document.querySelectorAll('[data-action="adjust-date"]').forEach(button => {
+        button.addEventListener('click', () => {
+            // Small delay to let the date input update first
+            setTimeout(emitEntryDateChange, 10);
+        });
+    });
 }
 
 export {

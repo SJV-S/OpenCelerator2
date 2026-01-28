@@ -35,6 +35,9 @@ function showCounter() {
             updateDateDisplay(chartState.startDate);
         }
 
+        // Emit counter show event for entry date indicator
+        eventBus.emit(EVENTS.COUNTER_SHOW);
+
         // Show dismiss menu hint tooltip
         setTimeout(showDismissMenuHint, 300);
     }
@@ -51,6 +54,9 @@ function hideCounter() {
     if (counterOverlay) {
         counterOverlay.style.display = 'none';
     }
+
+    // Emit counter hide event to remove entry date indicator
+    eventBus.emit(EVENTS.COUNTER_HIDE);
 }
 
 // ============================================================================
@@ -71,8 +77,8 @@ function switchTab(tabName) {
         content.classList.remove('active');
     });
 
-    // Remove active styling from all tab buttons
-    document.querySelectorAll('.chart-menu-tab-btn').forEach(button => {
+    // Remove active styling from main tab buttons only (not sub-tabs)
+    document.querySelectorAll('.chart-menu-tabs .chart-menu-tab-btn').forEach(button => {
         button.classList.remove('active');
     });
 
@@ -90,6 +96,41 @@ function switchTab(tabName) {
 
     // Emit tab switch event - subscribers load data as needed
     eventBus.emit(EVENTS.NAV_TAB_SWITCH, { tab: tabName });
+}
+
+// ============================================================================
+// DATA SUB-TAB SWITCHING
+// ============================================================================
+
+/**
+ * Switches between sub-tabs in the Data tab (New / Previous)
+ * @param {string} subtab - The sub-tab to switch to ('new' or 'previous')
+ */
+function switchDataSubtab(subtab) {
+    // Remove active class from all sub-tab buttons
+    document.querySelectorAll('.data-subtabs .chart-menu-tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+
+    // Hide all sub-panes
+    document.querySelectorAll('.data-subpane').forEach(pane => {
+        pane.classList.remove('active');
+    });
+
+    // Activate selected button
+    const activeBtn = document.querySelector(`[data-subtab="${subtab}"]`);
+    if (activeBtn) {
+        activeBtn.classList.add('active');
+    }
+
+    // Show selected pane
+    const activePane = document.getElementById(`${subtab}-subpane`);
+    if (activePane) {
+        activePane.classList.add('active');
+    }
+
+    // Emit event for sub-tab switch
+    eventBus.emit(EVENTS.NAV_DATA_SUBTAB_SWITCH, { subtab });
 }
 
 // ============================================================================
@@ -172,7 +213,7 @@ function toggleLineClickability(showToast = true) {
         createToast({
             message: `Line editing ${lineClickabilityEnabled ? 'enabled' : 'disabled'}`,
             duration: lineClickabilityEnabled ? undefined : 3000,  // No time limit when ON, 3s when OFF
-            position: 'top-left'
+            position: 'top-right-secondary'
         });
     }
 }
@@ -392,4 +433,4 @@ function init() {
 }
 
 // Export functions for use in main.js
-export { showCounter, hideCounter, switchTab, phaseTextTop, phaseTextBottom, aimDiagonal, aimHorizontal, otherScissors, otherCeleration, toggleLineClickability, initGestureNavigation, initFormKeyboardShortcuts, init };
+export { showCounter, hideCounter, switchTab, switchDataSubtab, phaseTextTop, phaseTextBottom, aimDiagonal, aimHorizontal, otherScissors, otherCeleration, toggleLineClickability, initGestureNavigation, initFormKeyboardShortcuts, init };

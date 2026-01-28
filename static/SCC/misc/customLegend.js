@@ -147,7 +147,7 @@ function createLinesSection() {
     const lineTypes = [
         { key: 'aim', label: 'Aim', icon: icons.aimDiagonal(20, false) },
         { key: 'phase', label: 'Phase', icon: icons.phaseTextTop(20, false) },
-        { key: 'change', label: 'Change', icon: icons.otherCeleration(20) },
+        { key: 'change', label: 'Change', icon: icons.scatterLine(20) },
         { key: 'grid', label: 'Grid', icon: icons.grid(20) }
     ];
 

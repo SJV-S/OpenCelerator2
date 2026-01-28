@@ -380,7 +380,7 @@ function handleCutLineClick(lineName) {
 
     createToast({
         id: 'cut-line-click-toaster',
-        message: `Cut line: ${lineName}`,
+        message: 'Cut line',
         buttons: [
             {
                 label: 'Remove',

@@ -140,5 +140,18 @@ export const icons = {
             <line x1="3" y1="8" x2="21" y2="8"/>
             <line x1="3" y1="16" x2="21" y2="16"/>
         </svg>
+    `,
+
+    // Scatter line icon (regression line with data points)
+    scatterLine: (size = null) => `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" ${sizeAttrs(size)}>
+            <line x1="20" y1="165" x2="180" y2="35" stroke="black" stroke-width="8"/>
+            <circle cx="40" cy="175" r="8" fill="none" stroke="black" stroke-width="4"/>
+            <circle cx="65" cy="100" r="8" fill="none" stroke="black" stroke-width="4"/>
+            <circle cx="95" cy="130" r="8" fill="none" stroke="black" stroke-width="4"/>
+            <circle cx="120" cy="55" r="8" fill="none" stroke="black" stroke-width="4"/>
+            <circle cx="145" cy="90" r="8" fill="none" stroke="black" stroke-width="4"/>
+            <circle cx="175" cy="15" r="8" fill="none" stroke="black" stroke-width="4"/>
+        </svg>
     `
 };

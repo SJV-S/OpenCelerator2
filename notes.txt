@@ -9,3 +9,5 @@ To-do
 * Changing the start date on non-daily chart is currently buggy, likely because somewhere in the code, there's an assumption about us still using the daily chart
 * Phase lines don't land where I click
 * Make sure that minute column is excluded from count on export
+* Maybe a fading or transition phase to spare the user from seeing the credit lines and chart adjust in size
+* Having instructions on both the right and left side is confusing.

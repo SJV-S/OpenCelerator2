@@ -65,7 +65,7 @@
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: 5%;
+    padding: 0;
     box-sizing: border-box;
 }
 
@@ -116,7 +116,7 @@
 }
 
 /* ===== BUTTONS ===== */
-.chart-menu-content button {
+.chart-menu-content button:not(.chart-menu-tab-btn) {
     font-size: 0.875rem;
     padding: 0.5rem 0.75rem;
     border-radius: 0.25rem;
@@ -124,7 +124,7 @@
     transition: opacity 0.15s ease;
 }
 
-.chart-menu-content button:hover {
+.chart-menu-content button:not(.chart-menu-tab-btn):hover {
     opacity: 0.9;
 }
 
@@ -232,13 +232,13 @@
 /* ===== TAB INNER WRAPPER ===== */
 .chart-menu-tab-inner {
     width: 100%;
-    padding: 1rem;
+    padding: 5%;
     box-sizing: border-box;
 }
 
 @media (min-width: 1024px) {
     .chart-menu-tab-inner {
-        padding: 0;
+        padding: 5%;
     }
 }
 
@@ -319,6 +319,33 @@
     .chart-menu-icon-category h2 {
         font-size: 0.875rem;
     }
+}
+
+/* ===== DATA TAB SUB-TABS ===== */
+.data-subtabs {
+    display: flex;
+    border-bottom: 1px solid #d1d5db;
+}
+
+.data-subtabs .chart-menu-tab-btn {
+    flex: 1;
+    text-align: center;
+}
+
+.data-subtabs .chart-menu-tab-btn:hover {
+    background-color: #e5e7eb;
+}
+
+.data-subtabs .chart-menu-tab-btn.active {
+    background-color: #b5e8f0;
+}
+
+.data-subpane {
+    display: none;
+}
+
+.data-subpane.active {
+    display: block;
 }
 
 /* ===== DATE INPUT WITH ARROWS ===== */
@@ -430,10 +457,8 @@
     height: 100%;
     display: flex;
     flex-direction: column;
-}
-
-.crosshair-panel {
-    width: 100%;
+    padding: 16px;
+    box-sizing: border-box;
 }
 
 .crosshair-title {
@@ -448,7 +473,7 @@
     font-size: 20px;
     line-height: 1.5;
     min-height: 100px;
-    padding: 5px;
+    padding: 12px;
 }
 
 .crosshair-section {

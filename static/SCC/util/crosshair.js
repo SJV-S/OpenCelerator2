@@ -24,6 +24,22 @@ const crosshairState = {
 };
 
 /**
+ * Marker style configuration by series type.
+ * toPixels: multiply by chartState value to get rendered pixel size
+ */
+const MARKER_STYLES = {
+    corrects: { color: '#22c55e', shape: 'circle', toPixels: 1.0 },
+    errors: { color: '#ef4444', shape: 'circle', toPixels: 0.54 },
+    timing: { color: '#a855f7', shape: 'triangle', toPixels: 0.30 },
+    misc: { color: '#f97316', shape: 'square', toPixels: 1.3 }
+};
+
+/**
+ * Pixels added to visual size to get overlay size.
+ */
+const OVERLAY_PADDING = 8;
+
+/**
  * Activate crosshair mode - called when Shift is pressed
  */
 function activateCrosshair() {
@@ -295,14 +311,34 @@ function removeCrosshairLines() {
 }
 
 /**
- * Marker style configuration by series type
+ * Get overlay marker size for a given series
+ * @param {string} seriesType - 'corrects', 'errors', 'timing', or misc ID
+ * @returns {number} The overlay size in pixels
  */
-const MARKER_STYLES = {
-    corrects: { color: '#22c55e', shape: 'circle', size: 16 },
-    errors: { color: '#ef4444', shape: 'circle', size: 16 },
-    timing: { color: '#a855f7', shape: 'triangle', size: 14 },
-    misc: { color: '#f97316', shape: 'square', size: 16 }
-};
+function getMarkerSize(seriesType) {
+    let chartSize, style;
+
+    if (seriesType === 'corrects') {
+        chartSize = chartState.traceStyles.correct?.raw?.markerSize ?? 8;
+        style = MARKER_STYLES.corrects;
+    } else if (seriesType === 'errors') {
+        chartSize = chartState.traceStyles.incorrect?.raw?.textSize ?? 20;
+        style = MARKER_STYLES.errors;
+    } else if (seriesType === 'timing') {
+        chartSize = chartState.traceStyles.timing?.raw?.markerSize ?? 30;
+        style = MARKER_STYLES.timing;
+    } else if (seriesType.startsWith('misc')) {
+        chartSize = chartState.traceStyles.misc[seriesType]?.raw?.markerSize ?? 8;
+        style = MARKER_STYLES.misc;
+    } else {
+        chartSize = 8;
+        style = MARKER_STYLES.misc;
+    }
+
+    // Convert to visual pixels, then apply overlay multiplier
+    const visualPixels = chartSize * style.toPixels;
+    return visualPixels + OVERLAY_PADDING;
+}
 
 /**
  * Get or create marker container
@@ -331,11 +367,14 @@ function getOrCreateMarkerContainer() {
 
 /**
  * Create a marker element with appropriate shape and color
+ * @param {string} seriesType - 'corrects', 'errors', 'timing', or misc ID (e.g., 'misc1')
  */
 function createMarker(seriesType) {
-    const style = MARKER_STYLES[seriesType] || MARKER_STYLES.misc;
+    // For misc series, use misc style but get size from the specific misc ID
+    const styleKey = seriesType.startsWith('misc') ? 'misc' : seriesType;
+    const style = MARKER_STYLES[styleKey] || MARKER_STYLES.misc;
     const marker = document.createElement('div');
-    const size = style.size;
+    const size = getMarkerSize(seriesType);
     const halfSize = size / 2;
 
     marker.style.position = 'absolute';
@@ -430,6 +469,7 @@ function updateDataMarkers(xRounded, chartDiv) {
             const value = yArray[closestIdx];
             if (value !== null && !isNaN(value) && value > 0) {
                 // Determine series type for marker style
+                // Use actual series name for misc series to get correct size from chartState
                 let seriesType;
                 if (seriesName === 'corrects') {
                     seriesType = 'corrects';
@@ -438,7 +478,8 @@ function updateDataMarkers(xRounded, chartDiv) {
                 } else if (seriesName === 'timing') {
                     seriesType = 'timing';
                 } else {
-                    seriesType = 'misc';
+                    // Keep the actual misc ID (e.g., 'misc1') for size lookup
+                    seriesType = seriesName;
                 }
 
                 // Calculate y pixel position (log scale)

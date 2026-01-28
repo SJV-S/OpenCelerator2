@@ -36,6 +36,7 @@ import {
     showCounter,
     hideCounter,
     switchTab,
+    switchDataSubtab,
     phaseTextTop,
     phaseTextBottom,
     aimDiagonal,
@@ -53,7 +54,7 @@ import { init as aimLinesInit } from './lines/aimLines.js';
 import { init as cutLinesInit } from './lines/cutLines.js';
 import { init as celLineInit } from './lines/celLine.js';
 import { initGridToggle } from './misc/grid.js';
-import { injectCelerationFan, initFanDrag, init as celerationFanInit } from './misc/celerationFan.js';
+import { injectCelerationFan, initFanDrag, regenerateFan, init as celerationFanInit } from './misc/celerationFan.js';
 import { toggleLegend, renderCustomLegend, init as customLegendInit } from './misc/customLegend.js';
 import { setupPanConstraints } from './util/panning_controls.js';
 import { resizeChartByHeight, CHART_CONFIG } from './util/resize_chart/resize-chart.js';
@@ -117,9 +118,11 @@ export function initializeChart(plotData, maxWindowWidth) {
                 const xaxis_px = delta_y_px / Math.tan((deg * Math.PI) / 180);
                 const newWidth = xaxis_px + (margin.l + margin.r);
 
-                Plotly.relayout(chartDiv, { height: newHeight, width: newWidth });
-                renderCredits();
-                renderCustomLegend();
+                Plotly.relayout(chartDiv, { height: newHeight, width: newWidth }).then(() => {
+                    regenerateFan();
+                    renderCredits();
+                    renderCustomLegend();
+                });
             }, 100);
         });
         resizeObserver.observe(chartContainer);
@@ -157,11 +160,8 @@ export function initializeChart(plotData, maxWindowWidth) {
  * Initialize date input fields
  */
 function initializeDateInputs() {
-    // Entry date input with today's date
+    // Entry date input with today's date (shared between New and Previous sub-tabs)
     initializeDateInput('entry-date');
-
-    // Data tab date input with today's date
-    initializeDateInput('data-entry-date');
 
     // Initialize start date controls in Chart tab
     initStartDateControls();
@@ -175,13 +175,6 @@ export function adjustDate(days) {
     adjustDateInput('entry-date', days);
 }
 
-/**
- * Adjust the data tab date by a number of days
- * @param {number} days - Number of days to adjust (positive or negative)
- */
-export function adjustDataDate(days) {
-    adjustDateInput('data-entry-date', days);
-}
 
 // ============================================================================
 // INITIALIZATION
@@ -259,6 +252,14 @@ function setupEventListeners() {
         });
     });
 
+    // Data sub-tabs (New / Previous)
+    document.querySelectorAll('[data-subtab]').forEach(button => {
+        button.addEventListener('click', (e) => {
+            const subtab = e.currentTarget.dataset.subtab;
+            switchDataSubtab(subtab);
+        });
+    });
+
     // Line drawing actions
     const lineActions = {
         'phase-text-top': phaseTextTop,
@@ -290,21 +291,6 @@ function setupEventListeners() {
             adjustDate(offset);
         });
     });
-
-    // Data tab date adjustment buttons
-    document.querySelectorAll('[data-action="adjust-data-date"]').forEach(button => {
-        button.addEventListener('click', (e) => {
-            const offset = parseInt(e.currentTarget.dataset.offset);
-            adjustDataDate(offset);
-            loadDataForDate();
-        });
-    });
-
-    // Data tab date input change
-    const dataDateInput = document.getElementById('data-entry-date');
-    if (dataDateInput) {
-        dataDateInput.addEventListener('change', loadDataForDate);
-    }
 
     // Data tab timestamp adjustment buttons
     document.querySelectorAll('[data-action="adjust-timestamp"]').forEach(button => {

@@ -86,7 +86,15 @@ const LABELS = ['×16', '×4', '×2', '×1.4', '×1', '÷1.4', '÷2', '÷4', '÷
 const UNITS = { Daily: 7, Weekly: 5, Monthly: 6, Yearly: 5 };
 const PERIOD_LABELS = { Daily: 'per week', Weekly: 'per month', Monthly: 'per 6 months', Yearly: 'per 5 years' };
 
-const FAN_COLOR = '#6ad1e3';
+const FAN_COLOR = '#05c3de';
+const MOBILE_BREAKPOINT = 768;
+
+/**
+ * Check if current viewport is mobile-sized
+ */
+function isMobile() {
+    return window.innerWidth < MOBILE_BREAKPOINT;
+}
 
 /**
  * Step 1: Calculate angle (same formula for line AND text)
@@ -237,6 +245,12 @@ export function generateFanElements(layout, isMinuteChart, chartType) {
 }
 
 export function injectCelerationFan(plotData, isMinuteChart, chartType) {
+    // Skip fan on mobile - screen too small
+    if (isMobile()) {
+        chartState.fanVisible = false;
+        return plotData;
+    }
+
     const extraMargin = isMinuteChart ? 90 : 60;
 
     if (isMinuteChart) {
@@ -267,6 +281,9 @@ export function removeCelerationFan() {
 }
 
 export function addCelerationFan() {
+    // Skip fan on mobile - screen too small
+    if (isMobile()) return;
+
     const chartDiv = document.getElementById('chart');
     if (!chartDiv?.layout) return;
 
@@ -281,6 +298,38 @@ export function addCelerationFan() {
 
 export function toggleCelerationFan(visible) {
     visible ? addCelerationFan() : removeCelerationFan();
+}
+
+/**
+ * Regenerate the fan with current layout dimensions
+ * Called on resize to recalculate visual angles for new aspect ratio
+ */
+export function regenerateFan() {
+    // On mobile, remove fan if it exists (e.g., resized from desktop)
+    if (isMobile()) {
+        if (chartState.fanVisible) {
+            removeCelerationFan();
+        }
+        return;
+    }
+
+    if (!chartState.fanVisible) return;
+
+    const chartDiv = document.getElementById('chart');
+    if (!chartDiv?.layout) return;
+
+    // Remove existing fan shapes and annotations
+    const existingShapes = (chartDiv.layout.shapes || []).filter(s => !s.name?.startsWith('fan-'));
+    const existingAnnotations = (chartDiv.layout.annotations || []).filter(a => !a.name?.startsWith('fan-'));
+
+    // Generate new fan with current layout dimensions
+    const { shapes, annotations } = generateFanElements(chartDiv.layout, chartState.minuteChart, chartState.chartType);
+
+    // Update in single relayout call
+    Plotly.relayout(chartDiv, {
+        shapes: [...existingShapes, ...shapes],
+        annotations: [...existingAnnotations, ...annotations]
+    });
 }
 
 /**

@@ -143,7 +143,7 @@ function deactivateAimLineMode() {
     }
 
     // Remove mode toast if it exists
-    removeToast('toast-top-left');
+    removeToast('toast-top-right-secondary');
     aimLineState.modeToast = null;
 
     // Remove temporary dot marker if it exists
@@ -467,7 +467,7 @@ function drawDiagonalAimLine(chartDiv, coords) {
 function showAimTextInput(chartDiv) {
     createTextInputDialog({
         id: 'aim-text-input-overlay',
-        title: 'Enter Aim Line Text',
+        title: 'Enter Event Marker Text',
         placeholder: 'Enter label...',
         borderColor: '#6ad1e3',
         onSubmit: (text) => {
@@ -768,7 +768,7 @@ function handleAimLineClick(lineName) {
     // Show toaster with Remove button, auto-dismiss after 3 seconds
     createToast({
         id: 'aim-line-click-toaster',
-        message: `Aim line: ${lineName}`,
+        message: 'Event marker',
         buttons: [
             {
                 label: 'Remove',
@@ -792,7 +792,7 @@ function handleAimLineClick(lineName) {
 function showAimModeToaster(phase) {
     const stepText = getPhaseStepText(phase);
     aimLineState.modeToast = createToast({
-        message: `Aim mode - ${stepText}`,
+        message: `Event marker mode - ${stepText}`,
         buttons: [
             {
                 label: 'Cancel',
@@ -804,7 +804,7 @@ function showAimModeToaster(phase) {
         ],
         layout: 'horizontal',
         borderColor: '#6ad1e3',
-        position: 'top-left'
+        position: 'top-right-secondary'
     });
 }
 
@@ -814,7 +814,7 @@ function showAimModeToaster(phase) {
  */
 function updateAimModeToaster(phase) {
     // Remove existing toaster
-    removeToast('toast-top-left');
+    removeToast('toast-top-right-secondary');
 
     // Show new toaster with updated phase
     showAimModeToaster(phase);

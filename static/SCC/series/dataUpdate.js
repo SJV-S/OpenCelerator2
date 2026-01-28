@@ -19,7 +19,7 @@ let currentTimestampIndex = 0;
  * Load and display data for the selected date
  */
 export function loadDataForDate() {
-    const dateInput = document.getElementById('data-entry-date');
+    const dateInput = document.getElementById('entry-date');
     if (!dateInput) return;
 
     const selectedDate = new Date(dateInput.value);
@@ -99,20 +99,16 @@ function renderCurrentEntry() {
     // Show timestamp selector
     if (timestampSelector) timestampSelector.style.display = 'block';
 
-    // Grey out timestamp arrows if only one entry
+    // Hide arrows if only one entry
     const timestampPrevBtn = document.querySelector('[data-action="adjust-timestamp"][data-offset="-1"]');
     const timestampNextBtn = document.querySelector('[data-action="adjust-timestamp"][data-offset="1"]');
     const singleEntry = currentDataForDate.length === 1;
 
     if (timestampPrevBtn) {
-        timestampPrevBtn.disabled = singleEntry;
-        timestampPrevBtn.style.opacity = singleEntry ? '0.3' : '1';
-        timestampPrevBtn.style.cursor = singleEntry ? 'not-allowed' : 'pointer';
+        timestampPrevBtn.style.display = singleEntry ? 'none' : '';
     }
     if (timestampNextBtn) {
-        timestampNextBtn.disabled = singleEntry;
-        timestampNextBtn.style.opacity = singleEntry ? '0.3' : '1';
-        timestampNextBtn.style.cursor = singleEntry ? 'not-allowed' : 'pointer';
+        timestampNextBtn.style.display = singleEntry ? 'none' : '';
     }
 
     // Get current entry
@@ -120,11 +116,13 @@ function renderCurrentEntry() {
 
     // Convert timestamp to readable time
     const date = new Date(point.timestamp * 1000);
-    const timeString = date.toLocaleTimeString('en-US', { hour12: false });
+    const timeString = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 
-    // Update timestamp display
+    // Update timestamp display - only show count if multiple entries
     if (timestampDisplay) {
-        timestampDisplay.textContent = `${timeString} (${currentTimestampIndex + 1} of ${currentDataForDate.length})`;
+        timestampDisplay.textContent = singleEntry
+            ? timeString
+            : `${timeString} (${currentTimestampIndex + 1} of ${currentDataForDate.length})`;
     }
 
     // Timing is stored in chartState.series.timing[] as total MINUTES
@@ -300,7 +298,7 @@ export function deleteCurrentEntry() {
 
     const point = currentDataForDate[currentTimestampIndex];
     const date = new Date(point.timestamp * 1000);
-    const timeString = date.toLocaleTimeString('en-US', { hour12: false });
+    const timeString = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 
     // Show confirmation toast
     createConfirmToast({
@@ -364,11 +362,20 @@ export function deleteCurrentEntry() {
  * Initialize event subscriptions
  */
 export function init() {
-    eventBus.subscribe(EVENTS.NAV_TAB_SWITCH, (data) => {
-        if (data.tab === 'data') {
+    // Load data when switching to "previous" sub-tab
+    eventBus.subscribe(EVENTS.NAV_DATA_SUBTAB_SWITCH, (data) => {
+        if (data.subtab === 'previous') {
             loadDataForDate();
         }
     }, true);
+
+    // Also reload when entry date changes while on previous sub-tab
+    eventBus.subscribe(EVENTS.COUNTER_ENTRY_DATE_CHANGED, () => {
+        const previousPane = document.getElementById('previous-subpane');
+        if (previousPane && previousPane.classList.contains('active')) {
+            loadDataForDate();
+        }
+    });
 }
 
 console.log('dataUpdate.js loaded');

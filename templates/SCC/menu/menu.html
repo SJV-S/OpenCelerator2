@@ -2,8 +2,7 @@
 <div id="counter-overlay" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: white; z-index: 1000; flex-direction: row;">
     <!-- Tabs -->
     <div class="chart-menu-tabs">
-        <button class="chart-menu-tab-btn active" data-tab="counter">Counter</button>
-        <button class="chart-menu-tab-btn" data-tab="data">Data</button>
+        <button class="chart-menu-tab-btn active" data-tab="data">Data</button>
         <button class="chart-menu-tab-btn" data-tab="credit">Credit</button>
         <button class="chart-menu-tab-btn" data-tab="lines">Lines</button>
         <button class="chart-menu-tab-btn" data-tab="series">Series</button>
@@ -13,10 +12,7 @@
 
     <!-- Tab Content -->
     <div id="chart-menu-content" class="chart-menu-content">
-        <div id="counter-content" class="chart-menu-tab-pane active">
-            {% include 'SCC/menu/counter_tab.html' %}
-        </div>
-        <div id="data-content" class="chart-menu-tab-pane">
+        <div id="data-content" class="chart-menu-tab-pane active">
             {% include 'SCC/menu/data_tab.html' %}
         </div>
         <div id="credit-content" class="chart-menu-tab-pane">
