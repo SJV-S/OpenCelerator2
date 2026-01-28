@@ -34,6 +34,13 @@ let db = null;
 let saveTimeout = null;
 const SAVE_DEBOUNCE_MS = 1000;
 
+function uuid() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+        const r = Math.random() * 16 | 0;
+        return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+}
+
 // ============================================================================
 // Serialization Helpers
 // ============================================================================
@@ -70,7 +77,7 @@ function serializeChart(id, state) {
         config: {
             lineVisibility: { ...state.lineVisibility },
             fanVisible: state.fanVisible,
-            lineStyles: JSON.parse(JSON.stringify(state.lineStyles)),
+            lineStyles: JSON.parse(JSON.sringify(state.lineStyles)),
             traceStyles: JSON.parse(JSON.stringify(state.traceStyles)),
             legend: JSON.parse(JSON.stringify(state.legend)),
             credits: { ...state.credits }
@@ -230,7 +237,7 @@ export async function saveChart(id = null) {
     }
 
     try {
-        const chartId = id || chartState.id || crypto.randomUUID();
+        const chartId = id || chartState.id || uuid();
         chartState.id = chartId;
         const data = serializeChart(chartId, chartState);
 
@@ -352,9 +359,10 @@ export async function createChart(name, chartType, minuteChart) {
         return null;
     }
 
-    const chartId = crypto.randomUUID();
+    const chartId = uuid();
     const startDate = findNearestSunday(new Date());
     startDate.setHours(0, 0, 0, 0);
+    const now = Date.now();
 
     const data = {
         id: chartId,
@@ -386,7 +394,7 @@ export async function createChart(name, chartType, minuteChart) {
             lineVisibility: { phaseLines: true, aimLines: true, cutLines: true, celLines: true },
             fanVisible: true,
             lineStyles: {},
-            traceStyles: {},
+            traceStyles: JSON.parse(JSON.stringify(chartState.traceStyles)),
             legend: { show: false, position: 'top-right' },
             credits: {}
         }
