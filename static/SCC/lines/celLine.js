@@ -17,7 +17,7 @@ import { applySvgCursor, restoreCursor } from '../util/cursorIcon.js';
 import { chartState } from '../chartState.js';
 import { xPositionToDate } from '../util/dates.js';
 import { removeLine } from './allLines.js';
-import { theilSenFit } from '../util/theilSen.js';
+import { fit, FIT_METHODS, BOUNCE_ENVELOPES, DEFAULT_FIT_METHOD, DEFAULT_BOUNCE_ENVELOPE, calculateBounceBounds, calculateBounceLines, formatCelerationLabel } from '../util/fit_lines.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 
 // Cel line drawing state (ephemeral UI state)
@@ -37,7 +37,9 @@ var celLineState = {
     previousDragMode: null,
     toastElement: null,
     seriesSelectionToast: null,
-    selectedSeriesKey: null
+    selectedSeriesKey: null,
+    lastUpdateTime: 0,
+    throttleDelay: 33  // ~30fps throttle
 };
 
 /**
@@ -316,6 +318,13 @@ function handleCelLineMouseDown(event, chartDiv) {
 function handleCelLineMouseMove(event, chartDiv) {
     if (!celLineState.isDragging) return;
 
+    // Throttle updates to ~30fps to prevent CPU overload
+    const now = Date.now();
+    if (now - celLineState.lastUpdateTime < celLineState.throttleDelay) {
+        return;
+    }
+    celLineState.lastUpdateTime = now;
+
     const coords = getPlotCoordinatesForCelLine(event, chartDiv);
     if (!coords) return;
 
@@ -370,6 +379,13 @@ function handleCelLineTouchMove(event, chartDiv) {
     event.preventDefault();
 
     if (!celLineState.isDragging) return;
+
+    // Throttle updates to ~30fps to prevent CPU overload
+    const now = Date.now();
+    if (now - celLineState.lastUpdateTime < celLineState.throttleDelay) {
+        return;
+    }
+    celLineState.lastUpdateTime = now;
 
     if (event.touches.length === 1) {
         const touch = event.touches[0];
@@ -644,31 +660,41 @@ function handleCelLineConfirm(data, baseKey) {
     const filteredX = validPairs.map(p => p.x);
     const filteredLogY = validPairs.map(p => p.logY);
 
-    const fit = theilSenFit(filteredX, filteredLogY);
+    // Get fit settings from chartState (or use defaults)
+    const settings = chartState.CelLines.settings || {};
+    const fitMethod = settings.fitMethod || DEFAULT_FIT_METHOD;
+    const bounceEnvelope = settings.bounceEnvelope || DEFAULT_BOUNCE_ENVELOPE;
+    const forecast = settings.forecast || 0;
 
-    if (!fit) {
+    const fitResult = fit(filteredX, filteredLogY, fitMethod);
+
+    if (!fitResult) {
         alert('Could not calculate trend line.');
         handleCelLineCancel();
         return;
     }
 
     const firstX = filteredX[0];
-    const lastX = filteredX[filteredX.length - 1];
+    const dataLastX = filteredX[filteredX.length - 1];
+    const lastX = dataLastX + forecast;  // Extend by forecast amount
 
-    const logY1 = fit.slope * firstX + fit.intercept;
-    const logY2 = fit.slope * lastX + fit.intercept;
+    const logY1 = fitResult.slope * firstX + fitResult.intercept;
+    const logY2 = fitResult.slope * lastX + fitResult.intercept;
     const y1_display = Math.pow(10, logY1);
     const y2_display = Math.pow(10, logY2);
 
-    const celerationMultiplier = Math.pow(10, fit.slope * 7);
-    const celeration = celerationMultiplier.toFixed(2);
-    const labelText = `×${celeration}`;
+    const labelText = formatCelerationLabel(fitResult.slope, 'weekly');
+
+    // Calculate bounce bounds if envelope is enabled
+    const bounceBounds = calculateBounceBounds(filteredLogY, filteredX, fitResult.slope, fitResult.intercept, bounceEnvelope);
 
     const lineId = Date.now();
     const lineName = `cel-${lineId}`;
 
     const trendStyle = chartState.lineStyles.trend[baseKey] || chartState.lineStyles.trend.timing;
 
+    // Build shapes array - main trend line first
+    const newShapes = [];
     const lineShape = {
         type: 'line',
         x0: firstX,
@@ -684,6 +710,55 @@ function handleCelLineConfirm(data, baseKey) {
             dash: trendStyle.dash
         }
     };
+    newShapes.push(lineShape);
+
+    // Add bounce line shapes if bounds exist
+    let bounceUpperY1 = null, bounceUpperY2 = null;
+    let bounceLowerY1 = null, bounceLowerY2 = null;
+
+    if (bounceBounds) {
+        const bounceLines = calculateBounceLines([firstX, lastX], fitResult.slope, fitResult.intercept, bounceBounds);
+        if (bounceLines) {
+            bounceUpperY1 = bounceLines.upperY[0];
+            bounceUpperY2 = bounceLines.upperY[1];
+            bounceLowerY1 = bounceLines.lowerY[0];
+            bounceLowerY2 = bounceLines.lowerY[1];
+
+            // Upper bounce line
+            newShapes.push({
+                type: 'line',
+                x0: firstX,
+                y0: bounceUpperY1,
+                x1: lastX,
+                y1: bounceUpperY2,
+                xref: 'x',
+                yref: 'y',
+                name: `${lineName}-upper`,
+                line: {
+                    color: trendStyle.color,
+                    width: 1,
+                    dash: 'dot'
+                }
+            });
+
+            // Lower bounce line
+            newShapes.push({
+                type: 'line',
+                x0: firstX,
+                y0: bounceLowerY1,
+                x1: lastX,
+                y1: bounceLowerY2,
+                xref: 'x',
+                yref: 'y',
+                name: `${lineName}-lower`,
+                line: {
+                    color: trendStyle.color,
+                    width: 1,
+                    dash: 'dot'
+                }
+            });
+        }
+    }
 
     const currentShapes = chartDiv.layout.shapes || [];
     const shapeIndex = currentShapes.length;
@@ -717,9 +792,15 @@ function handleCelLineConfirm(data, baseKey) {
     const annotationIndex = currentAnnotations.length;
 
     Plotly.relayout(chartDiv, {
-        shapes: [...currentShapes, lineShape],
+        shapes: [...currentShapes, ...newShapes],
         annotations: [...currentAnnotations, annotation]
     });
+
+    // Store shape indices for all shapes (trend + bounce lines)
+    const shapeIndices = [];
+    for (let i = 0; i < newShapes.length; i++) {
+        shapeIndices.push(shapeIndex + i);
+    }
 
     const metadata = {
         id: lineId,
@@ -728,11 +809,17 @@ function handleCelLineConfirm(data, baseKey) {
         y1: y1_display,
         date2: xPositionToDate(lastX),
         y2: y2_display,
-        slope: fit.slope,
-        intercept: fit.intercept,
-        celeration: celeration,
+        slope: fitResult.slope,
+        intercept: fitResult.intercept,
+        fitMethod: fitMethod,
+        bounceEnvelope: bounceEnvelope,
+        forecast: forecast,
+        bounceUpperY1: bounceUpperY1,
+        bounceUpperY2: bounceUpperY2,
+        bounceLowerY1: bounceLowerY1,
+        bounceLowerY2: bounceLowerY2,
         text: labelText,
-        shapeIndices: [shapeIndex],
+        shapeIndices: shapeIndices,
         annotationIndex: annotationIndex
     };
 
@@ -766,9 +853,19 @@ function handleCelLineClick(lineName) {
         return;
     }
 
+    // Build info message including fit method and forecast
+    let message = `Celeration: ${metadata.text}`;
+    if (metadata.fitMethod) {
+        message += ` (${metadata.fitMethod}`;
+        if (metadata.forecast && metadata.forecast > 0) {
+            message += `, +${metadata.forecast}d`;
+        }
+        message += ')';
+    }
+
     createToast({
         id: 'cel-line-click-toaster',
-        message: `Celeration: ${metadata.text}`,
+        message: message,
         buttons: [
             {
                 label: 'Remove',
@@ -806,7 +903,11 @@ function redrawCelLines() {
     const celShapes = [];
     const celAnnotations = [];
 
-    Object.values(chartState.CelLines).forEach(metadata => {
+    Object.values(chartState.CelLines).forEach(entry => {
+        // Skip the settings object
+        if (entry === chartState.CelLines.settings) return;
+
+        const metadata = entry;
         const lineName = `cel-${metadata.id}`;
 
         const x1 = Math.floor((metadata.date1 - chartState.startDate) / (1000 * 60 * 60 * 24));
@@ -814,6 +915,7 @@ function redrawCelLines() {
 
         const trendStyle = chartState.lineStyles.trend[metadata.seriesKey] || chartState.lineStyles.trend.timing;
 
+        // Main trend line
         const lineShape = {
             type: 'line',
             x0: x1,
@@ -829,8 +931,44 @@ function redrawCelLines() {
                 dash: trendStyle.dash
             }
         };
-
         celShapes.push(lineShape);
+
+        // Bounce lines if they exist in metadata
+        if (metadata.bounceUpperY1 != null && metadata.bounceUpperY2 != null) {
+            celShapes.push({
+                type: 'line',
+                x0: x1,
+                y0: metadata.bounceUpperY1,
+                x1: x2,
+                y1: metadata.bounceUpperY2,
+                xref: 'x',
+                yref: 'y',
+                name: `${lineName}-upper`,
+                line: {
+                    color: trendStyle.color,
+                    width: 1,
+                    dash: 'dot'
+                }
+            });
+        }
+
+        if (metadata.bounceLowerY1 != null && metadata.bounceLowerY2 != null) {
+            celShapes.push({
+                type: 'line',
+                x0: x1,
+                y0: metadata.bounceLowerY1,
+                x1: x2,
+                y1: metadata.bounceLowerY2,
+                xref: 'x',
+                yref: 'y',
+                name: `${lineName}-lower`,
+                line: {
+                    color: trendStyle.color,
+                    width: 1,
+                    dash: 'dot'
+                }
+            });
+        }
 
         const centerX = (x1 + x2) / 2;
         const logY1 = Math.log10(metadata.y1);

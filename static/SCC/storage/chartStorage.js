@@ -286,13 +286,19 @@ export async function createChart(name, chartType, minuteChart) {
     startDate.setHours(0, 0, 0, 0);
     const now = Date.now();
 
+    // TODO: Remove test data - to disable hardcoded test data in chartState.js:
+    // 1. Uncomment `hasTimestamps: false` below
+    // 2. Uncomment the `series: {...}` block below to reset series to empty arrays
+    // 3. Uncomment `startDate` below
+    // 4. Delete TEST_DATA and its usage in chartState.js
     const data = serializeChart(chartId, {
         ...chartState,
         chartType,
         minuteChart,
         chartName: name.trim(),
-        hasTimestamps: false,
-        startDate,
+        // hasTimestamps: false,  // Commented out for test data - uncomment to disable
+        // series: { xValues: [], corrects: [], errors: [], timing: [], misc: {} },
+        // startDate,  // Commented out for test data - uncomment to disable
         chartCapacity: 140,
         chartWindow: 140,
         _createdAt: now

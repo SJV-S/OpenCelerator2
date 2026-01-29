@@ -83,6 +83,44 @@
         </div>
     </div>
 
+    <!-- Trend Fit Settings -->
+    <div class="mb-8 lg:mb-4">
+        <label class="block text-sm font-semibold text-gray-600 mb-2 lg:mb-1 text-center">Trend Fit Settings</label>
+        <div class="border-2 border-gray-300 rounded-lg p-4 max-w-md lg:max-w-full mx-auto">
+            <!-- Fit Method -->
+            <div class="flex items-center justify-between mb-3">
+                <label class="text-sm text-gray-500" for="fit-method">Fit Method</label>
+                <select id="fit-method" data-action="fit-method-change" class="px-3 py-2 lg:px-2 lg:py-1 text-sm border-2 border-gray-300 rounded focus:outline-none focus:border-[#6ad1e3] transition-colors bg-white">
+                    <option value="Theil-Sen" selected>Theil-Sen</option>
+                    <option value="Least-squares">Least-squares</option>
+                    <option value="Quarter-intersect">Quarter-intersect</option>
+                    <option value="Split-middle-line">Split-middle-line</option>
+                    <option value="Mean">Mean</option>
+                    <option value="Median">Median</option>
+                </select>
+            </div>
+            <!-- Bounce Envelope -->
+            <div class="flex items-center justify-between mb-3">
+                <label class="text-sm text-gray-500" for="bounce-envelope">Bounce Envelope</label>
+                <select id="bounce-envelope" data-action="bounce-envelope-change" class="px-3 py-2 lg:px-2 lg:py-1 text-sm border-2 border-gray-300 rounded focus:outline-none focus:border-[#6ad1e3] transition-colors bg-white">
+                    <option value="None" selected>None</option>
+                    <option value="5-95 percentile">5-95 percentile</option>
+                    <option value="Interquartile range">Interquartile range</option>
+                    <option value="Standard deviation">Standard deviation</option>
+                    <option value="90% confidence interval">90% confidence interval</option>
+                </select>
+            </div>
+            <!-- Forecast -->
+            <div class="flex items-center justify-between">
+                <label class="text-sm text-gray-500" for="trend-forecast">Forecast</label>
+                <div class="flex items-center gap-2">
+                    <input type="number" id="trend-forecast" min="0" max="100" value="0" class="w-16 px-2 py-2 lg:py-1 text-sm text-center border-2 border-gray-300 rounded focus:outline-none focus:border-[#6ad1e3] transition-colors">
+                    <span class="text-sm text-gray-500">days</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Chart Capacity -->
     <div class="mb-8 lg:mb-4">
         <label class="block text-sm font-semibold text-gray-600 mb-2 lg:mb-1 text-center" for="chart-capacity">Chart Capacity</label>

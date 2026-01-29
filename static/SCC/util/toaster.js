@@ -10,17 +10,63 @@
  * - Secondary button: #f3f4f6
  */
 
-// Track active toasts per position for stacking
-const activeToasts = {
-    'top-right': [],
-    'top-right-secondary': [],
-    'top-left': [],
-    'bottom-right': [],
-    'bottom-left': []
-};
+// Flex containers for each position - created lazily
+const toastContainers = {};
 
 // Counter for unique toast IDs
 let toastCounter = 0;
+
+/**
+ * Gets or creates a flex container for a given position
+ * @param {string} position - Position key
+ * @returns {HTMLElement} The container element
+ * @private
+ */
+function getOrCreateContainer(position) {
+    if (toastContainers[position]) {
+        return toastContainers[position];
+    }
+
+    const container = document.createElement('div');
+    container.id = `toast-container-${position}`;
+    container.setAttribute('data-toast-container', 'true');
+
+    // Base styles - flex container handles all stacking automatically
+    let styles = `
+        position: fixed;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        z-index: 10000;
+        pointer-events: none;
+    `;
+
+    // Position-specific styles
+    switch (position) {
+        case 'top-right':
+            styles += 'top: 1vh; right: 1vw;';
+            break;
+        case 'top-right-secondary':
+            styles += 'top: 60px; right: 1vw;';
+            break;
+        case 'top-left':
+            styles += 'top: 1vh; left: 1vw;';
+            break;
+        case 'bottom-right':
+            styles += 'bottom: 1vh; right: 1vw; flex-direction: column-reverse;';
+            break;
+        case 'bottom-left':
+            styles += 'bottom: 1vh; left: 1vw; flex-direction: column-reverse;';
+            break;
+        default:
+            styles += 'top: 1vh; right: 1vw;';
+    }
+
+    container.style.cssText = styles;
+    document.body.appendChild(container);
+    toastContainers[position] = container;
+    return container;
+}
 
 /**
  * Creates and shows a toast notification

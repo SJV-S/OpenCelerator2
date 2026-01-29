@@ -178,6 +178,32 @@ function exportDataToCSV() {
 }
 
 /**
+ * Handles share link option click
+ * Shows "Copied" feedback on the clicked option
+ *
+ * @param {string} type - 'view' or 'edit'
+ */
+function handleShareLinkClick(type) {
+    const viewStatus = document.getElementById('share-view-status');
+    const editStatus = document.getElementById('share-edit-status');
+
+    // Hide both statuses first
+    viewStatus?.classList.add('invisible');
+    editStatus?.classList.add('invisible');
+
+    // Show status for clicked option
+    const status = type === 'view' ? viewStatus : editStatus;
+    status?.classList.remove('invisible');
+
+    // Hide after 3 seconds
+    setTimeout(() => {
+        status?.classList.add('invisible');
+    }, 3000);
+
+    // TODO: Actual clipboard copy will go here
+}
+
+/**
  * Initializes the share tab functionality
  *
  * Data flow:
@@ -198,7 +224,28 @@ function initializeShareTab() {
         csvIconElement.innerHTML = icons.csvExportSvgIcon();
     }
 
-    // Attach event listeners
+    // Inject share link icons
+    const viewLinkIcon = document.getElementById('view-link-icon');
+    if (viewLinkIcon) {
+        viewLinkIcon.innerHTML = icons.shareLink();
+    }
+
+    const editLinkIcon = document.getElementById('edit-link-icon');
+    if (editLinkIcon) {
+        editLinkIcon.innerHTML = icons.shareLink();
+    }
+
+    // Attach share link click handlers
+    const shareViewBtn = document.getElementById('share-view-btn');
+    if (shareViewBtn) {
+        shareViewBtn.addEventListener('click', () => handleShareLinkClick('view'));
+    }
+
+    const shareEditBtn = document.getElementById('share-edit-btn');
+    if (shareEditBtn) {
+        shareEditBtn.addEventListener('click', () => handleShareLinkClick('edit'));
+    }
+
     const screenshotBtn = document.getElementById('screenshot-btn');
     if (screenshotBtn) {
         screenshotBtn.addEventListener('click', takeChartScreenshot);

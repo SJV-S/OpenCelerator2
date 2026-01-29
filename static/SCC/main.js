@@ -430,6 +430,56 @@ export function setupEventListeners() {
         });
     }
 
+    // Trend fit method dropdown
+    const fitMethodSelect = document.getElementById('fit-method');
+    if (fitMethodSelect) {
+        // Initialize from chartState
+        const settings = chartState.CelLines.settings || {};
+        fitMethodSelect.value = settings.fitMethod || 'Theil-Sen';
+
+        fitMethodSelect.addEventListener('change', (e) => {
+            if (!chartState.CelLines.settings) {
+                chartState.CelLines.settings = {};
+            }
+            chartState.CelLines.settings.fitMethod = e.target.value;
+            e.target.blur();
+        });
+    }
+
+    // Bounce envelope dropdown
+    const bounceEnvelopeSelect = document.getElementById('bounce-envelope');
+    if (bounceEnvelopeSelect) {
+        // Initialize from chartState
+        const settings = chartState.CelLines.settings || {};
+        bounceEnvelopeSelect.value = settings.bounceEnvelope || 'None';
+
+        bounceEnvelopeSelect.addEventListener('change', (e) => {
+            if (!chartState.CelLines.settings) {
+                chartState.CelLines.settings = {};
+            }
+            chartState.CelLines.settings.bounceEnvelope = e.target.value;
+            e.target.blur();
+        });
+    }
+
+    // Trend forecast input
+    const trendForecastInput = document.getElementById('trend-forecast');
+    if (trendForecastInput) {
+        // Initialize from chartState
+        const settings = chartState.CelLines.settings || {};
+        trendForecastInput.value = settings.forecast || 0;
+
+        trendForecastInput.addEventListener('change', (e) => {
+            if (!chartState.CelLines.settings) {
+                chartState.CelLines.settings = {};
+            }
+            const value = parseInt(e.target.value) || 0;
+            chartState.CelLines.settings.forecast = Math.max(0, value);
+            e.target.value = chartState.CelLines.settings.forecast;
+            e.target.blur();
+        });
+    }
+
     // Chart name input
     const chartNameInput = document.getElementById('chart-name');
     if (chartNameInput) {
