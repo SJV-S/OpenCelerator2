@@ -66,6 +66,7 @@ import { icons } from './util/icons.js';
 import { initializeShareTab } from './misc/share.js';
 import { init as crosshairInit } from './util/crosshair.js';
 import { initStorage } from './storage/chartStorage.js';
+import { initImportUI } from './util/importUI.js';
 
 // ============================================================================
 // CHART INITIALIZATION
@@ -248,6 +249,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initialize share tab icons
     initializeShareTab();
+
+    // Initialize import tab UI
+    initImportUI();
 
     // Initialize series input controls
     initializeAllSeriesInputs();

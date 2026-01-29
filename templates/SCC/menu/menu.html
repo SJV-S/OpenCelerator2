@@ -8,6 +8,7 @@
         <button class="chart-menu-tab-btn" data-tab="series">Series</button>
         <button class="chart-menu-tab-btn" data-tab="chart">Settings</button>
         <button class="chart-menu-tab-btn" data-tab="share">Share</button>
+        <button class="chart-menu-tab-btn" data-tab="import">Import</button>
     </div>
 
     <!-- Tab Content -->
@@ -29,6 +30,9 @@
         </div>
         <div id="share-content" class="chart-menu-tab-pane">
             {% include 'SCC/menu/share_tab.html' %}
+        </div>
+        <div id="import-content" class="chart-menu-tab-pane">
+            {% include 'SCC/menu/import_tab.html' %}
         </div>
         <!-- Crosshair info panel (shown when Shift+hover) -->
         <div id="crosshair-content" class="chart-menu-tab-pane">

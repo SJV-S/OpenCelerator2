@@ -24,7 +24,9 @@ import { eventBus, EVENTS } from '../eventBus.js';
 // ============================================================================
 
 // Regex patterns for column type detection
-const DATE_PATTERN = /^(?=.*\d{2})(?:[^-/.\s]*[-/.]){1,2}[^-/.\s]*$/;
+// Date pattern: requires at least one 2-digit number AND at least 2 separators (-, /, or .)
+// Matches: "2024-01-15", "01/15/2024", "15.01.2024", etc.
+const DATE_PATTERN = /^(?=.*\d{2})(?:[^-/.\n]*[-/.]){2,}[^-/.\n]*$/;
 const NUMERIC_PATTERN = /^\s*-?\d+(\.\d+)?\s*$/;
 
 // Detection thresholds
@@ -180,21 +182,49 @@ function lazyCheck(rows, columns, pattern, isDateCheck) {
 
 /**
  * Additional date heuristics beyond regex
+ * Handles partial dates and various formats per reference document
  * @param {string} value - String value to check
  * @returns {boolean} Whether value looks like a date
  */
 function isLikelyDate(value) {
-    // Year only: 1900-2100
-    if (/^(19|20)\d{2}$/.test(value)) {
-        return true;
+    const str = String(value).trim();
+    const MIN_YEAR = 1900;
+    const MAX_YEAR = 2100;
+
+    // Year only: "2024" (4 digits, valid year range)
+    if (/^\d{4}$/.test(str)) {
+        const year = parseInt(str);
+        return year >= MIN_YEAR && year <= MAX_YEAR;
+    }
+
+    // Year-month formats: "2024-03", "2024/03", "03-2024", "03/2024"
+    const parts = str.replace(/[/.]/g, '-').split('-');
+    if (parts.length === 2) {
+        const [p1, p2] = parts;
+        // YYYY-MM format
+        if (p1.length === 4 && /^\d+$/.test(p1) && /^\d+$/.test(p2)) {
+            const year = parseInt(p1);
+            const month = parseInt(p2);
+            if (year >= MIN_YEAR && year <= MAX_YEAR && month >= 1 && month <= 12) {
+                return true;
+            }
+        }
+        // MM-YYYY format
+        if (p2.length === 4 && /^\d+$/.test(p1) && /^\d+$/.test(p2)) {
+            const month = parseInt(p1);
+            const year = parseInt(p2);
+            if (year >= MIN_YEAR && year <= MAX_YEAR && month >= 1 && month <= 12) {
+                return true;
+            }
+        }
     }
 
     // Try native Date parsing (catches many formats)
-    const parsed = new Date(value);
+    const parsed = new Date(str);
     if (!isNaN(parsed.getTime())) {
         const year = parsed.getFullYear();
-        // Sanity check: year between 1900 and 2100
-        return year >= 1900 && year <= 2100;
+        // Sanity check: year between valid range
+        return year >= MIN_YEAR && year <= MAX_YEAR;
     }
 
     return false;
@@ -208,8 +238,8 @@ function isLikelyDate(value) {
  * Clean and validate imported data based on column mapping
  * @param {object[]} rows - Raw row objects from spreadsheet
  * @param {object} columnMap - Mapping of system columns to spreadsheet columns
- *   { date: 'DateCol', corrects: 'CorrectCol', errors: 'ErrorCol', timing: 'MinutesCol' }
- *   Note: timing is optional
+ *   { date: 'DateCol', corrects: 'CorrectCol', errors: 'ErrorCol', timing: 'MinutesCol', misc: { misc1: 'col', ... } }
+ *   Note: timing and misc are optional
  * @returns {{valid: object[], invalid: object[], errors: string[]}}
  */
 export function cleanImportData(rows, columnMap) {
@@ -281,13 +311,23 @@ function cleanRow(row, columnMap) {
         ? (cleanNumeric(row[columnMap.timing]) || 1)
         : 1;
 
+    // Parse misc columns
+    const misc = {};
+    if (columnMap.misc) {
+        for (const [miscId, colName] of Object.entries(columnMap.misc)) {
+            if (colName) {
+                misc[miscId] = cleanNumeric(row[colName]);
+            }
+        }
+    }
+
     // At least one of corrects or errors should have data
     if (isNaN(corrects) && isNaN(errors)) {
         return { data: null, error: 'No count data (corrects or errors)' };
     }
 
     return {
-        data: { timestamp, corrects, errors, timing },
+        data: { timestamp, corrects, errors, timing, misc },
         error: null
     };
 }
@@ -398,7 +438,7 @@ function cleanNumeric(value) {
 
 /**
  * Import cleaned data into chartState
- * @param {object[]} cleanedRows - Array of {timestamp, corrects, errors, timing}
+ * @param {object[]} cleanedRows - Array of {timestamp, corrects, errors, timing, misc}
  * @param {object} options - Import options
  *   { replace: true } - Clear existing data (default)
  *   { merge: true } - Merge with existing data (not yet implemented)
@@ -417,14 +457,26 @@ export function importToChartState(cleanedRows, options = { replace: true }) {
         // Sort by timestamp
         const sortedRows = [...cleanedRows].sort((a, b) => a.timestamp - b.timestamp);
 
+        // Collect all misc column IDs from the data
+        const miscIds = new Set();
+        for (const row of sortedRows) {
+            if (row.misc) {
+                Object.keys(row.misc).forEach(id => miscIds.add(id));
+            }
+        }
+
         if (options.replace) {
             // Clear existing data
             chartState.series.xValues = [];
             chartState.series.corrects = [];
             chartState.series.errors = [];
             chartState.series.timing = [];
-            // Note: misc series are cleared too
             chartState.series.misc = {};
+
+            // Initialize misc arrays
+            for (const miscId of miscIds) {
+                chartState.series.misc[miscId] = [];
+            }
         }
 
         // Push new data
@@ -433,6 +485,15 @@ export function importToChartState(cleanedRows, options = { replace: true }) {
             chartState.series.corrects.push(row.corrects);
             chartState.series.errors.push(row.errors);
             chartState.series.timing.push(row.timing);
+
+            // Push misc values
+            for (const miscId of miscIds) {
+                if (!chartState.series.misc[miscId]) {
+                    chartState.series.misc[miscId] = [];
+                }
+                const miscValue = row.misc?.[miscId];
+                chartState.series.misc[miscId].push(miscValue !== undefined ? miscValue : NaN);
+            }
         }
 
         // Update startDate to Sunday before earliest data point

@@ -227,7 +227,13 @@ function initializeShareTab() {
     // Inject share link icons
     const viewLinkIcon = document.getElementById('view-link-icon');
     if (viewLinkIcon) {
-        viewLinkIcon.innerHTML = icons.shareLink();
+        viewLinkIcon.style.position = 'relative';
+        viewLinkIcon.innerHTML = `
+            ${icons.shareLink()}
+            <span style="position: absolute; top: -4px; right: -4px; width: 24px; height: 24px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,0.2);">
+                ${icons.lockSolid(16)}
+            </span>
+        `;
     }
 
     const editLinkIcon = document.getElementById('edit-link-icon');
