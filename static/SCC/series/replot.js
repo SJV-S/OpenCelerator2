@@ -60,9 +60,10 @@ function refreshChart() {
     const floorShadowTraces = createFloorShadowTraces(xPositions, frequencies);
     dataTraces.push(...floorShadowTraces);
 
-    // Combine placeholder traces with data traces
+    // IMPORTANT! Keep permanent traces: grid (0-4) + placeholder (5-6)
+    // If you add/remove base traces in the Python chart classes, update this number!
     const updatedData = [
-        ...chartDiv.data.slice(0, 2), // Keep placeholder traces
+        ...chartDiv.data.slice(0, 7),
         ...dataTraces
     ];
 

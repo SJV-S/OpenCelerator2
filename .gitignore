@@ -29,6 +29,5 @@ Thumbs.db
 
 # Project specific
 *.log
-charts/
 push.sh
 notes.txt
