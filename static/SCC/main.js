@@ -32,7 +32,6 @@ import { createToast } from './util/toaster.js';
 import { refreshChart, init as replotInit } from './series/replot.js';
 import { updateChartDateLabels, updateDateDisplay, adjustDateInput, initializeDateInput } from './util/dates.js';
 import { initStartDateControls } from './util/startDateControls.js';
-import { renderCredits, injectCredits, initCreditClick, regenerateCredits, init as creditInit } from './misc/credit.js';
 import { loadDataForDate, adjustTimestamp, updateCurrentEntry, deleteCurrentEntry, init as dataUpdateInit } from './series/dataUpdate.js';
 import {
     showCounter,
@@ -85,14 +84,14 @@ export function initializeChart(plotData, maxWindowWidth) {
     const chartContainer = document.getElementById('chart-container');
     const containerHeight = chartContainer ? chartContainer.clientHeight : window.innerHeight;
 
-    // Resize chart based on chart type
-    plotData = resizeChartByHeight(plotData, containerHeight, chartState.chartType);
+    // Resize chart based on chart type (includes margin expansion for fan)
+    plotData = resizeChartByHeight(plotData, containerHeight, chartState.chartType, {
+        fanVisible: true,
+        isMinuteChart: chartState.minuteChart
+    });
 
-    // Inject celeration fan into plotData BEFORE initial render (avoids clipping)
+    // Inject celeration fan shapes/annotations (margins already handled by resize)
     plotData = injectCelerationFan(plotData, chartState.minuteChart, chartState.chartType);
-
-    // Inject credit lines into plotData BEFORE initial render (expands bottom margin)
-    plotData = injectCredits(plotData);
 
     // Create chart
     Plotly.newPlot(chartDiv, plotData.data, plotData.layout, {
@@ -105,9 +104,6 @@ export function initializeChart(plotData, maxWindowWidth) {
 
     // Initialize draggable fan
     initFanDrag();
-
-    // Initialize credit click handler
-    initCreditClick();
 
     // Observe container for resize (fullscreen, viewport changes)
     if (chartContainer) {
@@ -129,7 +125,6 @@ export function initializeChart(plotData, maxWindowWidth) {
 
                 Plotly.relayout(chartDiv, { height: newHeight, width: newWidth }).then(() => {
                     regenerateFan();
-                    regenerateCredits();
                     renderCustomLegend();
                 });
             }, 100);
@@ -197,7 +192,6 @@ document.addEventListener('DOMContentLoaded', () => {
     lineClickHandlerInit();
     dataEntryInit();
     replotInit();
-    creditInit();
     dataUpdateInit();
     navigationInit();
     phaseLinesInit();

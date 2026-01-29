@@ -252,14 +252,8 @@ export function injectCelerationFan(plotData, isMinuteChart, chartType) {
         return plotData;
     }
 
-    const extraMargin = isMinuteChart ? 90 : 60;
-
-    if (isMinuteChart) {
-        plotData.layout.margin.l += extraMargin;
-    } else {
-        plotData.layout.margin.r += extraMargin;
-    }
-    plotData.layout.width += extraMargin;
+    // Note: Margin expansion is handled by resizeChartByHeight() in resize-chart.js
+    // This function only injects the fan shapes and annotations
 
     const { shapes, annotations } = generateFanElements(plotData.layout, isMinuteChart, chartType);
 

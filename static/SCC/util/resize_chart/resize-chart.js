@@ -1,7 +1,17 @@
 /**
  * Unified chart resize module
  * Handles responsive scaling for all chart types: Daily, Weekly, Monthly, Yearly, FrequencyCollections
+ * Also handles margin expansion for celeration fan
  */
+
+const MOBILE_BREAKPOINT = 768;
+
+/**
+ * Check if current viewport is mobile-sized
+ */
+function isMobile() {
+    return window.innerWidth < MOBILE_BREAKPOINT;
+}
 
 // Chart-specific configuration
 const CHART_CONFIG = {
@@ -87,19 +97,34 @@ const CHART_CONFIG = {
  * @param {Object} chartJson - Plotly chart data/layout object
  * @param {number} containerHeight - Height of the container element
  * @param {string} chartType - Type of chart (Daily, Weekly, Monthly, Yearly, FrequencyCollections)
+ * @param {Object} options - Additional options
+ * @param {boolean} options.fanVisible - Whether celeration fan will be shown
+ * @param {boolean} options.isMinuteChart - Whether this is a minute chart (affects fan position)
  * @returns {Object} Modified chartJson with updated dimensions
  */
-function resizeChartByHeight(chartJson, containerHeight, chartType = 'Daily') {
+function resizeChartByHeight(chartJson, containerHeight, chartType = 'Daily', options = {}) {
+    const { fanVisible = false, isMinuteChart = false } = options;
+
     const config = CHART_CONFIG[chartType];
     if (!config) {
         console.warn(`Unknown chart type: ${chartType}, defaulting to Daily`);
-        return resizeChartByHeight(chartJson, containerHeight, 'Daily');
+        return resizeChartByHeight(chartJson, containerHeight, 'Daily', options);
     }
 
     // Use 98% of container height for padding
     const height = containerHeight * 0.98;
 
     const margin = chartJson.layout.margin;
+
+    // Expand margin for celeration fan (must happen before width calculation)
+    if (fanVisible && !isMobile()) {
+        const extraMargin = isMinuteChart ? 90 : 60;
+        if (isMinuteChart) {
+            margin.l += extraMargin;
+        } else {
+            margin.r += extraMargin;
+        }
+    }
     const y = { min: config.yMin, max: config.yMax };
     const xmax = Math.round(chartJson.layout.xaxis.range[1]);
     const deg = 34; // Desired angle of doubling in degrees

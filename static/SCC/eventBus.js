@@ -78,9 +78,6 @@ export const EVENTS = {
     CHART_PANNING_ENABLED_CHANGED: 'chart:panning_enabled_changed',
     CHART_NAME_CHANGED: 'chart:name_changed',
 
-    // Credit Events
-    CREDIT_CHANGED: 'credit:changed',
-
     // Counter Events
     COUNTER_ENTRY_DATE_CHANGED: 'counter:entry_date_changed',
     COUNTER_SHOW: 'counter:show',
@@ -126,9 +123,6 @@ const EVENT_CATEGORY_MAP = {
     // Chart settings
     [EVENTS.CHART_PANNING_ENABLED_CHANGED]: [EVENT_CATEGORIES.STATE_MUTATING],
     [EVENTS.CHART_NAME_CHANGED]: [EVENT_CATEGORIES.STATE_MUTATING],
-
-    // Credits
-    [EVENTS.CREDIT_CHANGED]: [EVENT_CATEGORIES.STATE_MUTATING],
 
     // UI state that persists
     [EVENTS.UI_TRACE_STYLE_CHANGED]: [EVENT_CATEGORIES.STATE_MUTATING]
