@@ -17,3 +17,4 @@ To-do
 * What's up with the chartStorage.js reproducing the json?
 * Is the cel line added even when there's less than 5 data points?
 * I need to check that my PWA is not relying on CDN that will break the app in offline mode
+* We might need a button for line editing instead of long press...

@@ -24,7 +24,7 @@
 import { openDB } from '../lib/idb.js';
 import { eventBus, EVENTS, EVENT_CATEGORIES } from '../eventBus.js';
 import { chartState } from '../chartState.js';
-import { findNearestSunday } from '../util/dates.js';
+import { findNearestMonday } from '../util/dates.js';
 import { jsonBackwardsCompatibilityCheck } from '../util/jsonBackwardsCompatibility.js';
 
 const DB_NAME = 'SCC_Charts';
@@ -282,7 +282,7 @@ export async function createChart(name, chartType, minuteChart) {
     }
 
     const chartId = uuid();
-    const startDate = findNearestSunday(new Date());
+    const startDate = findNearestMonday(new Date());
     startDate.setHours(0, 0, 0, 0);
     const now = Date.now();
 

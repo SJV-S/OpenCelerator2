@@ -2,7 +2,7 @@
  * Start Date Controls - Custom spinbox UI for setting chart start date
  *
  * Shows different inputs based on chartState.chartType:
- * - Daily: Sunday dropdown + Month spinbox + Year spinbox
+ * - Daily: Monday dropdown + Month spinbox + Year spinbox
  * - Weekly: Month spinbox + Year spinbox
  * - Monthly: Year spinbox only
  * - Yearly: Decade spinbox (step 10)
@@ -14,74 +14,124 @@ import { createToast } from './toaster.js';
 
 // Current values stored here for easy access
 let currentValues = {
-    sunday: 1,
+    monday: 1,
     month: 1,
     year: 2025,
     decade: 2020,
-    availableSundays: []
+    availableMondays: []
 };
 
 /**
- * Get all Sundays in a given month/year
+ * Get all Mondays in a given month/year
  * @param {number} year - Full year (e.g., 2025)
  * @param {number} month - Month 1-12
- * @returns {number[]} Array of day numbers that are Sundays (e.g., [5, 12, 19, 26])
+ * @returns {number[]} Array of day numbers that are Mondays (e.g., [6, 13, 20, 27])
  */
-function getSundaysInMonth(year, month) {
-    const sundays = [];
-    const lastDay = new Date(year, month, 0).getDate();
+function getMondaysInMonth(year, month) {
+    const mondays = [];
+    // Get last day of month using a temp date
+    const tempDate = new Date(2000, month, 0);
+    tempDate.setFullYear(year);
+    const lastDay = tempDate.getDate();
 
     for (let day = 1; day <= lastDay; day++) {
-        const date = new Date(year, month - 1, day);
-        if (date.getDay() === 0) {
-            sundays.push(day);
+        const date = new Date(2000, month - 1, day);
+        date.setFullYear(year);
+        if (date.getDay() === 1) { // 1 = Monday
+            mondays.push(day);
         }
     }
 
-    return sundays;
+    return mondays;
 }
 
 /**
- * Update the display for a spinbox
+ * Format year for display with BC/AD
+ * Internal: 1 = 1 AD, 0 = 1 BC, -1 = 2 BC
+ */
+function formatYearDisplay(internalYear) {
+    if (internalYear >= 1) {
+        return `${internalYear} AD`;
+    } else {
+        return `${1 - internalYear} BC`;
+    }
+}
+
+/**
+ * Parse year input that may contain BC/AD
+ * Returns internal year number
+ */
+function parseYearInput(input) {
+    const str = input.toString().trim().toUpperCase();
+    const bcMatch = str.match(/^(\d+)\s*BC$/);
+    const adMatch = str.match(/^(\d+)\s*AD$/);
+
+    if (bcMatch) {
+        // "X BC" → internal = 1 - X
+        return 1 - parseInt(bcMatch[1]);
+    } else if (adMatch) {
+        // "X AD" → internal = X
+        return parseInt(adMatch[1]);
+    } else {
+        // Plain number - treat as AD if positive
+        const num = parseInt(str);
+        return isNaN(num) ? null : num;
+    }
+}
+
+/**
+ * Update the display for a spinbox (works with both div and input elements)
  */
 function updateDisplay(id, value) {
     const el = document.getElementById(id);
     if (el) {
         el.dataset.value = value;
-        el.textContent = value;
+
+        // Format year with BC/AD
+        let displayValue = value;
+        if (id === 'start-year') {
+            displayValue = formatYearDisplay(value);
+        }
+
+        // Handle both input elements and div elements
+        if (el.tagName === 'INPUT') {
+            el.value = displayValue;
+        } else {
+            el.textContent = displayValue;
+        }
     }
 }
 
 /**
- * Update Sunday display and available sundays list
+ * Update Monday display and available mondays list
  */
-function updateSundayControl() {
-    currentValues.availableSundays = getSundaysInMonth(currentValues.year, currentValues.month);
+function updateMondayControl() {
+    currentValues.availableMondays = getMondaysInMonth(currentValues.year, currentValues.month);
 
-    // Ensure current sunday is valid for this month
-    if (!currentValues.availableSundays.includes(currentValues.sunday)) {
-        currentValues.sunday = currentValues.availableSundays[0] || 1;
+    // Ensure current monday is valid for this month
+    if (!currentValues.availableMondays.includes(currentValues.monday)) {
+        currentValues.monday = currentValues.availableMondays[0] || 1;
     }
 
-    updateDisplay('start-sunday', currentValues.sunday);
+    updateDisplay('start-monday', currentValues.monday);
 }
 
 /**
- * Increment/decrement Sunday (cycles through available Sundays)
+ * Increment/decrement Monday (cycles through available Mondays)
  */
-function adjustSunday(delta) {
-    const sundays = currentValues.availableSundays;
-    if (sundays.length === 0) return;
+function adjustMonday(delta) {
+    const mondays = currentValues.availableMondays;
+    if (mondays.length === 0) return;
 
-    const currentIndex = sundays.indexOf(currentValues.sunday);
+    const currentIndex = mondays.indexOf(currentValues.monday);
     let newIndex = currentIndex + delta;
 
     // Wrap around
-    if (newIndex < 0) newIndex = sundays.length - 1;
-    if (newIndex >= sundays.length) newIndex = 0;
+    if (newIndex < 0) newIndex = mondays.length - 1;
+    if (newIndex >= mondays.length) newIndex = 0;
 
-    currentValues.sunday = sundays[newIndex];
-    updateDisplay('start-sunday', currentValues.sunday);
+    currentValues.monday = mondays[newIndex];
+    updateDisplay('start-monday', currentValues.monday);
     handleStartDateChange();
 }
 
@@ -94,39 +144,46 @@ function adjustMonth(delta) {
     if (newMonth < 1) {
         newMonth = 12;
         currentValues.year--;
+        // Skip year 0 (doesn't exist in historical calendar)
+        if (currentValues.year === 0) currentValues.year = -1;
         updateDisplay('start-year', currentValues.year);
     } else if (newMonth > 12) {
         newMonth = 1;
         currentValues.year++;
+        // Skip year 0 (doesn't exist in historical calendar)
+        if (currentValues.year === 0) currentValues.year = 1;
         updateDisplay('start-year', currentValues.year);
     }
 
     currentValues.month = newMonth;
     updateDisplay('start-month', currentValues.month);
 
-    // Update available Sundays for Daily charts
+    // Update available Mondays for Daily charts
     if (chartState.chartType.toLowerCase() === 'daily') {
-        updateSundayControl();
+        updateMondayControl();
     }
 
     handleStartDateChange();
 }
 
 /**
- * Adjust year (1679-2261)
+ * Adjust year
  */
 function adjustYear(delta) {
     let newYear = currentValues.year + delta;
 
-    if (newYear < 1679) newYear = 1679;
-    if (newYear > 2261) newYear = 2261;
+    // Skip year 0 (doesn't exist in historical calendar)
+    if (newYear === 0) newYear = delta > 0 ? 1 : -1;
+
+    if (newYear < -9999) newYear = -9999;
+    if (newYear > 9999) newYear = 9999;
 
     currentValues.year = newYear;
     updateDisplay('start-year', currentValues.year);
 
-    // Update available Sundays for Daily charts
+    // Update available Mondays for Daily charts
     if (chartState.chartType.toLowerCase() === 'daily') {
-        updateSundayControl();
+        updateMondayControl();
     }
 
     handleStartDateChange();
@@ -154,17 +211,20 @@ function internalToUserDate() {
     const chartType = chartState.chartType.toLowerCase();
 
     if (chartType === 'daily') {
-        // Find the previous Sunday from internal date
+        // Find the previous Monday from internal date (ISO 8601)
         const dayOfWeek = internalDate.getDay();
-        const sundayDate = new Date(internalDate);
-        if (dayOfWeek !== 0) {
-            sundayDate.setDate(internalDate.getDate() - dayOfWeek);
+        const mondayDate = new Date(internalDate);
+        // getDay(): 0=Sun, 1=Mon, ..., 6=Sat
+        // Days to subtract: Mon(1)->0, Tue(2)->1, ..., Sun(0)->6
+        const daysToSubtract = (dayOfWeek === 0) ? 6 : dayOfWeek - 1;
+        if (daysToSubtract > 0) {
+            mondayDate.setDate(internalDate.getDate() - daysToSubtract);
         }
 
         return {
-            sunday: sundayDate.getDate(),
-            month: sundayDate.getMonth() + 1,
-            year: sundayDate.getFullYear()
+            monday: mondayDate.getDate(),
+            month: mondayDate.getMonth() + 1,
+            year: mondayDate.getFullYear()
         };
     } else if (chartType === 'weekly') {
         const prevMonth = new Date(internalDate);
@@ -190,26 +250,33 @@ function internalToUserDate() {
 }
 
 /**
+ * Create a Date object with correct year handling
+ * (JavaScript Date treats years 0-99 as 1900-1999, so we use setFullYear)
+ */
+function createDate(year, month, day) {
+    const date = new Date(2000, month, day);
+    date.setFullYear(year);
+    return date;
+}
+
+/**
  * Convert user-selected values back to internal date
  */
 function userToInternalDate() {
     const chartType = chartState.chartType.toLowerCase();
 
     if (chartType === 'daily') {
-        // Selected Sunday + 1 day = Monday
-        const sundayDate = new Date(currentValues.year, currentValues.month - 1, currentValues.sunday);
-        const mondayDate = new Date(sundayDate);
-        mondayDate.setDate(sundayDate.getDate() + 1);
-        return mondayDate;
+        // Selected Monday is the start date
+        return createDate(currentValues.year, currentValues.month - 1, currentValues.monday);
     } else if (chartType === 'weekly') {
         // First day of following month
-        return new Date(currentValues.year, currentValues.month, 1);
+        return createDate(currentValues.year, currentValues.month, 1);
     } else if (chartType === 'monthly') {
         // January 1st of following year
-        return new Date(currentValues.year + 1, 0, 1);
+        return createDate(currentValues.year + 1, 0, 1);
     } else if (chartType === 'yearly') {
         // January 1st of decade + 9
-        return new Date(currentValues.decade + 9, 0, 1);
+        return createDate(currentValues.decade + 9, 0, 1);
     }
 
     return new Date();
@@ -240,7 +307,7 @@ function updateLabel() {
 
     switch (chartType) {
         case 'daily':
-            label.textContent = 'Start Date (Sunday)';
+            label.textContent = 'Start Date (Monday)';
             break;
         case 'weekly':
             label.textContent = 'Start Date (Month)';
@@ -262,20 +329,20 @@ function updateLabel() {
 function updateVisibility() {
     const chartType = chartState.chartType.toLowerCase();
 
-    const sundayRow = document.getElementById('start-sunday-row');
+    const mondayRow = document.getElementById('start-monday-row');
     const monthRow = document.getElementById('start-month-row');
     const yearRow = document.getElementById('start-year-row');
     const decadeRow = document.getElementById('start-decade-row');
 
     // Hide all first
-    [sundayRow, monthRow, yearRow, decadeRow].forEach(row => {
+    [mondayRow, monthRow, yearRow, decadeRow].forEach(row => {
         if (row) row.style.display = 'none';
     });
 
     // Show based on chart type
     switch (chartType) {
         case 'daily':
-            if (sundayRow) sundayRow.style.display = 'flex';
+            if (mondayRow) mondayRow.style.display = 'flex';
             if (monthRow) monthRow.style.display = 'flex';
             if (yearRow) yearRow.style.display = 'flex';
             break;
@@ -302,11 +369,11 @@ function setInputValues() {
     if (chartType === 'daily') {
         currentValues.month = values.month;
         currentValues.year = values.year;
-        currentValues.sunday = values.sunday;
+        currentValues.monday = values.monday;
 
         updateDisplay('start-month', currentValues.month);
         updateDisplay('start-year', currentValues.year);
-        updateSundayControl();
+        updateMondayControl();
     } else if (chartType === 'weekly') {
         currentValues.month = values.month;
         currentValues.year = values.year;
@@ -323,12 +390,59 @@ function setInputValues() {
 }
 
 /**
- * Set up event listeners for arrow buttons
+ * Handle direct year input change
+ */
+function handleYearInput(e) {
+    let newYear = parseYearInput(e.target.value);
+
+    if (newYear === null) return;
+
+    // Skip year 0 (doesn't exist in historical calendar)
+    if (newYear === 0) newYear = 1;
+
+    // Clamp to valid range
+    if (newYear < -9999) newYear = -9999;
+    if (newYear > 9999) newYear = 9999;
+
+    currentValues.year = newYear;
+    e.target.value = formatYearDisplay(newYear);
+
+    // Update available Mondays for Daily charts
+    if (chartState.chartType.toLowerCase() === 'daily') {
+        updateMondayControl();
+    }
+
+    handleStartDateChange();
+}
+
+/**
+ * Handle direct decade input change
+ */
+function handleDecadeInput(e) {
+    let newDecade = parseInt(e.target.value);
+
+    if (isNaN(newDecade)) return;
+
+    // Round to nearest decade
+    newDecade = Math.round(newDecade / 10) * 10;
+
+    // Clamp to valid range
+    if (newDecade < 1600) newDecade = 1600;
+    if (newDecade > 2300) newDecade = 2300;
+
+    currentValues.decade = newDecade;
+    e.target.value = newDecade;
+
+    handleStartDateChange();
+}
+
+/**
+ * Set up event listeners for arrow buttons and direct input
  */
 function setupEventListeners() {
-    // Sunday arrows
-    document.querySelector('[data-action="start-sunday-dec"]')?.addEventListener('click', () => adjustSunday(-1));
-    document.querySelector('[data-action="start-sunday-inc"]')?.addEventListener('click', () => adjustSunday(1));
+    // Monday arrows
+    document.querySelector('[data-action="start-monday-dec"]')?.addEventListener('click', () => adjustMonday(-1));
+    document.querySelector('[data-action="start-monday-inc"]')?.addEventListener('click', () => adjustMonday(1));
 
     // Month arrows
     document.querySelector('[data-action="start-month-dec"]')?.addEventListener('click', () => adjustMonth(-1));
@@ -338,9 +452,21 @@ function setupEventListeners() {
     document.querySelector('[data-action="start-year-dec"]')?.addEventListener('click', () => adjustYear(-1));
     document.querySelector('[data-action="start-year-inc"]')?.addEventListener('click', () => adjustYear(1));
 
+    // Year direct input
+    const yearInput = document.getElementById('start-year');
+    if (yearInput) {
+        yearInput.addEventListener('change', handleYearInput);
+    }
+
     // Decade arrows
     document.querySelector('[data-action="start-decade-dec"]')?.addEventListener('click', () => adjustDecade(-1));
     document.querySelector('[data-action="start-decade-inc"]')?.addEventListener('click', () => adjustDecade(1));
+
+    // Decade direct input
+    const decadeInput = document.getElementById('start-decade');
+    if (decadeInput) {
+        decadeInput.addEventListener('change', handleDecadeInput);
+    }
 }
 
 /**
@@ -362,6 +488,6 @@ export function refreshStartDateDisplay() {
     setInputValues();
 }
 
-export { getSundaysInMonth };
+export { getMondaysInMonth };
 
 console.log('startDateControls.js loaded');

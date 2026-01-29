@@ -1,6 +1,50 @@
 // ============================================================================
 // AGGREGATION UTILITY FUNCTIONS
 // ============================================================================
+//
+// =============================================================================
+// DATA BINNING & AGGREGATION POLICY
+// =============================================================================
+//
+// This application uses LEFT-EDGE (beginning-of-period) binning for all
+// chart types. Multiple data entries within the same period are aggregated
+// into a single X-position.
+//
+// BINNING BY CHART TYPE:
+// ┌────────────┬─────────────────┬──────────────┬─────────────────────────┐
+// │ Chart Type │ Bin Contains    │ Labeled As   │ X-Position Calculation  │
+// ├────────────┼─────────────────┼──────────────┼─────────────────────────┤
+// │ Daily      │ Single day      │ That day     │ daysDiff from startDate │
+// │ Weekly     │ Mon-Sun (7 days)│ The Monday   │ floor(daysDiff / 7)     │
+// │ Monthly    │ All days in mo. │ 1st of month │ monthsDiff from start   │
+// │ Yearly     │ All days in yr. │ Jan 1st      │ yearsDiff from start    │
+// └────────────┴─────────────────┴──────────────┴─────────────────────────┘
+//
+// EXAMPLE (Weekly Chart):
+//   startDate = Mon Nov 24, 2025
+//
+//   Data entered for:
+//     Tue Nov 25 → snaps to Mon Nov 24 → X = 0
+//     Sun Nov 30 → snaps to Mon Nov 24 → X = 0  (same bin, aggregated)
+//     Mon Dec 1  → snaps to Mon Dec 1  → X = 1
+//     Fri Dec 5  → snaps to Mon Dec 1  → X = 1  (same bin, aggregated)
+//
+// COMPARED TO PANDAS:
+//   - Equivalent to: closed='left', label='left'
+//   - Period start date is used as the bin label
+//   - All data from period start to period end (exclusive) is included
+//
+// PRACTICAL IMPLICATIONS:
+//   1. Users see the period START date when hovering over aggregated points
+//   2. All data within a period (day/week/month/year) sums into one bin
+//   3. Consistent "first of everything" mental model
+//
+// RELATED FUNCTIONS (in dates.js):
+//   - timestampsToXPositions(): Converts timestamps to X-positions with binning
+//   - snapToChartBoundary(): Snaps dates to period boundaries (first of period)
+//   - alignStartDate(): Sets chart anchor point per chart type
+//
+// =============================================================================
 
 /**
  * Calculate the median of an array

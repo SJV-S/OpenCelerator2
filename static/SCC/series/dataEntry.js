@@ -11,6 +11,7 @@
 
 import { chartState } from '../chartState.js';
 import { eventBus, EVENTS } from '../eventBus.js';
+import { snapToChartBoundary, formatDateInputValue } from '../util/dates.js';
 
 // Shape name for the entry date indicator line
 const ENTRY_DATE_INDICATOR_NAME = 'entry-date-indicator';
@@ -155,9 +156,15 @@ function updateTimingVisibility() {
 // ============================================================================
 
 /**
- * Convert a date string (YYYY-MM-DD) to an x-position on the chart
+ * Convert a date string (YYYY-MM-DD) to an x-position on the chart.
+ * Uses chart-type-specific calculations matching timestampsToXPositions():
+ * - Daily: X = day offset from startDate
+ * - Weekly: X = week offset (days / 7, floored)
+ * - Monthly: X = month offset from startDate
+ * - Yearly: X = year offset from startDate
+ *
  * @param {string} dateString - Date in YYYY-MM-DD format
- * @returns {number} X-position (days from startDate)
+ * @returns {number} X-position for the chart
  */
 function dateToXPosition(dateString) {
     if (!chartState.startDate) return 0;
@@ -169,7 +176,23 @@ function dateToXPosition(dateString) {
     startDate.setHours(0, 0, 0, 0);
 
     const daysDiff = Math.floor((date - startDate) / (1000 * 60 * 60 * 24));
-    return daysDiff;
+    const chartType = (chartState.chartType || 'Daily').toLowerCase();
+
+    switch (chartType) {
+        case 'weekly':
+            return Math.floor(daysDiff / 7);
+        case 'monthly':
+            const startYear = startDate.getFullYear();
+            const startMonth = startDate.getMonth();
+            const dateYear = date.getFullYear();
+            const dateMonth = date.getMonth();
+            return (dateYear - startYear) * 12 + (dateMonth - startMonth);
+        case 'yearly':
+            return date.getFullYear() - startDate.getFullYear();
+        case 'daily':
+        default:
+            return daysDiff;
+    }
 }
 
 /**
@@ -241,12 +264,23 @@ function removeEntryDateIndicator() {
 }
 
 /**
- * Emit entry date change event based on current input value
+ * Emit entry date change event based on current input value.
+ * Snaps the date to appropriate boundary based on chart type first.
+ * Uses snapToChartBoundary() from dates.js to enforce the date boundary policy.
  */
 function emitEntryDateChange() {
     const entryDateInput = document.getElementById('entry-date');
     if (entryDateInput && entryDateInput.value) {
-        eventBus.emit(EVENTS.COUNTER_ENTRY_DATE_CHANGED, { date: entryDateInput.value });
+        // Snap the date to appropriate boundary for the chart type
+        const snappedDate = snapToChartBoundary(entryDateInput.value);
+        const snappedDateStr = formatDateInputValue(snappedDate);
+
+        // Update the input if the date was adjusted
+        if (snappedDateStr !== entryDateInput.value) {
+            entryDateInput.value = snappedDateStr;
+        }
+
+        eventBus.emit(EVENTS.COUNTER_ENTRY_DATE_CHANGED, { date: snappedDateStr });
     }
 }
 

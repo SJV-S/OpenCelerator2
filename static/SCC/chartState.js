@@ -142,7 +142,7 @@ export const chartState = {
     minuteChart: true,
     chartName: 'Unnamed',
     hasTimestamps: true, // If true, xValues are timestamps that need conversion; if false, xValues are direct x-positions
-    startDate: null, // The Sunday before/at earliest data point (set on import or first data entry)
+    startDate: null, // The Monday before/at earliest data point (set on import or first data entry)
 
     // Chart dimensions (NOT CURRENTLY IN USE - placeholder for future implementation)
     chartCapacity: 280, // Max X positions the chart can hold (Daily: 280, Weekly: 200, Monthly: 240, Yearly: 200)

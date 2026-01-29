@@ -30,7 +30,7 @@ import {
 import { addMiscSeries, canAddMiscSeries } from './series/miscSeries.js';
 import { createToast } from './util/toaster.js';
 import { refreshChart, init as replotInit } from './series/replot.js';
-import { updateChartDateLabels, updateDateDisplay, adjustDateInput, initializeDateInput } from './util/dates.js';
+import { alignStartDate, updateChartDateLabels, updateDateDisplay, adjustDateInput, initializeDateInput, updatePlotDateLabel } from './util/dates.js';
 import { initStartDateControls } from './util/startDateControls.js';
 import { loadDataForDate, adjustTimestamp, updateCurrentEntry, deleteCurrentEntry, init as dataUpdateInit } from './series/dataUpdate.js';
 import {
@@ -54,7 +54,7 @@ import { init as phaseLinesInit } from './lines/phaseLines.js';
 import { init as aimLinesInit } from './lines/aimLines.js';
 import { init as cutLinesInit } from './lines/cutLines.js';
 import { init as celLineInit } from './lines/celLine.js';
-import { initGridToggle } from './misc/grid.js';
+import { initGridToggle, toggleDateLines, toggleCountLines, toggleMinorGrid } from './misc/grid.js';
 import { injectCelerationFan, initFanDrag, regenerateFan, init as celerationFanInit } from './misc/celerationFan.js';
 import { injectCredits, initCreditClick, regenerateCredits, init as creditInit } from './misc/credit.js';
 import { toggleLegend, renderCustomLegend, init as customLegendInit } from './misc/customLegend.js';
@@ -150,6 +150,7 @@ export function initializeChart() {
             resizeTimeout = setTimeout(() => {
                 const newHeight = entries[0].contentRect.height * 0.98;
                 const config = CHART_CONFIG[chartState.chartType];
+                // Use the current chart margins (already expanded for fan/credits)
                 const margin = chartDiv.layout.margin;
                 const xmax = Math.round(chartDiv.layout.xaxis.range[1]);
                 const deg = 34;
@@ -170,13 +171,10 @@ export function initializeChart() {
         resizeObserver.observe(chartContainer);
     }
 
-    // Initialize startDate to the most recent Sunday at midnight
+    // Initialize startDate using chart-type-specific alignment
     if (!chartState.startDate) {
         const now = new Date();
-        const daysSinceSunday = now.getDay() || 7;
-        chartState.startDate = new Date(now);
-        chartState.startDate.setDate(now.getDate() - daysSinceSunday);
-        chartState.startDate.setHours(0, 0, 0, 0);
+        chartState.startDate = alignStartDate(now, chartState.chartType);
 
         updateChartDateLabels(chartDiv, chartState.startDate);
     }
@@ -204,6 +202,9 @@ export function initializeChart() {
 function initializeDateInputs() {
     // Entry date input with today's date (shared between New and Previous sub-tabs)
     initializeDateInput('entry-date');
+
+    // Update the "Plot Date" label based on chart type
+    updatePlotDateLabel();
 
     // Initialize start date controls in Chart tab
     initStartDateControls();
@@ -451,6 +452,38 @@ export function setupEventListeners() {
             e.target.blur();
         });
     }
+
+    // Grid toggles
+    const gridDateLinesToggle = document.getElementById('grid-date-lines-toggle');
+    if (gridDateLinesToggle) {
+        gridDateLinesToggle.addEventListener('change', (e) => {
+            toggleDateLines(e.target.checked);
+            e.target.blur();
+        });
+    }
+
+    const gridCountLinesToggle = document.getElementById('grid-count-lines-toggle');
+    if (gridCountLinesToggle) {
+        gridCountLinesToggle.addEventListener('change', (e) => {
+            toggleCountLines(e.target.checked);
+            e.target.blur();
+        });
+    }
+
+    const gridMinorToggle = document.getElementById('grid-minor-toggle');
+    if (gridMinorToggle) {
+        gridMinorToggle.addEventListener('change', (e) => {
+            toggleMinorGrid(e.target.checked);
+            e.target.blur();
+        });
+    }
+
+    // Sync grid toggles when legend toggles entire grid
+    eventBus.subscribe(EVENTS.CHART_GRID_VISIBILITY_CHANGED, ({ visible }) => {
+        if (gridDateLinesToggle) gridDateLinesToggle.checked = visible;
+        if (gridCountLinesToggle) gridCountLinesToggle.checked = visible;
+        if (gridMinorToggle) gridMinorToggle.checked = visible;
+    }, true);
 
     // Trend fit method dropdown
     const fitMethodSelect = document.getElementById('fit-method');

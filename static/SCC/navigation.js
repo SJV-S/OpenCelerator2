@@ -2,7 +2,7 @@
 // Handles tab switching, counter overlay control, and gesture/keyboard navigation
 
 import { chartState } from './chartState.js';
-import { updateDateDisplay } from './util/dates.js';
+import { updateDateDisplay, formatDateInputValue } from './util/dates.js';
 import { createToast, removeAllToasts } from './util/toaster.js';
 import { showDismissMenuHint } from './util/tooltip.js';
 import { eventBus, EVENTS } from './eventBus.js';
@@ -30,7 +30,7 @@ function showCounter() {
         // Update the date input to reflect current startDate
         const otherDateInput = document.getElementById('other-date');
         if (otherDateInput && chartState.startDate) {
-            otherDateInput.value = chartState.startDate.toISOString().split('T')[0];
+            otherDateInput.value = formatDateInputValue(chartState.startDate);
             // Update the visible display
             updateDateDisplay(chartState.startDate);
         }

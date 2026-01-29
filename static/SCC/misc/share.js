@@ -39,11 +39,15 @@ function takeChartScreenshot() {
     // Use chartName from metadata if available, otherwise default to 'chart-screenshot'
     const fileName = chartState.chartName || 'chart-screenshot';
 
+    // Get the chart's actual rendered dimensions to preserve aspect ratio
+    const chartWidth = chartElement.layout.width || chartElement.offsetWidth;
+    const chartHeight = chartElement.layout.height || chartElement.offsetHeight;
+
     // Download chart as PNG using Plotly's built-in function
     Plotly.downloadImage(chartElement, {
         format: 'png',
-        width: 1200,
-        height: 800,
+        width: chartWidth,
+        height: chartHeight,
         filename: fileName
     }).then(() => {
         createToast({

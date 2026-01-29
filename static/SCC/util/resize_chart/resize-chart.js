@@ -22,6 +22,10 @@ const CHART_CONFIG = {
         snapTo: 14,  // Snap xmax to multiples of 14 (28, 42, 56...)
         minXmax: 28,
         maxWindow: 140,
+        creditMarginMultiplier: 0.10,
+        topMarginMultiplier: 0,
+        fanMarginMinute: 0.10,
+        fanMarginCount: 0.07,
         annotations: {
             'date-text': { offsetMultiplier: 4, useGeneral: true },
             'week-count': { offsetMultiplier: 2.0833, useGeneral: true },
@@ -40,6 +44,10 @@ const CHART_CONFIG = {
         snapTo: 8,  // Snap to multiples of 8 (8, 16, 24...)
         minXmax: 8,
         maxWindow: 100,
+        creditMarginMultiplier: 0.10,
+        topMarginMultiplier: 0,
+        fanMarginMinute: 0.10,
+        fanMarginCount: 0.07,
         annotations: {
             'month-label': { offsetMultiplier: 3.05, useGeneral: true, fontScale: 0.85, prefix: true },
             'month-count': { offsetMultiplier: 5.93, useGeneral: true },
@@ -48,25 +56,29 @@ const CHART_CONFIG = {
         },
         shapes: {
             hasTopXTick: true,
-            topXTickHeight: 55
+            topXTickMultiplier: 4
         }
     },
     Monthly: {
         yMin: 0.001 * 0.69,
         yMax: 1000,
-        unit: 5,
+        unit: 6,
         snapTo: 24,  // Snap to multiples of 24 (24, 48, 72...)
         minXmax: 24,
         maxWindow: 120,
+        creditMarginMultiplier: 0.15,
+        topMarginMultiplier: 0,
+        fanMarginMinute: 0.15,
+        fanMarginCount: 0.07,
         annotations: {
-            'year-label': { offsetMultiplier: 2.61, useGeneral: true, fontScale: 0.85, prefix: true },
-            'year-count': { offsetMultiplier: 5.05, useGeneral: true },
+            'year-label': { offsetMultiplier: 3, useGeneral: true, fontScale: 1.5, prefix: true },
+            'year-count': { offsetMultiplier: 5.2, useGeneral: true },
             'top_x_title': { offsetMultiplier: 5.93, useTitle: true, yDirection: 'above' },
             'bottom_x_title': { offsetMultiplier: 4.44, useTitle: true, yDirection: 'below' }
         },
         shapes: {
             hasTopXTick: true,
-            topXTickHeight: 45
+            topXTickMultiplier: 3.3
         }
     },
     Yearly: {
@@ -76,16 +88,20 @@ const CHART_CONFIG = {
         snapTo: 20,  // Snap to multiples of 20 (20, 40, 60...)
         minXmax: 20,
         maxWindow: 100,
+        creditMarginMultiplier: 0.15,
+        topMarginMultiplier: 0,
+        fanMarginMinute: 0.10,
+        fanMarginCount: 0.07,
         annotations: {
-            'year-label': { offsetMultiplier: 3.05, useGeneral: true, fontScale: 0.75, prefix: true },
-            'decade-count': { offsetMultiplier: 5.93, useGeneral: true },
-            'top_x_title': { offsetMultiplier: 6.81, useTitle: true, yDirection: 'above' },
+            'year-label': { offsetMultiplier: 3, useGeneral: true, fontScale: 1, prefix: true },
+            'decade-count': { offsetMultiplier: 4.7, useGeneral: true, fontScale: 1 },
+            'top_x_title': { offsetMultiplier: 5.5, useTitle: true, yDirection: 'above' },
             'bottom_x_title': { offsetMultiplier: 4.44, useTitle: true, yDirection: 'below' }
         },
         shapes: {
             hasTopXTick: true,
-            topXTickFullHeight: 55,
-            topXTickHalfHeight: 30,
+            topXTickFullMultiplier: 1.4,
+            topXTickHalfMultiplier: 0.8,
             useDecadeTicks: true
         }
     },
@@ -96,6 +112,10 @@ const CHART_CONFIG = {
         snapTo: 7,  // Snap to multiples of 7 (42, 49, 56...)
         minXmax: 42,
         maxWindow: 70,
+        creditMarginMultiplier: 0.10,
+        topMarginMultiplier: 0,
+        fanMarginMinute: 0.10,
+        fanMarginCount: 0.07,
         annotations: {
             'blank-line': { offsetMultiplier: 3.05, useGeneral: true, fontScale: 0.75, prefix: true, yDirection: 'below' },
             'counted-label': { offsetMultiplier: 4.79, useGeneral: true, fontScale: 0.75, prefix: true, yDirection: 'below' },
@@ -103,25 +123,6 @@ const CHART_CONFIG = {
         },
         shapes: {
             noRightYTick: true
-        }
-    },
-    Timing: {
-        // Timing uses Daily's template and settings
-        yMin: 1 * 0.69,
-        yMax: 1000000,
-        unit: 7,
-        snapTo: 14,
-        minXmax: 28,
-        maxWindow: 140,
-        annotations: {
-            'date-text': { offsetMultiplier: 4, useGeneral: true },
-            'week-count': { offsetMultiplier: 2.0833, useGeneral: true },
-            'top_x_title': { offsetMultiplier: 5.2, useTitle: true, yDirection: 'above' },
-            'bottom_x_title': { offsetMultiplier: 4.1666, useTitle: true, yDirection: 'below' }
-        },
-        shapes: {
-            hasDateLine: true,
-            dateLineOffsetMultiplier: 2.4305
         }
     }
 };
@@ -188,7 +189,10 @@ function resizeChartByHeight(chartJson, containerWidth, containerHeight, chartTy
     // Expand margin for celeration fan (must happen before width calculation)
     if (fanVisible && !isMobile()) {
         // Minute charts need more space (fan on left with labels extending outward)
-        const fanMargin = isMinuteChart ? height * 0.10 : height * 0.07;
+        const fanMultiplier = isMinuteChart
+            ? (config.fanMarginMinute ?? 0.10)
+            : (config.fanMarginCount ?? 0.07);
+        const fanMargin = height * fanMultiplier;
         if (isMinuteChart) {
             margin.l += fanMargin;
         } else {
@@ -197,8 +201,12 @@ function resizeChartByHeight(chartJson, containerWidth, containerHeight, chartTy
     }
 
     // Expand bottom margin for credit information
-    const creditMargin = height * 0.10;
+    const creditMargin = height * (config.creditMarginMultiplier ?? 0.10);
     margin.b += creditMargin;
+
+    // Expand top margin
+    const topMargin = height * (config.topMarginMultiplier ?? 0);
+    margin.t += topMargin;
 
     const y = { min: config.yMin, max: config.yMax };
     const xmax = newXmax;  // Use peeled xmax for remaining calculations
@@ -320,13 +328,13 @@ function resizeChartByHeight(chartJson, containerWidth, containerHeight, chartTy
         if (shape.name === 'top-x-tick') {
             if (config.shapes.useDecadeTicks) {
                 // Yearly chart: variable tick heights for decade boundaries
-                const fullHeight = config.shapes.topXTickFullHeight / yaxis_px;
-                const halfHeight = config.shapes.topXTickHalfHeight / yaxis_px;
+                const fullHeight = (generalFontScale * config.shapes.topXTickFullMultiplier) / yaxis_px;
+                const halfHeight = (generalFontScale * config.shapes.topXTickHalfMultiplier) / yaxis_px;
                 const xPos = shape.x0;
                 shape.y0 = 1 + (xPos % 10 === 0 ? fullHeight : halfHeight);
             } else if (config.shapes.hasTopXTick) {
                 // Weekly/Monthly: uniform tick height
-                const tickHeight = config.shapes.topXTickHeight / yaxis_px;
+                const tickHeight = (generalFontScale * config.shapes.topXTickMultiplier) / yaxis_px;
                 shape.y0 = 1 + tickHeight;
             }
         }

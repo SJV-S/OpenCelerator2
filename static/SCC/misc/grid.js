@@ -1,5 +1,8 @@
 // Track grid visibility state
 let gridVisible = true;
+let dateLinesVisible = true;
+let countLinesVisible = true;
+let minorGridVisible = true;
 
 /**
  * Get indices of grid traces (traces with names starting with 'grid-')
@@ -9,6 +12,21 @@ function getGridTraceIndices(chartDiv) {
     if (chartDiv.data) {
         chartDiv.data.forEach((trace, i) => {
             if (trace.name && trace.name.startsWith('grid-')) {
+                indices.push(i);
+            }
+        });
+    }
+    return indices;
+}
+
+/**
+ * Get indices of traces matching specific names
+ */
+function getTraceIndicesByNames(chartDiv, names) {
+    const indices = [];
+    if (chartDiv.data) {
+        chartDiv.data.forEach((trace, i) => {
+            if (trace.name && names.includes(trace.name)) {
                 indices.push(i);
             }
         });
@@ -44,6 +62,48 @@ export function toggleGrid(show) {
  */
 export function rmGrid() {
     toggleGrid(false);
+}
+
+/**
+ * Toggle thick vertical lines (date lines)
+ */
+export function toggleDateLines(show) {
+    const chartDiv = document.getElementById('chart');
+    if (!chartDiv || !chartDiv.data) return;
+
+    const indices = getTraceIndicesByNames(chartDiv, ['grid-major-vertical']);
+    if (indices.length === 0) return;
+
+    Plotly.restyle(chartDiv, { visible: show }, indices);
+    dateLinesVisible = show;
+}
+
+/**
+ * Toggle thick horizontal lines (count lines)
+ */
+export function toggleCountLines(show) {
+    const chartDiv = document.getElementById('chart');
+    if (!chartDiv || !chartDiv.data) return;
+
+    const indices = getTraceIndicesByNames(chartDiv, ['grid-major-horizontal', 'grid-sub-horizontal']);
+    if (indices.length === 0) return;
+
+    Plotly.restyle(chartDiv, { visible: show }, indices);
+    countLinesVisible = show;
+}
+
+/**
+ * Toggle thin lines (minor grid)
+ */
+export function toggleMinorGrid(show) {
+    const chartDiv = document.getElementById('chart');
+    if (!chartDiv || !chartDiv.data) return;
+
+    const indices = getTraceIndicesByNames(chartDiv, ['grid-minor-vertical', 'grid-minor-horizontal']);
+    if (indices.length === 0) return;
+
+    Plotly.restyle(chartDiv, { visible: show }, indices);
+    minorGridVisible = show;
 }
 
 /**

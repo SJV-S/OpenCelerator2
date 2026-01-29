@@ -521,16 +521,19 @@ export function importToChartState(cleanedRows, options = { replace: true }) {
             }
         }
 
-        // Update startDate to Sunday before earliest data point
+        // Update startDate to Monday before earliest data point (ISO 8601)
         if (chartState.series.xValues.length > 0) {
             // Find earliest timestamp in all data (could be existing or new)
             const earliestTimestamp = Math.min(...chartState.series.xValues);
             const earliestDate = new Date(earliestTimestamp * 1000);
             const dayOfWeek = earliestDate.getDay();
-            const sundayOffset = dayOfWeek * 86400 * 1000;
-            const sundayDate = new Date(earliestDate.getTime() - sundayOffset);
-            sundayDate.setHours(0, 0, 0, 0);
-            chartState.startDate = sundayDate;
+            // getDay(): 0=Sun, 1=Mon, ..., 6=Sat
+            // Days to subtract to reach Monday: Mon(1)->0, Tue(2)->1, ..., Sun(0)->6
+            const daysToMonday = (dayOfWeek === 0) ? 6 : dayOfWeek - 1;
+            const mondayOffset = daysToMonday * 86400 * 1000;
+            const mondayDate = new Date(earliestDate.getTime() - mondayOffset);
+            mondayDate.setHours(0, 0, 0, 0);
+            chartState.startDate = mondayDate;
         }
 
         // Emit success event
