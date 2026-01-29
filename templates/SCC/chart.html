@@ -57,62 +57,33 @@
         import { initializeChart, setupEventListeners } from '/static/SCC/main.js';
         import { initStorage, loadChart } from '/static/SCC/storage/chartStorage.js';
 
-        {% if initial_load %}
-        // Initial load: redirect with container dimensions
-        // Account for menu on desktop (1024px+ screens)
-        const menuWidth = window.innerWidth >= 1024 ? Math.max(280, Math.min(window.innerWidth * 0.25, 400)) : 0;
-        const width = window.innerWidth - menuWidth;
-        const height = window.innerHeight;
-        // Preserve load param if present
+        // Check for load param (chart ID from menu)
         const urlParams = new URLSearchParams(window.location.search);
         const loadId = urlParams.get('load');
-        const loadParam = loadId ? `&load=${loadId}` : '';
-        window.location.href = `/chart/{{ chart_type }}/{{ minute_type }}?width=${width}&height=${height}${loadParam}`;
-        {% else %}
-        // On refresh: reset URL to recapture current dimensions
-        const navEntry = performance.getEntriesByType('navigation')[0];
-        if (navEntry && navEntry.type === 'reload') {
-            const urlParams = new URLSearchParams(window.location.search);
-            const loadId = urlParams.get('load');
-            const loadParam = loadId ? `?load=${loadId}` : '';
-            window.location.href = `/chart/{{ chart_type }}/{{ minute_type }}${loadParam}`;
-        } else {
-            // Template selected: render chart
-            var plotData = {{ plot_json | safe }};
-            var chartDiv = document.getElementById('chart');
 
-            // Template variables
-            var maxWindowWidth = {{ max_window_width }};
-
-            // Check for explicit load param (from menu list)
-            const urlParams = new URLSearchParams(window.location.search);
-            const loadId = urlParams.get('load');
-
-            async function init() {
-                if (!loadId) {
-                    // No chart specified - redirect to menu
-                    window.location.href = '/';
-                    return;
-                }
-
-                await initStorage();
-
-                const success = await loadChart(loadId);
-                if (!success) {
-                    console.warn('Failed to load chart:', loadId);
-                    window.location.href = '/';
-                    return;
-                }
-
-                // Set up event listeners (chartState now populated)
-                setupEventListeners();
-
-                // Initialize chart with loaded data
-                initializeChart(plotData, maxWindowWidth);
+        async function init() {
+            if (!loadId) {
+                // No chart specified - redirect to menu
+                window.location.href = '/';
+                return;
             }
 
-            init();
+            await initStorage();
+
+            const success = await loadChart(loadId);
+            if (!success) {
+                console.warn('Failed to load chart:', loadId);
+                window.location.href = '/';
+                return;
+            }
+
+            // Set up event listeners (chartState now populated)
+            setupEventListeners();
+
+            // Initialize chart (templates loaded client-side)
+            initializeChart();
         }
-        {% endif %}
+
+        init();
     </script>
 {% endblock %}

@@ -21,6 +21,7 @@ const CHART_CONFIG = {
         unit: 7,
         snapTo: 14,  // Snap xmax to multiples of 14 (28, 42, 56...)
         minXmax: 28,
+        maxWindow: 140,
         annotations: {
             'date-text': { offsetMultiplier: 4, useGeneral: true },
             'week-count': { offsetMultiplier: 2.0833, useGeneral: true },
@@ -38,6 +39,7 @@ const CHART_CONFIG = {
         unit: 4,
         snapTo: 8,  // Snap to multiples of 8 (8, 16, 24...)
         minXmax: 8,
+        maxWindow: 100,
         annotations: {
             'month-label': { offsetMultiplier: 3.05, useGeneral: true, fontScale: 0.85, prefix: true },
             'month-count': { offsetMultiplier: 5.93, useGeneral: true },
@@ -55,6 +57,7 @@ const CHART_CONFIG = {
         unit: 5,
         snapTo: 24,  // Snap to multiples of 24 (24, 48, 72...)
         minXmax: 24,
+        maxWindow: 120,
         annotations: {
             'year-label': { offsetMultiplier: 2.61, useGeneral: true, fontScale: 0.85, prefix: true },
             'year-count': { offsetMultiplier: 5.05, useGeneral: true },
@@ -72,6 +75,7 @@ const CHART_CONFIG = {
         unit: 5,
         snapTo: 20,  // Snap to multiples of 20 (20, 40, 60...)
         minXmax: 20,
+        maxWindow: 100,
         annotations: {
             'year-label': { offsetMultiplier: 3.05, useGeneral: true, fontScale: 0.75, prefix: true },
             'decade-count': { offsetMultiplier: 5.93, useGeneral: true },
@@ -91,6 +95,7 @@ const CHART_CONFIG = {
         unit: 7,
         snapTo: 7,  // Snap to multiples of 7 (42, 49, 56...)
         minXmax: 42,
+        maxWindow: 70,
         annotations: {
             'blank-line': { offsetMultiplier: 3.05, useGeneral: true, fontScale: 0.75, prefix: true, yDirection: 'below' },
             'counted-label': { offsetMultiplier: 4.79, useGeneral: true, fontScale: 0.75, prefix: true, yDirection: 'below' },
@@ -98,6 +103,25 @@ const CHART_CONFIG = {
         },
         shapes: {
             noRightYTick: true
+        }
+    },
+    Timing: {
+        // Timing uses Daily's template and settings
+        yMin: 1 * 0.69,
+        yMax: 1000000,
+        unit: 7,
+        snapTo: 14,
+        minXmax: 28,
+        maxWindow: 140,
+        annotations: {
+            'date-text': { offsetMultiplier: 4, useGeneral: true },
+            'week-count': { offsetMultiplier: 2.0833, useGeneral: true },
+            'top_x_title': { offsetMultiplier: 5.2, useTitle: true, yDirection: 'above' },
+            'bottom_x_title': { offsetMultiplier: 4.1666, useTitle: true, yDirection: 'below' }
+        },
+        shapes: {
+            hasDateLine: true,
+            dateLineOffsetMultiplier: 2.4305
         }
     }
 };

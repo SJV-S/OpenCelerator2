@@ -200,6 +200,7 @@ function toggleLineVisibility(lineType) {
     // Handle grid specially - call toggleGrid directly
     if (lineType === 'grid') {
         toggleGrid(chartState.lineVisibility[lineType]);
+        eventBus.emit(EVENTS.CHART_GRID_VISIBILITY_CHANGED, { visible: chartState.lineVisibility[lineType] });
         return;
     }
 

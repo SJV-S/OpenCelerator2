@@ -77,6 +77,7 @@ export const EVENTS = {
     // Chart Settings Events
     CHART_PANNING_ENABLED_CHANGED: 'chart:panning_enabled_changed',
     CHART_NAME_CHANGED: 'chart:name_changed',
+    CHART_GRID_VISIBILITY_CHANGED: 'chart:grid_visibility_changed',
 
     // Counter Events
     COUNTER_ENTRY_DATE_CHANGED: 'counter:entry_date_changed',

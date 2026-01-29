@@ -60,6 +60,7 @@ import { injectCredits, initCreditClick, regenerateCredits, init as creditInit }
 import { toggleLegend, renderCustomLegend, init as customLegendInit } from './misc/customLegend.js';
 import { setupPanConstraints } from './util/panning_controls.js';
 import { resizeChartByHeight, CHART_CONFIG } from './util/resize_chart/resize-chart.js';
+import { getTemplate } from './util/chartLayouts.js';
 import { showInitialMenuHint } from './util/tooltip.js';
 import { icons } from './util/icons.js';
 import { initializeShareTab } from './misc/share.js';
@@ -71,13 +72,22 @@ import { initStorage } from './storage/chartStorage.js';
 // ============================================================================
 
 /**
- * Initialize the chart with server-rendered data
- * @param {Object} plotData - Plot data from Jinja template
- * @param {number} maxWindowWidth - Max window width from template
+ * Initialize the chart using client-side templates
+ * Template is loaded based on chartState.chartType and chartState.minuteChart
  */
-export function initializeChart(plotData, maxWindowWidth) {
+export function initializeChart() {
     // Update UI based on chartState.minuteChart (already set in chartState.js)
     updateTimingVisibility();
+
+    // Get template from client-side module
+    let plotData = getTemplate(chartState.chartType, chartState.minuteChart);
+    if (!plotData) {
+        console.error('Failed to load template for:', chartState.chartType, chartState.minuteChart);
+        return;
+    }
+
+    // Get maxWindowWidth from config
+    const maxWindowWidth = (CHART_CONFIG[chartState.chartType]?.maxWindow || 140) + 0.4;
 
     const chartDiv = document.getElementById('chart');
 

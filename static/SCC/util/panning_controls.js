@@ -1,5 +1,12 @@
 import { eventBus, EVENTS } from '../eventBus.js';
 
+// Dynamic spine configuration
+const LEFT_SPINE_NAME = 'dynamic-left-spine';
+const RIGHT_SPINE_NAME = 'dynamic-right-spine';
+const SPINE_COLOR = '#6ad1e3';
+const SPINE_WIDTH = 2.5;
+let gridVisible = true;
+
 // Chart boundary configuration
 const CHART_MARGIN = 0.2;
 const CHART_X_MIN = -CHART_MARGIN;
@@ -31,11 +38,57 @@ function setupPanConstraints(plotDiv, maxWindowWidth, chartType) {
 
     let isProgrammaticUpdate = false;
     let defaultWindowWidth = MAX_WINDOW_WIDTH;
+    let isDragging = false;
 
     // Subscribe to panning enabled/disabled changes
     eventBus.subscribe(EVENTS.CHART_PANNING_ENABLED_CHANGED, (enabled) => {
         Plotly.relayout(plotDiv, { 'xaxis.fixedrange': !enabled });
     }, true);
+
+    // Dynamic spines helper
+    function updateDynamicSpines() {
+        if (gridVisible) return;
+        const shapes = plotDiv.layout.shapes || [];
+        const xRange = plotDiv.layout.xaxis.range;
+        const yRange = plotDiv.layout.yaxis.range;
+        const yMin = Math.pow(10, yRange[0]);
+        const yMax = Math.pow(10, yRange[1]);
+
+        const otherShapes = shapes.filter(s => s.name !== LEFT_SPINE_NAME && s.name !== RIGHT_SPINE_NAME);
+        const leftSpine = {
+            type: 'line', x0: xRange[0] + 0.2, x1: xRange[0] + 0.2, y0: yMin, y1: yMax,
+            yref: 'y', line: { color: SPINE_COLOR, width: SPINE_WIDTH },
+            layer: 'below', name: LEFT_SPINE_NAME
+        };
+        const rightSpine = {
+            type: 'line', x0: xRange[1] - 0.2, x1: xRange[1] - 0.2, y0: yMin, y1: yMax,
+            yref: 'y', line: { color: SPINE_COLOR, width: SPINE_WIDTH },
+            layer: 'below', name: RIGHT_SPINE_NAME
+        };
+        Plotly.relayout(plotDiv, { shapes: [...otherShapes, leftSpine, rightSpine] });
+    }
+
+    function removeDynamicSpines() {
+        const shapes = plotDiv.layout.shapes || [];
+        const filtered = shapes.filter(s => s.name !== LEFT_SPINE_NAME && s.name !== RIGHT_SPINE_NAME);
+        if (filtered.length !== shapes.length) {
+            Plotly.relayout(plotDiv, { shapes: filtered });
+        }
+    }
+
+    // Subscribe to grid visibility changes
+    eventBus.subscribe(EVENTS.CHART_GRID_VISIBILITY_CHANGED, ({ visible }) => {
+        gridVisible = visible;
+        visible ? removeDynamicSpines() : updateDynamicSpines();
+    }, true);
+
+    // Hide dynamic spines immediately when dragging starts
+    plotDiv.on('plotly_relayouting', function() {
+        if (!gridVisible && !isDragging) {
+            isDragging = true;
+            removeDynamicSpines();
+        }
+    });
 
     plotDiv.on('plotly_relayout', function(eventData) {
         // Ignore events triggered by our own updates
@@ -93,6 +146,12 @@ function setupPanConstraints(plotDiv, maxWindowWidth, chartType) {
                 Plotly.relayout(plotDiv, {
                     'xaxis.range': [newXMin, newXMax]
                 });
+            }
+
+            // Update dynamic spines position after panning
+            isDragging = false;
+            if (!gridVisible) {
+                setTimeout(() => updateDynamicSpines(), 10);
             }
         }
     });
