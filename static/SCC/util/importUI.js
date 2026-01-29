@@ -66,6 +66,8 @@ function cacheElements() {
         timingRow: document.getElementById('import-timing-row'),
         miscContainer: document.getElementById('import-misc-container'),
         addMiscBtn: document.getElementById('import-add-misc-btn'),
+        replaceOption: document.getElementById('import-replace-option'),
+        replaceCheckbox: document.getElementById('import-replace-checkbox'),
         cancelBtn: document.getElementById('import-cancel-btn'),
         confirmBtn: document.getElementById('import-confirm-btn')
     };
@@ -129,6 +131,23 @@ function updateTimingRowVisibility() {
 }
 
 // ============================================================================
+// Replace Option Visibility (based on existing data)
+// ============================================================================
+
+function hasExistingData() {
+    return chartState.series.xValues && chartState.series.xValues.length > 0;
+}
+
+function updateReplaceOptionVisibility() {
+    if (elements.replaceOption) {
+        elements.replaceOption.style.display = hasExistingData() ? 'block' : 'none';
+    }
+    if (elements.replaceCheckbox) {
+        elements.replaceCheckbox.checked = true; // Default to replace
+    }
+}
+
+// ============================================================================
 // File Handling
 // ============================================================================
 
@@ -163,6 +182,7 @@ async function handleFile(file) {
         showState('mapping');
         updateFileInfo(file.name, data.rows.length);
         updateTimingRowVisibility();
+        updateReplaceOptionVisibility();
 
     } catch (err) {
         console.error('Import error:', err);
@@ -180,17 +200,18 @@ async function handleFile(file) {
 // ============================================================================
 
 function setupMappingControls() {
-    // Dropdowns - update validation on change
-    const dropdowns = [
+    // Dropdowns - update validation and filter other dropdowns on change
+    const coreDropdowns = [
         elements.mapDate,
         elements.mapCorrects,
         elements.mapErrors,
         elements.mapTiming
     ];
 
-    dropdowns.forEach(dropdown => {
+    coreDropdowns.forEach(dropdown => {
         if (dropdown) {
             dropdown.addEventListener('change', () => {
+                updateDropdownOptions();
                 updateDropdownStyles();
                 validateMapping();
             });
@@ -228,7 +249,7 @@ function populateMappingDropdowns(data) {
     // Numeric dropdowns - prioritize detected numeric columns
     populateDropdown(elements.mapCorrects, columns, numericColumns, 'Select');
     populateDropdown(elements.mapErrors, columns, numericColumns, 'Select');
-    populateDropdown(elements.mapTiming, columns, numericColumns, 'Default: 1');
+    populateDropdown(elements.mapTiming, columns, numericColumns, 'Select');
 
     // Auto-select if only one date column detected
     if (dateColumns.length === 1) {
@@ -241,6 +262,7 @@ function populateMappingDropdowns(data) {
     autoSelectByName(elements.mapErrors, columns, ['error', 'errors', 'incorrect', 'wrong', 'mistakes']);
     autoSelectByName(elements.mapTiming, columns, ['minute', 'minutes', 'time', 'duration', 'timing', 'floor']);
 
+    updateDropdownOptions();
     updateDropdownStyles();
     validateMapping();
 }
@@ -248,41 +270,26 @@ function populateMappingDropdowns(data) {
 function populateDropdown(select, allColumns, priorityColumns, placeholder) {
     if (!select) return;
 
-    // Clear existing options
     select.innerHTML = '';
 
-    // Add placeholder
+    // Placeholder
     const placeholderOpt = document.createElement('option');
     placeholderOpt.value = '';
     placeholderOpt.textContent = placeholder;
     select.appendChild(placeholderOpt);
 
-    // Add priority columns first (detected type)
-    if (priorityColumns && priorityColumns.length > 0) {
-        const group = document.createElement('optgroup');
-        group.label = 'Detected';
-        priorityColumns.forEach(col => {
-            const opt = document.createElement('option');
-            opt.value = col;
-            opt.textContent = col;
-            group.appendChild(opt);
-        });
-        select.appendChild(group);
-    }
+    // Priority columns first, then others
+    const orderedColumns = [
+        ...(priorityColumns || []),
+        ...allColumns.filter(c => !priorityColumns || !priorityColumns.includes(c))
+    ];
 
-    // Add remaining columns
-    const otherColumns = allColumns.filter(c => !priorityColumns || !priorityColumns.includes(c));
-    if (otherColumns.length > 0) {
-        const group = document.createElement('optgroup');
-        group.label = priorityColumns && priorityColumns.length > 0 ? 'Other' : 'Columns';
-        otherColumns.forEach(col => {
-            const opt = document.createElement('option');
-            opt.value = col;
-            opt.textContent = col;
-            group.appendChild(opt);
-        });
-        select.appendChild(group);
-    }
+    orderedColumns.forEach(col => {
+        const opt = document.createElement('option');
+        opt.value = col;
+        opt.textContent = col;
+        select.appendChild(opt);
+    });
 }
 
 function autoSelectByName(select, columns, keywords) {
@@ -297,6 +304,38 @@ function autoSelectByName(select, columns, keywords) {
             return;
         }
     }
+}
+
+function updateDropdownOptions() {
+    const selected = [];
+
+    // Collect all selected values
+    [elements.mapDate, elements.mapCorrects, elements.mapErrors, elements.mapTiming].forEach(el => {
+        if (el?.value) selected.push(el.value);
+    });
+    document.querySelectorAll('.import-misc-select').forEach(el => {
+        if (el.value) selected.push(el.value);
+    });
+
+    // Disable selected options in all other dropdowns
+    const allDropdowns = [
+        elements.mapDate,
+        elements.mapCorrects,
+        elements.mapErrors,
+        elements.mapTiming,
+        ...document.querySelectorAll('.import-misc-select')
+    ];
+
+    allDropdowns.forEach(dropdown => {
+        if (!dropdown) return;
+        const myValue = dropdown.value;
+
+        for (const opt of dropdown.options) {
+            if (!opt.value) continue; // skip placeholder
+            // Disable if selected elsewhere (not in this dropdown)
+            opt.disabled = selected.includes(opt.value) && opt.value !== myValue;
+        }
+    });
 }
 
 function updateDropdownStyles() {
@@ -354,6 +393,7 @@ function addMiscColumn() {
     populateDropdown(select, currentFileData.columns, [], 'Select');
 
     select.addEventListener('change', () => {
+        updateDropdownOptions();
         updateDropdownStyles();
         validateMapping();
     });
@@ -394,6 +434,7 @@ function validateMapping() {
     const dateCol = elements.mapDate?.value;
     const correctsCol = elements.mapCorrects?.value;
     const errorsCol = elements.mapErrors?.value;
+    const timingCol = elements.mapTiming?.value;
 
     let valid = true;
 
@@ -405,13 +446,17 @@ function validateMapping() {
     else if (!correctsCol && !errorsCol) {
         valid = false;
     }
+    // Minutes required for minute charts
+    else if (chartState.minuteChart && !timingCol) {
+        valid = false;
+    }
     // Check for duplicate selections
     else {
         const selected = [
             dateCol,
             correctsCol,
             errorsCol,
-            chartState.minuteChart ? elements.mapTiming?.value : null,
+            chartState.minuteChart ? timingCol : null,
             ...Object.values(getMiscColumnMappings())
         ].filter(Boolean);
 
@@ -455,7 +500,8 @@ async function performImport() {
         }
 
         // Import to chartState
-        const result = importToChartState(valid, { replace: true });
+        const shouldReplace = !hasExistingData() || elements.replaceCheckbox?.checked !== false;
+        const result = importToChartState(valid, { replace: shouldReplace });
 
         if (result.success) {
             // Show success message

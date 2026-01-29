@@ -112,3 +112,20 @@ export function last(arr) {
     // Return the last valid value
     return validValues[validValues.length - 1];
 }
+
+/**
+ * Calculate the sum of an array
+ * Note: Only meaningful for non-minute charts where frequency = raw count
+ * @param {Array<number>} arr - Array of numbers
+ * @returns {number} The sum of all values
+ */
+export function sum(arr) {
+    if (!arr || arr.length === 0) return NaN;
+
+    // Filter out NaN and null values
+    const validValues = arr.filter(val => val !== null && !isNaN(val));
+
+    if (validValues.length === 0) return NaN;
+
+    return validValues.reduce((acc, val) => acc + val, 0);
+}

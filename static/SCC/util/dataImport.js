@@ -136,15 +136,23 @@ export function detectColumnTypes(rows) {
 
 /**
  * Check columns against a pattern using lazy evaluation
+ * For date detection, uses a multi-stage approach:
+ *   Stage 0: Check if value is already a Date object (XLSX may parse dates)
+ *   Stage 1: Check if value is an Excel serial date number
+ *   Stage 2: Primary regex pattern (2+ separators)
+ *   Stage 3: Fallback for partial dates (year-only, year-month)
+ *
  * @param {object[]} rows - Data rows
  * @param {string[]} columns - Columns to check
  * @param {RegExp} pattern - Pattern to match
- * @param {boolean} isDateCheck - Whether this is date detection (uses additional heuristics)
+ * @param {boolean} isDateCheck - Whether this is date detection (uses fallback heuristics)
  * @returns {string[]} Columns that match the pattern
  */
 function lazyCheck(rows, columns, pattern, isDateCheck) {
     const matchingColumns = [];
     const sampleRows = rows.slice(0, DETECTION_SAMPLE_SIZE);
+    const MIN_YEAR = 1900;
+    const MAX_YEAR = 2100;
 
     for (const col of columns) {
         let matches = 0;
@@ -157,16 +165,83 @@ function lazyCheck(rows, columns, pattern, isDateCheck) {
             if (value == null || value === '') continue;
 
             total++;
-            const strValue = String(value).trim();
 
             if (isDateCheck) {
-                // For dates, also try parsing with Date constructor
-                if (pattern.test(strValue) || isLikelyDate(strValue)) {
-                    matches++;
+                // Stage 0: Check if already a Date object (XLSX parses dates)
+                if (value instanceof Date) {
+                    if (!isNaN(value.getTime())) {
+                        const year = value.getFullYear();
+                        if (year >= MIN_YEAR && year <= MAX_YEAR) {
+                            matches++;
+                            continue;
+                        }
+                    }
                 }
-            } else {
-                if (pattern.test(strValue)) {
-                    matches++;
+
+                // Stage 1: Check if Excel serial date (number between ~1 and ~60000)
+                if (typeof value === 'number' && value > 0 && value < 100000) {
+                    // Excel serial dates: 1 = Jan 1, 1900, ~45000 = ~2023
+                    // Valid range roughly 1 (1900) to 73000 (2100)
+                    if (value >= 1 && value <= 73050) {
+                        matches++;
+                        continue;
+                    }
+                }
+            }
+
+            const strValue = String(value).trim();
+
+            // Stage 2: Try primary regex pattern (for strings)
+            if (pattern.test(strValue)) {
+                matches++;
+                continue;
+            }
+
+            // Stage 3: Fallback for date detection only
+            if (isDateCheck) {
+                // Year-only: "2024" (exactly 4 digits, valid year range)
+                if (/^\d{4}$/.test(strValue)) {
+                    const year = parseInt(strValue);
+                    if (year >= MIN_YEAR && year <= MAX_YEAR) {
+                        matches++;
+                        continue;
+                    }
+                }
+
+                // Year-month formats: normalize separators and split
+                const parts = strValue.replace(/[/.]/g, '-').split('-');
+                if (parts.length === 2) {
+                    const [p1, p2] = parts;
+
+                    // YYYY-MM format (e.g., "2024-06", "2024/06")
+                    if (p1.length === 4 && /^\d+$/.test(p1) && /^\d+$/.test(p2)) {
+                        const year = parseInt(p1);
+                        const month = parseInt(p2);
+                        if (year >= MIN_YEAR && year <= MAX_YEAR && month >= 1 && month <= 12) {
+                            matches++;
+                            continue;
+                        }
+                    }
+
+                    // MM-YYYY format (e.g., "06-2024", "06/2024")
+                    if (p2.length === 4 && /^\d+$/.test(p1) && /^\d+$/.test(p2)) {
+                        const month = parseInt(p1);
+                        const year = parseInt(p2);
+                        if (year >= MIN_YEAR && year <= MAX_YEAR && month >= 1 && month <= 12) {
+                            matches++;
+                            continue;
+                        }
+                    }
+                }
+
+                // Final fallback: try native Date parsing on string
+                const parsed = new Date(strValue);
+                if (!isNaN(parsed.getTime())) {
+                    const year = parsed.getFullYear();
+                    if (year >= MIN_YEAR && year <= MAX_YEAR) {
+                        matches++;
+                        continue;
+                    }
                 }
             }
         }
@@ -178,56 +253,6 @@ function lazyCheck(rows, columns, pattern, isDateCheck) {
     }
 
     return matchingColumns;
-}
-
-/**
- * Additional date heuristics beyond regex
- * Handles partial dates and various formats per reference document
- * @param {string} value - String value to check
- * @returns {boolean} Whether value looks like a date
- */
-function isLikelyDate(value) {
-    const str = String(value).trim();
-    const MIN_YEAR = 1900;
-    const MAX_YEAR = 2100;
-
-    // Year only: "2024" (4 digits, valid year range)
-    if (/^\d{4}$/.test(str)) {
-        const year = parseInt(str);
-        return year >= MIN_YEAR && year <= MAX_YEAR;
-    }
-
-    // Year-month formats: "2024-03", "2024/03", "03-2024", "03/2024"
-    const parts = str.replace(/[/.]/g, '-').split('-');
-    if (parts.length === 2) {
-        const [p1, p2] = parts;
-        // YYYY-MM format
-        if (p1.length === 4 && /^\d+$/.test(p1) && /^\d+$/.test(p2)) {
-            const year = parseInt(p1);
-            const month = parseInt(p2);
-            if (year >= MIN_YEAR && year <= MAX_YEAR && month >= 1 && month <= 12) {
-                return true;
-            }
-        }
-        // MM-YYYY format
-        if (p2.length === 4 && /^\d+$/.test(p1) && /^\d+$/.test(p2)) {
-            const month = parseInt(p1);
-            const year = parseInt(p2);
-            if (year >= MIN_YEAR && year <= MAX_YEAR && month >= 1 && month <= 12) {
-                return true;
-            }
-        }
-    }
-
-    // Try native Date parsing (catches many formats)
-    const parsed = new Date(str);
-    if (!isNaN(parsed.getTime())) {
-        const year = parsed.getFullYear();
-        // Sanity check: year between valid range
-        return year >= MIN_YEAR && year <= MAX_YEAR;
-    }
-
-    return false;
 }
 
 // ============================================================================
@@ -497,8 +522,9 @@ export function importToChartState(cleanedRows, options = { replace: true }) {
         }
 
         // Update startDate to Sunday before earliest data point
-        if (sortedRows.length > 0) {
-            const earliestTimestamp = sortedRows[0].timestamp;
+        if (chartState.series.xValues.length > 0) {
+            // Find earliest timestamp in all data (could be existing or new)
+            const earliestTimestamp = Math.min(...chartState.series.xValues);
             const earliestDate = new Date(earliestTimestamp * 1000);
             const dayOfWeek = earliestDate.getDay();
             const sundayOffset = dayOfWeek * 86400 * 1000;

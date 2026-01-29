@@ -3,13 +3,15 @@
  *
  * This module handles:
  * - Trace template functions for all series types
- * - Aggregation logic (median, mean, min, max, first, last, raw)
+ * - Aggregation logic (median, mean, min, max, first, last, sum, raw)
  * - Frequency calculations and floor thresholding
  * - Trace creation with segmentation and aggregation
+ *
+ * Note: 'sum' aggregation only works for non-minute charts (where frequency = raw count)
  */
 
 import { chartState } from '../chartState.js';
-import { median, mean, min, max, first, last } from '../util/agg.js';
+import { median, mean, min, max, first, last, sum } from '../util/agg.js';
 
 // ============================================================================
 // TRACE CREATION FUNCTIONS
@@ -142,7 +144,7 @@ function miscFloorTrace(xValues, yValues, config) {
  * Apply aggregation to frequency data based on aggregation type.
  *
  * @param {Array<number>} data - Frequency data array
- * @param {string} aggType - Aggregation type (e.g., 'raw', 'median', 'min', 'max', 'mean', 'first', 'last')
+ * @param {string} aggType - Aggregation type (e.g., 'raw', 'median', 'min', 'max', 'mean', 'first', 'last', 'sum')
  * @returns {Array<number>} Aggregated data
  */
 function applyAggregation(data, aggType) {
@@ -173,6 +175,14 @@ function applyAggregation(data, aggType) {
             break;
         case 'last':
             aggregatedValue = last(data);
+            break;
+        case 'sum':
+            // Sum is only meaningful for non-minute charts (where frequency = raw count)
+            // For minute charts, return raw data unchanged since summing rates is meaningless
+            if (chartState.minuteChart) {
+                return data;
+            }
+            aggregatedValue = sum(data);
             break;
         default:
             // Unknown aggregation type, return raw data

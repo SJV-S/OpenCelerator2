@@ -45,11 +45,11 @@
                     </select>
                 </div>
 
-                <!-- Timing Column (only shown for minute charts) -->
+                <!-- Timing Column (only shown for minute charts, required when shown) -->
                 <div class="import-mapping-row" id="import-timing-row">
-                    <label class="import-mapping-label">Minutes</label>
+                    <label class="import-mapping-label">Minutes <span class="import-required">*</span></label>
                     <select id="import-map-timing" class="import-mapping-select">
-                        <option value="">Default: 1</option>
+                        <option value="">Select</option>
                     </select>
                 </div>
 
@@ -60,6 +60,14 @@
                 <button type="button" id="import-add-misc-btn" class="import-add-misc-btn">
                     + Add column
                 </button>
+            </div>
+
+            <!-- Replace data option (only shown when data exists) -->
+            <div id="import-replace-option" class="import-replace-option" style="display: none;">
+                <label class="import-checkbox-label">
+                    <input type="checkbox" id="import-replace-checkbox" checked>
+                    <span>Replace existing data</span>
+                </label>
             </div>
 
             <!-- Action buttons -->
@@ -266,6 +274,28 @@
     .import-add-misc-btn:hover {
         border-color: #6ad1e3;
         color: #374151;
+    }
+
+    /* Replace option */
+    .import-replace-option {
+        padding: 8px 0;
+        border-top: 1px solid #e5e7eb;
+        margin-top: 8px;
+    }
+
+    .import-checkbox-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: #374151;
+        cursor: pointer;
+    }
+
+    .import-checkbox-label input[type="checkbox"] {
+        width: 16px;
+        height: 16px;
+        cursor: pointer;
     }
 
     /* Action buttons */

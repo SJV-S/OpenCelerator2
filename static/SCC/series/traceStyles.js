@@ -14,6 +14,40 @@ import { createToast } from '../util/toaster.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 
 // ============================================================================
+// AGGREGATION OPTIONS
+// ============================================================================
+
+/**
+ * Get available aggregation types based on chart type.
+ * 'sum' is only available for non-minute charts (where frequency = raw count).
+ * @returns {string[]} Array of available aggregation type keys
+ */
+function getAvailableAggTypes() {
+    const baseAggs = ['raw', 'mean', 'median', 'min', 'max', 'first', 'last'];
+    if (!chartState.minuteChart) {
+        baseAggs.push('sum');
+    }
+    return baseAggs;
+}
+
+/**
+ * Update visibility of sum option in all aggregation select dropdowns.
+ * Called on initialization and when chart type could change.
+ */
+function updateSumOptionVisibility() {
+    const sumOptions = document.querySelectorAll('.agg-type-select .sum-option');
+    const shouldShow = !chartState.minuteChart;
+
+    sumOptions.forEach(option => {
+        option.style.display = shouldShow ? '' : 'none';
+        // If sum was selected on a minute chart, reset to 'raw'
+        if (!shouldShow && option.selected) {
+            option.parentElement.value = 'raw';
+        }
+    });
+}
+
+// ============================================================================
 // TRACE CONFIGURATION UI
 // ============================================================================
 
@@ -123,6 +157,8 @@ function initializeSeriesInputs(seriesName) {
 }
 
 function initializeAllSeriesInputs() {
+    // Update sum option visibility based on chart type
+    updateSumOptionVisibility();
     // Initialize fixed series
     ['correct', 'incorrect', 'timing'].forEach(initializeSeriesInputs);
     // Initialize dynamic misc series
@@ -322,7 +358,7 @@ function addAggregationBlock(seriesName) {
     const usedAggs = Array.from(container.querySelectorAll('.agg-config-block .agg-type-select'))
         .map(select => select.value);
 
-    const availableAggs = ['raw', 'mean', 'median', 'min', 'max', 'first', 'last'];
+    const availableAggs = getAvailableAggTypes();
 
     // If all aggregation types are used, don't allow adding more blocks
     if (usedAggs.length >= availableAggs.length) {
@@ -377,7 +413,7 @@ function updateButtonVisibility(seriesName) {
     if (!container) return;
 
     const blocks = container.querySelectorAll('.agg-config-block');
-    const availableAggs = ['raw', 'mean', 'median', 'min', 'max', 'first', 'last'];
+    const availableAggs = getAvailableAggTypes();
 
     // Hide/show the + button based on whether all aggregation types are used
     if (addButton) {
@@ -490,9 +526,15 @@ eventBus.subscribe(EVENTS.MISC_SERIES_ADDED, ({ id, index }) => {
 
     panelContainer.appendChild(panel);
     updateButtonVisibility(id);
+    updateSumOptionVisibility();
 
     eventBus.emit(EVENTS.DATA_CHART_REFRESH);
     eventBus.emit(EVENTS.UI_LEGEND_RENDER);
+}, true);
+
+// Update sum option visibility after chart loads (minuteChart value now correct)
+eventBus.subscribe(EVENTS.STORAGE_CHART_LOADED, () => {
+    updateSumOptionVisibility();
 }, true);
 
 eventBus.subscribe(EVENTS.MISC_SERIES_REMOVED, ({ id }) => {
@@ -525,5 +567,7 @@ export {
     initializeLineWidthToggles,
     addAggregationBlock,
     updateButtonVisibility,
-    removeAggregationBlock
+    removeAggregationBlock,
+    getAvailableAggTypes,
+    updateSumOptionVisibility
 };
