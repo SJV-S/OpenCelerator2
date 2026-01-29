@@ -79,11 +79,10 @@
 
 import { chartState } from '../chartState.js';
 import { eventBus, EVENTS } from '../eventBus.js';
+import { CHART_CONFIG } from '../util/resize_chart/resize-chart.js';
 
 const CEL_VALUES = [16, 4, 2, 1.4, 1, 1/1.4, 1/2, 1/4, 1/16];
 const LABELS = ['×16', '×4', '×2', '×1.4', '×1', '÷1.4', '÷2', '÷4', '÷16'];
-
-const UNITS = { Daily: 7, Weekly: 5, Monthly: 6, Yearly: 5 };
 const PERIOD_LABELS = { Daily: 'per week', Weekly: 'per month', Monthly: 'per 6 months', Yearly: 'per 5 years' };
 
 const FAN_COLOR = '#05c3de';
@@ -119,19 +118,22 @@ export function generateFanElements(layout, isMinuteChart, chartType) {
     const yMinLog = layout.yaxis.range[0]; // Already log10
     const yMaxLog = layout.yaxis.range[1]; // Already log10
 
-    const unit = UNITS[chartType] || 7;
+    const config = CHART_CONFIG[chartType] || CHART_CONFIG.Daily;
+    const unit = config.unit || 7;
     const periodLabel = PERIOD_LABELS[chartType] || 'per week';
 
     // Calculate plot area dimensions for visual angle calculation
     const plotWidth = layout.width - layout.margin.l - layout.margin.r;
     const plotHeight = layout.height - layout.margin.t - layout.margin.b;
 
-    // Fan center in DATA coordinates
-    const xMid = isMinuteChart ? xMax * -0.22 : xMax * 1.04;
-    const yMid = isMinuteChart ? 0.01 : 1000;
+    // Fan center in DATA coordinates (use capacity for fixed position)
+    const capacity = config.capacity || xMax;
+    const xMid = isMinuteChart ? capacity * config.fanXMultiplierMinute : capacity * config.fanXMultiplier;
+    const yMid = isMinuteChart ? config.fanYPositionMinute : config.fanYPosition;
 
-    // Line length in DATA units (9% of chart width)
-    const lineLength = (xMax - xMin) * 0.09;
+    // Line length based on chart height (constant visual size)
+    const lineLengthPx = plotHeight * config.fanLineLengthMultiplier;
+    const lineLength = lineLengthPx * (xMax - xMin) / plotWidth;
 
     const shapes = [];
     const annotations = [];

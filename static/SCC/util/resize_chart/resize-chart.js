@@ -22,10 +22,18 @@ const CHART_CONFIG = {
         snapTo: 14,  // Snap xmax to multiples of 14 (28, 42, 56...)
         minXmax: 28,
         maxWindow: 140,
-        creditMarginMultiplier: 0.10,
+        capacity: 280,
+        creditMarginMultiplier: 0.13,
         topMarginMultiplier: 0,
         fanMarginMinute: 0.10,
         fanMarginCount: 0.07,
+        fanXMultiplier: 1.04,
+        fanXMultiplierMinute: -0.11,
+        fanYPosition: 1000,
+        fanYPositionMinute: 0.01,
+        fanLineLengthMultiplier: 0.13,
+        yAxisTitlePosition: 0.5,
+        yAxisTitlePositionMinute: 0.7,
         annotations: {
             'date-text': { offsetMultiplier: 4, useGeneral: true },
             'week-count': { offsetMultiplier: 2.0833, useGeneral: true },
@@ -44,10 +52,18 @@ const CHART_CONFIG = {
         snapTo: 8,  // Snap to multiples of 8 (8, 16, 24...)
         minXmax: 8,
         maxWindow: 100,
+        capacity: 200,
         creditMarginMultiplier: 0.10,
         topMarginMultiplier: 0,
         fanMarginMinute: 0.10,
         fanMarginCount: 0.07,
+        fanXMultiplier: 1.04,
+        fanXMultiplierMinute: -0.12,
+        fanYPosition: 1000,
+        fanYPositionMinute: 0.01,
+        fanLineLengthMultiplier: 0.13,
+        yAxisTitlePosition: 0.5,
+        yAxisTitlePositionMinute: 0.7,
         annotations: {
             'month-label': { offsetMultiplier: 3.05, useGeneral: true, fontScale: 0.85, prefix: true },
             'month-count': { offsetMultiplier: 5.93, useGeneral: true },
@@ -66,10 +82,18 @@ const CHART_CONFIG = {
         snapTo: 24,  // Snap to multiples of 24 (24, 48, 72...)
         minXmax: 24,
         maxWindow: 120,
+        capacity: 240,
         creditMarginMultiplier: 0.15,
         topMarginMultiplier: 0,
         fanMarginMinute: 0.15,
         fanMarginCount: 0.07,
+        fanXMultiplier: 1.04,
+        fanXMultiplierMinute: -0.12,
+        fanYPosition: 1000,
+        fanYPositionMinute: 0.01,
+        fanLineLengthMultiplier: 0.13,
+        yAxisTitlePosition: 0.5,
+        yAxisTitlePositionMinute: 0.7,
         annotations: {
             'year-label': { offsetMultiplier: 3, useGeneral: true, fontScale: 1.5, prefix: true },
             'year-count': { offsetMultiplier: 5.2, useGeneral: true },
@@ -88,10 +112,18 @@ const CHART_CONFIG = {
         snapTo: 20,  // Snap to multiples of 20 (20, 40, 60...)
         minXmax: 20,
         maxWindow: 100,
+        capacity: 200,
         creditMarginMultiplier: 0.15,
         topMarginMultiplier: 0,
         fanMarginMinute: 0.10,
         fanMarginCount: 0.07,
+        fanXMultiplier: 1.04,
+        fanXMultiplierMinute: -0.12,
+        fanYPosition: 1000,
+        fanYPositionMinute: 0.01,
+        fanLineLengthMultiplier: 0.13,
+        yAxisTitlePosition: 0.5,
+        yAxisTitlePositionMinute: 0.7,
         annotations: {
             'year-label': { offsetMultiplier: 3, useGeneral: true, fontScale: 1, prefix: true },
             'decade-count': { offsetMultiplier: 4.7, useGeneral: true, fontScale: 1 },
@@ -112,10 +144,18 @@ const CHART_CONFIG = {
         snapTo: 7,  // Snap to multiples of 7 (42, 49, 56...)
         minXmax: 42,
         maxWindow: 70,
+        capacity: 280,
         creditMarginMultiplier: 0.10,
         topMarginMultiplier: 0,
         fanMarginMinute: 0.10,
         fanMarginCount: 0.07,
+        fanXMultiplier: 1.04,
+        fanXMultiplierMinute: -0.12,
+        fanYPosition: 1000,
+        fanYPositionMinute: 0.01,
+        fanLineLengthMultiplier: 0.13,
+        yAxisTitlePosition: 0.5,
+        yAxisTitlePositionMinute: 0.7,
         annotations: {
             'blank-line': { offsetMultiplier: 3.05, useGeneral: true, fontScale: 0.75, prefix: true, yDirection: 'below' },
             'counted-label': { offsetMultiplier: 4.79, useGeneral: true, fontScale: 0.75, prefix: true, yDirection: 'below' },
@@ -234,6 +274,31 @@ function resizeChartByHeight(chartJson, containerWidth, containerHeight, chartTy
     // Axes scaling
     chartJson.layout.xaxis.ticklabelstandoff = Math.round(height / xTicksDown);
     chartJson.layout.yaxis.title.font.size = titleFontScale;
+    // Reposition y-axis title vertically for minute charts (convert to annotation for vertical control)
+    if (isMinuteChart && config.yAxisTitlePositionMinute !== undefined && chartJson.layout.yaxis.title?.text) {
+        const titleText = chartJson.layout.yaxis.title.text;
+        const titleFont = chartJson.layout.yaxis.title.font || {};
+
+        chartJson.layout.yaxis.title.text = '';
+
+        chartJson.layout.annotations.push({
+            text: titleText,
+            xref: 'paper',
+            yref: 'paper',
+            x: -(margin.l / width) * 0.6,
+            y: config.yAxisTitlePositionMinute,
+            xanchor: 'center',
+            yanchor: 'middle',
+            showarrow: false,
+            textangle: -90,
+            font: {
+                size: titleFont.size || titleFontScale,
+                family: titleFont.family,
+                color: titleFont.color,
+                weight: titleFont.weight
+            }
+        });
+    }
     chartJson.layout.yaxis.tickfont.size = generalFontScale * 1.5;
     if (chartJson.layout.xaxis?.tickfont?.size) {
         chartJson.layout.xaxis.tickfont.size = generalFontScale * 1.5;

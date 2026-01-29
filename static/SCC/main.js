@@ -134,6 +134,17 @@ export function initializeChart() {
         doubleClick: false
     });
 
+    // Initialize chartState capacity and window from config and actual range
+    const chartConfig = CHART_CONFIG[chartState.chartType];
+    chartState.chartCapacity = chartConfig?.capacity || 280;
+    chartState.chartWindow = Math.round(chartDiv.layout.xaxis.range[1]);
+
+    // Update display elements (setupEventListeners ran before initializeChart)
+    const capacityInput = document.getElementById('chart-capacity');
+    const windowDisplay = document.getElementById('chart-window');
+    if (capacityInput) capacityInput.value = chartState.chartCapacity;
+    if (windowDisplay) windowDisplay.textContent = chartState.chartWindow;
+
     setupPanConstraints(chartDiv, maxWindowWidth, chartState.chartType);
 
     // Initialize draggable fan
@@ -559,8 +570,8 @@ export function setupEventListeners() {
                 // Ensure window doesn't exceed capacity
                 if (chartState.chartWindow > value) {
                     chartState.chartWindow = value;
-                    const windowInput = document.getElementById('chart-window');
-                    if (windowInput) windowInput.value = value;
+                    const windowDisplay = document.getElementById('chart-window');
+                    if (windowDisplay) windowDisplay.textContent = value;
                 }
                 // Disable panning if capacity equals window
                 eventBus.emit(EVENTS.CHART_PANNING_ENABLED_CHANGED, chartState.chartCapacity !== chartState.chartWindow);
@@ -568,22 +579,59 @@ export function setupEventListeners() {
         });
     }
 
-    // Chart window input
-    const chartWindowInput = document.getElementById('chart-window');
-    if (chartWindowInput) {
-        chartWindowInput.value = chartState.chartWindow;
+    // Chart window controls (chevron buttons with debouncing)
+    const chartWindowDisplay = document.getElementById('chart-window');
+    if (chartWindowDisplay) {
+        chartWindowDisplay.textContent = chartState.chartWindow;
 
-        chartWindowInput.addEventListener('change', (e) => {
-            const value = parseInt(e.target.value);
-            if (value > 0 && value <= chartState.chartCapacity) {
-                chartState.chartWindow = value;
-            } else if (value > chartState.chartCapacity) {
-                // Cap at capacity
-                chartState.chartWindow = chartState.chartCapacity;
-                e.target.value = chartState.chartCapacity;
-            }
-            // Disable panning if capacity equals window
-            eventBus.emit(EVENTS.CHART_PANNING_ENABLED_CHANGED, chartState.chartCapacity !== chartState.chartWindow);
+        let windowDebounceTimer = null;
+        const DEBOUNCE_DELAY = 150; // ms
+        const chartDiv = document.getElementById('chart');
+
+        const updateChartWindow = (newValue) => {
+            const config = CHART_CONFIG[chartState.chartType];
+            const minWindow = config?.minXmax || config?.snapTo || 14;
+
+            // Clamp value between min and capacity
+            if (newValue < minWindow) newValue = minWindow;
+            if (newValue > chartState.chartCapacity) newValue = chartState.chartCapacity;
+
+            chartState.chartWindow = newValue;
+            chartWindowDisplay.textContent = newValue;
+
+            // Debounce the relayout for fast clicking
+            clearTimeout(windowDebounceTimer);
+            windowDebounceTimer = setTimeout(() => {
+                // Recalculate width to maintain 34° diagonal (same as ResizeObserver)
+                const margin = chartDiv.layout.margin;
+                const height = chartDiv.layout.height;
+                const deg = 34;
+                const yaxis_px = height - (margin.t + margin.b);
+                const y_axis = Math.log10(config.yMax) - Math.log10(config.yMin);
+                const delta_y = Math.log10(2 ** (newValue / config.unit));
+                const delta_y_px = (delta_y / y_axis) * yaxis_px;
+                const xaxis_px = delta_y_px / Math.tan((deg * Math.PI) / 180);
+                const newWidth = xaxis_px + (margin.l + margin.r);
+
+                Plotly.relayout(chartDiv, {
+                    'xaxis.range': [-0.2, newValue + 0.2],
+                    width: newWidth
+                }).then(() => {
+                    regenerateFan();
+                    regenerateCredits();
+                    renderCustomLegend();
+                });
+            }, DEBOUNCE_DELAY);
+        };
+
+        document.querySelector('[data-action="chart-window-dec"]')?.addEventListener('click', () => {
+            const increment = CHART_CONFIG[chartState.chartType]?.snapTo || 14;
+            updateChartWindow(chartState.chartWindow - increment);
+        });
+
+        document.querySelector('[data-action="chart-window-inc"]')?.addEventListener('click', () => {
+            const increment = CHART_CONFIG[chartState.chartType]?.snapTo || 14;
+            updateChartWindow(chartState.chartWindow + increment);
         });
     }
 

@@ -433,6 +433,7 @@ function createConfirmToast(options) {
  * @param {number} [options.maxLength=50] - Maximum input length
  * @param {string} [options.borderColor='#6ad1e3'] - Border color
  * @param {Object} [options.stateRef] - Optional state reference
+ * @param {string} [options.position='top-right'] - Position for stacking
  * @returns {HTMLElement} The created overlay element
  */
 function createTextInputDialog(options) {
@@ -444,26 +445,38 @@ function createTextInputDialog(options) {
         onCancel,
         maxLength = 50,
         borderColor = '#6ad1e3',
-        stateRef = null
+        stateRef = null,
+        position = 'top-right'
     } = options;
 
     // Remove existing dialog with same ID if any
     removeToast(id);
 
+    // Get the flex container for this position (same as regular toasts)
+    const container = getOrCreateContainer(position);
+
     // Create overlay for text input
     const overlay = document.createElement('div');
     overlay.id = id;
+    overlay.setAttribute('data-toast', 'true');
+    overlay.dataset.position = position;
+
+    // Determine slide direction based on position
+    const isRightSide = position === 'top-right' || position === 'bottom-right' || position === 'top-right-secondary';
+    const slideDirection = isRightSide ? 'calc(100% + 1vw)' : 'calc(-100% - 1vw)';
+
     overlay.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
+        position: relative;
         background: white;
         padding: 15px 20px;
         border: 2px solid ${borderColor};
         border-radius: 8px;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-        z-index: 10000;
         min-width: 250px;
+        pointer-events: auto;
+        opacity: 0;
+        transform: translateX(${slideDirection});
+        transition: transform 0.3s ease-out, opacity 0.3s ease-out;
     `;
 
     const inputId = `${id}-input`;
@@ -488,7 +501,16 @@ function createTextInputDialog(options) {
         </div>
     `;
 
-    document.body.appendChild(overlay);
+    // Append to the flex container (not body)
+    container.appendChild(overlay);
+
+    // Trigger slide-in animation
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            overlay.style.opacity = '1';
+            overlay.style.transform = 'translateX(0)';
+        });
+    });
 
     // Store reference if state object provided
     if (stateRef && stateRef.state) {
@@ -541,6 +563,7 @@ function createTextInputDialog(options) {
  * @param {number|string} [options.step='any'] - Step size for number input
  * @param {string} [options.borderColor='#6ad1e3'] - Border color
  * @param {Object} [options.stateRef] - Optional state reference
+ * @param {string} [options.position='top-right'] - Position for stacking
  * @returns {HTMLElement} The created overlay element
  */
 function createNumberInputDialog(options) {
@@ -555,26 +578,38 @@ function createNumberInputDialog(options) {
         max,
         step = 'any',
         borderColor = '#6ad1e3',
-        stateRef = null
+        stateRef = null,
+        position = 'top-right'
     } = options;
 
     // Remove existing dialog with same ID if any
     removeToast(id);
 
+    // Get the flex container for this position (same as regular toasts)
+    const container = getOrCreateContainer(position);
+
     // Create overlay for number input
     const overlay = document.createElement('div');
     overlay.id = id;
+    overlay.setAttribute('data-toast', 'true');
+    overlay.dataset.position = position;
+
+    // Determine slide direction based on position
+    const isRightSide = position === 'top-right' || position === 'bottom-right' || position === 'top-right-secondary';
+    const slideDirection = isRightSide ? 'calc(100% + 1vw)' : 'calc(-100% - 1vw)';
+
     overlay.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
+        position: relative;
         background: white;
         padding: 15px 20px;
         border: 2px solid ${borderColor};
         border-radius: 8px;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-        z-index: 10000;
         min-width: 250px;
+        pointer-events: auto;
+        opacity: 0;
+        transform: translateX(${slideDirection});
+        transition: transform 0.3s ease-out, opacity 0.3s ease-out;
     `;
 
     const inputId = `${id}-input`;
@@ -606,7 +641,16 @@ function createNumberInputDialog(options) {
         </div>
     `;
 
-    document.body.appendChild(overlay);
+    // Append to the flex container (not body)
+    container.appendChild(overlay);
+
+    // Trigger slide-in animation
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            overlay.style.opacity = '1';
+            overlay.style.transform = 'translateX(0)';
+        });
+    });
 
     // Store reference if state object provided
     if (stateRef && stateRef.state) {
