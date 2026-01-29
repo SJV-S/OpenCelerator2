@@ -1,6 +1,6 @@
 {% extends "SCC/base.html" %}
 
-{% block title %}{{ chart_type }} Chart{% endblock %}
+{% block title %}Chart{% endblock %}
 
 {% block content %}
     <!-- Chart area wrapper - shifts right on desktop for menu -->
@@ -57,22 +57,14 @@
         import { initializeChart, setupEventListeners } from '/static/SCC/main.js';
         import { initStorage, loadChart } from '/static/SCC/storage/chartStorage.js';
 
-        // Check for load param (chart ID from menu)
-        const urlParams = new URLSearchParams(window.location.search);
-        const loadId = urlParams.get('load');
+        const chartId = '{{ chart_id }}';
 
         async function init() {
-            if (!loadId) {
-                // No chart specified - redirect to menu
-                window.location.href = '/';
-                return;
-            }
-
             await initStorage();
 
-            const success = await loadChart(loadId);
+            const success = await loadChart(chartId);
             if (!success) {
-                console.warn('Failed to load chart:', loadId);
+                console.warn('Failed to load chart:', chartId);
                 window.location.href = '/';
                 return;
             }

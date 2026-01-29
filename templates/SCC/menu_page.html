@@ -80,28 +80,28 @@
                 <th>Count</th>
             </tr>
             <tr>
-                <td><a href="/chart/Daily/minute">Daily</a></td>
-                <td><a href="/chart/Daily/count">Daily</a></td>
+                <td><a href="#" data-chart-type="Daily" data-minute="true">Daily</a></td>
+                <td><a href="#" data-chart-type="Daily" data-minute="false">Daily</a></td>
             </tr>
             <tr>
-                <td><a href="/chart/Weekly/minute">Weekly</a></td>
-                <td><a href="/chart/Weekly/count">Weekly</a></td>
+                <td><a href="#" data-chart-type="Weekly" data-minute="true">Weekly</a></td>
+                <td><a href="#" data-chart-type="Weekly" data-minute="false">Weekly</a></td>
             </tr>
             <tr>
-                <td><a href="/chart/Monthly/minute">Monthly</a></td>
-                <td><a href="/chart/Monthly/count">Monthly</a></td>
+                <td><a href="#" data-chart-type="Monthly" data-minute="true">Monthly</a></td>
+                <td><a href="#" data-chart-type="Monthly" data-minute="false">Monthly</a></td>
             </tr>
             <tr>
-                <td><a href="/chart/Yearly/minute">Yearly</a></td>
-                <td><a href="/chart/Yearly/count">Yearly</a></td>
+                <td><a href="#" data-chart-type="Yearly" data-minute="true">Yearly</a></td>
+                <td><a href="#" data-chart-type="Yearly" data-minute="false">Yearly</a></td>
             </tr>
             <tr>
-                <td><a href="/chart/Timing/minute">Timing</a></td>
-                <td><a href="/chart/Timing/count">Timing</a></td>
+                <td><a href="#" data-chart-type="Timing" data-minute="true">Timing</a></td>
+                <td><a href="#" data-chart-type="Timing" data-minute="false">Timing</a></td>
             </tr>
             <tr>
-                <td><a href="/chart/FrequencyCollections/minute">Frequency Collections</a></td>
-                <td><a href="/chart/FrequencyCollections/count">Frequency Collections</a></td>
+                <td><a href="#" data-chart-type="FrequencyCollections" data-minute="true">Frequency Collections</a></td>
+                <td><a href="#" data-chart-type="FrequencyCollections" data-minute="false">Frequency Collections</a></td>
             </tr>
         </table>
 
@@ -139,9 +139,8 @@
             const select = document.getElementById('saved-charts-list');
             if (!select.value) return;
 
-            const { id, chartType, minuteChart } = JSON.parse(select.value);
-            const minuteType = minuteChart ? 'minute' : 'count';
-            window.location.href = `/chart/${chartType}/${minuteType}?load=${id}`;
+            const { id } = JSON.parse(select.value);
+            window.location.href = `/chart/${id}`;
         });
 
         // New Chart links - prompt for name first
@@ -152,17 +151,12 @@
                 const name = prompt('Enter chart name:');
                 if (!name || !name.trim()) return;
 
-                // Parse chart type and minute type from href
-                const href = link.getAttribute('href');
-                const match = href.match(/\/chart\/([^/]+)\/(\w+)/);
-                if (!match) return;
-
-                const chartType = match[1];
-                const minuteChart = match[2] === 'minute';
+                const chartType = link.dataset.chartType;
+                const minuteChart = link.dataset.minute === 'true';
 
                 const id = await createChart(name.trim(), chartType, minuteChart);
                 if (id) {
-                    window.location.href = `${href}?load=${id}`;
+                    window.location.href = `/chart/${id}`;
                 }
             });
         });
