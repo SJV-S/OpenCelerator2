@@ -129,3 +129,46 @@ export function sum(arr) {
 
     return validValues.reduce((acc, val) => acc + val, 0);
 }
+
+/**
+ * Aggregate data by X position using a specified aggregation function.
+ * Groups Y values by their corresponding X position and applies the aggregation.
+ *
+ * @param {Array<number>} xArr - X position array
+ * @param {Array<number>} yArr - Y data array (same length as xArr)
+ * @param {function} aggFn - Aggregation function (e.g., mean, median, sum)
+ * @returns {{x: Array<number>, y: Array<number>}} Aggregated x and y arrays
+ */
+export function aggregateByX(xArr, yArr, aggFn) {
+    if (!xArr || !yArr || xArr.length === 0) {
+        return { x: [], y: [] };
+    }
+
+    // Group y values by x position
+    const groups = new Map();
+    for (let i = 0; i < xArr.length; i++) {
+        const x = xArr[i];
+        const y = yArr[i];
+        if (!groups.has(x)) {
+            groups.set(x, []);
+        }
+        groups.get(x).push(y);
+    }
+
+    // Apply aggregation function to each group
+    const aggX = [];
+    const aggY = [];
+
+    // Sort by x position to maintain order
+    const sortedX = Array.from(groups.keys()).sort((a, b) => a - b);
+
+    for (const x of sortedX) {
+        const values = groups.get(x);
+        // For single values, use the value directly (avoids NaN from first/last)
+        const aggregatedValue = values.length === 1 ? values[0] : aggFn(values);
+        aggX.push(x);
+        aggY.push(aggregatedValue);
+    }
+
+    return { x: aggX, y: aggY };
+}

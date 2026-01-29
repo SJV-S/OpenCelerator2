@@ -11,7 +11,7 @@
  */
 
 import { chartState } from '../chartState.js';
-import { median, mean, min, max, first, last, sum } from '../util/agg.js';
+import { median, mean, min, max, first, last, sum, aggregateByX } from '../util/agg.js';
 
 // ============================================================================
 // TRACE CREATION FUNCTIONS
@@ -142,56 +142,42 @@ function miscFloorTrace(xValues, yValues, config) {
 
 /**
  * Apply aggregation to frequency data based on aggregation type.
+ * Groups data by X position and applies the aggregation to each group.
  *
- * @param {Array<number>} data - Frequency data array
+ * @param {Array<number>} xPositions - X position array
+ * @param {Array<number>} yData - Frequency data array (same length as xPositions)
  * @param {string} aggType - Aggregation type (e.g., 'raw', 'median', 'min', 'max', 'mean', 'first', 'last', 'sum')
- * @returns {Array<number>} Aggregated data
+ * @returns {{x: Array<number>, y: Array<number>}} Aggregated x and y arrays
  */
-function applyAggregation(data, aggType) {
+function applyAggregation(xPositions, yData, aggType) {
     // If "raw", return data unchanged
     if (aggType === 'raw') {
-        return data;
+        return { x: xPositions, y: yData };
     }
 
-    // For other aggregation types, apply the aggregation function
-    // to get a single value, then create an array filled with that value
-    let aggregatedValue;
-
-    switch (aggType) {
-        case 'median':
-            aggregatedValue = median(data);
-            break;
-        case 'mean':
-            aggregatedValue = mean(data);
-            break;
-        case 'min':
-            aggregatedValue = min(data);
-            break;
-        case 'max':
-            aggregatedValue = max(data);
-            break;
-        case 'first':
-            aggregatedValue = first(data);
-            break;
-        case 'last':
-            aggregatedValue = last(data);
-            break;
-        case 'sum':
-            // Sum is only meaningful for non-minute charts (where frequency = raw count)
-            // For minute charts, return raw data unchanged since summing rates is meaningless
-            if (chartState.minuteChart) {
-                return data;
-            }
-            aggregatedValue = sum(data);
-            break;
-        default:
-            // Unknown aggregation type, return raw data
-            return data;
+    // Sum is only meaningful for non-minute charts
+    if (aggType === 'sum' && chartState.minuteChart) {
+        return { x: xPositions, y: yData };
     }
 
-    // Return array filled with the aggregated value
-    // This creates a horizontal line at the aggregated level
-    return new Array(data.length).fill(aggregatedValue);
+    // Map aggType to aggregation function
+    const aggFunctions = {
+        median: median,
+        mean: mean,
+        min: min,
+        max: max,
+        first: first,
+        last: last,
+        sum: sum
+    };
+
+    const aggFn = aggFunctions[aggType];
+    if (!aggFn) {
+        // Unknown aggregation type, return raw data
+        return { x: xPositions, y: yData };
+    }
+
+    return aggregateByX(xPositions, yData, aggFn);
 }
 
 /**
@@ -352,27 +338,8 @@ function createTimingTraces(xPositions) {
 
     // Loop through all aggregation keys for timing
     Object.entries(chartState.traceStyles.timing).forEach(([aggType, config]) => {
-        // Apply aggregation to timing frequency data
-        const aggregatedFreq = applyAggregation(timingFrequencies, aggType);
-
-        // Deduplicate: keep only one entry when both x and y values are the same
-        const seen = new Map();
-        const deduplicatedX = [];
-        const deduplicatedY = [];
-
-        for (let i = 0; i < xPositions.length; i++) {
-            const x = xPositions[i];
-            const y = aggregatedFreq[i];
-            const key = `${x}_${y}`;
-
-            if (!seen.has(key)) {
-                seen.set(key, true);
-                deduplicatedX.push(x);
-                deduplicatedY.push(y);
-            }
-        }
-
-        const trace = timingFloorTrace(deduplicatedX, deduplicatedY, config);
+        const { x, y } = applyAggregation(xPositions, timingFrequencies, aggType);
+        const trace = timingFloorTrace(x, y, config);
         trace.meta = {seriesName: 'timing', aggType: aggType};
         timingTraces.push(trace);
     });
@@ -389,19 +356,16 @@ function createFloorShadowTraces(xPositions, frequencies) {
 
     // CORRECTS FLOOR SHADOW - loop through all agg keys
     Object.entries(chartState.traceStyles.correct).forEach(([aggType, config]) => {
-        // Apply aggregation to floor shadow data
-        const aggregatedFloor = applyAggregation(frequencies.correctsFloor, aggType);
-
-        const trace = correctsFloorTrace(xPositions, aggregatedFloor, config);
+        const { x, y } = applyAggregation(xPositions, frequencies.correctsFloor, aggType);
+        const trace = correctsFloorTrace(x, y, config);
         trace.meta = {seriesName: 'correctsFloorShadow', aggType: aggType};
         floorShadowTraces.push(trace);
     });
 
     // ERRORS FLOOR SHADOW
     Object.entries(chartState.traceStyles.incorrect).forEach(([aggType, config]) => {
-        const aggregatedFloor = applyAggregation(frequencies.errorsFloor, aggType);
-
-        const trace = errorsFloorTrace(xPositions, aggregatedFloor, config);
+        const { x, y } = applyAggregation(xPositions, frequencies.errorsFloor, aggType);
+        const trace = errorsFloorTrace(x, y, config);
         trace.meta = {seriesName: 'errorsFloorShadow', aggType: aggType};
         floorShadowTraces.push(trace);
     });
@@ -409,9 +373,8 @@ function createFloorShadowTraces(xPositions, frequencies) {
     // MISC FLOOR SHADOWS (dynamic)
     Object.entries(chartState.traceStyles.misc).forEach(([miscId, aggConfigs]) => {
         Object.entries(aggConfigs).forEach(([aggType, config]) => {
-            const aggregatedFloor = applyAggregation(frequencies.miscFloor[miscId], aggType);
-
-            const trace = miscFloorTrace(xPositions, aggregatedFloor, config);
+            const { x, y } = applyAggregation(xPositions, frequencies.miscFloor[miscId], aggType);
+            const trace = miscFloorTrace(x, y, config);
             trace.meta = {seriesName: `${miscId}FloorShadow`, aggType: aggType};
             floorShadowTraces.push(trace);
         });
@@ -443,13 +406,9 @@ function createFrequencyTraces(xPositions, frequencies, timestampsToXPositions) 
     // For each series type, loop through all aggregation keys
     // CORRECTS
     Object.entries(chartState.traceStyles.correct).forEach(([aggType, config]) => {
-        // Apply aggregation to frequency data (placeholder for now)
-        const aggregatedFreq = applyAggregation(frequencies.corrects, aggType);
+        const { x, y } = applyAggregation(xPositions, frequencies.corrects, aggType);
+        const segments = createSegments(x, y, cutXPositions, 'corrects');
 
-        // Create segments from aggregated data
-        const segments = createSegments(xPositions, aggregatedFreq, cutXPositions, 'corrects');
-
-        // Create trace for each segment with this agg config
         segments.forEach(seg => {
             const trace = correctsTrace(seg.x, seg.y, config);
             trace.meta = {seriesName: seg.seriesName, aggType: aggType};
@@ -459,8 +418,8 @@ function createFrequencyTraces(xPositions, frequencies, timestampsToXPositions) 
 
     // ERRORS/INCORRECTS
     Object.entries(chartState.traceStyles.incorrect).forEach(([aggType, config]) => {
-        const aggregatedFreq = applyAggregation(frequencies.errors, aggType);
-        const segments = createSegments(xPositions, aggregatedFreq, cutXPositions, 'errors');
+        const { x, y } = applyAggregation(xPositions, frequencies.errors, aggType);
+        const segments = createSegments(x, y, cutXPositions, 'errors');
 
         segments.forEach(seg => {
             const trace = errorTrace(seg.x, seg.y, config);
@@ -472,8 +431,8 @@ function createFrequencyTraces(xPositions, frequencies, timestampsToXPositions) 
     // MISC (dynamic)
     Object.entries(chartState.traceStyles.misc).forEach(([miscId, aggConfigs]) => {
         Object.entries(aggConfigs).forEach(([aggType, config]) => {
-            const aggregatedFreq = applyAggregation(frequencies.misc[miscId], aggType);
-            const segments = createSegments(xPositions, aggregatedFreq, cutXPositions, miscId);
+            const { x, y } = applyAggregation(xPositions, frequencies.misc[miscId], aggType);
+            const segments = createSegments(x, y, cutXPositions, miscId);
 
             segments.forEach(seg => {
                 const trace = miscTrace(seg.x, seg.y, config);

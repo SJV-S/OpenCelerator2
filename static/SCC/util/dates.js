@@ -55,8 +55,17 @@ function calculateStartDate(dates) {
 
 /**
  * Convert x-values to x-position coordinates for chart rendering.
- * - If chartState.hasTimestamps is true: converts timestamps to days from startDate
+ * - If chartState.hasTimestamps is true: converts timestamps to positions based on chart type
  * - If chartState.hasTimestamps is false: returns x-positions as-is
+ *
+ * BINNING BEHAVIOR:
+ * This function also handles binning by chart type. Multiple data entries that fall
+ * within the same time unit will have the same X position, enabling proper aggregation.
+ * - Daily: X = day offset from startDate (no binning, each day unique)
+ * - Weekly: X = week offset (days / 7, floored) - entries in same week share X
+ * - Monthly: X = month offset from startDate - entries in same month share X
+ * - Yearly: X = year offset from startDate - entries in same year share X
+ *
  * @param {Array<number>} xValues - Array of Unix timestamps (seconds) or direct x-positions
  * @returns {Array<number>} Array of x-position coordinates
  */
@@ -80,9 +89,27 @@ function timestampsToXPositions(xValues) {
         calculateStartDate(dates);
     }
 
+    const chartType = (chartState.chartType || 'Daily').toLowerCase();
+
     const xPositions = dates.map(date => {
         const daysDiff = Math.floor((date - chartState.startDate) / (1000 * 60 * 60 * 24));
-        return daysDiff;
+
+        switch (chartType) {
+            case 'weekly':
+                return Math.floor(daysDiff / 7);
+            case 'monthly':
+                // Calculate month difference from startDate
+                const startYear = chartState.startDate.getFullYear();
+                const startMonth = chartState.startDate.getMonth();
+                const dateYear = date.getFullYear();
+                const dateMonth = date.getMonth();
+                return (dateYear - startYear) * 12 + (dateMonth - startMonth);
+            case 'yearly':
+                return date.getFullYear() - chartState.startDate.getFullYear();
+            case 'daily':
+            default:
+                return daysDiff;
+        }
     });
 
     return xPositions;
@@ -90,12 +117,35 @@ function timestampsToXPositions(xValues) {
 
 /**
  * Convert a single x-position coordinate back to a date.
- * @param {number} xPosition - X-position coordinate (days from start_date)
+ * Reverses the binning done by timestampsToXPositions.
+ * - Daily: X = day offset, returns that day
+ * - Weekly: X = week offset, returns first day of that week
+ * - Monthly: X = month offset, returns first day of that month
+ * - Yearly: X = year offset, returns first day of that year
+ *
+ * @param {number} xPosition - X-position coordinate
  * @returns {Date} Date object corresponding to the x-position
  */
 function xPositionToDate(xPosition) {
+    const chartType = (chartState.chartType || 'Daily').toLowerCase();
     const resultDate = new Date(chartState.startDate);
-    resultDate.setDate(chartState.startDate.getDate() + xPosition);
+
+    switch (chartType) {
+        case 'weekly':
+            resultDate.setDate(chartState.startDate.getDate() + (xPosition * 7));
+            break;
+        case 'monthly':
+            resultDate.setMonth(chartState.startDate.getMonth() + xPosition);
+            break;
+        case 'yearly':
+            resultDate.setFullYear(chartState.startDate.getFullYear() + xPosition);
+            break;
+        case 'daily':
+        default:
+            resultDate.setDate(chartState.startDate.getDate() + xPosition);
+            break;
+    }
+
     resultDate.setHours(0, 0, 0, 0);
     return resultDate;
 }

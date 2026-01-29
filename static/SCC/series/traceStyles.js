@@ -96,16 +96,17 @@ function initializeSeriesInputs(seriesName) {
 
     if (!aggConfigs) return;
 
-    // Get all existing blocks
-    const blocks = Array.from(container.querySelectorAll('.agg-config-block'));
+    // Get template block, clear all blocks, rebuild from chartState
+    const existingBlocks = Array.from(container.querySelectorAll('.agg-config-block'));
+    const templateBlock = existingBlocks[0]?.cloneNode(true);
+    if (!templateBlock) return;
 
-    // For each aggregation type in the config, ensure there's a block
-    Object.entries(aggConfigs).forEach(([aggType, config], index) => {
-        let block = blocks[index];
+    existingBlocks.forEach(block => block.remove());
 
-        // If we need more blocks than exist, we'll just use the first block for now
-        // The user can add more blocks manually
-        if (!block) return;
+    // Create and initialize a block for each entry in aggConfigs
+    Object.entries(aggConfigs).forEach(([aggType, config]) => {
+        const block = templateBlock.cloneNode(true);
+        container.appendChild(block);
 
         // Set the aggregation type
         const aggSelect = block.querySelector('.agg-type-select');
@@ -154,6 +155,8 @@ function initializeSeriesInputs(seriesName) {
             if (markerEdgeColorInput) markerEdgeColorInput.value = config.markerEdgeColor;
         }
     });
+
+    updateButtonVisibility(seriesName);
 }
 
 function initializeAllSeriesInputs() {
@@ -532,9 +535,9 @@ eventBus.subscribe(EVENTS.MISC_SERIES_ADDED, ({ id, index }) => {
     eventBus.emit(EVENTS.UI_LEGEND_RENDER);
 }, true);
 
-// Update sum option visibility after chart loads (minuteChart value now correct)
+// Sync UI with chartState after chart loads from storage
 eventBus.subscribe(EVENTS.STORAGE_CHART_LOADED, () => {
-    updateSumOptionVisibility();
+    initializeAllSeriesInputs();
 }, true);
 
 eventBus.subscribe(EVENTS.MISC_SERIES_REMOVED, ({ id }) => {
