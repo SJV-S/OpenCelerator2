@@ -351,6 +351,48 @@ let dragState = {
     fanElements: null  // Cached SVG elements for the fan (lines, rect, annotations)
 };
 
+let fanHoverState = {
+    isHovered: false,
+    tooltip: null
+};
+
+/**
+ * Show/hide fan tooltip
+ */
+function updateFanTooltip(show, x, y) {
+    if (show) {
+        if (!fanHoverState.tooltip) {
+            fanHoverState.tooltip = document.createElement('div');
+            fanHoverState.tooltip.className = 'fixed px-2 py-1 text-xs rounded pointer-events-none z-[9999]';
+            fanHoverState.tooltip.style.cssText = `background: ${FAN_COLOR}; color: white;`;
+            fanHoverState.tooltip.textContent = 'Drag to move';
+            document.body.appendChild(fanHoverState.tooltip);
+        }
+        fanHoverState.tooltip.style.left = `${x + 10}px`;
+        fanHoverState.tooltip.style.top = `${y + 10}px`;
+        fanHoverState.tooltip.style.display = 'block';
+    } else if (fanHoverState.tooltip) {
+        fanHoverState.tooltip.style.display = 'none';
+    }
+}
+
+/**
+ * Update fan highlight on hover
+ */
+function updateFanHighlight(chartDiv, isHovered) {
+    const updates = {};
+
+    (chartDiv.layout.shapes || []).forEach((shape, i) => {
+        if (shape.name === 'fan-hitarea') {
+            updates[`shapes[${i}].fillcolor`] = isHovered ? 'rgba(5, 195, 222, 0.1)' : 'rgba(0,0,0,0)';
+        }
+    });
+
+    if (Object.keys(updates).length > 0) {
+        Plotly.relayout(chartDiv, updates);
+    }
+}
+
 /**
  * Convert pixel coordinates to paper coordinates
  */
@@ -481,6 +523,7 @@ function handleMouseDown(e) {
         dragState.fanElements = getFanSvgElements(chartDiv);
 
         chartDiv.style.cursor = 'grabbing';
+        updateFanTooltip(false);  // Hide tooltip while dragging
 
         // Prevent Plotly's pan from intercepting
         e.preventDefault();
@@ -490,16 +533,39 @@ function handleMouseDown(e) {
 }
 
 function handleMouseMove(e) {
-    if (!dragState.isDragging || !dragState.fanElements) return;
+    if (dragState.isDragging && dragState.fanElements) {
+        // Apply CSS transform to actual Plotly elements (fast)
+        const dx = e.clientX - dragState.startX;
+        const dy = e.clientY - dragState.startY;
+        const transform = `translate(${dx}px, ${dy}px)`;
 
-    // Apply CSS transform to actual Plotly elements (fast)
-    const dx = e.clientX - dragState.startX;
-    const dy = e.clientY - dragState.startY;
-    const transform = `translate(${dx}px, ${dy}px)`;
+        dragState.fanElements.forEach(el => {
+            el.style.transform = transform;
+        });
+        return;
+    }
 
-    dragState.fanElements.forEach(el => {
-        el.style.transform = transform;
-    });
+    // Hover detection when not dragging
+    const chartDiv = document.getElementById('chart');
+    if (!chartDiv?.layout || !chartState.fanVisible) return;
+
+    const paper = pixelToPaper(chartDiv, e.clientX, e.clientY);
+    const isOnFan = isPointOnFan(chartDiv, paper.x, paper.y);
+
+    if (isOnFan) {
+        chartDiv.style.cursor = 'grab';
+        updateFanTooltip(true, e.clientX, e.clientY);
+    } else {
+        if (fanHoverState.isHovered) {
+            chartDiv.style.cursor = '';
+            updateFanTooltip(false);
+        }
+    }
+
+    if (isOnFan !== fanHoverState.isHovered) {
+        fanHoverState.isHovered = isOnFan;
+        updateFanHighlight(chartDiv, isOnFan);
+    }
 }
 
 function handleMouseUp(e) {
@@ -528,6 +594,10 @@ function handleMouseUp(e) {
             if (dx !== 0 || dy !== 0) {
                 updateFanPosition(chartDiv, dx, dy);
             }
+
+            // Reset hover state after drag
+            fanHoverState.isHovered = false;
+            updateFanHighlight(chartDiv, false);
         }
     }
 }

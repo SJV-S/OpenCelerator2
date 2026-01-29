@@ -233,6 +233,27 @@ function handleChartClick(e) {
 }
 
 let currentHoveredCredit = -1;
+let creditTooltip = null;
+
+/**
+ * Show/hide credit tooltip
+ */
+function updateCreditTooltip(show, x, y) {
+    if (show) {
+        if (!creditTooltip) {
+            creditTooltip = document.createElement('div');
+            creditTooltip.className = 'fixed px-2 py-1 text-xs rounded pointer-events-none z-[9999]';
+            creditTooltip.style.cssText = `background: ${CREDIT_COLOR}; color: white;`;
+            creditTooltip.textContent = 'Click to modify';
+            document.body.appendChild(creditTooltip);
+        }
+        creditTooltip.style.left = `${x + 10}px`;
+        creditTooltip.style.top = `${y + 10}px`;
+        creditTooltip.style.display = 'block';
+    } else if (creditTooltip) {
+        creditTooltip.style.display = 'none';
+    }
+}
 
 /**
  * Handle mouse move to show hover effect on credit lines
@@ -248,8 +269,10 @@ function handleChartMouseMove(e) {
 
     if (creditIndex >= 0) {
         chartDiv.style.cursor = 'pointer';
+        updateCreditTooltip(true, e.clientX, e.clientY);
     } else {
         chartDiv.style.cursor = '';
+        updateCreditTooltip(false);
     }
 
     // Update highlight if hover state changed
@@ -260,10 +283,22 @@ function handleChartMouseMove(e) {
 }
 
 /**
- * Update credit annotation highlight - just cursor change, no visual effect
+ * Update credit annotation highlight - subtle background rectangle on hover
  */
 function updateCreditHighlight(chartDiv, hoveredIndex) {
-    // Cursor change is handled in handleChartMouseMove, nothing else needed
+    const isHovered = hoveredIndex >= 0;
+    const updates = {};
+
+    (chartDiv.layout.annotations || []).forEach((ann, i) => {
+        if (ann.name === 'credit-line-0' || ann.name === 'credit-line-1') {
+            updates[`annotations[${i}].bgcolor`] = isHovered ? 'rgba(5, 195, 222, 0.1)' : 'rgba(0,0,0,0)';
+            updates[`annotations[${i}].borderpad`] = isHovered ? 3 : 0;
+        }
+    });
+
+    if (Object.keys(updates).length > 0) {
+        Plotly.relayout(chartDiv, updates);
+    }
 }
 
 /**
