@@ -33,13 +33,12 @@ var celLineState = {
     guideHandler: null,
     x1: null,
     x2: null,
+    x1Pixel: null,  // Starting pixel position for DOM overlay
     shadeShape: null,
     previousDragMode: null,
     toastElement: null,
     seriesSelectionToast: null,
-    selectedSeriesKey: null,
-    lastUpdateTime: 0,
-    throttleDelay: 33  // ~30fps throttle
+    selectedSeriesKey: null
 };
 
 /**
@@ -203,7 +202,8 @@ function enableDragMode() {
         if (!celLineState.isDragging) {
             const coords = getPlotCoordinatesForCelLine(event, chartDiv);
             if (coords) {
-                updateVerticalGuideLine(coords.x);
+                // Use fast DOM overlay instead of Plotly
+                updateGuideLineOverlay(coords.xPixel);
             }
         }
     };
@@ -286,12 +286,12 @@ function deactivateCelLineMode() {
         celLineState.guideHandler = null;
     }
 
-    removeShadeRectangle();
-    removeVerticalGuideLine();
+    removeOverlays();
     cleanupSeriesSelectionMode();
 
     celLineState.x1 = null;
     celLineState.x2 = null;
+    celLineState.x1Pixel = null;
     celLineState.shadeShape = null;
 
     console.log('Cel line mode deactivated');
@@ -308,6 +308,7 @@ function handleCelLineMouseDown(event, chartDiv) {
     celLineState.isDragging = true;
     celLineState.x1 = coords.x;
     celLineState.x2 = coords.x;
+    celLineState.x1Pixel = coords.xPixel;
 
     document.addEventListener('mousemove', celLineState.mouseMoveHandler);
     document.addEventListener('mouseup', celLineState.mouseUpHandler);
@@ -318,20 +319,14 @@ function handleCelLineMouseDown(event, chartDiv) {
 function handleCelLineMouseMove(event, chartDiv) {
     if (!celLineState.isDragging) return;
 
-    // Throttle updates to ~30fps to prevent CPU overload
-    const now = Date.now();
-    if (now - celLineState.lastUpdateTime < celLineState.throttleDelay) {
-        return;
-    }
-    celLineState.lastUpdateTime = now;
-
     const coords = getPlotCoordinatesForCelLine(event, chartDiv);
     if (!coords) return;
 
     if (coords.x > celLineState.x1) {
         celLineState.x2 = coords.x;
-        updateShadeRectangle();
-        updateVerticalGuideLine(coords.x);
+        // Use fast DOM overlays instead of Plotly
+        updateShadeOverlay(celLineState.x1Pixel, coords.xPixel);
+        updateGuideLineOverlay(coords.xPixel);
     }
 }
 
@@ -343,14 +338,16 @@ function handleCelLineMouseUp(event, chartDiv) {
     document.removeEventListener('mousemove', celLineState.mouseMoveHandler);
     document.removeEventListener('mouseup', celLineState.mouseUpHandler);
 
+    // Remove DOM overlays
+    removeOverlays();
+
     if (celLineState.x2 && celLineState.x2 > celLineState.x1) {
         // Use pre-selected series to create the line
         finalizeCelLine();
     } else {
-        removeShadeRectangle();
-        removeVerticalGuideLine();
         celLineState.x1 = null;
         celLineState.x2 = null;
+        celLineState.x1Pixel = null;
     }
 }
 
@@ -369,6 +366,7 @@ function handleCelLineTouchStart(event, chartDiv) {
         celLineState.isDragging = true;
         celLineState.x1 = coords.x;
         celLineState.x2 = coords.x;
+        celLineState.x1Pixel = coords.xPixel;
 
         document.addEventListener('touchmove', celLineState.touchMoveHandler, { passive: false });
         document.addEventListener('touchend', celLineState.touchEndHandler);
@@ -380,13 +378,6 @@ function handleCelLineTouchMove(event, chartDiv) {
 
     if (!celLineState.isDragging) return;
 
-    // Throttle updates to ~30fps to prevent CPU overload
-    const now = Date.now();
-    if (now - celLineState.lastUpdateTime < celLineState.throttleDelay) {
-        return;
-    }
-    celLineState.lastUpdateTime = now;
-
     if (event.touches.length === 1) {
         const touch = event.touches[0];
         const coords = getPlotCoordinatesForCelLineTouch(touch, chartDiv);
@@ -394,8 +385,9 @@ function handleCelLineTouchMove(event, chartDiv) {
 
         if (coords.x > celLineState.x1) {
             celLineState.x2 = coords.x;
-            updateShadeRectangle();
-            updateVerticalGuideLine(coords.x);
+            // Use fast DOM overlays instead of Plotly
+            updateShadeOverlay(celLineState.x1Pixel, coords.xPixel);
+            updateGuideLineOverlay(coords.xPixel);
         }
     }
 }
@@ -408,14 +400,16 @@ function handleCelLineTouchEnd(event, chartDiv) {
     document.removeEventListener('touchmove', celLineState.touchMoveHandler);
     document.removeEventListener('touchend', celLineState.touchEndHandler);
 
+    // Remove DOM overlays
+    removeOverlays();
+
     if (celLineState.x2 && celLineState.x2 > celLineState.x1) {
         // Use pre-selected series to create the line
         finalizeCelLine();
     } else {
-        removeShadeRectangle();
-        removeVerticalGuideLine();
         celLineState.x1 = null;
         celLineState.x2 = null;
+        celLineState.x1Pixel = null;
     }
 }
 
@@ -437,10 +431,10 @@ function finalizeCelLine() {
             message: `Need at least 5 data points. Found ${data ? data.x.length : 0}.`,
             duration: 3000
         });
-        removeShadeRectangle();
-        removeVerticalGuideLine();
+        removeOverlays();
         celLineState.x1 = null;
         celLineState.x2 = null;
+        celLineState.x1Pixel = null;
         // Stay in drag mode so user can try again
         return;
     }
@@ -501,6 +495,124 @@ function getPlotCoordinatesForCelLineTouch(touch, chartDiv) {
 
     return { x: xRounded, xPixel: xPixel, yPixel: yPixel };
 }
+
+// ============================================
+// DOM Overlay Functions (fast, no Plotly calls)
+// ============================================
+
+/**
+ * Get or create the overlay container for cel line preview elements
+ */
+function getOrCreateOverlayContainer() {
+    const chartDiv = document.getElementById('chart');
+    if (!chartDiv) return null;
+
+    let container = document.getElementById('celline-overlay');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'celline-overlay';
+        container.style.cssText = `
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 50;
+        `;
+
+        // Shade rectangle
+        const shade = document.createElement('div');
+        shade.id = 'celline-shade-overlay';
+        shade.style.cssText = `
+            position: absolute;
+            background: rgba(128, 128, 128, 0.3);
+            display: none;
+        `;
+
+        // Vertical guide line
+        const guide = document.createElement('div');
+        guide.id = 'celline-guide-overlay';
+        guide.style.cssText = `
+            position: absolute;
+            width: 3px;
+            background: rgba(147, 51, 234, 0.25);
+            display: none;
+        `;
+
+        container.appendChild(shade);
+        container.appendChild(guide);
+        chartDiv.appendChild(container);
+    }
+
+    return {
+        container,
+        shade: document.getElementById('celline-shade-overlay'),
+        guide: document.getElementById('celline-guide-overlay')
+    };
+}
+
+/**
+ * Update the DOM shade overlay position (no Plotly calls)
+ */
+function updateShadeOverlay(x1Pixel, x2Pixel) {
+    const chartDiv = document.getElementById('chart');
+    if (!chartDiv?.layout) return;
+
+    const overlays = getOrCreateOverlayContainer();
+    if (!overlays) return;
+
+    const layout = chartDiv.layout;
+    const rect = chartDiv.getBoundingClientRect();
+    const plotTop = layout.margin.t;
+    const plotBottom = rect.height - layout.margin.b;
+    const plotHeight = plotBottom - plotTop;
+
+    const left = Math.min(x1Pixel, x2Pixel);
+    const width = Math.abs(x2Pixel - x1Pixel);
+
+    overlays.shade.style.left = `${left}px`;
+    overlays.shade.style.top = `${plotTop}px`;
+    overlays.shade.style.width = `${width}px`;
+    overlays.shade.style.height = `${plotHeight}px`;
+    overlays.shade.style.display = 'block';
+}
+
+/**
+ * Update the DOM guide line overlay position (no Plotly calls)
+ */
+function updateGuideLineOverlay(xPixel) {
+    const chartDiv = document.getElementById('chart');
+    if (!chartDiv?.layout) return;
+
+    const overlays = getOrCreateOverlayContainer();
+    if (!overlays) return;
+
+    const layout = chartDiv.layout;
+    const rect = chartDiv.getBoundingClientRect();
+    const plotTop = layout.margin.t;
+    const plotBottom = rect.height - layout.margin.b;
+    const plotHeight = plotBottom - plotTop;
+
+    overlays.guide.style.left = `${xPixel - 1}px`;  // Center the 3px line
+    overlays.guide.style.top = `${plotTop}px`;
+    overlays.guide.style.height = `${plotHeight}px`;
+    overlays.guide.style.display = 'block';
+}
+
+/**
+ * Remove the DOM overlays
+ */
+function removeOverlays() {
+    const container = document.getElementById('celline-overlay');
+    if (container) {
+        container.remove();
+    }
+}
+
+// ============================================
+// Plotly-based functions (kept for compatibility)
+// ============================================
 
 function updateShadeRectangle() {
     const chartDiv = document.getElementById('chart');
@@ -826,18 +938,18 @@ function handleCelLineConfirm(data, baseKey) {
     chartState.CelLines[lineId] = metadata;
     eventBus.emit(EVENTS.LINE_CEL_SAVED, { lineId, metadata });
 
-    removeShadeRectangle();
+    removeOverlays();
     cleanupSeriesSelectionMode();
     deactivateCelLineMode();
 }
 
 function handleCelLineCancel() {
-    removeShadeRectangle();
-    removeVerticalGuideLine();
+    removeOverlays();
     cleanupSeriesSelectionMode();
 
     celLineState.x1 = null;
     celLineState.x2 = null;
+    celLineState.x1Pixel = null;
 }
 
 function handleCelLineClick(lineName) {

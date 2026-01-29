@@ -15,4 +15,5 @@ To-do
 -- A refresh fixes the missing floor data point, but not the line going in the wrong direction
 * Might be using a UUID hack right now
 * What's up with the chartStorage.js reproducing the json?
+* Is the cel line added even when there's less than 5 data points?
 

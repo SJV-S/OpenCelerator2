@@ -88,7 +88,13 @@ export const EVENTS = {
     STORAGE_CHART_SAVED: 'storage:chart_saved',
     STORAGE_CHART_LOADED: 'storage:chart_loaded',
     STORAGE_CHART_DELETED: 'storage:chart_deleted',
-    STORAGE_ERROR: 'storage:error'
+    STORAGE_ERROR: 'storage:error',
+
+    // Data Import Events
+    DATA_IMPORT_STARTED: 'data:import_started',
+    DATA_IMPORT_FILE_PARSED: 'data:import_file_parsed',
+    DATA_IMPORT_COMPLETED: 'data:import_completed',
+    DATA_IMPORT_FAILED: 'data:import_failed'
 };
 
 /**
@@ -126,7 +132,10 @@ const EVENT_CATEGORY_MAP = {
     [EVENTS.CHART_NAME_CHANGED]: [EVENT_CATEGORIES.STATE_MUTATING],
 
     // UI state that persists
-    [EVENTS.UI_TRACE_STYLE_CHANGED]: [EVENT_CATEGORIES.STATE_MUTATING]
+    [EVENTS.UI_TRACE_STYLE_CHANGED]: [EVENT_CATEGORIES.STATE_MUTATING],
+
+    // Data import
+    [EVENTS.DATA_IMPORT_COMPLETED]: [EVENT_CATEGORIES.STATE_MUTATING]
 };
 
 class EventBus {

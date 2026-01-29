@@ -24,9 +24,7 @@ var cutLinesState = {
     touchStartHandler: null,
     touchMoveHandler: null,
     touchEndHandler: null,
-    verticalLineShape: null,
-    lastUpdateTime: 0,
-    throttleDelay: 33,
+    currentX: null,  // Current x position for cut (replaces reading from Plotly shape)
     previousDragMode: null,
     toastElement: null,
     isTouchActive: false
@@ -133,23 +131,21 @@ function deactivateCutLinesMode() {
         cutLinesState.touchEndHandler = null;
     }
 
-    removeVerticalLine();
+    removeCutLineOverlay();
     removeCutLineToast();
+    cutLinesState.currentX = null;
 
     console.log('Cut lines mode deactivated');
 }
 
 function handleCutLineMouseMove(event, chartDiv) {
-    const now = Date.now();
-    if (now - cutLinesState.lastUpdateTime < cutLinesState.throttleDelay) {
-        return;
-    }
-    cutLinesState.lastUpdateTime = now;
-
     const coords = getPlotCoordinatesForCutLine(event, chartDiv);
     if (!coords) return;
 
-    updateVerticalLine(coords.x);
+    // Store current x for click handler
+    cutLinesState.currentX = coords.x;
+    // Use fast DOM overlay instead of Plotly
+    updateGuideLineOverlay(coords.xPixel);
 }
 
 function handleCutLineDrawClick(event, chartDiv) {
@@ -157,11 +153,9 @@ function handleCutLineDrawClick(event, chartDiv) {
         return;
     }
 
-    const currentShapes = chartDiv.layout.shapes || [];
-    const cutLineShape = currentShapes.find(shape => shape.name === 'cutline-guide');
-
-    if (cutLineShape) {
-        cutLine(cutLineShape.x0);
+    // Read position from state (set by mousemove handler)
+    if (cutLinesState.currentX !== null) {
+        cutLine(cutLinesState.currentX);
     }
 
     deactivateCutLinesMode();
@@ -177,7 +171,8 @@ function handleCutLineTouchStart(event, chartDiv) {
         const touch = event.touches[0];
         const coords = getPlotCoordinatesForCutLineTouch(touch, chartDiv);
         if (coords) {
-            updateVerticalLine(coords.x);
+            cutLinesState.currentX = coords.x;
+            updateGuideLineOverlay(coords.xPixel);
         }
     }
 }
@@ -185,17 +180,12 @@ function handleCutLineTouchStart(event, chartDiv) {
 function handleCutLineTouchMove(event, chartDiv) {
     event.preventDefault();
 
-    const now = Date.now();
-    if (now - cutLinesState.lastUpdateTime < cutLinesState.throttleDelay) {
-        return;
-    }
-    cutLinesState.lastUpdateTime = now;
-
     if (event.touches.length === 1) {
         const touch = event.touches[0];
         const coords = getPlotCoordinatesForCutLineTouch(touch, chartDiv);
         if (coords) {
-            updateVerticalLine(coords.x);
+            cutLinesState.currentX = coords.x;
+            updateGuideLineOverlay(coords.xPixel);
         }
     }
 }
@@ -210,11 +200,9 @@ function handleCutLineTouchEnd(event, chartDiv) {
         return;
     }
 
-    const currentShapes = chartDiv.layout.shapes || [];
-    const cutLineShape = currentShapes.find(shape => shape.name === 'cutline-guide');
-
-    if (cutLineShape) {
-        cutLine(cutLineShape.x0);
+    // Read position from state (set by touchmove handler)
+    if (cutLinesState.currentX !== null) {
+        cutLine(cutLinesState.currentX);
     }
 
     deactivateCutLinesMode();
@@ -273,6 +261,87 @@ function getPlotCoordinatesForCutLineTouch(touch, chartDiv) {
 
     return { x: xRounded, xPixel: xPixel, yPixel: yPixel };
 }
+
+// ============================================
+// DOM Overlay Functions (fast, no Plotly calls)
+// ============================================
+
+/**
+ * Get or create the overlay container for cut line preview
+ */
+function getOrCreateCutLineOverlay() {
+    const chartDiv = document.getElementById('chart');
+    if (!chartDiv) return null;
+
+    let container = document.getElementById('cutline-overlay');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'cutline-overlay';
+        container.style.cssText = `
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 50;
+        `;
+
+        // Vertical guide line
+        const guide = document.createElement('div');
+        guide.id = 'cutline-guide-overlay';
+        guide.style.cssText = `
+            position: absolute;
+            width: 1px;
+            background: gray;
+            display: none;
+        `;
+
+        container.appendChild(guide);
+        chartDiv.appendChild(container);
+    }
+
+    return {
+        container,
+        guide: document.getElementById('cutline-guide-overlay')
+    };
+}
+
+/**
+ * Update the DOM guide line overlay position (no Plotly calls)
+ */
+function updateGuideLineOverlay(xPixel) {
+    const chartDiv = document.getElementById('chart');
+    if (!chartDiv?.layout) return;
+
+    const overlays = getOrCreateCutLineOverlay();
+    if (!overlays) return;
+
+    const layout = chartDiv.layout;
+    const rect = chartDiv.getBoundingClientRect();
+    const plotTop = layout.margin.t;
+    const plotBottom = rect.height - layout.margin.b;
+    const plotHeight = plotBottom - plotTop;
+
+    overlays.guide.style.left = `${xPixel}px`;
+    overlays.guide.style.top = `${plotTop}px`;
+    overlays.guide.style.height = `${plotHeight}px`;
+    overlays.guide.style.display = 'block';
+}
+
+/**
+ * Remove the DOM overlay
+ */
+function removeCutLineOverlay() {
+    const container = document.getElementById('cutline-overlay');
+    if (container) {
+        container.remove();
+    }
+}
+
+// ============================================
+// Plotly-based functions (kept for reference)
+// ============================================
 
 function updateVerticalLine(xValue) {
     const chartDiv = document.getElementById('chart');
