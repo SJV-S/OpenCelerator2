@@ -19,6 +19,8 @@ const CHART_CONFIG = {
         yMin: 1 * 0.69,
         yMax: 1000000,
         unit: 7,
+        snapTo: 14,  // Snap xmax to multiples of 14 (28, 42, 56...)
+        minXmax: 28,
         annotations: {
             'date-text': { offsetMultiplier: 4, useGeneral: true },
             'week-count': { offsetMultiplier: 2.0833, useGeneral: true },
@@ -34,6 +36,8 @@ const CHART_CONFIG = {
         yMin: 0.001 * 0.69,
         yMax: 1000,
         unit: 4,
+        snapTo: 8,  // Snap to multiples of 8 (8, 16, 24...)
+        minXmax: 8,
         annotations: {
             'month-label': { offsetMultiplier: 3.05, useGeneral: true, fontScale: 0.85, prefix: true },
             'month-count': { offsetMultiplier: 5.93, useGeneral: true },
@@ -49,6 +53,8 @@ const CHART_CONFIG = {
         yMin: 0.001 * 0.69,
         yMax: 1000,
         unit: 5,
+        snapTo: 24,  // Snap to multiples of 24 (24, 48, 72...)
+        minXmax: 24,
         annotations: {
             'year-label': { offsetMultiplier: 2.61, useGeneral: true, fontScale: 0.85, prefix: true },
             'year-count': { offsetMultiplier: 5.05, useGeneral: true },
@@ -64,6 +70,8 @@ const CHART_CONFIG = {
         yMin: 0.001 * 0.69,
         yMax: 1000,
         unit: 5,
+        snapTo: 20,  // Snap to multiples of 20 (20, 40, 60...)
+        minXmax: 20,
         annotations: {
             'year-label': { offsetMultiplier: 3.05, useGeneral: true, fontScale: 0.75, prefix: true },
             'decade-count': { offsetMultiplier: 5.93, useGeneral: true },
@@ -81,6 +89,8 @@ const CHART_CONFIG = {
         yMin: 0.001 * 0.69,
         yMax: 1000,
         unit: 7,
+        snapTo: 7,  // Snap to multiples of 7 (42, 49, 56...)
+        minXmax: 42,
         annotations: {
             'blank-line': { offsetMultiplier: 3.05, useGeneral: true, fontScale: 0.75, prefix: true, yDirection: 'below' },
             'counted-label': { offsetMultiplier: 4.79, useGeneral: true, fontScale: 0.75, prefix: true, yDirection: 'below' },
@@ -93,8 +103,9 @@ const CHART_CONFIG = {
 };
 
 /**
- * Resize chart based on container height
+ * Resize chart based on container dimensions
  * @param {Object} chartJson - Plotly chart data/layout object
+ * @param {number} containerWidth - Width of the container element
  * @param {number} containerHeight - Height of the container element
  * @param {string} chartType - Type of chart (Daily, Weekly, Monthly, Yearly, FrequencyCollections)
  * @param {Object} options - Additional options
@@ -102,19 +113,53 @@ const CHART_CONFIG = {
  * @param {boolean} options.isMinuteChart - Whether this is a minute chart (affects fan position)
  * @returns {Object} Modified chartJson with updated dimensions
  */
-function resizeChartByHeight(chartJson, containerHeight, chartType = 'Daily', options = {}) {
+function resizeChartByHeight(chartJson, containerWidth, containerHeight, chartType = 'Daily', options = {}) {
     const { fanVisible = false, isMinuteChart = false } = options;
 
     const config = CHART_CONFIG[chartType];
     if (!config) {
         console.warn(`Unknown chart type: ${chartType}, defaulting to Daily`);
-        return resizeChartByHeight(chartJson, containerHeight, 'Daily', options);
+        return resizeChartByHeight(chartJson, containerWidth, containerHeight, 'Daily', options);
     }
 
     // Use 98% of container height for padding
     const height = containerHeight * 0.98;
 
     const margin = chartJson.layout.margin;
+
+    // === PEELING: Calculate and apply new xmax based on viewport ===
+    const originalXmax = Math.round(chartJson.layout.xaxis.range[1]);
+
+    // Calculate what xmax fits the viewport (using pre-margin-adjustment values)
+    const peelHeight = containerHeight * 0.90;
+    const peelYaxisPx = peelHeight - (margin.t + margin.b);
+    const peelXaxisPx = containerWidth - (margin.l + margin.r);
+    const yAxisRange = Math.log10(config.yMax) - Math.log10(config.yMin);
+    const deg = 34;
+    const deltaYPx = peelXaxisPx * Math.tan(deg * Math.PI / 180);
+    const deltaY = (deltaYPx / peelYaxisPx) * yAxisRange;
+    let newXmax = Math.floor(config.unit * deltaY / Math.log10(2));
+
+    // Snap to configured breakpoints (e.g., multiples of 14 for Daily)
+    if (config.snapTo) {
+        newXmax = Math.floor(newXmax / config.snapTo) * config.snapTo;
+    }
+
+    // Clamp to min/max bounds
+    newXmax = Math.max(newXmax, config.minXmax || config.snapTo);
+    newXmax = Math.min(newXmax, originalXmax);
+
+    // Move right spine from originalXmax to newXmax
+    chartJson.layout.shapes.forEach(shape => {
+        if (shape.name === 'spine' && Math.round(shape.x0) === originalXmax) {
+            shape.x0 = newXmax;
+            shape.x1 = newXmax;
+        }
+    });
+
+    // Set new x-axis range
+    chartJson.layout.xaxis.range = [-0.2, newXmax + 0.2];
+    // === END PEELING ===
 
     // Expand margin for celeration fan (must happen before width calculation)
     if (fanVisible && !isMobile()) {
@@ -132,8 +177,7 @@ function resizeChartByHeight(chartJson, containerHeight, chartType = 'Daily', op
     margin.b += creditMargin;
 
     const y = { min: config.yMin, max: config.yMax };
-    const xmax = Math.round(chartJson.layout.xaxis.range[1]);
-    const deg = 34; // Desired angle of doubling in degrees
+    const xmax = newXmax;  // Use peeled xmax for remaining calculations
     const yaxis_px = height - (margin.t + margin.b);
     const y_axis = Math.log10(y.max) - Math.log10(y.min);
     const delta_y = Math.log10(2 ** (xmax / config.unit));
@@ -168,7 +212,19 @@ function resizeChartByHeight(chartJson, containerHeight, chartType = 'Daily', op
 
     // Scale specific annotations based on config
     chartJson.layout.annotations.forEach(annotation => {
+        // Reposition "COUNTING TIMES" annotation (Daily chart, right y-axis label)
+        // Must check before the name guard since this annotation has no name
+        if (annotation.text === 'COUNTING TIMES') {
+            annotation.x = 1 + (30 / xaxis_px);
+        }
+
         if (!annotation.name) return;
+
+        // On mobile, hide top_x_title (e.g., "SUCCESSIVE CALENDAR DAYS")
+        if (isMobile() && annotation.name === 'top_x_title') {
+            annotation.visible = false;
+            return;
+        }
 
         // Check each configured annotation pattern
         for (const [pattern, settings] of Object.entries(config.annotations)) {

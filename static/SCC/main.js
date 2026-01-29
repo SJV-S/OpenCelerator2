@@ -56,6 +56,7 @@ import { init as cutLinesInit } from './lines/cutLines.js';
 import { init as celLineInit } from './lines/celLine.js';
 import { initGridToggle } from './misc/grid.js';
 import { injectCelerationFan, initFanDrag, regenerateFan, init as celerationFanInit } from './misc/celerationFan.js';
+import { injectCredits, initCreditClick, regenerateCredits, init as creditInit } from './misc/credit.js';
 import { toggleLegend, renderCustomLegend, init as customLegendInit } from './misc/customLegend.js';
 import { setupPanConstraints } from './util/panning_controls.js';
 import { resizeChartByHeight, CHART_CONFIG } from './util/resize_chart/resize-chart.js';
@@ -80,18 +81,22 @@ export function initializeChart(plotData, maxWindowWidth) {
 
     const chartDiv = document.getElementById('chart');
 
-    // Get container height: use #chart-container on desktop, window.innerHeight on mobile
+    // Get container dimensions: use #chart-container on desktop, window dimensions on mobile
     const chartContainer = document.getElementById('chart-container');
+    const containerWidth = chartContainer ? chartContainer.clientWidth : window.innerWidth;
     const containerHeight = chartContainer ? chartContainer.clientHeight : window.innerHeight;
 
-    // Resize chart based on chart type (includes margin expansion for fan)
-    plotData = resizeChartByHeight(plotData, containerHeight, chartState.chartType, {
+    // Resize chart based on chart type (includes peeling and margin expansion for fan)
+    plotData = resizeChartByHeight(plotData, containerWidth, containerHeight, chartState.chartType, {
         fanVisible: true,
         isMinuteChart: chartState.minuteChart
     });
 
     // Inject celeration fan shapes/annotations (margins already handled by resize)
     plotData = injectCelerationFan(plotData, chartState.minuteChart, chartState.chartType);
+
+    // Inject credit line annotations (margin already handled by resize)
+    plotData = injectCredits(plotData);
 
     // Create chart
     Plotly.newPlot(chartDiv, plotData.data, plotData.layout, {
@@ -104,6 +109,9 @@ export function initializeChart(plotData, maxWindowWidth) {
 
     // Initialize draggable fan
     initFanDrag();
+
+    // Initialize credit click handler
+    initCreditClick();
 
     // Observe container for resize (fullscreen, viewport changes)
     if (chartContainer) {
@@ -125,6 +133,7 @@ export function initializeChart(plotData, maxWindowWidth) {
 
                 Plotly.relayout(chartDiv, { height: newHeight, width: newWidth }).then(() => {
                     regenerateFan();
+                    regenerateCredits();
                     renderCustomLegend();
                 });
             }, 100);
@@ -201,6 +210,7 @@ document.addEventListener('DOMContentLoaded', () => {
     customLegendInit();
     crosshairInit();
     celerationFanInit();
+    creditInit();
     console.log('Main.js: Event bus subscriptions initialized');
 
     // Initialize IndexedDB storage
