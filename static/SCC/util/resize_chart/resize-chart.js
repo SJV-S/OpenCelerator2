@@ -118,13 +118,19 @@ function resizeChartByHeight(chartJson, containerHeight, chartType = 'Daily', op
 
     // Expand margin for celeration fan (must happen before width calculation)
     if (fanVisible && !isMobile()) {
-        const extraMargin = isMinuteChart ? 90 : 60;
+        // Minute charts need more space (fan on left with labels extending outward)
+        const fanMargin = isMinuteChart ? height * 0.10 : height * 0.07;
         if (isMinuteChart) {
-            margin.l += extraMargin;
+            margin.l += fanMargin;
         } else {
-            margin.r += extraMargin;
+            margin.r += fanMargin;
         }
     }
+
+    // Expand bottom margin for credit information
+    const creditMargin = height * 0.10;
+    margin.b += creditMargin;
+
     const y = { min: config.yMin, max: config.yMax };
     const xmax = Math.round(chartJson.layout.xaxis.range[1]);
     const deg = 34; // Desired angle of doubling in degrees
