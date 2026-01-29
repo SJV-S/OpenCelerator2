@@ -453,16 +453,31 @@ function removeAggregationBlock(block) {
         return;
     }
 
-    // Get the series name from the block before removing it
+    // Get the series name and aggType before removing
     const seriesName = block.dataset.series;
+    const aggType = block.dataset.agg;
 
-    // Remove the block
+    // Remove the block from DOM
     block.remove();
 
-    // Update button visibility (may need to show + button and update - buttons)
+    // Remove from chartState
+    if (seriesName && aggType) {
+        const isMiscSeries = seriesName.startsWith('misc');
+        if (isMiscSeries) {
+            delete chartState.traceStyles.misc[seriesName][aggType];
+        } else {
+            delete chartState.traceStyles[seriesName][aggType];
+        }
+    }
+
+    // Update button visibility
     if (seriesName) {
         updateButtonVisibility(seriesName);
     }
+
+    // Refresh chart
+    eventBus.emit(EVENTS.DATA_CHART_REFRESH);
+    eventBus.emit(EVENTS.UI_LEGEND_RENDER);
 }
 
 // ============================================================================
