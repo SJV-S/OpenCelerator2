@@ -9,9 +9,28 @@
  */
 
 import { chartState, defaultCorrectTraceConfig, defaultErrorTraceConfig, defaultTimingTraceConfig, createMiscTraceConfig } from '../chartState.js';
+import { CORRECTS, ERRORS, TIMING } from '../config.js';
 import { getMiscSeriesIds } from './miscSeries.js';
 import { createToast } from '../util/toaster.js';
 import { eventBus, EVENTS } from '../eventBus.js';
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+const MAX_TAB_NAME_LENGTH = 17;
+
+/**
+ * Truncate a series name for display in tab buttons.
+ * @param {string} name - The series name to truncate
+ * @returns {string} Truncated name with "..." if over limit
+ */
+function truncateTabName(name) {
+    if (!name || name.length <= MAX_TAB_NAME_LENGTH) {
+        return name;
+    }
+    return name.slice(0, MAX_TAB_NAME_LENGTH) + '...';
+}
 
 // ============================================================================
 // AGGREGATION OPTIONS
@@ -62,9 +81,9 @@ function updateCounterLabels() {
         return configs[firstAggType];
     };
 
-    document.getElementById('correct-series-label').textContent = getFirstConfig('correct').seriesName;
-    document.getElementById('incorrect-series-label').textContent = getFirstConfig('incorrect').seriesName;
-    document.getElementById('timing-series-label').textContent = getFirstConfig('timing').seriesName;
+    document.getElementById('corrects-series-label').textContent = getFirstConfig(CORRECTS).seriesName;
+    document.getElementById('errors-series-label').textContent = getFirstConfig(ERRORS).seriesName;
+    document.getElementById('timing-series-label').textContent = getFirstConfig(TIMING).seriesName;
 
     // Update labels for dynamic misc series
     getMiscSeriesIds().forEach(miscId => {
@@ -127,17 +146,17 @@ function initializeSeriesInputs(seriesName) {
         if (lineColorInput) lineColorInput.value = config.lineColor;
 
         // Set series-specific fields
-        if (seriesName === 'incorrect') {
+        if (seriesName === ERRORS) {
             const textSizeInput = block.querySelector('.text-size-input');
             const markerColorInput = block.querySelector('.marker-color-input');
             if (textSizeInput) textSizeInput.value = config.textSize;
             if (markerColorInput) markerColorInput.value = config.markerColor;
-        } else if (seriesName === 'timing') {
+        } else if (seriesName === TIMING) {
             const markerSizeInput = block.querySelector('.marker-size-input');
             const markerColorInput = block.querySelector('.marker-color-input');
             if (markerSizeInput) markerSizeInput.value = config.markerSize;
             if (markerColorInput) markerColorInput.value = config.markerColor;
-        } else if (seriesName === 'correct') {
+        } else if (seriesName === CORRECTS) {
             const markerSizeInput = block.querySelector('.marker-size-input');
             const markerFaceColorInput = block.querySelector('.marker-face-color-input');
             const markerEdgeColorInput = block.querySelector('.marker-edge-color-input');
@@ -163,7 +182,7 @@ function initializeAllSeriesInputs() {
     // Update sum option visibility based on chart type
     updateSumOptionVisibility();
     // Initialize fixed series
-    ['correct', 'incorrect', 'timing'].forEach(initializeSeriesInputs);
+    [CORRECTS, ERRORS, TIMING].forEach(initializeSeriesInputs);
     // Initialize dynamic misc series
     getMiscSeriesIds().forEach(initializeSeriesInputs);
 }
@@ -196,13 +215,13 @@ function applyTraceConfig(seriesName) {
         };
 
         // Add series-specific fields
-        if (seriesName === 'incorrect') {
+        if (seriesName === ERRORS) {
             config.textSize = parseInt(block.querySelector('.text-size-input')?.value) || 20;
             config.markerColor = block.querySelector('.marker-color-input')?.value || '#000000';
-        } else if (seriesName === 'timing') {
+        } else if (seriesName === TIMING) {
             config.markerSize = parseInt(block.querySelector('.marker-size-input')?.value) || 30;
             config.markerColor = block.querySelector('.marker-color-input')?.value || '#000000';
-        } else if (seriesName === 'correct') {
+        } else if (seriesName === CORRECTS) {
             config.markerSize = parseInt(block.querySelector('.marker-size-input')?.value) || 8;
             config.markerSymbol = 'circle';
             config.markerFaceColor = block.querySelector('.marker-face-color-input')?.value || '#000000';
@@ -224,12 +243,14 @@ function applyTraceConfig(seriesName) {
 
     updateCounterLabels();
 
-    // Update tab button text for misc series
-    if (isMiscSeries) {
-        const tabButton = document.querySelector(`[data-series-tab="${seriesName}"]`);
-        const rawConfig = chartState.traceStyles.misc[seriesName]?.raw;
-        if (tabButton && rawConfig?.seriesName) {
-            tabButton.textContent = rawConfig.seriesName;
+    // Update tab button text (for all series, truncated for display)
+    const tabButton = document.querySelector(`[data-series-tab="${seriesName}"]`);
+    if (tabButton) {
+        const rawConfig = isMiscSeries
+            ? chartState.traceStyles.misc[seriesName]?.raw
+            : chartState.traceStyles[seriesName]?.raw;
+        if (rawConfig?.seriesName) {
+            tabButton.textContent = truncateTabName(rawConfig.seriesName);
         }
     }
 
@@ -241,9 +262,9 @@ function applyTraceConfig(seriesName) {
 function resetTraceConfig(seriesName) {
     // Reset to default "raw" aggregation only
     const defaultsMap = {
-        correct: defaultCorrectTraceConfig,
-        incorrect: defaultErrorTraceConfig,
-        timing: defaultTimingTraceConfig
+        [CORRECTS]: defaultCorrectTraceConfig,
+        [ERRORS]: defaultErrorTraceConfig,
+        [TIMING]: defaultTimingTraceConfig
     };
 
     // Check if this is a misc series
@@ -275,12 +296,14 @@ function resetTraceConfig(seriesName) {
     initializeSeriesInputs(seriesName);
     updateCounterLabels();
 
-    // Update tab button text for misc series
-    if (isMiscSeries) {
-        const tabButton = document.querySelector(`[data-series-tab="${seriesName}"]`);
-        const rawConfig = chartState.traceStyles.misc[seriesName]?.raw;
-        if (tabButton && rawConfig?.seriesName) {
-            tabButton.textContent = rawConfig.seriesName;
+    // Update tab button text (for all series, truncated for display)
+    const tabButton = document.querySelector(`[data-series-tab="${seriesName}"]`);
+    if (tabButton) {
+        const rawConfig = isMiscSeries
+            ? chartState.traceStyles.misc[seriesName]?.raw
+            : chartState.traceStyles[seriesName]?.raw;
+        if (rawConfig?.seriesName) {
+            tabButton.textContent = truncateTabName(rawConfig.seriesName);
         }
     }
 
@@ -484,7 +507,57 @@ function removeAggregationBlock(block) {
 // EVENT SUBSCRIPTIONS
 // ============================================================================
 
+// For manual "Add Misc Series" button - creates single series
 eventBus.subscribe(EVENTS.MISC_SERIES_ADDED, ({ id, index }) => {
+    createMiscSeriesTab(id, index);
+    updateSumOptionVisibility();
+    eventBus.emit(EVENTS.DATA_CHART_REFRESH);
+    eventBus.emit(EVENTS.UI_LEGEND_RENDER);
+}, true);
+
+// Sync misc series UI after import completes
+eventBus.subscribe(EVENTS.DATA_IMPORT_COMPLETED, () => {
+    syncMiscSeriesUI();
+    initializeAllSeriesInputs();
+}, true);
+
+/**
+ * Sync misc series UI tabs/panels with chartState.series.misc
+ * Creates missing tabs, removes orphaned tabs
+ */
+function syncMiscSeriesUI() {
+    const tabContainer = document.getElementById('series-tab-container');
+    const panelContainer = document.getElementById('misc-panels-container');
+    const template = document.getElementById('misc-series-template');
+
+    if (!tabContainer || !panelContainer || !template) return;
+
+    const miscIdsInState = Object.keys(chartState.series.misc || {});
+    const existingTabs = tabContainer.querySelectorAll('[data-series-tab^="misc"]');
+    const existingTabIds = Array.from(existingTabs).map(t => t.dataset.seriesTab);
+
+    // Remove tabs that no longer exist in chartState
+    for (const tabId of existingTabIds) {
+        if (!miscIdsInState.includes(tabId)) {
+            document.querySelector(`[data-series-tab="${tabId}"]`)?.remove();
+            document.getElementById(`${tabId}-series-config`)?.remove();
+        }
+    }
+
+    // Create tabs for misc series that don't have UI yet
+    for (const id of miscIdsInState) {
+        if (!existingTabIds.includes(id)) {
+            const num = parseInt(id.slice(4));
+            const index = num - 1;
+            createMiscSeriesTab(id, index);
+        }
+    }
+}
+
+/**
+ * Create a single misc series tab and panel
+ */
+function createMiscSeriesTab(id, index) {
     const tabContainer = document.getElementById('series-tab-container');
     const panelContainer = document.getElementById('misc-panels-container');
     const template = document.getElementById('misc-series-template');
@@ -496,9 +569,8 @@ eventBus.subscribe(EVENTS.MISC_SERIES_ADDED, ({ id, index }) => {
     const tabButton = document.createElement('button');
     tabButton.className = 'series-subtab';
     tabButton.dataset.seriesTab = id;
-    // Use custom series name if available, otherwise default
     const config = chartState.traceStyles.misc[id]?.raw;
-    tabButton.textContent = config?.seriesName || `Misc ${index + 1}`;
+    tabButton.textContent = truncateTabName(config?.seriesName || `Misc ${index + 1}`);
     tabButton.addEventListener('click', () => switchSeriesTab(id));
     tabContainer.insertBefore(tabButton, addBtn);
 
@@ -506,18 +578,15 @@ eventBus.subscribe(EVENTS.MISC_SERIES_ADDED, ({ id, index }) => {
     const panel = template.content.firstElementChild.cloneNode(true);
     panel.id = `${id}-series-config`;
 
-    // Update data-series attributes
     panel.querySelectorAll('[data-series="misc-template"]').forEach(el => {
         el.dataset.series = id;
     });
 
-    // Update blocks container ID
     const blocksContainer = panel.querySelector('.misc-blocks-container');
     if (blocksContainer) {
         blocksContainer.id = `${id}-blocks-container`;
     }
 
-    // Set values from chartState config (config already declared above)
     if (config) {
         const nameInput = panel.querySelector('.series-name-input');
         if (nameInput) nameInput.value = config.seriesName;
@@ -529,7 +598,6 @@ eventBus.subscribe(EVENTS.MISC_SERIES_ADDED, ({ id, index }) => {
         if (faceColorInput) faceColorInput.value = config.markerFaceColor;
     }
 
-    // Wire up buttons
     panel.querySelector('.apply-misc-btn')?.addEventListener('click', () => applyTraceConfig(id));
     panel.querySelector('.reset-misc-btn')?.addEventListener('click', () => resetTraceConfig(id));
     panel.querySelector('.delete-misc-btn')?.addEventListener('click', () => {
@@ -544,14 +612,11 @@ eventBus.subscribe(EVENTS.MISC_SERIES_ADDED, ({ id, index }) => {
 
     panelContainer.appendChild(panel);
     updateButtonVisibility(id);
-    updateSumOptionVisibility();
-
-    eventBus.emit(EVENTS.DATA_CHART_REFRESH);
-    eventBus.emit(EVENTS.UI_LEGEND_RENDER);
-}, true);
+}
 
 // Sync UI with chartState after chart loads from storage
 eventBus.subscribe(EVENTS.STORAGE_CHART_LOADED, () => {
+    syncMiscSeriesUI();
     initializeAllSeriesInputs();
 }, true);
 
@@ -566,7 +631,7 @@ eventBus.subscribe(EVENTS.MISC_SERIES_REMOVED, ({ id }) => {
 
     // Switch to correct tab if needed
     const activePanel = document.querySelector('.series-config-panel[style*="display: block"]');
-    if (!activePanel) switchSeriesTab('correct');
+    if (!activePanel) switchSeriesTab(CORRECTS);
 
     eventBus.emit(EVENTS.DATA_CHART_REFRESH);
     eventBus.emit(EVENTS.UI_LEGEND_RENDER);

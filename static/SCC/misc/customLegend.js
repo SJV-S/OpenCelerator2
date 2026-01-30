@@ -9,6 +9,7 @@
  */
 
 import { chartState } from '../chartState.js';
+import { CORRECTS, ERRORS, TIMING } from '../config.js';
 import { icons } from '../util/icons.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 import { toggleGrid } from './grid.js';
@@ -26,8 +27,16 @@ const visibilityState = {};
 function getLegendItems() {
     const items = [];
 
-    // Process fixed series (correct, incorrect, timing)
-    ['correct', 'incorrect', 'timing'].forEach(seriesKey => {
+    // Process fixed series (corrects, errors, timing)
+    [CORRECTS, ERRORS, TIMING].forEach(seriesKey => {
+        // Timing only shows on minute charts
+        if (seriesKey === TIMING && !chartState.minuteChart) return;
+
+        // Skip if no data for this series (NaN values don't count as data)
+        const dataArray = chartState.series[seriesKey];
+        const hasData = dataArray && dataArray.some(val => Number.isFinite(val));
+        if (!hasData) return;
+
         const aggConfigs = chartState.traceStyles[seriesKey];
         if (!aggConfigs) return;
 
@@ -79,13 +88,17 @@ function getLegendItems() {
  * Get the appropriate SVG marker for a series
  * @param {string} seriesKey - Series identifier (correct, incorrect, timing, misc1, misc2)
  * @param {Object} config - Trace configuration object
+ * @param {number} scale - Scale factor for sizing
  * @returns {string} SVG string
  */
-function getMarkerSVG(seriesKey, config) {
-    if (seriesKey === 'incorrect') {
-        return icons.markerX(config.textSize || 20, config.markerColor);
-    } else if (seriesKey === 'timing') {
-        return icons.markerDash(config.markerSize || 20, config.markerColor);
+function getMarkerSVG(seriesKey, config, scale = 1) {
+    const baseSize = 20;
+    const scaledSize = Math.round(baseSize * scale);
+
+    if (seriesKey === ERRORS) {
+        return icons.markerX(scaledSize, config.markerColor);
+    } else if (seriesKey === TIMING) {
+        return icons.markerDash(scaledSize, config.markerColor);
     } else {
         // Map Plotly symbol names to icon functions
         const symbolMap = {
@@ -96,29 +109,35 @@ function getMarkerSVG(seriesKey, config) {
         };
 
         const iconFn = symbolMap[config.markerSymbol] || icons.markerCircle;
-        return iconFn(config.markerSize, config.markerFaceColor, config.markerEdgeColor);
+        return iconFn(Math.round((config.markerSize || baseSize) * scale), config.markerFaceColor, config.markerEdgeColor);
     }
 }
 
 /**
  * Create a legend item DOM element
  * @param {Object} item - Legend item object
+ * @param {number} scale - Scale factor for sizing
  * @returns {HTMLElement} Legend item div
  */
-function createLegendItem(item) {
+function createLegendItem(item, scale = 1) {
     const div = document.createElement('div');
     div.className = 'legend-item';
     div.dataset.seriesKey = item.seriesKey;
 
+    // Apply scaled styles
+    div.style.gap = `${Math.round(4 * scale)}px`;
+    div.style.padding = `${Math.round(2 * scale)}px ${Math.round(4 * scale)}px`;
+
     // Create marker container
     const markerContainer = document.createElement('span');
     markerContainer.className = 'legend-marker';
-    markerContainer.innerHTML = getMarkerSVG(item.baseSeriesKey, item.config);
+    markerContainer.innerHTML = getMarkerSVG(item.baseSeriesKey, item.config, scale);
 
     // Create label
     const label = document.createElement('span');
     label.textContent = item.displayName;
     label.className = 'legend-label';
+    label.style.fontSize = `${Math.round(14 * scale)}px`;
 
     div.appendChild(markerContainer);
     div.appendChild(label);
@@ -137,24 +156,32 @@ function createLegendItem(item) {
 /**
  * Create the collapsible lines section for the legend
  * Shows on hover/tap of the legend
+ * @param {number} scale - Scale factor for sizing
  * @returns {HTMLElement} Lines section container
  */
-function createLinesSection() {
+function createLinesSection(scale = 1) {
     const section = document.createElement('div');
     section.className = 'legend-lines-section';
+    section.style.gap = `${Math.round(2 * scale)}px`;
 
-    // Line type items - use main icons with size=20 and showText=false
+    const scaledIconSize = Math.round(20 * scale);
+
+    // Line type items - use main icons with scaled size and showText=false
     const lineTypes = [
-        { key: 'aim', label: 'Aim', icon: icons.aimDiagonal(20, false) },
-        { key: 'phase', label: 'Phase', icon: icons.phaseTextTop(20, false) },
-        { key: 'change', label: 'Change', icon: icons.scatterLine(20) },
-        { key: 'grid', label: 'Grid', icon: icons.grid(20) }
+        { key: 'aim', label: 'Aim', icon: icons.aimDiagonal(scaledIconSize, false) },
+        { key: 'phase', label: 'Phase', icon: icons.phaseTextTop(scaledIconSize, false) },
+        { key: 'change', label: 'Change', icon: icons.scatterLine(scaledIconSize) },
+        { key: 'grid', label: 'Grid', icon: icons.grid(scaledIconSize) }
     ];
 
     lineTypes.forEach(lineType => {
         const item = document.createElement('div');
         item.className = 'legend-item legend-line-item';
         item.dataset.lineType = lineType.key;
+
+        // Apply scaled styles
+        item.style.gap = `${Math.round(4 * scale)}px`;
+        item.style.padding = `${Math.round(2 * scale)}px ${Math.round(4 * scale)}px`;
 
         if (!chartState.lineVisibility[lineType.key]) {
             item.classList.add('legend-item-hidden');
@@ -167,6 +194,7 @@ function createLinesSection() {
         const label = document.createElement('span');
         label.className = 'legend-label';
         label.textContent = lineType.label;
+        label.style.fontSize = `${Math.round(14 * scale)}px`;
 
         item.appendChild(markerContainer);
         item.appendChild(label);
@@ -209,6 +237,21 @@ function toggleLineVisibility(lineType) {
 }
 
 /**
+ * Calculate scale factor based on chart height
+ * @returns {number} Scale factor (1.0 = baseline at ~900px height)
+ */
+function getScaleFactor() {
+    const chartDiv = document.getElementById('chart');
+    if (!chartDiv?._fullLayout) return 1;
+
+    const height = chartDiv._fullLayout.height;
+    const baseHeight = 900;
+    const ratio = height / baseHeight;
+    // Gentle scaling with square root to dampen effect
+    return Math.max(0.5, Math.min(1.1, Math.sqrt(ratio)));
+}
+
+/**
  * Render the complete custom legend
  * Clears existing legend and rebuilds from current chartState
  */
@@ -229,17 +272,21 @@ function renderCustomLegend() {
     container.innerHTML = '';
     container.style.display = 'flex';
 
+    // Calculate scale factor based on chart height
+    const scale = getScaleFactor();
+
+    // Apply scaled CSS custom properties
+    container.style.setProperty('--legend-scale', scale);
+    container.style.gap = `${Math.round(4 * scale)}px`;
+    container.style.padding = `${Math.round(6 * scale)}px`;
+
     items.forEach(item => {
-        container.appendChild(createLegendItem(item));
+        container.appendChild(createLegendItem(item, scale));
     });
 
     // Add collapsible lines section (hidden by default, shows on hover/tap)
-    container.appendChild(createLinesSection());
+    container.appendChild(createLinesSection(scale));
 
-    // Add touch handling to show lines section on tap
-    container.addEventListener('touchstart', () => {
-        container.classList.toggle('touched');
-    }, { passive: true });
 
     // Move legend inside chart div (which has position: relative)
     if (container.parentElement !== chartDiv) {
@@ -261,8 +308,8 @@ function renderCustomLegend() {
 
         container.style.position = 'absolute';
 
-        // Position legend at plot area corners with small offset
-        const offset = 8;
+        // Position legend at plot area corners with scaled offset
+        const offset = Math.round(8 * scale);
 
         if (position === 'top-right') {
             container.style.top = (plotTop + offset) + 'px';
@@ -322,20 +369,13 @@ function updatePlotlyTraceVisibility(seriesKey, visible) {
     const chartDiv = document.getElementById('chart');
     if (!chartDiv) return;
 
-    // Parse the unique key (e.g., "correct_mean" -> baseKey="correct", aggType="mean")
+    // Parse the unique key (e.g., "corrects_mean" -> baseKey="corrects", aggType="mean")
     const parts = seriesKey.split('_');
     const baseKey = parts[0];
     const aggType = parts[1];
 
-    // Map base seriesKey to trace meta seriesName
-    const seriesNameMap = {
-        'correct': 'corrects',
-        'incorrect': 'errors',
-        'timing': 'timing'
-    };
-
-    // For misc series, the baseKey IS the seriesName (misc1, misc2, etc.)
-    const targetSeriesName = seriesNameMap[baseKey] || baseKey;
+    // baseKey is now consistent: 'corrects', 'errors', 'timing', or misc ID
+    const targetSeriesName = baseKey;
     const traceIndices = [];
 
     // Find all traces for this specific series AND aggregation type
@@ -386,6 +426,14 @@ function toggleLegend(visible) {
  * Called by main.js coordinator
  */
 function init() {
+    // Attach touch handler once (not in renderCustomLegend to avoid duplicates)
+    const container = document.getElementById('custom-legend');
+    if (container) {
+        container.addEventListener('touchstart', () => {
+            container.classList.toggle('touched');
+        }, { passive: true });
+    }
+
     // Subscribe to legend render events
     eventBus.subscribe(EVENTS.UI_LEGEND_RENDER, () => {
         renderCustomLegend();

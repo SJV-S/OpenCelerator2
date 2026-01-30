@@ -27,11 +27,11 @@
     <div id="new-subpane" class="data-subpane active">
         <div class="mb-6 lg:mb-3 grid grid-cols-2 gap-4 lg:gap-2">
             <div>
-                <label id="correct-series-label" class="block text-sm font-semibold text-gray-600 mb-2 lg:mb-1 text-center" for="corrects">Corrects</label>
+                <label id="corrects-series-label" class="block text-sm font-semibold text-gray-600 mb-2 lg:mb-1 text-center" for="corrects">Corrects</label>
                 <input type="text" inputmode="numeric" pattern="[0-9]*" id="corrects" class="w-full px-3 py-3 lg:px-2 lg:py-2 text-lg lg:text-base border-2 border-gray-300 rounded focus:outline-none transition-colors text-center" placeholder="" oninput="this.value=this.value.replace(/[^0-9]/g,'')">
             </div>
             <div>
-                <label id="incorrect-series-label" class="block text-sm font-semibold text-gray-600 mb-2 lg:mb-1 text-center" for="incorrects">Incorrects</label>
+                <label id="errors-series-label" class="block text-sm font-semibold text-gray-600 mb-2 lg:mb-1 text-center" for="incorrects">Incorrects</label>
                 <input type="text" inputmode="numeric" pattern="[0-9]*" id="incorrects" class="w-full px-3 py-3 lg:px-2 lg:py-2 text-lg lg:text-base border-2 border-gray-300 rounded focus:outline-none transition-colors text-center" placeholder="" oninput="this.value=this.value.replace(/[^0-9]/g,'')">
             </div>
         </div>

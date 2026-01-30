@@ -11,6 +11,7 @@
  */
 
 import { chartState } from '../chartState.js';
+import { CORRECTS, ERRORS } from '../config.js';
 import { median, mean, min, max, first, last, sum, aggregateByX } from '../util/agg.js';
 
 // ============================================================================
@@ -141,6 +142,16 @@ function miscFloorTrace(xValues, yValues, config) {
 // ============================================================================
 
 /**
+ * Check if a frequency array has any valid (finite) data
+ * @param {Array<number>} arr - Array of frequency values
+ * @returns {boolean} True if at least one finite value exists
+ */
+function hasValidData(arr) {
+    if (!arr || arr.length === 0) return false;
+    return arr.some(v => Number.isFinite(v));
+}
+
+/**
  * Apply aggregation to frequency data based on aggregation type.
  * Groups data by X position and applies the aggregation to each group.
  *
@@ -229,9 +240,15 @@ function calculateFrequencies() {
         ? chartState.series.timing
         : chartState.series.timing.map(() => 1);
 
-    // Calculate raw frequencies for fixed series
-    const correctsFreqRaw = chartState.series.corrects.map((count, i) => count / timingMinutes[i]);
-    const errorsFreqRaw = chartState.series.errors.map((count, i) => count / timingMinutes[i]);
+    // Helper: convert zeros to NaN when placeZerosBelowFloor is false
+    const handleZero = (freq) => {
+        if (freq === 0 && !chartState.placeZerosBelowFloor) return NaN;
+        return freq;
+    };
+
+    // Calculate raw frequencies for fixed series (convert zeros to NaN if setting is off)
+    const correctsFreqRaw = chartState.series.corrects.map((count, i) => handleZero(count / timingMinutes[i]));
+    const errorsFreqRaw = chartState.series.errors.map((count, i) => handleZero(count / timingMinutes[i]));
 
     // Create original frequency arrays (below-floor values set to NaN)
     const correctsFreq = correctsFreqRaw.map((freq, i) =>
@@ -258,9 +275,9 @@ function calculateFrequencies() {
         miscFloor: {}
     };
 
-    // Calculate frequencies for dynamic misc series
+    // Calculate frequencies for dynamic misc series (convert zeros to NaN if setting is off)
     Object.entries(chartState.series.misc).forEach(([miscId, data]) => {
-        const miscFreqRaw = data.map((count, i) => count / timingMinutes[i]);
+        const miscFreqRaw = data.map((count, i) => handleZero(count / timingMinutes[i]));
         result.misc[miscId] = miscFreqRaw.map((freq, i) =>
             isBelowFloor(freq, timingMinutes[i]) ? NaN : freq
         );
@@ -354,21 +371,25 @@ function createTimingTraces(xPositions) {
 function createFloorShadowTraces(xPositions, frequencies) {
     const floorShadowTraces = [];
 
-    // CORRECTS FLOOR SHADOW - loop through all agg keys
-    Object.entries(chartState.traceStyles.correct).forEach(([aggType, config]) => {
-        const { x, y } = applyAggregation(xPositions, frequencies.correctsFloor, aggType);
-        const trace = correctsFloorTrace(x, y, config);
-        trace.meta = {seriesName: 'correctsFloorShadow', aggType: aggType};
-        floorShadowTraces.push(trace);
-    });
+    // CORRECTS FLOOR SHADOW - loop through all agg keys (skip if no valid data)
+    if (hasValidData(frequencies.correctsFloor)) {
+        Object.entries(chartState.traceStyles[CORRECTS]).forEach(([aggType, config]) => {
+            const { x, y } = applyAggregation(xPositions, frequencies.correctsFloor, aggType);
+            const trace = correctsFloorTrace(x, y, config);
+            trace.meta = {seriesName: 'correctsFloorShadow', aggType: aggType};
+            floorShadowTraces.push(trace);
+        });
+    }
 
-    // ERRORS FLOOR SHADOW
-    Object.entries(chartState.traceStyles.incorrect).forEach(([aggType, config]) => {
-        const { x, y } = applyAggregation(xPositions, frequencies.errorsFloor, aggType);
-        const trace = errorsFloorTrace(x, y, config);
-        trace.meta = {seriesName: 'errorsFloorShadow', aggType: aggType};
-        floorShadowTraces.push(trace);
-    });
+    // ERRORS FLOOR SHADOW (skip if no valid data)
+    if (hasValidData(frequencies.errorsFloor)) {
+        Object.entries(chartState.traceStyles[ERRORS]).forEach(([aggType, config]) => {
+            const { x, y } = applyAggregation(xPositions, frequencies.errorsFloor, aggType);
+            const trace = errorsFloorTrace(x, y, config);
+            trace.meta = {seriesName: 'errorsFloorShadow', aggType: aggType};
+            floorShadowTraces.push(trace);
+        });
+    }
 
     // MISC FLOOR SHADOWS (dynamic)
     Object.entries(chartState.traceStyles.misc).forEach(([miscId, aggConfigs]) => {
@@ -404,29 +425,33 @@ function createFrequencyTraces(xPositions, frequencies, timestampsToXPositions) 
     }
 
     // For each series type, loop through all aggregation keys
-    // CORRECTS
-    Object.entries(chartState.traceStyles.correct).forEach(([aggType, config]) => {
-        const { x, y } = applyAggregation(xPositions, frequencies.corrects, aggType);
-        const segments = createSegments(x, y, cutXPositions, 'corrects');
+    // CORRECTS (skip if no valid data)
+    if (hasValidData(frequencies.corrects)) {
+        Object.entries(chartState.traceStyles[CORRECTS]).forEach(([aggType, config]) => {
+            const { x, y } = applyAggregation(xPositions, frequencies.corrects, aggType);
+            const segments = createSegments(x, y, cutXPositions, 'corrects');
 
-        segments.forEach(seg => {
-            const trace = correctsTrace(seg.x, seg.y, config);
-            trace.meta = {seriesName: seg.seriesName, aggType: aggType};
-            dataTraces.push(trace);
+            segments.forEach(seg => {
+                const trace = correctsTrace(seg.x, seg.y, config);
+                trace.meta = {seriesName: seg.seriesName, aggType: aggType};
+                dataTraces.push(trace);
+            });
         });
-    });
+    }
 
-    // ERRORS/INCORRECTS
-    Object.entries(chartState.traceStyles.incorrect).forEach(([aggType, config]) => {
-        const { x, y } = applyAggregation(xPositions, frequencies.errors, aggType);
-        const segments = createSegments(x, y, cutXPositions, 'errors');
+    // ERRORS/INCORRECTS (skip if no valid data)
+    if (hasValidData(frequencies.errors)) {
+        Object.entries(chartState.traceStyles[ERRORS]).forEach(([aggType, config]) => {
+            const { x, y } = applyAggregation(xPositions, frequencies.errors, aggType);
+            const segments = createSegments(x, y, cutXPositions, 'errors');
 
-        segments.forEach(seg => {
-            const trace = errorTrace(seg.x, seg.y, config);
-            trace.meta = {seriesName: seg.seriesName, aggType: aggType};
-            dataTraces.push(trace);
+            segments.forEach(seg => {
+                const trace = errorTrace(seg.x, seg.y, config);
+                trace.meta = {seriesName: seg.seriesName, aggType: aggType};
+                dataTraces.push(trace);
+            });
         });
-    });
+    }
 
     // MISC (dynamic)
     Object.entries(chartState.traceStyles.misc).forEach(([miscId, aggConfigs]) => {

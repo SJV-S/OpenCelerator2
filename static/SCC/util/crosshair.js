@@ -10,6 +10,7 @@
  */
 
 import { chartState } from '../chartState.js';
+import { CORRECTS, ERRORS } from '../config.js';
 import { xPositionToDate } from './dates.js';
 import { formatValue } from './format.js';
 
@@ -319,10 +320,10 @@ function getMarkerSize(seriesType) {
     let chartSize, style;
 
     if (seriesType === 'corrects') {
-        chartSize = chartState.traceStyles.correct?.raw?.markerSize ?? 8;
+        chartSize = chartState.traceStyles[CORRECTS]?.raw?.markerSize ?? 8;
         style = MARKER_STYLES.corrects;
     } else if (seriesType === 'errors') {
-        chartSize = chartState.traceStyles.incorrect?.raw?.textSize ?? 20;
+        chartSize = chartState.traceStyles[ERRORS]?.raw?.textSize ?? 20;
         style = MARKER_STYLES.errors;
     } else if (seriesType === 'timing') {
         chartSize = chartState.traceStyles.timing?.raw?.markerSize ?? 30;

@@ -7,6 +7,8 @@
  * Accessible from: Import this module in other scripts
  */
 
+import { CORRECTS, ERRORS, TIMING } from './config.js';
+
 // ============================================================================
 // Trace Configurations (Defaults - Read-only)
 // ============================================================================
@@ -141,6 +143,7 @@ export const chartState = {
     chartType: 'Daily',
     minuteChart: true,
     chartName: 'Unnamed',
+    tags: [],  // User-defined tags for organizing charts (stored lowercase for case-insensitive matching)
     hasTimestamps: true, // If true, xValues are timestamps that need conversion; if false, xValues are direct x-positions
     startDate: null, // The Monday before/at earliest data point (set on import or first data entry)
 
@@ -180,6 +183,9 @@ export const chartState = {
     // Celeration fan visibility
     fanVisible: true,
 
+    // Zero handling: when true, zeros are placed below floor; when false, zeros become NaN (not rendered)
+    placeZerosBelowFloor: true,
+
     // Line styling
     lineStyles: {
         phase: {
@@ -191,15 +197,15 @@ export const chartState = {
             width: DEFAULT_AIM_LINE_WIDTH
         },
         trend: {
-            correct: {
+            [CORRECTS]: {
                 color: 'green',
                 width: 2,
             },
-            incorrect: {
+            [ERRORS]: {
                 color: 'red',
                 width: 2,
             },
-            timing: {
+            [TIMING]: {
                 color: 'orange',
                 width: 2,
             },
@@ -209,13 +215,13 @@ export const chartState = {
 
     // Trace styling per series/aggregation
     traceStyles: {
-        correct: {
+        [CORRECTS]: {
             "raw": { ...defaultCorrectTraceConfig }
         },
-        incorrect: {
+        [ERRORS]: {
             "raw": { ...defaultErrorTraceConfig }
         },
-        timing: {
+        [TIMING]: {
             "raw": { ...defaultTimingTraceConfig }
         },
         misc: {}    // Dynamic misc series trace styles, keyed by ID

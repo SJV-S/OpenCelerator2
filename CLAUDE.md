@@ -72,6 +72,38 @@ Example format:
 
 For responsive design, use Tailwind breakpoint prefixes (`sm:`, `md:`, `lg:`, `xl:`) directly in HTML classes rather than writing `@media` queries in vanilla CSS.
 
+## JavaScript Architecture - STRICT RULES
+
+**This project uses ES6 modules. NEVER violate the architecture:**
+
+1. **NO inline onclick handlers** - Never add `onclick="..."` attributes to HTML elements
+2. **NO global/window functions** - Never attach functions to `window` object for HTML access
+3. **NO breaking module encapsulation** - All event handling must use `addEventListener` within the module scope
+4. **Use proper event delegation** - When handling dynamic elements, attach listeners to stable parent elements or re-attach after DOM updates
+
+These patterns are FORBIDDEN:
+```javascript
+// WRONG - inline handler
+<button onclick="doSomething()">
+
+// WRONG - global function
+window.myFunction = function() { ... }
+
+// WRONG - mixing paradigms
+<button onclick="window.moduleFunction()">
+```
+
+Correct pattern:
+```javascript
+// RIGHT - addEventListener in module scope
+element.addEventListener('click', (e) => { ... });
+
+// RIGHT - event delegation
+parentElement.addEventListener('click', (e) => {
+    if (e.target.closest('.target-class')) { ... }
+});
+```
+
 ## Event Bus Architecture
 
 This project uses a centralized event bus (`static/SCC/eventBus.js`) for module communication. **Always follow this pattern:**

@@ -84,6 +84,12 @@ export const EVENTS = {
     COUNTER_SHOW: 'counter:show',
     COUNTER_HIDE: 'counter:hide',
 
+    // Chart Click Events
+    CHART_CLICKED: 'chart:clicked',
+
+    // Credit Events
+    CREDITS_UPDATED: 'credits:updated',
+
     // Storage Events
     STORAGE_CHART_SAVED: 'storage:chart_saved',
     STORAGE_CHART_LOADED: 'storage:chart_loaded',
@@ -111,8 +117,8 @@ export const EVENT_CATEGORIES = {
 const EVENT_CATEGORY_MAP = {
     // Data mutations
     [EVENTS.DATA_ENTRY_SUBMITTED]: [EVENT_CATEGORIES.STATE_MUTATING],
-    [EVENTS.DATA_CHART_REFRESH]: [EVENT_CATEGORIES.STATE_MUTATING],
     [EVENTS.DATA_START_DATE_CHANGED]: [EVENT_CATEGORIES.STATE_MUTATING],
+    // Note: DATA_CHART_REFRESH is a rendering event, not a mutation - excluded from STATE_MUTATING
 
     // Line saves
     [EVENTS.LINE_PHASE_SAVED]: [EVENT_CATEGORIES.STATE_MUTATING],
@@ -128,11 +134,7 @@ const EVENT_CATEGORY_MAP = {
     [EVENTS.FAN_VISIBILITY_CHANGED]: [EVENT_CATEGORIES.STATE_MUTATING],
 
     // Chart settings
-    [EVENTS.CHART_PANNING_ENABLED_CHANGED]: [EVENT_CATEGORIES.STATE_MUTATING],
     [EVENTS.CHART_NAME_CHANGED]: [EVENT_CATEGORIES.STATE_MUTATING],
-
-    // UI state that persists
-    [EVENTS.UI_TRACE_STYLE_CHANGED]: [EVENT_CATEGORIES.STATE_MUTATING],
 
     // Data import
     [EVENTS.DATA_IMPORT_COMPLETED]: [EVENT_CATEGORIES.STATE_MUTATING]

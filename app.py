@@ -8,6 +8,11 @@ def index():
     return render_template('SCC/menu_page.html')
 
 
+@app.route('/new')
+def new_chart():
+    return render_template('SCC/new_chart.html')
+
+
 @app.route('/chart/<chart_id>')
 def chart(chart_id):
     # Render page - chart data loaded client-side from storage

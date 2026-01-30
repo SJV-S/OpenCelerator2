@@ -250,7 +250,7 @@ export function injectCelerationFan(plotData, isMinuteChart, chartType) {
     // Skip fan on mobile - screen too small
     if (isMobile()) {
         chartState.fanVisible = false;
-        eventBus.emit(EVENTS.FAN_VISIBILITY_CHANGED, { visible: false });
+        // Note: No event emit here - this is initial render, not user action
         return plotData;
     }
 
@@ -262,7 +262,8 @@ export function injectCelerationFan(plotData, isMinuteChart, chartType) {
     plotData.layout.shapes = [...(plotData.layout.shapes || []), ...shapes];
     plotData.layout.annotations = [...(plotData.layout.annotations || []), ...annotations];
     chartState.fanVisible = true;
-    eventBus.emit(EVENTS.FAN_VISIBILITY_CHANGED, { visible: true });
+    // Note: No event emit here - this is initial render, not user action
+    // Events are only emitted by addCelerationFan/removeCelerationFan for user changes
 
     return plotData;
 }

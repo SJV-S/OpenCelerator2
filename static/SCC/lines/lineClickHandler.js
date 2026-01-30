@@ -18,6 +18,7 @@ function setupClickHandler() {
 
     const chartDiv = document.getElementById('chart');
 
+    // Handler for clicks on data points/traces
     chartDiv.on('plotly_click', function(eventData) {
         const points = eventData.points;
         if (points.length === 0) return;
@@ -43,6 +44,20 @@ function setupClickHandler() {
             } else {
                 console.warn(`No event for category: ${category}`);
             }
+        }
+    });
+
+    // Handler for clicks anywhere on chart area (for date selection)
+    chartDiv.addEventListener('click', function(e) {
+        const xaxis = chartDiv._fullLayout?.xaxis;
+        if (!xaxis) return;
+
+        const rect = chartDiv.getBoundingClientRect();
+        const xData = xaxis.p2d(e.clientX - rect.left - xaxis._offset);
+
+        // Only emit if within visible x-range
+        if (xData >= xaxis.range[0] && xData <= xaxis.range[1]) {
+            eventBus.emit(EVENTS.CHART_CLICKED, { x: xData });
         }
     });
 

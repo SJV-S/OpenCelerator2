@@ -13,6 +13,10 @@ import {
     importToChartState
 } from './dataImport.js';
 import { createToast } from './toaster.js';
+import {
+    isOpenCeleratorFormat,
+    importOpenCeleratorFile
+} from './openCeleratorImport.js';
 
 // ============================================================================
 // State
@@ -153,7 +157,7 @@ function updateReplaceOptionVisibility() {
 
 async function handleFile(file) {
     // Validate file type
-    const validExtensions = ['.csv', '.xlsx', '.xls', '.ods'];
+    const validExtensions = ['.csv', '.xlsx', '.xls', '.ods', '.json'];
     const ext = '.' + file.name.split('.').pop().toLowerCase();
 
     if (!validExtensions.includes(ext)) {
@@ -162,6 +166,12 @@ async function handleFile(file) {
             duration: 3000,
             position: 'top-right'
         });
+        return;
+    }
+
+    // Handle JSON files (assumed to be OpenCelerator exports)
+    if (ext === '.json') {
+        await handleOpenCeleratorFile(file);
         return;
     }
 
@@ -189,6 +199,56 @@ async function handleFile(file) {
         showState('dropzone');
         createToast({
             message: `Failed to read file: ${err.message}`,
+            duration: 4000,
+            position: 'top-right'
+        });
+    }
+}
+
+/**
+ * Handle OpenCelerator JSON file import
+ * Bypasses column mapping since OpenCelerator has a known format
+ */
+async function handleOpenCeleratorFile(file) {
+    try {
+        showState('progress');
+
+        const result = await importOpenCeleratorFile(file);
+
+        if (result.success) {
+            // Show success message
+            let message = `Imported ${result.count} entries from OpenCelerator`;
+
+            // Show warnings if any
+            if (result.warnings.length > 0) {
+                console.log('[ImportUI] OpenCelerator import warnings:', result.warnings);
+                // Show first warning in toast if there are important ones
+                const importantWarnings = result.warnings.filter(w =>
+                    w.includes('not imported') || w.includes('not supported')
+                );
+                if (importantWarnings.length > 0) {
+                    message += ` (${importantWarnings.length} feature(s) skipped)`;
+                }
+            }
+
+            createToast({
+                message,
+                duration: 4000,
+                position: 'top-right'
+            });
+
+            // Reset UI back to dropzone
+            resetImportUI();
+
+        } else {
+            throw new Error(result.message || 'OpenCelerator import failed');
+        }
+
+    } catch (err) {
+        console.error('OpenCelerator import error:', err);
+        showState('dropzone');
+        createToast({
+            message: `Failed to import: ${err.message}`,
             duration: 4000,
             position: 'top-right'
         });

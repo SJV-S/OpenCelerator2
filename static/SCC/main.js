@@ -9,6 +9,8 @@
 
 // Import state and functions from modules
 import { chartState } from './chartState.js';
+import { CORRECTS, ERRORS, TIMING } from './config.js';
+import './debug.js';
 import { eventBus, EVENTS } from './eventBus.js';
 import {
     submitEntry,
@@ -127,6 +129,9 @@ export function initializeChart() {
     console.log('Y-axis2 tickvals:', plotData.layout.yaxis2?.tickvals?.slice(0, 5));
     console.log('=================');
 
+    // Disable mouse panning (use Pan Chart buttons instead)
+    plotData.layout.xaxis.fixedrange = true;
+
     // Create chart
     Plotly.newPlot(chartDiv, plotData.data, plotData.layout, {
         displayModeBar: false,
@@ -140,9 +145,7 @@ export function initializeChart() {
     chartState.chartWindow = Math.round(chartDiv.layout.xaxis.range[1]);
 
     // Update display elements (setupEventListeners ran before initializeChart)
-    const capacityInput = document.getElementById('chart-capacity');
     const windowDisplay = document.getElementById('chart-window');
-    if (capacityInput) capacityInput.value = chartState.chartCapacity;
     if (windowDisplay) windowDisplay.textContent = chartState.chartWindow;
 
     setupPanConstraints(chartDiv, maxWindowWidth, chartState.chartType);
@@ -155,10 +158,26 @@ export function initializeChart() {
 
     // Observe container for resize (fullscreen, viewport changes)
     if (chartContainer) {
+        const MOBILE_BREAKPOINT = 768;
+        const MIN_DESKTOP_WIDTH = 900;
+        const MIN_DESKTOP_HEIGHT = 500;
+
         let resizeTimeout;
         const resizeObserver = new ResizeObserver((entries) => {
             clearTimeout(resizeTimeout);
             resizeTimeout = setTimeout(() => {
+                const viewportWidth = window.innerWidth;
+                const viewportHeight = window.innerHeight;
+
+                // On non-mobile screens, hide chart if viewport too small
+                if (viewportWidth >= MOBILE_BREAKPOINT) {
+                    if (viewportWidth < MIN_DESKTOP_WIDTH || viewportHeight < MIN_DESKTOP_HEIGHT) {
+                        chartDiv.style.visibility = 'hidden';
+                        return;
+                    }
+                }
+                chartDiv.style.visibility = 'visible';
+
                 const newHeight = entries[0].contentRect.height * 0.98;
                 const config = CHART_CONFIG[chartState.chartType];
                 // Use the current chart margins (already expanded for fan/credits)
@@ -288,7 +307,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeLineWidthToggles();
 
     // Initialize button visibility for core series
-    ['correct', 'incorrect', 'timing'].forEach(updateButtonVisibility);
+    [CORRECTS, ERRORS, TIMING].forEach(updateButtonVisibility);
 
     console.log('Main.js: Application initialized');
 });
@@ -406,12 +425,12 @@ export function setupEventListeners() {
 
     // Apply and Reset buttons for each series
     const traceActions = {
-        'apply-correct-trace': () => applyTraceConfig('correct'),
-        'apply-incorrect-trace': () => applyTraceConfig('incorrect'),
-        'apply-timing-trace': () => applyTraceConfig('timing'),
-        'reset-trace-correct': () => resetTraceConfig('correct'),
-        'reset-trace-incorrect': () => resetTraceConfig('incorrect'),
-        'reset-trace-timing': () => resetTraceConfig('timing')
+        'apply-corrects-trace': () => applyTraceConfig(CORRECTS),
+        'apply-errors-trace': () => applyTraceConfig(ERRORS),
+        'apply-timing-trace': () => applyTraceConfig(TIMING),
+        'reset-trace-corrects': () => resetTraceConfig(CORRECTS),
+        'reset-trace-errors': () => resetTraceConfig(ERRORS),
+        'reset-trace-timing': () => resetTraceConfig(TIMING)
     };
 
     Object.entries(traceActions).forEach(([action, handler]) => {
@@ -460,6 +479,20 @@ export function setupEventListeners() {
         fanToggle.addEventListener('change', (e) => {
             eventBus.emit(EVENTS.FAN_VISIBILITY_CHANGED, { visible: e.target.checked });
             // Blur the checkbox so spacebar can be used for navigation
+            e.target.blur();
+        });
+    }
+
+    // Place zeros below floor toggle
+    const placeZerosToggle = document.getElementById('place-zeros-below-floor-toggle');
+    if (placeZerosToggle) {
+        // Initialize checkbox state from chartState
+        placeZerosToggle.checked = chartState.placeZerosBelowFloor;
+
+        placeZerosToggle.addEventListener('change', (e) => {
+            chartState.placeZerosBelowFloor = e.target.checked;
+            // Trigger chart refresh to apply the change
+            eventBus.emit(EVENTS.DATA_CHART_REFRESH);
             e.target.blur();
         });
     }
@@ -558,27 +591,6 @@ export function setupEventListeners() {
         });
     }
 
-    // Chart capacity input
-    const chartCapacityInput = document.getElementById('chart-capacity');
-    if (chartCapacityInput) {
-        chartCapacityInput.value = chartState.chartCapacity;
-
-        chartCapacityInput.addEventListener('change', (e) => {
-            const value = parseInt(e.target.value);
-            if (value > 0) {
-                chartState.chartCapacity = value;
-                // Ensure window doesn't exceed capacity
-                if (chartState.chartWindow > value) {
-                    chartState.chartWindow = value;
-                    const windowDisplay = document.getElementById('chart-window');
-                    if (windowDisplay) windowDisplay.textContent = value;
-                }
-                // Disable panning if capacity equals window
-                eventBus.emit(EVENTS.CHART_PANNING_ENABLED_CHANGED, chartState.chartCapacity !== chartState.chartWindow);
-            }
-        });
-    }
-
     // Chart window controls (chevron buttons with debouncing)
     const chartWindowDisplay = document.getElementById('chart-window');
     if (chartWindowDisplay) {
@@ -634,6 +646,36 @@ export function setupEventListeners() {
             updateChartWindow(chartState.chartWindow + increment);
         });
     }
+
+    // Pan Chart controls - uses Plotly's native panning mechanism
+    const chartDiv = document.getElementById('chart');
+    const panDisplay = document.getElementById('chart-pan-position');
+    const panIncrement = () => CHART_CONFIG[chartState.chartType]?.snapTo || 14;
+
+    const updatePanDisplay = () => {
+        if (panDisplay) {
+            // Show start position (range[0] + margin offset, rounded)
+            panDisplay.textContent = Math.round(chartDiv.layout.xaxis.range[0] + 0.2);
+        }
+    };
+
+    document.querySelector('[data-action="chart-pan-left"]')?.addEventListener('click', () => {
+        const currentRange = chartDiv.layout.xaxis.range;
+        const shift = panIncrement();
+        Plotly.relayout(chartDiv, {
+            'xaxis.range[0]': currentRange[0] - shift,
+            'xaxis.range[1]': currentRange[1] - shift
+        }).then(updatePanDisplay);
+    });
+
+    document.querySelector('[data-action="chart-pan-right"]')?.addEventListener('click', () => {
+        const currentRange = chartDiv.layout.xaxis.range;
+        const shift = panIncrement();
+        Plotly.relayout(chartDiv, {
+            'xaxis.range[0]': currentRange[0] + shift,
+            'xaxis.range[1]': currentRange[1] + shift
+        }).then(updatePanDisplay);
+    });
 
     console.log('Event listeners set up');
 }

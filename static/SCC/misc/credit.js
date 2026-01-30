@@ -314,4 +314,9 @@ export function initCreditClick() {
     chartDiv.addEventListener('mousemove', handleChartMouseMove);
 }
 
-export function init() {}
+export function init() {
+    // Subscribe to credits updated event
+    eventBus.subscribe(EVENTS.CREDITS_UPDATED, () => {
+        renderCredits();
+    }, true);
+}

@@ -15,6 +15,7 @@ import { removeToast, createToast } from '../util/toaster.js';
 import { icons } from '../util/icons.js';
 import { applySvgCursor, restoreCursor } from '../util/cursorIcon.js';
 import { chartState } from '../chartState.js';
+import { CORRECTS, ERRORS, TIMING } from '../config.js';
 import { xPositionToDate } from '../util/dates.js';
 import { removeLine } from './allLines.js';
 import { fit, FIT_METHODS, BOUNCE_ENVELOPES, DEFAULT_FIT_METHOD, DEFAULT_BOUNCE_ENVELOPE, calculateBounceBounds, calculateBounceLines, formatCelerationLabel } from '../util/fit_lines.js';
@@ -104,28 +105,28 @@ function getAvailableSeriesButtons() {
 
     // Check fixed series
     if (chartState.series.corrects && chartState.series.corrects.some(v => v !== null)) {
-        const config = chartState.traceStyles.correct?.raw;
+        const config = chartState.traceStyles[CORRECTS]?.raw;
         buttons.push({
             label: config?.seriesName || 'Corrects',
-            onClick: () => selectSeriesAndEnableDrag('correct'),
+            onClick: () => selectSeriesAndEnableDrag(CORRECTS),
             type: 'primary'
         });
     }
 
     if (chartState.series.errors && chartState.series.errors.some(v => v !== null)) {
-        const config = chartState.traceStyles.incorrect?.raw;
+        const config = chartState.traceStyles[ERRORS]?.raw;
         buttons.push({
             label: config?.seriesName || 'Errors',
-            onClick: () => selectSeriesAndEnableDrag('incorrect'),
+            onClick: () => selectSeriesAndEnableDrag(ERRORS),
             type: 'primary'
         });
     }
 
     if (chartState.series.timing && chartState.series.timing.some(v => v !== null)) {
-        const config = chartState.traceStyles.timing?.raw;
+        const config = chartState.traceStyles[TIMING]?.raw;
         buttons.push({
             label: config?.seriesName || 'Timing',
-            onClick: () => selectSeriesAndEnableDrag('timing'),
+            onClick: () => selectSeriesAndEnableDrag(TIMING),
             type: 'primary'
         });
     }
@@ -717,14 +718,8 @@ function getDataInRangeForSeries(x1, x2, baseKey) {
         return null;
     }
 
-    const seriesNameMap = {
-        'correct': 'corrects',
-        'incorrect': 'errors',
-        'timing': 'timing'
-    };
-
-    // For misc series, the baseKey IS the seriesName (misc1, misc2, etc.)
-    const targetSeriesName = seriesNameMap[baseKey] || baseKey;
+    // baseKey is now consistent: 'corrects', 'errors', 'timing', or misc ID
+    const targetSeriesName = baseKey;
     const xValues = [];
     const yValues = [];
 
@@ -803,7 +798,7 @@ function handleCelLineConfirm(data, baseKey) {
     const lineId = Date.now();
     const lineName = `cel-${lineId}`;
 
-    const trendStyle = chartState.lineStyles.trend[baseKey] || chartState.lineStyles.trend.timing;
+    const trendStyle = chartState.lineStyles.trend[baseKey] || chartState.lineStyles.trend[TIMING];
 
     // Build shapes array - main trend line first
     const newShapes = [];

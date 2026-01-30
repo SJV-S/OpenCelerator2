@@ -11,7 +11,7 @@
 
 import { chartState } from '../chartState.js';
 import { eventBus, EVENTS } from '../eventBus.js';
-import { snapToChartBoundary, formatDateInputValue } from '../util/dates.js';
+import { snapToChartBoundary, formatDateInputValue, xPositionToDate } from '../util/dates.js';
 
 // Shape name for the entry date indicator line
 const ENTRY_DATE_INDICATOR_NAME = 'entry-date-indicator';
@@ -19,6 +19,10 @@ const ENTRY_DATE_INDICATOR_NAME = 'entry-date-indicator';
 // Timer for auto-hiding the indicator
 let indicatorTimer = null;
 const INDICATOR_TIMEOUT = 5000; // 5 seconds
+
+// Track whether the Data tab is currently active (for click-to-set-date feature)
+// Initialized in init() based on DOM state
+let dataTabActive = false;
 
 /**
  * Generate input fields for all active misc series
@@ -289,6 +293,10 @@ function emitEntryDateChange() {
  * Called by main.js coordinator
  */
 function init() {
+    // Initialize dataTabActive based on current DOM state
+    const dataTabContent = document.getElementById('data-content');
+    dataTabActive = dataTabContent?.classList.contains('active') ?? false;
+
     // Subscribe to start date change events from dates.js
     eventBus.subscribe(EVENTS.DATA_START_DATE_CHANGED, (data) => {
         setStartDate(data.date);
@@ -310,27 +318,22 @@ function init() {
     // Entry date indicator subscriptions
     // ========================================================================
 
-    // Show indicator when counter overlay opens
+    // Track data tab state when counter overlay opens
     eventBus.subscribe(EVENTS.COUNTER_SHOW, () => {
-        const entryDateInput = document.getElementById('entry-date');
-        if (entryDateInput && entryDateInput.value) {
-            updateEntryDateIndicator(entryDateInput.value);
-        }
+        const dataTabContent = document.getElementById('data-content');
+        dataTabActive = dataTabContent?.classList.contains('active') ?? false;
     });
 
     // Hide indicator when counter overlay closes
     eventBus.subscribe(EVENTS.COUNTER_HIDE, () => {
         removeEntryDateIndicator();
+        dataTabActive = false;  // Disable click-to-set-date when menu closes
     });
 
-    // Handle tab switching - show only on data tab
+    // Handle tab switching - track state and hide indicator when leaving data tab
     eventBus.subscribe(EVENTS.NAV_TAB_SWITCH, (data) => {
-        if (data.tab === 'data') {
-            const entryDateInput = document.getElementById('entry-date');
-            if (entryDateInput && entryDateInput.value) {
-                updateEntryDateIndicator(entryDateInput.value);
-            }
-        } else {
+        dataTabActive = (data.tab === 'data');
+        if (!dataTabActive) {
             removeEntryDateIndicator();
         }
     }, true);
@@ -338,6 +341,27 @@ function init() {
     // Update indicator when entry date changes
     eventBus.subscribe(EVENTS.COUNTER_ENTRY_DATE_CHANGED, (data) => {
         updateEntryDateIndicator(data.date);
+    }, true);
+
+    // Handle chart clicks - update entry date when Data tab is active
+    eventBus.subscribe(EVENTS.CHART_CLICKED, (data) => {
+        if (!dataTabActive || !chartState.startDate) return;
+
+        // Convert x-position to date
+        const clickedDate = xPositionToDate(Math.round(data.x));
+        const dateStr = formatDateInputValue(clickedDate);
+
+        // Snap to chart boundary (e.g., Monday for weekly charts)
+        const snappedDate = snapToChartBoundary(dateStr);
+        const snappedDateStr = formatDateInputValue(snappedDate);
+
+        // Update the entry-date input
+        const entryDateInput = document.getElementById('entry-date');
+        if (entryDateInput) {
+            entryDateInput.value = snappedDateStr;
+            // Emit the date change event to update the indicator and load data
+            eventBus.emit(EVENTS.COUNTER_ENTRY_DATE_CHANGED, { date: snappedDateStr });
+        }
     }, true);
 
     // Set up entry-date input listeners

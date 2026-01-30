@@ -226,7 +226,9 @@ export async function listCharts() {
             chartType: chart.chartType,
             minuteChart: chart.minuteChart,
             updatedAt: chart._updatedAt,
-            createdAt: chart._createdAt
+            createdAt: chart._createdAt,
+            credits: chart.credits || {},
+            tags: chart.tags || []
         })).sort((a, b) => b.updatedAt - a.updatedAt);
     } catch (error) {
         console.error('[Storage] List failed:', error);
@@ -259,6 +261,45 @@ export async function deleteChart(id) {
     } catch (error) {
         console.error('[Storage] Delete failed:', error);
         eventBus.emit(EVENTS.STORAGE_ERROR, { operation: 'delete', error });
+        return false;
+    }
+}
+
+/**
+ * Update tags for a chart (without loading it into chartState)
+ * Tags are normalized to lowercase for case-insensitive matching
+ * @param {string} id - Chart ID
+ * @param {string[]} tags - Array of tags
+ * @returns {Promise<boolean>} Success status
+ */
+export async function updateChartTags(id, tags) {
+    if (!db) {
+        console.warn('[Storage] Database not initialized');
+        return false;
+    }
+
+    try {
+        const data = await db.get(STORE_NAME, id);
+        if (!data) {
+            console.warn(`[Storage] Chart not found: ${id}`);
+            return false;
+        }
+
+        // Normalize tags: lowercase, trim, remove duplicates and empties
+        const normalizedTags = [...new Set(
+            tags
+                .map(t => t.toLowerCase().trim())
+                .filter(t => t.length > 0)
+        )];
+
+        data.tags = normalizedTags;
+
+        await db.put(STORE_NAME, data);
+        console.log(`[Storage] Updated tags for chart: ${id}`);
+        return true;
+    } catch (error) {
+        console.error('[Storage] Update tags failed:', error);
+        eventBus.emit(EVENTS.STORAGE_ERROR, { operation: 'updateTags', error });
         return false;
     }
 }

@@ -227,17 +227,17 @@ function internalToUserDate() {
             year: mondayDate.getFullYear()
         };
     } else if (chartType === 'weekly') {
-        const prevMonth = new Date(internalDate);
-        prevMonth.setMonth(prevMonth.getMonth() - 1);
-        prevMonth.setDate(1);
-
+        // Internal is Monday at or before 1st of target month
+        // Add 6 days to get into the target month
+        const targetDate = new Date(internalDate);
+        targetDate.setDate(internalDate.getDate() + 6);
         return {
-            month: prevMonth.getMonth() + 1,
-            year: prevMonth.getFullYear()
+            month: targetDate.getMonth() + 1,
+            year: targetDate.getFullYear()
         };
     } else if (chartType === 'monthly') {
         return {
-            year: internalDate.getFullYear() - 1
+            year: internalDate.getFullYear()
         };
     } else if (chartType === 'yearly') {
         const year = internalDate.getFullYear();
@@ -269,14 +269,20 @@ function userToInternalDate() {
         // Selected Monday is the start date
         return createDate(currentValues.year, currentValues.month - 1, currentValues.monday);
     } else if (chartType === 'weekly') {
-        // First day of following month
-        return createDate(currentValues.year, currentValues.month, 1);
+        // First day of selected month, then find Monday at or before
+        const d = createDate(currentValues.year, currentValues.month - 1, 1);
+        const weekday = d.getDay();
+        const daysToSubtract = (weekday === 0) ? 6 : weekday - 1;
+        if (daysToSubtract > 0) {
+            d.setDate(d.getDate() - daysToSubtract);
+        }
+        return d;
     } else if (chartType === 'monthly') {
-        // January 1st of following year
-        return createDate(currentValues.year + 1, 0, 1);
+        // January 1st of selected year
+        return createDate(currentValues.year, 0, 1);
     } else if (chartType === 'yearly') {
-        // January 1st of decade + 9
-        return createDate(currentValues.decade + 9, 0, 1);
+        // January 1st of decade start
+        return createDate(currentValues.decade, 0, 1);
     }
 
     return new Date();
