@@ -16,7 +16,7 @@
  */
 
 import { chartState } from '../chartState.js';
-import { createToast, createTextInputDialog, createNumberInputDialog, removeToast, createConfirmToast, createArrowControls } from '../util/toaster.js';
+import { createToast, createTextInputDialog, createNumberInputDialog, createConfirmToast, createArrowControls } from '../util/toaster.js';
 import { xPositionToDate, timestampsToXPositions } from '../util/dates.js';
 import { icons } from '../util/icons.js';
 import { applySvgCursor, restoreCursor } from '../util/cursorIcon.js';
@@ -115,15 +115,10 @@ function activatePhaseLineMode(direction) {
  * @param {HTMLElement} chartDiv - Chart container element
  */
 function showArrowControls(chartDiv) {
-    createArrowControls({
-        id: 'phase-arrow-controls',
+    phaseLineState.arrowControls = createArrowControls({
         color: '#6ad1e3',
         onLeft: () => adjustVerticalLineX(chartDiv, -1),
-        onRight: () => adjustVerticalLineX(chartDiv, 1),
-        stateRef: {
-            state: phaseLineState,
-            key: 'arrowControls'
-        }
+        onRight: () => adjustVerticalLineX(chartDiv, 1)
     });
 }
 
@@ -131,8 +126,10 @@ function showArrowControls(chartDiv) {
  * Hides and removes arrow controls
  */
 function hideArrowControls() {
-    removeToast('phase-arrow-controls');
-    phaseLineState.arrowControls = null;
+    if (phaseLineState.arrowControls) {
+        phaseLineState.arrowControls.remove();
+        phaseLineState.arrowControls = null;
+    }
 }
 
 /**
@@ -284,8 +281,10 @@ function deactivatePhaseLineMode() {
     }
 
     // Remove text input overlay if it exists
-    removeToast('phase-text-input-overlay');
-    phaseLineState.textInputOverlay = null;
+    if (phaseLineState.textInputOverlay) {
+        phaseLineState.textInputOverlay.remove();
+        phaseLineState.textInputOverlay = null;
+    }
 
     // Remove save toast if it exists
     if (phaseLineState.saveToast) {
@@ -298,7 +297,7 @@ function deactivatePhaseLineMode() {
 
     // Remove mode toast if it exists
     if (phaseLineState.modeToast) {
-        removeToast(phaseLineState.modeToast.id);
+        phaseLineState.modeToast.remove();
         phaseLineState.modeToast = null;
     }
 
@@ -616,8 +615,7 @@ function drawHorizontalLine(chartDiv, coords) {
  * @param {HTMLElement} chartDiv - Chart container element
  */
 function showTextInput(chartDiv) {
-    createTextInputDialog({
-        id: 'phase-text-input-overlay',
+    phaseLineState.textInputOverlay = createTextInputDialog({
         title: 'Enter Count Marker Text',
         placeholder: 'Enter phase label...',
         borderColor: '#6ad1e3',
@@ -627,10 +625,6 @@ function showTextInput(chartDiv) {
         onCancel: () => {
             removePhaseShapes(chartDiv);
             deactivatePhaseLineMode();
-        },
-        stateRef: {
-            state: phaseLineState,
-            key: 'textInputOverlay'
         }
     });
 }
@@ -685,8 +679,10 @@ function addPhaseTextLabel(chartDiv, text) {
     });
 
     // Remove text input overlay
-    removeToast('phase-text-input-overlay');
-    phaseLineState.textInputOverlay = null;
+    if (phaseLineState.textInputOverlay) {
+        phaseLineState.textInputOverlay.remove();
+        phaseLineState.textInputOverlay = null;
+    }
 
     // Store annotation index for potential removal
     phaseLineState.tempAnnotationIndex = currentAnnotations.length;
@@ -705,26 +701,19 @@ function addPhaseTextLabel(chartDiv, text) {
  * @param {HTMLElement} chartDiv - Chart container element
  */
 function showSaveConfirmationToast(chartDiv) {
-    createConfirmToast({
-        id: 'phase-save-toast',
+    phaseLineState.saveToast = createConfirmToast({
         message: 'Save line?',
         borderColor: '#6ad1e3',
         onYes: () => {
             finalizePhaseLine(chartDiv);
-            removeToast('phase-save-toast');
             phaseLineState.saveToast = null;
             deactivatePhaseLineMode();
         },
         onNo: () => {
             removePhaseShapes(chartDiv);
             removePhaseAnnotation(chartDiv);
-            removeToast('phase-save-toast');
             phaseLineState.saveToast = null;
             deactivatePhaseLineMode();
-        },
-        stateRef: {
-            state: phaseLineState,
-            key: 'saveToast'
         }
     });
 }
@@ -860,7 +849,6 @@ function handlePhaseLineClick(lineName) {
 
     // Show toaster with Remove button, auto-dismiss after 3 seconds
     createToast({
-        id: 'phase-line-click-toaster',
         message: 'Count marker',
         buttons: [
             {
@@ -868,7 +856,6 @@ function handlePhaseLineClick(lineName) {
                 onClick: () => {
                     console.log(`[PHASE LINE CLICK] Remove clicked for ${lineName}`);
                     removePhaseLineById(lineName);
-                    removeToast('phase-line-click-toaster');
                 },
                 type: 'secondary'
             }
@@ -897,7 +884,7 @@ function showPhaseModeToaster(phase) {
         ],
         layout: 'horizontal',
         borderColor: '#6ad1e3',
-        position: 'top-right-secondary'
+        position: 'top-right'
     });
 }
 
@@ -908,7 +895,7 @@ function showPhaseModeToaster(phase) {
 function updatePhaseModeToaster(phase) {
     // Remove existing toaster
     if (phaseLineState.modeToast) {
-        removeToast(phaseLineState.modeToast.id);
+        phaseLineState.modeToast.remove();
         phaseLineState.modeToast = null;
     }
 

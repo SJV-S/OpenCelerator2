@@ -57,7 +57,7 @@ import { init as aimLinesInit } from './lines/aimLines.js';
 import { init as cutLinesInit } from './lines/cutLines.js';
 import { init as celLineInit } from './lines/celLine.js';
 import { initGridToggle, toggleDateLines, toggleCountLines, toggleMinorGrid } from './misc/grid.js';
-import { injectCelerationFan, initFanDrag, regenerateFan, init as celerationFanInit } from './misc/celerationFan.js';
+import { injectCelerationFan, initFanDrag, regenerateFan, toggleCelerationFan, init as celerationFanInit } from './misc/celerationFan.js';
 import { injectCredits, initCreditClick, regenerateCredits, init as creditInit } from './misc/credit.js';
 import { toggleLegend, renderCustomLegend, init as customLegendInit } from './misc/customLegend.js';
 import { setupPanConstraints } from './util/panning_controls.js';
@@ -139,6 +139,9 @@ export function initializeChart() {
         doubleClick: false
     });
 
+    // Re-apply CSS visibility after any Plotly render
+    chartDiv.on('plotly_afterplot', syncVisibilityState);
+
     // Initialize chartState capacity and window from config and actual range
     const chartConfig = CHART_CONFIG[chartState.chartType];
     chartState.chartCapacity = chartConfig?.capacity || 280;
@@ -182,7 +185,8 @@ export function initializeChart() {
                 const config = CHART_CONFIG[chartState.chartType];
                 // Use the current chart margins (already expanded for fan/credits)
                 const margin = chartDiv.layout.margin;
-                const xmax = Math.round(chartDiv.layout.xaxis.range[1]);
+                // Use chartState.chartWindow - the authoritative window width
+                const xmax = chartState.chartWindow;
                 const deg = 34;
                 const yaxis_px = newHeight - (margin.t + margin.b);
                 const y_axis = Math.log10(config.yMax) - Math.log10(config.yMin);
@@ -191,7 +195,14 @@ export function initializeChart() {
                 const xaxis_px = delta_y_px / Math.tan((deg * Math.PI) / 180);
                 const newWidth = xaxis_px + (margin.l + margin.r);
 
-                Plotly.relayout(chartDiv, { height: newHeight, width: newWidth }).then(() => {
+                // Preserve the current x-axis range to prevent stretching after pan
+                const currentRange = chartDiv.layout.xaxis.range;
+
+                Plotly.relayout(chartDiv, {
+                    height: newHeight,
+                    width: newWidth,
+                    'xaxis.range': [currentRange[0], currentRange[1]]
+                }).then(() => {
                     regenerateFan();
                     regenerateCredits();
                     renderCustomLegend();
@@ -224,6 +235,18 @@ export function initializeChart() {
     // Trigger chart refresh to render data from chartState.series
     refreshChart();
     renderCustomLegend();
+}
+
+/**
+ * Sync visual visibility with chartState bools
+ * Called after every Plotly render to re-apply CSS visibility states
+ * (Plotly regenerates SVG elements, overwriting CSS changes)
+ */
+function syncVisibilityState() {
+    if (!chartState.fanVisible) {
+        toggleCelerationFan(false);
+    }
+    // Future: add other visibility syncs here (grid, etc.)
 }
 
 /**
@@ -674,6 +697,16 @@ export function setupEventListeners() {
         Plotly.relayout(chartDiv, {
             'xaxis.range[0]': currentRange[0] + shift,
             'xaxis.range[1]': currentRange[1] + shift
+        }).then(updatePanDisplay);
+    });
+
+    // Reset pan position when start date changes
+    eventBus.subscribe(EVENTS.DATA_START_DATE_CHANGED, () => {
+        const currentRange = chartDiv.layout.xaxis.range;
+        const rangeWidth = currentRange[1] - currentRange[0];
+        Plotly.relayout(chartDiv, {
+            'xaxis.range[0]': -0.2,
+            'xaxis.range[1]': -0.2 + rangeWidth
         }).then(updatePanDisplay);
     });
 

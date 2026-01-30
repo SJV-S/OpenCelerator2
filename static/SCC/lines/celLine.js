@@ -11,7 +11,7 @@
  * Emits events instead of calling peer modules directly.
  */
 
-import { removeToast, createToast } from '../util/toaster.js';
+import { createToast } from '../util/toaster.js';
 import { icons } from '../util/icons.js';
 import { applySvgCursor, restoreCursor } from '../util/cursorIcon.js';
 import { chartState } from '../chartState.js';
@@ -154,7 +154,7 @@ function selectSeriesAndEnableDrag(seriesKey) {
 
     // Remove series selection toast using stored reference
     if (celLineState.seriesSelectionToast) {
-        removeToast(celLineState.seriesSelectionToast.id);
+        celLineState.seriesSelectionToast.remove();
         celLineState.seriesSelectionToast = null;
     }
 
@@ -226,7 +226,7 @@ function enableDragMode() {
             }
         ],
         layout: 'horizontal',
-        position: 'top-right-secondary'
+        position: 'top-right'
     });
 
     console.log('Drag mode enabled for cel line');
@@ -703,11 +703,11 @@ function removeVerticalGuideLine() {
 
 function cleanupSeriesSelectionMode() {
     if (celLineState.toastElement) {
-        removeToast(celLineState.toastElement.id);
+        celLineState.toastElement.remove();
         celLineState.toastElement = null;
     }
     if (celLineState.seriesSelectionToast) {
-        removeToast(celLineState.seriesSelectionToast.id);
+        celLineState.seriesSelectionToast.remove();
         celLineState.seriesSelectionToast = null;
     }
 }
@@ -971,14 +971,12 @@ function handleCelLineClick(lineName) {
     }
 
     createToast({
-        id: 'cel-line-click-toaster',
         message: message,
         buttons: [
             {
                 label: 'Remove',
                 onClick: () => {
                     removeCelLineById(lineName);
-                    removeToast('cel-line-click-toaster');
                 },
                 type: 'secondary'
             }

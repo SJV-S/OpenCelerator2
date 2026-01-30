@@ -1,5 +1,9 @@
 # Project Rules
 
+## Interaction Rules
+
+**Answer questions before writing code.** When the user asks a question, answer it. A question is never an invitation to start coding just because auto-edit is enabled. Respond to what was asked, then wait for direction.
+
 ## Codebase Overview
 
 **Single-Case Chart (SCC) Application** - A behavioral data visualization tool displaying time-series data (correct/incorrect responses, timing) on logarithmic charts with analytical line drawing tools.
@@ -43,6 +47,8 @@
 - **Celeration lines**: Log-scale trend analysis
 
 ## File Handling
+- **NEVER create new directories** - always use existing project structure. If unsure where a file belongs, ASK first.
+- **Documentation goes in `Docs/`** (capital D) - NOT `docs/`
 - **NEVER read .json template files** - they are extremely large and will cause errors
 - **NEVER attempt to read files in charts/ directory** - always assume they exist and are too large
 - Always ask before reading any .json file anywhere in the project
@@ -126,3 +132,33 @@ eventBus.subscribe(EVENTS.SOMETHING_HAPPENED, (data) => {
     // React to the event
 }, true);
 ```
+
+## Plotly Shape Management - CRITICAL
+
+**Always use surgical updates for shapes and annotations.** When adding/removing individual shapes, target them by index - never replace the entire array.
+
+```javascript
+// WRONG - replaces entire array, redraws ALL shapes
+const filtered = chartDiv.layout.shapes.filter(s => s.name !== 'my-shape');
+Plotly.relayout(chartDiv, { shapes: filtered });
+
+// RIGHT - use the wrapper with name=true to remove by name
+import { relayout } from './util/plotlyWrapper.js';
+await relayout(chartDiv, 'my-shape', true);
+```
+
+**Why this matters:** Passing `shapes: [array]` tells Plotly to redraw every shape from scratch. This destroys existing SVG elements and creates new ones, which breaks any CSS modifications (like visibility toggling) applied to those elements.
+
+**Always use the plotlyWrapper** for Plotly operations. It emits events through the eventBus and supports name-based shape removal.
+
+You may suggest (but never add without permission) additional helper functions for the wrapper when a pattern emerges, similar to the `name=true` parameter for shape removal.
+
+See `Docs/plotly-shape-surgical-updates.md` for full context.
+
+## Debugging
+
+`static/SCC/debug.js` exposes internals to `window` for console access. This is the ONE exception to the "no window object" rule - debugging utilities are allowed.
+
+Available in browser console:
+- `window.chartState` - Full chart state object
+- `window.testToaster()` - Creates multiple stacked notifications to test toaster behavior

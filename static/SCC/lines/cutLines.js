@@ -10,7 +10,7 @@
  */
 
 import { chartState } from '../chartState.js';
-import { createToast, createConfirmToast, createInfoToast, removeToast, updateToastMessage } from '../util/toaster.js';
+import { createToast, createConfirmToast, createInfoToast, updateToastMessage } from '../util/toaster.js';
 import { xPositionToDate, timestampsToXPositions } from '../util/dates.js';
 import { icons } from '../util/icons.js';
 import { applySvgCursor, restoreCursor } from '../util/cursorIcon.js';
@@ -339,56 +339,6 @@ function removeCutLineOverlay() {
     }
 }
 
-// ============================================
-// Plotly-based functions (kept for reference)
-// ============================================
-
-function updateVerticalLine(xValue) {
-    const chartDiv = document.getElementById('chart');
-    if (!chartDiv) return;
-
-    const layout = chartDiv.layout;
-    if (!layout || !layout.yaxis) return;
-
-    const yRange = layout.yaxis.range;
-    const yMin = Math.pow(10, yRange[0]);
-    const yMax = Math.pow(10, yRange[1]);
-
-    const lineShape = {
-        type: 'line',
-        x0: xValue,
-        y0: yMin,
-        x1: xValue,
-        y1: yMax,
-        xref: 'x',
-        yref: 'y',
-        line: { color: 'gray', width: 1 },
-        name: 'cutline-guide'
-    };
-
-    const currentShapes = chartDiv.layout.shapes || [];
-    const filteredShapes = currentShapes.filter(shape => shape.name !== 'cutline-guide');
-    const newShapes = [...filteredShapes, lineShape];
-
-    Plotly.relayout(chartDiv, { shapes: newShapes }).then(() => {
-        cutLinesState.verticalLineShape = newShapes.length - 1;
-    });
-}
-
-function removeVerticalLine() {
-    const chartDiv = document.getElementById('chart');
-    if (!chartDiv) return;
-
-    const currentShapes = chartDiv.layout.shapes || [];
-    const newShapes = currentShapes.filter(shape => shape.name !== 'cutline-guide');
-
-    if (newShapes.length !== currentShapes.length) {
-        Plotly.relayout(chartDiv, { shapes: newShapes });
-    }
-
-    cutLinesState.verticalLineShape = null;
-}
-
 function cutLine(xValue) {
     if (!chartState.startDate) {
         console.error('Cannot cut: chart has no data yet');
@@ -409,29 +359,25 @@ function cutLine(xValue) {
 }
 
 function showCutLineToast() {
-    createInfoToast({
-        id: 'cut-line-toast',
+    cutLinesState.toastElement = createInfoToast({
         message: 'Click to cut',
-        messageId: 'cut-line-toast-message',
         onCancel: () => {
             console.log('Cancel button clicked');
             deactivateCutLinesMode();
-        },
-        stateRef: {
-            state: cutLinesState,
-            key: 'toastElement'
         }
     });
 }
 
 function updateCutLineToastMessage() {
-    updateToastMessage('cut-line-toast-message',
+    updateToastMessage(cutLinesState.toastElement,
         cutLinesState.isTouchActive ? 'Release to cut' : 'Click to cut');
 }
 
 function removeCutLineToast() {
-    removeToast('cut-line-toast');
-    cutLinesState.toastElement = null;
+    if (cutLinesState.toastElement) {
+        cutLinesState.toastElement.remove();
+        cutLinesState.toastElement = null;
+    }
 }
 
 /**
@@ -448,7 +394,6 @@ function handleCutLineClick(lineName) {
     }
 
     createToast({
-        id: 'cut-line-click-toaster',
         message: 'Cut line',
         buttons: [
             {
@@ -464,8 +409,6 @@ function handleCutLineClick(lineName) {
                     } else {
                         console.error(`[CUT LINE CLICK] Invalid cut ID: ${lineId}`);
                     }
-
-                    removeToast('cut-line-click-toaster');
                 },
                 type: 'secondary'
             }

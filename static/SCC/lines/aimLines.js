@@ -13,7 +13,7 @@
  */
 
 import { chartState } from '../chartState.js';
-import { createToast, createTextInputDialog, createConfirmToast, removeToast } from '../util/toaster.js';
+import { createToast, createTextInputDialog, createConfirmToast } from '../util/toaster.js';
 import { xPositionToDate } from '../util/dates.js';
 import { aimLineMetadata, removeLine } from './allLines.js';
 import { icons } from '../util/icons.js';
@@ -133,8 +133,10 @@ function deactivateAimLineMode() {
     }
 
     // Remove text input overlay if it exists
-    removeToast('aim-text-input-overlay');
-    aimLineState.textInputOverlay = null;
+    if (aimLineState.textInputOverlay) {
+        aimLineState.textInputOverlay.remove();
+        aimLineState.textInputOverlay = null;
+    }
 
     // Remove save toast if it exists
     if (aimLineState.saveToast) {
@@ -144,7 +146,7 @@ function deactivateAimLineMode() {
 
     // Remove mode toast if it exists
     if (aimLineState.modeToast) {
-        removeToast(aimLineState.modeToast.id);
+        aimLineState.modeToast.remove();
         aimLineState.modeToast = null;
     }
 
@@ -467,8 +469,7 @@ function drawDiagonalAimLine(chartDiv, coords) {
  * @param {HTMLElement} chartDiv - Chart container element
  */
 function showAimTextInput(chartDiv) {
-    createTextInputDialog({
-        id: 'aim-text-input-overlay',
+    aimLineState.textInputOverlay = createTextInputDialog({
         title: 'Enter Event Marker Text',
         placeholder: 'Enter label...',
         borderColor: '#6ad1e3',
@@ -478,10 +479,6 @@ function showAimTextInput(chartDiv) {
         onCancel: () => {
             removeAimShapes(chartDiv);
             deactivateAimLineMode();
-        },
-        stateRef: {
-            state: aimLineState,
-            key: 'textInputOverlay'
         }
     });
 }
@@ -493,8 +490,10 @@ function showAimTextInput(chartDiv) {
  */
 function addAimTextLabel(chartDiv, text) {
     // Remove text input overlay
-    removeToast('aim-text-input-overlay');
-    aimLineState.textInputOverlay = null;
+    if (aimLineState.textInputOverlay) {
+        aimLineState.textInputOverlay.remove();
+        aimLineState.textInputOverlay = null;
+    }
 
     // If text is empty, skip annotation creation
     if (!text || text.trim() === '') {
@@ -614,26 +613,19 @@ function addAimTextLabel(chartDiv, text) {
  * @param {HTMLElement} chartDiv - Chart container element
  */
 function showAimSaveConfirmationToast(chartDiv) {
-    createConfirmToast({
-        id: 'aim-save-toast',
+    aimLineState.saveToast = createConfirmToast({
         message: 'Save line?',
         borderColor: '#6ad1e3',
         onYes: () => {
             finalizeAimLine(chartDiv);
-            removeToast('aim-save-toast');
             aimLineState.saveToast = null;
             deactivateAimLineMode();
         },
         onNo: () => {
             removeAimShapes(chartDiv);
             removeAimAnnotation(chartDiv);
-            removeToast('aim-save-toast');
             aimLineState.saveToast = null;
             deactivateAimLineMode();
-        },
-        stateRef: {
-            state: aimLineState,
-            key: 'saveToast'
         }
     });
 }
@@ -770,7 +762,6 @@ function handleAimLineClick(lineName) {
 
     // Show toaster with Remove button, auto-dismiss after 3 seconds
     createToast({
-        id: 'aim-line-click-toaster',
         message: 'Event marker',
         buttons: [
             {
@@ -778,7 +769,6 @@ function handleAimLineClick(lineName) {
                 onClick: () => {
                     console.log(`[AIM LINE CLICK] Remove clicked for ${lineName}`);
                     removeAimLineById(lineName);
-                    removeToast('aim-line-click-toaster');
                 },
                 type: 'secondary'
             }
@@ -807,7 +797,7 @@ function showAimModeToaster(phase) {
         ],
         layout: 'horizontal',
         borderColor: '#6ad1e3',
-        position: 'top-right-secondary'
+        position: 'top-right'
     });
 }
 
@@ -818,7 +808,7 @@ function showAimModeToaster(phase) {
 function updateAimModeToaster(phase) {
     // Remove existing toaster
     if (aimLineState.modeToast) {
-        removeToast(aimLineState.modeToast.id);
+        aimLineState.modeToast.remove();
         aimLineState.modeToast = null;
     }
 

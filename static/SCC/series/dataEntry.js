@@ -12,6 +12,7 @@
 import { chartState } from '../chartState.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 import { snapToChartBoundary, formatDateInputValue, xPositionToDate } from '../util/dates.js';
+import { relayout } from '../util/plotlyWrapper.js';
 
 // Shape name for the entry date indicator line
 const ENTRY_DATE_INDICATOR_NAME = 'entry-date-indicator';
@@ -203,37 +204,36 @@ function dateToXPosition(dateString) {
  * Draw or update the entry date indicator line on the chart
  * @param {string} dateString - Date in YYYY-MM-DD format
  */
-function updateEntryDateIndicator(dateString) {
+async function updateEntryDateIndicator(dateString) {
     const chartDiv = document.getElementById('chart');
     if (!chartDiv || !chartDiv.layout) return;
 
     const xPos = dateToXPosition(dateString);
+    const shapes = chartDiv.layout.shapes || [];
+    const index = shapes.findIndex(s => s.name === ENTRY_DATE_INDICATOR_NAME);
 
-    // Get current shapes, filter out any existing indicator
-    const currentShapes = (chartDiv.layout.shapes || []).filter(
-        shape => shape.name !== ENTRY_DATE_INDICATOR_NAME
-    );
-
-    // Create the new indicator line
-    const indicatorLine = {
-        name: ENTRY_DATE_INDICATOR_NAME,
-        type: 'line',
-        x0: xPos,
-        x1: xPos,
-        y0: 0,
-        y1: 1,
-        yref: 'paper',
-        opacity: 0.25,
-        line: {
-            color: '#9333ea',  // Purple
-            width: 3
-        }
-    };
-
-    // Update the chart with the new shapes
-    Plotly.relayout(chartDiv, {
-        shapes: [...currentShapes, indicatorLine]
-    });
+    if (index >= 0) {
+        // Update existing indicator position
+        await relayout(chartDiv, {
+            [`shapes[${index}].x0`]: xPos,
+            [`shapes[${index}].x1`]: xPos
+        });
+    } else {
+        // Add new indicator at end
+        await relayout(chartDiv, {
+            [`shapes[${shapes.length}]`]: {
+                name: ENTRY_DATE_INDICATOR_NAME,
+                type: 'line',
+                x0: xPos,
+                x1: xPos,
+                y0: 0,
+                y1: 1,
+                yref: 'paper',
+                opacity: 0.25,
+                line: { color: '#9333ea', width: 3 }
+            }
+        });
+    }
 
     // Reset timer - clear existing and start new
     if (indicatorTimer) {
@@ -247,7 +247,7 @@ function updateEntryDateIndicator(dateString) {
 /**
  * Remove the entry date indicator line from the chart
  */
-function removeEntryDateIndicator() {
+async function removeEntryDateIndicator() {
     // Clear timer if running
     if (indicatorTimer) {
         clearTimeout(indicatorTimer);
@@ -257,14 +257,7 @@ function removeEntryDateIndicator() {
     const chartDiv = document.getElementById('chart');
     if (!chartDiv || !chartDiv.layout) return;
 
-    // Filter out the indicator line
-    const currentShapes = (chartDiv.layout.shapes || []).filter(
-        shape => shape.name !== ENTRY_DATE_INDICATOR_NAME
-    );
-
-    Plotly.relayout(chartDiv, {
-        shapes: currentShapes
-    });
+    await relayout(chartDiv, ENTRY_DATE_INDICATOR_NAME, true);
 }
 
 /**

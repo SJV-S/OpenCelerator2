@@ -213,7 +213,7 @@ function toggleLineClickability(showToast = true) {
         createToast({
             message: `Line editing ${lineClickabilityEnabled ? 'enabled' : 'disabled'}`,
             duration: lineClickabilityEnabled ? undefined : 3000,  // No time limit when ON, 3s when OFF
-            position: 'top-right-secondary'
+            position: 'top-right'
         });
     }
 }

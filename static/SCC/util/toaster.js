@@ -10,62 +10,81 @@
  * - Secondary button: #f3f4f6
  */
 
-// Flex containers for each position - created lazily
-const toastContainers = {};
-
-// Counter for unique toast IDs
-let toastCounter = 0;
+// Track active toasts per position for stacking
+const activeToasts = {};
 
 /**
- * Gets or creates a flex container for a given position
+ * Gets base offset values for each position
  * @param {string} position - Position key
- * @returns {HTMLElement} The container element
+ * @returns {Object} Base offsets {top, right, left, bottom}
  * @private
  */
-function getOrCreateContainer(position) {
-    if (toastContainers[position]) {
-        return toastContainers[position];
-    }
-
-    const container = document.createElement('div');
-    container.id = `toast-container-${position}`;
-    container.setAttribute('data-toast-container', 'true');
-
-    // Base styles - flex container handles all stacking automatically
-    let styles = `
-        position: fixed;
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        z-index: 10000;
-        pointer-events: none;
-    `;
-
-    // Position-specific styles
+function getPositionOffsets(position) {
     switch (position) {
         case 'top-right':
-            styles += 'top: 1vh; right: 1vw;';
-            break;
-        case 'top-right-secondary':
-            styles += 'top: 60px; right: 1vw;';
-            break;
+            return { top: 10, right: 10, left: null, bottom: null };
         case 'top-left':
-            styles += 'top: 1vh; left: 1vw;';
-            break;
+            return { top: 10, right: null, left: 10, bottom: null };
         case 'bottom-right':
-            styles += 'bottom: 1vh; right: 1vw; flex-direction: column-reverse;';
-            break;
+            return { top: null, right: 10, left: null, bottom: 10 };
         case 'bottom-left':
-            styles += 'bottom: 1vh; left: 1vw; flex-direction: column-reverse;';
-            break;
+            return { top: null, right: null, left: 10, bottom: 10 };
         default:
-            styles += 'top: 1vh; right: 1vw;';
+            return { top: 10, right: 10, left: null, bottom: null };
     }
+}
 
-    container.style.cssText = styles;
-    document.body.appendChild(container);
-    toastContainers[position] = container;
-    return container;
+/**
+ * Ensures tracking array exists for a position
+ * @param {string} position - Position key
+ * @private
+ */
+function ensureTrackingArray(position) {
+    if (!activeToasts[position]) {
+        activeToasts[position] = [];
+    }
+}
+
+const TOAST_GAP = 10;
+
+/**
+ * Recalculates and applies positions for all toasts at a position
+ * @param {string} position - Position key
+ */
+function repositionToasts(position) {
+    const toasts = activeToasts[position] || [];
+    const isBottomPosition = position.startsWith('bottom');
+    const baseOffsets = getPositionOffsets(position);
+    let offset = 0;
+
+    toasts.forEach((toast, index) => {
+        const height = toast.offsetHeight || toast._expectedHeight || 60;
+
+        if (isBottomPosition) {
+            toast.style.top = 'auto';
+            toast.style.bottom = `${baseOffsets.bottom + offset}px`;
+        } else {
+            toast.style.top = `${baseOffsets.top + offset}px`;
+            toast.style.bottom = 'auto';
+        }
+
+        offset += height + TOAST_GAP;
+    });
+}
+
+/**
+ * Removes a toast from tracking and repositions remaining toasts
+ * @param {HTMLElement} toast - Toast element
+ * @param {string} position - Position key
+ */
+function untrackToast(toast, position) {
+    if (!activeToasts[position]) return;
+
+    const index = activeToasts[position].indexOf(toast);
+    if (index > -1) {
+        activeToasts[position].splice(index, 1);
+        repositionToasts(position);
+    }
 }
 
 /**
@@ -80,7 +99,6 @@ function getOrCreateContainer(position) {
  * @param {string} [options.buttons[].hoverColor] - Custom hover color
  * @param {string} [options.borderColor='#6ad1e3'] - Border color
  * @param {string} [options.layout='vertical'] - Layout direction: 'horizontal' or 'vertical'
- * @param {string} [options.messageId] - Optional ID for message element (for updates)
  * @param {number} [options.duration] - Optional duration in milliseconds before auto-dismiss (no auto-dismiss if not specified)
  * @param {Object} [options.stateRef] - Optional state object to store toast reference
  * @param {string} [options.stateRef.key='toastElement'] - Key name in state object for storing reference
@@ -93,37 +111,46 @@ function createToast(options) {
         buttons = [],
         borderColor = '#6ad1e3',
         layout = 'vertical',
-        messageId = null,
         duration = null,
         stateRef = null,
-        position = 'top-right',
-        id: customId = null
+        position = 'top-right'
     } = options;
 
-    // Use custom ID if provided (replaces existing), otherwise generate unique ID
-    const id = customId || `toast-${position}-${++toastCounter}`;
+    // Calculate position BEFORE creating element
+    ensureTrackingArray(position);
+    const baseOffsets = getPositionOffsets(position);
+    const isBottomPosition = position.startsWith('bottom');
+    const isRightSide = position === 'top-right' || position === 'bottom-right';
 
-    // If custom ID provided, remove existing toast with that ID (replacement behavior)
-    if (customId) {
-        removeToast(customId);
-    }
+    // Calculate stack offset from existing toasts
+    let stackOffset = 0;
+    activeToasts[position].forEach(existingToast => {
+        const height = existingToast.offsetHeight || existingToast._expectedHeight || 60;
+        stackOffset += height + TOAST_GAP;
+    });
 
-    // Get the flex container for this position
-    const container = getOrCreateContainer(position);
+    // Calculate final position values
+    const topValue = isBottomPosition ? 'auto' : `${baseOffsets.top + stackOffset}px`;
+    const bottomValue = isBottomPosition ? `${baseOffsets.bottom + stackOffset}px` : 'auto';
+    const rightValue = baseOffsets.right !== null ? `${baseOffsets.right}px` : 'auto';
+    const leftValue = baseOffsets.left !== null ? `${baseOffsets.left}px` : 'auto';
 
     // Create toast element
     const toast = document.createElement('div');
-    toast.id = id;
     toast.setAttribute('data-toast', 'true');
     toast.dataset.position = position;
 
     // Determine slide direction based on position
-    const isRightSide = position === 'top-right' || position === 'bottom-right' || position === 'top-right-secondary';
-    const slideDirection = isRightSide ? 'calc(100% + 1vw)' : 'calc(-100% - 1vw)';
+    const slideDirection = isRightSide ? 'calc(100% + 10px)' : 'calc(-100% - 10px)';
 
-    // Toast styles - position:relative since container handles positioning
+    // Toast styles - position values calculated above
     const baseStyles = `
-        position: relative;
+        position: fixed;
+        z-index: 10000;
+        top: ${topValue};
+        bottom: ${bottomValue};
+        right: ${rightValue};
+        left: ${leftValue};
         background-color: white;
         border: 2px solid ${borderColor};
         border-radius: 8px;
@@ -134,7 +161,7 @@ function createToast(options) {
         pointer-events: auto;
         opacity: 0;
         transform: translateX(${slideDirection});
-        transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+        transition: transform 0.3s ease-out, opacity 0.3s ease-out, top 0.2s ease-out;
     `;
 
     // Layout-specific styles
@@ -146,9 +173,6 @@ function createToast(options) {
 
     // Create message element
     const messageElement = document.createElement(layout === 'horizontal' ? 'span' : 'div');
-    if (messageId) {
-        messageElement.id = messageId;
-    }
     messageElement.textContent = message;
     messageElement.style.cssText = `
         color: #374151;
@@ -157,6 +181,9 @@ function createToast(options) {
     `;
 
     toast.appendChild(messageElement);
+
+    // Store message element reference on toast for later updates
+    toast.messageElement = messageElement;
 
     // Create buttons
     if (buttons.length > 0) {
@@ -177,7 +204,7 @@ function createToast(options) {
                 ...buttonConfig,
                 onClick: () => {
                     if (buttonConfig.onClick) buttonConfig.onClick();
-                    removeToast(id);
+                    toast.remove();
                 }
             };
             const button = createButton(wrappedConfig, borderColor);
@@ -189,14 +216,28 @@ function createToast(options) {
         }
     }
 
-    // Append toast to the flex container (container handles stacking)
-    container.appendChild(toast);
+    // Store expected height for repositioning calculations
+    toast._expectedHeight = 60;
 
-    // Trigger slide-in animation after element is in DOM
+    // Add to tracking array
+    activeToasts[position].push(toast);
+
+    // Append toast to body (position already set in styles)
+    document.body.appendChild(toast);
+
+    // Override remove to auto-untrack and reposition remaining toasts
+    const originalRemove = toast.remove.bind(toast);
+    toast.remove = () => {
+        untrackToast(toast, position);
+        originalRemove();
+    };
+
+    // Trigger slide-in animation and reposition after render (to get actual heights)
     requestAnimationFrame(() => {
         requestAnimationFrame(() => {
             toast.style.opacity = '1';
             toast.style.transform = 'translateX(0)';
+            repositionToasts(position);
         });
     });
 
@@ -209,7 +250,7 @@ function createToast(options) {
     // Auto-dismiss after duration if specified
     if (duration && duration > 0) {
         setTimeout(() => {
-            removeToast(id);
+            toast.remove();
         }, duration);
     }
 
@@ -320,33 +361,25 @@ function darkenColor(color, percent) {
 
 /**
  * Updates the message text in an existing toast
- * @param {string} messageId - ID of the message element to update
+ * @param {HTMLElement} toast - The toast element (must have messageElement property)
  * @param {string} newMessage - New message text
  */
-function updateToastMessage(messageId, newMessage) {
-    const messageElement = document.getElementById(messageId);
-    if (messageElement) {
-        messageElement.textContent = newMessage;
+function updateToastMessage(toast, newMessage) {
+    if (toast && toast.messageElement) {
+        toast.messageElement.textContent = newMessage;
     }
 }
 
-/**
- * Removes a toast from the DOM by ID
- * Flex container automatically repositions remaining toasts
- * @param {string} id - ID of the toast to remove
- */
-function removeToast(id) {
-    const toast = document.getElementById(id);
-    if (toast) {
-        toast.remove();
-    }
-}
 
 /**
  * Removes ALL toasts from the DOM
  */
 function removeAllToasts() {
     document.querySelectorAll('[data-toast]').forEach(el => el.remove());
+    // Clear all tracking arrays
+    Object.keys(activeToasts).forEach(position => {
+        activeToasts[position] = [];
+    });
 }
 
 /**
@@ -362,9 +395,7 @@ function removeAllToasts() {
  */
 function createInfoToast(options) {
     return createToast({
-        id: options.id,
         message: options.message,
-        messageId: options.messageId,
         buttons: [
             {
                 label: 'Cancel',
@@ -398,21 +429,18 @@ function createConfirmToast(options) {
     const primaryColor = options.primaryColor || borderColor;
 
     return createToast({
-        id: options.id,
         message: options.message,
         buttons: [
             {
                 label: options.yesLabel || 'Yes',
                 onClick: options.onYes,
                 type: 'primary',
-                backgroundColor: primaryColor,
-                id: options.yesId
+                backgroundColor: primaryColor
             },
             {
                 label: options.noLabel || 'No',
                 onClick: options.onNo,
-                type: 'secondary',
-                id: options.noId
+                type: 'secondary'
             }
         ],
         layout: 'vertical',
@@ -425,7 +453,6 @@ function createConfirmToast(options) {
 /**
  * Creates a text input dialog overlay
  * @param {Object} options - Configuration options
- * @param {string} options.id - Unique ID for the overlay
  * @param {string} options.title - Title text for the dialog
  * @param {string} options.placeholder - Placeholder text for input field
  * @param {Function} options.onSubmit - Submit button handler (receives text value)
@@ -438,7 +465,6 @@ function createConfirmToast(options) {
  */
 function createTextInputDialog(options) {
     const {
-        id,
         title,
         placeholder = 'Enter text...',
         onSubmit,
@@ -449,24 +475,36 @@ function createTextInputDialog(options) {
         position = 'top-right'
     } = options;
 
-    // Remove existing dialog with same ID if any
-    removeToast(id);
+    // Calculate position before creating element
+    ensureTrackingArray(position);
+    const baseOffsets = getPositionOffsets(position);
+    const isBottomPosition = position.startsWith('bottom');
+    const isRightSide = position === 'top-right' || position === 'bottom-right';
 
-    // Get the flex container for this position (same as regular toasts)
-    const container = getOrCreateContainer(position);
+    let stackOffset = 0;
+    activeToasts[position].forEach(existingToast => {
+        const height = existingToast.offsetHeight || existingToast._expectedHeight || 60;
+        stackOffset += height + TOAST_GAP;
+    });
+
+    const topValue = isBottomPosition ? 'auto' : `${baseOffsets.top + stackOffset}px`;
+    const bottomValue = isBottomPosition ? `${baseOffsets.bottom + stackOffset}px` : 'auto';
+    const rightValue = baseOffsets.right !== null ? `${baseOffsets.right}px` : 'auto';
+    const leftValue = baseOffsets.left !== null ? `${baseOffsets.left}px` : 'auto';
+    const slideDirection = isRightSide ? 'calc(100% + 10px)' : 'calc(-100% - 10px)';
 
     // Create overlay for text input
     const overlay = document.createElement('div');
-    overlay.id = id;
     overlay.setAttribute('data-toast', 'true');
     overlay.dataset.position = position;
 
-    // Determine slide direction based on position
-    const isRightSide = position === 'top-right' || position === 'bottom-right' || position === 'top-right-secondary';
-    const slideDirection = isRightSide ? 'calc(100% + 1vw)' : 'calc(-100% - 1vw)';
-
     overlay.style.cssText = `
-        position: relative;
+        position: fixed;
+        z-index: 10000;
+        top: ${topValue};
+        bottom: ${bottomValue};
+        right: ${rightValue};
+        left: ${leftValue};
         background: white;
         padding: 15px 20px;
         border: 2px solid ${borderColor};
@@ -476,39 +514,55 @@ function createTextInputDialog(options) {
         pointer-events: auto;
         opacity: 0;
         transform: translateX(${slideDirection});
-        transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+        transition: transform 0.3s ease-out, opacity 0.3s ease-out, top 0.2s ease-out;
     `;
 
-    const inputId = `${id}-input`;
-    const submitId = `${id}-submit`;
-    const cancelId = `${id}-cancel`;
+    // Create elements
+    const heading = document.createElement('h3');
+    heading.style.cssText = 'margin: 0 0 10px 0; color: #374151; font-size: 14px; font-weight: bold;';
+    heading.textContent = title;
 
-    overlay.innerHTML = `
-        <h3 style="margin: 0 0 10px 0; color: #374151; font-size: 14px; font-weight: bold;">${title}</h3>
-        <input type="text" id="${inputId}"
-               style="width: 100%; padding: 8px; margin-bottom: 10px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;"
-               placeholder="${placeholder}"
-               maxlength="${maxLength}">
-        <div style="display: flex; gap: 10px;">
-            <button id="${submitId}"
-                    style="flex: 1; padding: 8px; background: ${borderColor}; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">
-                Submit
-            </button>
-            <button id="${cancelId}"
-                    style="flex: 1; padding: 8px; background: #ccc; color: black; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">
-                Cancel
-            </button>
-        </div>
-    `;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.style.cssText = 'width: 100%; padding: 8px; margin-bottom: 10px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;';
+    input.placeholder = placeholder;
+    input.maxLength = maxLength;
 
-    // Append to the flex container (not body)
-    container.appendChild(overlay);
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.cssText = 'display: flex; gap: 10px;';
 
-    // Trigger slide-in animation
+    const submitBtn = document.createElement('button');
+    submitBtn.style.cssText = `flex: 1; padding: 8px; background: ${borderColor}; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;`;
+    submitBtn.textContent = 'Submit';
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.style.cssText = 'flex: 1; padding: 8px; background: #ccc; color: black; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;';
+    cancelBtn.textContent = 'Cancel';
+
+    buttonContainer.appendChild(submitBtn);
+    buttonContainer.appendChild(cancelBtn);
+    overlay.appendChild(heading);
+    overlay.appendChild(input);
+    overlay.appendChild(buttonContainer);
+
+    // Add to tracking and append to body
+    overlay._expectedHeight = 60;
+    activeToasts[position].push(overlay);
+    document.body.appendChild(overlay);
+
+    // Override remove to auto-untrack
+    const originalRemove = overlay.remove.bind(overlay);
+    overlay.remove = () => {
+        untrackToast(overlay, position);
+        originalRemove();
+    };
+
+    // Trigger slide-in animation and reposition after render
     requestAnimationFrame(() => {
         requestAnimationFrame(() => {
             overlay.style.opacity = '1';
             overlay.style.transform = 'translateX(0)';
+            repositionToasts(position);
         });
     });
 
@@ -518,18 +572,16 @@ function createTextInputDialog(options) {
         stateRef.state[key] = overlay;
     }
 
-    // Get input element
-    const input = document.getElementById(inputId);
     input.focus();
 
     // Handle submit
-    document.getElementById(submitId).addEventListener('click', () => {
+    submitBtn.addEventListener('click', () => {
         const text = input.value.trim();
         onSubmit(text);  // Allow empty text
     });
 
     // Handle cancel
-    document.getElementById(cancelId).addEventListener('click', onCancel);
+    cancelBtn.addEventListener('click', onCancel);
 
     // Handle Enter key
     input.addEventListener('keypress', (event) => {
@@ -552,7 +604,6 @@ function createTextInputDialog(options) {
 /**
  * Creates a number input dialog overlay
  * @param {Object} options - Configuration options
- * @param {string} options.id - Unique ID for the overlay
  * @param {string} options.title - Title text for the dialog
  * @param {string} options.placeholder - Placeholder text for input field
  * @param {Function} options.onSubmit - Submit button handler (receives number value)
@@ -568,7 +619,6 @@ function createTextInputDialog(options) {
  */
 function createNumberInputDialog(options) {
     const {
-        id,
         title,
         placeholder = 'Enter number...',
         onSubmit,
@@ -582,24 +632,36 @@ function createNumberInputDialog(options) {
         position = 'top-right'
     } = options;
 
-    // Remove existing dialog with same ID if any
-    removeToast(id);
+    // Calculate position before creating element
+    ensureTrackingArray(position);
+    const baseOffsets = getPositionOffsets(position);
+    const isBottomPosition = position.startsWith('bottom');
+    const isRightSide = position === 'top-right' || position === 'bottom-right';
 
-    // Get the flex container for this position (same as regular toasts)
-    const container = getOrCreateContainer(position);
+    let stackOffset = 0;
+    activeToasts[position].forEach(existingToast => {
+        const height = existingToast.offsetHeight || existingToast._expectedHeight || 60;
+        stackOffset += height + TOAST_GAP;
+    });
+
+    const topValue = isBottomPosition ? 'auto' : `${baseOffsets.top + stackOffset}px`;
+    const bottomValue = isBottomPosition ? `${baseOffsets.bottom + stackOffset}px` : 'auto';
+    const rightValue = baseOffsets.right !== null ? `${baseOffsets.right}px` : 'auto';
+    const leftValue = baseOffsets.left !== null ? `${baseOffsets.left}px` : 'auto';
+    const slideDirection = isRightSide ? 'calc(100% + 10px)' : 'calc(-100% - 10px)';
 
     // Create overlay for number input
     const overlay = document.createElement('div');
-    overlay.id = id;
     overlay.setAttribute('data-toast', 'true');
     overlay.dataset.position = position;
 
-    // Determine slide direction based on position
-    const isRightSide = position === 'top-right' || position === 'bottom-right' || position === 'top-right-secondary';
-    const slideDirection = isRightSide ? 'calc(100% + 1vw)' : 'calc(-100% - 1vw)';
-
     overlay.style.cssText = `
-        position: relative;
+        position: fixed;
+        z-index: 10000;
+        top: ${topValue};
+        bottom: ${bottomValue};
+        right: ${rightValue};
+        left: ${leftValue};
         background: white;
         padding: 15px 20px;
         border: 2px solid ${borderColor};
@@ -609,46 +671,58 @@ function createNumberInputDialog(options) {
         pointer-events: auto;
         opacity: 0;
         transform: translateX(${slideDirection});
-        transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+        transition: transform 0.3s ease-out, opacity 0.3s ease-out, top 0.2s ease-out;
     `;
 
-    const inputId = `${id}-input`;
-    const submitId = `${id}-submit`;
-    const cancelId = `${id}-cancel`;
+    // Create elements
+    const heading = document.createElement('h3');
+    heading.style.cssText = 'margin: 0 0 10px 0; color: #374151; font-size: 14px; font-weight: bold;';
+    heading.textContent = title;
 
-    // Build input attributes
-    const minAttr = min !== undefined ? `min="${min}"` : '';
-    const maxAttr = max !== undefined ? `max="${max}"` : '';
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.style.cssText = 'width: 100%; padding: 8px; margin-bottom: 10px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;';
+    input.placeholder = placeholder;
+    input.step = step;
+    if (min !== undefined) input.min = min;
+    if (max !== undefined) input.max = max;
+    if (defaultValue !== '') input.value = defaultValue;
 
-    overlay.innerHTML = `
-        <h3 style="margin: 0 0 10px 0; color: #374151; font-size: 14px; font-weight: bold;">${title}</h3>
-        <input type="number" id="${inputId}"
-               style="width: 100%; padding: 8px; margin-bottom: 10px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;"
-               placeholder="${placeholder}"
-               step="${step}"
-               ${minAttr}
-               ${maxAttr}
-               value="${defaultValue}">
-        <div style="display: flex; gap: 10px;">
-            <button id="${submitId}"
-                    style="flex: 1; padding: 8px; background: ${borderColor}; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">
-                Submit
-            </button>
-            <button id="${cancelId}"
-                    style="flex: 1; padding: 8px; background: #ccc; color: black; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">
-                Cancel
-            </button>
-        </div>
-    `;
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.cssText = 'display: flex; gap: 10px;';
 
-    // Append to the flex container (not body)
-    container.appendChild(overlay);
+    const submitBtn = document.createElement('button');
+    submitBtn.style.cssText = `flex: 1; padding: 8px; background: ${borderColor}; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;`;
+    submitBtn.textContent = 'Submit';
 
-    // Trigger slide-in animation
+    const cancelBtn = document.createElement('button');
+    cancelBtn.style.cssText = 'flex: 1; padding: 8px; background: #ccc; color: black; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;';
+    cancelBtn.textContent = 'Cancel';
+
+    buttonContainer.appendChild(submitBtn);
+    buttonContainer.appendChild(cancelBtn);
+    overlay.appendChild(heading);
+    overlay.appendChild(input);
+    overlay.appendChild(buttonContainer);
+
+    // Add to tracking and append to body
+    overlay._expectedHeight = 60;
+    activeToasts[position].push(overlay);
+    document.body.appendChild(overlay);
+
+    // Override remove to auto-untrack
+    const originalRemove = overlay.remove.bind(overlay);
+    overlay.remove = () => {
+        untrackToast(overlay, position);
+        originalRemove();
+    };
+
+    // Trigger slide-in animation and reposition after render
     requestAnimationFrame(() => {
         requestAnimationFrame(() => {
             overlay.style.opacity = '1';
             overlay.style.transform = 'translateX(0)';
+            repositionToasts(position);
         });
     });
 
@@ -658,8 +732,6 @@ function createNumberInputDialog(options) {
         stateRef.state[key] = overlay;
     }
 
-    // Get input element
-    const input = document.getElementById(inputId);
     input.focus();
     input.select();
 
@@ -681,10 +753,10 @@ function createNumberInputDialog(options) {
         onSubmit(value);
     };
 
-    document.getElementById(submitId).addEventListener('click', handleSubmit);
+    submitBtn.addEventListener('click', handleSubmit);
 
     // Handle cancel
-    document.getElementById(cancelId).addEventListener('click', onCancel);
+    cancelBtn.addEventListener('click', onCancel);
 
     // Handle Enter key
     input.addEventListener('keypress', (event) => {
@@ -706,7 +778,6 @@ function createNumberInputDialog(options) {
 /**
  * Creates left/right arrow controls for adjusting values
  * @param {Object} options - Configuration options
- * @param {string} options.id - Unique ID for the controls
  * @param {Function} options.onLeft - Left arrow click handler
  * @param {Function} options.onRight - Right arrow click handler
  * @param {string} [options.color='#6ad1e3'] - Arrow button color
@@ -715,19 +786,14 @@ function createNumberInputDialog(options) {
  */
 function createArrowControls(options) {
     const {
-        id,
         onLeft,
         onRight,
         color = '#6ad1e3',
         stateRef = null
     } = options;
 
-    // Remove existing controls with same ID if any
-    removeToast(id);
-
     // Create arrow control container
     const arrowDiv = document.createElement('div');
-    arrowDiv.id = id;
     arrowDiv.style.cssText = `
         position: fixed;
         bottom: 20px;
@@ -812,7 +878,6 @@ function createArrowControls(options) {
 export {
     createToast,
     updateToastMessage,
-    removeToast,
     removeAllToasts,
     createInfoToast,
     createConfirmToast,

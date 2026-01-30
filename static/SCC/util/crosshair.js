@@ -20,8 +20,9 @@ const crosshairState = {
     shiftHeld: false,
     previousActiveTab: null,
     mouseMoveHandler: null,
-    lastUpdateTime: 0,
-    throttleDelay: 33  // ~30fps
+    beforeHoverHandler: null,
+    rafPending: null,  // For requestAnimationFrame throttling
+    lastXRounded: null  // Track previous x to skip redundant data lookups
 };
 
 /**
@@ -51,35 +52,73 @@ function activateCrosshair() {
 
     crosshairState.active = true;
 
+    // Block Plotly's internal hover computation entirely
+    crosshairState.beforeHoverHandler = () => false;
+    chartDiv.on('plotly_beforehover', crosshairState.beforeHoverHandler);
+
+    // Also disable hovermode and dragmode
+    crosshairState.previousHovermode = chartDiv.layout?.hovermode;
+    crosshairState.previousDragmode = chartDiv.layout?.dragmode;
+    Plotly.relayout(chartDiv, { hovermode: false, dragmode: false });
+
     // Store the currently active tab
     const activeTab = document.querySelector('.chart-menu-tab-pane.active');
     if (activeTab) {
         crosshairState.previousActiveTab = activeTab.id;
     }
 
+    // TEMP DISABLED: testing if panel causes CPU issue
     // Hide tabs and all tab panes
-    const tabs = document.querySelector('.chart-menu-tabs');
-    if (tabs) tabs.style.display = 'none';
+    // const tabs = document.querySelector('.chart-menu-tabs');
+    // if (tabs) tabs.style.display = 'none';
 
-    document.querySelectorAll('.chart-menu-tab-pane').forEach(pane => {
-        pane.classList.remove('active');
-    });
+    // document.querySelectorAll('.chart-menu-tab-pane').forEach(pane => {
+    //     pane.classList.remove('active');
+    // });
 
+    // TEMP DISABLED: testing if panel causes CPU issue
     // Show crosshair content
-    const crosshairContent = document.getElementById('crosshair-content');
-    if (crosshairContent) {
-        crosshairContent.classList.add('active');
+    // const crosshairContent = document.getElementById('crosshair-content');
+    // if (crosshairContent) {
+    //     crosshairContent.classList.add('active');
+    // }
+
+    // Show the counter overlay on mobile if hidden
+    const counterOverlay = document.getElementById('counter-overlay');
+    if (counterOverlay && counterOverlay.style.display === 'none') {
+        counterOverlay.style.display = 'flex';
     }
 
-    // Show the overlay on mobile if hidden
-    const overlay = document.getElementById('counter-overlay');
-    if (overlay && overlay.style.display === 'none') {
-        overlay.style.display = 'flex';
-    }
+    // Create event-capturing overlay so Plotly never receives mouse events
+    const eventOverlay = getOrCreateEventOverlay(chartDiv);
+    eventOverlay.style.pointerEvents = 'auto';  // Capture events
 
-    // Set up mousemove handler
+    // Set up mousemove handler on the overlay, not the chart
     crosshairState.mouseMoveHandler = (event) => handleMouseMove(event, chartDiv);
-    chartDiv.addEventListener('mousemove', crosshairState.mouseMoveHandler);
+    eventOverlay.addEventListener('mousemove', crosshairState.mouseMoveHandler);
+}
+
+/**
+ * Get or create transparent overlay that captures mouse events
+ * When active, this prevents Plotly from receiving any mouse events
+ */
+function getOrCreateEventOverlay(chartDiv) {
+    let overlay = document.getElementById('crosshair-event-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'crosshair-event-overlay';
+        overlay.style.cssText = `
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100;
+        `;
+        chartDiv.appendChild(overlay);
+    }
+    return overlay;
 }
 
 /**
@@ -90,12 +129,40 @@ function deactivateCrosshair() {
 
     const chartDiv = document.getElementById('chart');
     crosshairState.active = false;
+    crosshairState.lastXRounded = null;  // Reset for next activation
 
-    // Remove mousemove handler
-    if (chartDiv && crosshairState.mouseMoveHandler) {
-        chartDiv.removeEventListener('mousemove', crosshairState.mouseMoveHandler);
-        crosshairState.mouseMoveHandler = null;
+    // Cancel any pending animation frame
+    if (crosshairState.rafPending) {
+        cancelAnimationFrame(crosshairState.rafPending);
+        crosshairState.rafPending = null;
     }
+    crosshairState.lastEvent = null;
+
+    // Remove the beforehover blocker
+    if (chartDiv && crosshairState.beforeHoverHandler) {
+        chartDiv.removeListener('plotly_beforehover', crosshairState.beforeHoverHandler);
+        crosshairState.beforeHoverHandler = null;
+    }
+
+    // Restore Plotly's hover and drag modes
+    if (crosshairState.previousHovermode !== undefined || crosshairState.previousDragmode !== undefined) {
+        Plotly.relayout(chartDiv, {
+            hovermode: crosshairState.previousHovermode ?? 'closest',
+            dragmode: crosshairState.previousDragmode ?? 'zoom'
+        });
+        crosshairState.previousHovermode = undefined;
+        crosshairState.previousDragmode = undefined;
+    }
+
+    // Remove mousemove handler and disable event capture on overlay
+    const overlay = document.getElementById('crosshair-event-overlay');
+    if (overlay) {
+        if (crosshairState.mouseMoveHandler) {
+            overlay.removeEventListener('mousemove', crosshairState.mouseMoveHandler);
+        }
+        overlay.style.pointerEvents = 'none';  // Let events through to Plotly again
+    }
+    crosshairState.mouseMoveHandler = null;
 
     // Remove crosshair lines
     removeCrosshairLines();
@@ -131,14 +198,23 @@ function deactivateCrosshair() {
 
 /**
  * Handle mouse movement - update crosshair and info panel
+ * Uses requestAnimationFrame for smooth updates aligned with display refresh
  */
 function handleMouseMove(event, chartDiv) {
-    // Throttle updates
-    const now = Date.now();
-    if (now - crosshairState.lastUpdateTime < crosshairState.throttleDelay) {
-        return;
+    if (!crosshairState.rafPending) {
+        crosshairState.rafPending = requestAnimationFrame(() => {
+            crosshairState.rafPending = null;
+            processMouseMove(crosshairState.lastEvent, chartDiv);
+        });
     }
-    crosshairState.lastUpdateTime = now;
+    crosshairState.lastEvent = event;
+}
+
+/**
+ * Process mouse move - called once per animation frame
+ */
+function processMouseMove(event, chartDiv) {
+    if (!event) return;
 
     const coords = getPlotCoordinates(event, chartDiv);
     if (!coords) {
@@ -146,15 +222,55 @@ function handleMouseMove(event, chartDiv) {
         return;
     }
 
-    // Update crosshair lines
     updateCrosshairLines(coords.x, coords.y);
+    return;  // Stop here for now
 
-    // Update data point markers
+    // TEMP DISABLED: testing if crosshair lines cause CPU issue
+    // updateCrosshairLines(coords.x, coords.y);
+
     const xRounded = Math.round(coords.x);
-    updateDataMarkers(xRounded, chartDiv);
 
-    // Update info panel
-    updateInfoPanel(coords.x, coords.y, chartDiv);
+    // TEMP DISABLED: testing CPU issue - only crosshair lines active
+    // if (xRounded !== crosshairState.lastXRounded) {
+    //     crosshairState.lastXRounded = xRounded;
+    //
+    //     const traceData = findTraceDataAtX(xRounded, chartDiv);
+    //     updateDataMarkers(xRounded, chartDiv, traceData);
+    //     updateInfoPanel(xRounded, coords.y, chartDiv, traceData);
+    // }
+}
+
+/**
+ * Find data values for all traces at a given x position
+ * @returns {Map} Map of seriesName-aggType -> {seriesName, aggType, value}
+ */
+function findTraceDataAtX(xRounded, chartDiv) {
+    const traces = chartDiv.data || [];
+    const result = new Map();
+
+    for (const trace of traces) {
+        if (!trace.meta) continue;
+
+        const { seriesName, aggType } = trace.meta;
+        if (!seriesName || seriesName.includes('FloorShadow')) continue;
+
+        const xArray = trace.x || [];
+        const yArray = trace.y || [];
+
+        // Direct lookup - find exact x match
+        const idx = xArray.indexOf(xRounded);
+        if (idx !== -1) {
+            const value = yArray[idx];
+            if (value !== null && !isNaN(value)) {
+                const key = `${seriesName}-${aggType}`;
+                if (!result.has(key)) {
+                    result.set(key, { seriesName, aggType, value });
+                }
+            }
+        }
+    }
+
+    return result;
 }
 
 /**
@@ -196,6 +312,7 @@ function getPlotCoordinates(event, chartDiv) {
 
 /**
  * Get or create DOM crosshair line elements
+ * Uses GPU-accelerated positioning via transforms
  */
 function getOrCreateCrosshairLines() {
     const chartDiv = document.getElementById('chart');
@@ -213,18 +330,23 @@ function getOrCreateCrosshairLines() {
             height: 100%;
             pointer-events: none;
             z-index: 50;
+            contain: strict;
         `;
 
         const vLine = document.createElement('div');
         vLine.id = 'crosshair-v';
         vLine.style.cssText = `
             position: absolute;
+            top: 0;
+            left: 0;
             width: 1px;
             background: repeating-linear-gradient(
                 to bottom,
                 gray 0px, gray 4px,
                 transparent 4px, transparent 8px
             );
+            will-change: transform;
+            contain: layout paint;
             display: none;
         `;
 
@@ -232,12 +354,16 @@ function getOrCreateCrosshairLines() {
         hLine.id = 'crosshair-h';
         hLine.style.cssText = `
             position: absolute;
+            top: 0;
+            left: 0;
             height: 1px;
             background: repeating-linear-gradient(
                 to right,
                 gray 0px, gray 4px,
                 transparent 4px, transparent 8px
             );
+            will-change: transform;
+            contain: layout paint;
             display: none;
         `;
 
@@ -254,6 +380,7 @@ function getOrCreateCrosshairLines() {
 
 /**
  * Update crosshair lines on chart using DOM elements
+ * Uses CSS transforms for GPU-accelerated positioning
  */
 function updateCrosshairLines(xValue, yValue) {
     const chartDiv = document.getElementById('chart');
@@ -284,16 +411,14 @@ function updateCrosshairLines(xValue, yValue) {
     const yFraction = (yLog - yRange[0]) / (yRange[1] - yRange[0]);
     const yPixel = plotBottom - yFraction * plotHeight;
 
-    // Update vertical line
-    lines.vLine.style.left = `${xPixel}px`;
-    lines.vLine.style.top = `${plotTop}px`;
+    // Update vertical line using transform (GPU-accelerated)
     lines.vLine.style.height = `${plotHeight}px`;
+    lines.vLine.style.transform = `translate(${xPixel}px, ${plotTop}px)`;
     lines.vLine.style.display = 'block';
 
-    // Update horizontal line
-    lines.hLine.style.left = `${plotLeft}px`;
-    lines.hLine.style.top = `${yPixel}px`;
+    // Update horizontal line using transform (GPU-accelerated)
     lines.hLine.style.width = `${plotWidth}px`;
+    lines.hLine.style.transform = `translate(${plotLeft}px, ${yPixel}px)`;
     lines.hLine.style.display = 'block';
 }
 
@@ -415,13 +540,18 @@ function clearDataMarkers() {
 
 /**
  * Update data point markers at the current x position
+ * @param {number} xRounded - Rounded x position
+ * @param {HTMLElement} chartDiv - Chart element
+ * @param {Map} traceData - Pre-computed data from findTraceDataAtX
  */
-function updateDataMarkers(xRounded, chartDiv) {
+function updateDataMarkers(xRounded, chartDiv, traceData) {
     const container = getOrCreateMarkerContainer();
     if (!container) return;
 
     // Clear existing markers
     container.innerHTML = '';
+
+    if (!traceData || traceData.size === 0) return;
 
     const layout = chartDiv.layout;
     const rect = chartDiv.getBoundingClientRect();
@@ -441,78 +571,51 @@ function updateDataMarkers(xRounded, chartDiv) {
     const xFraction = (xRounded - xRange[0]) / (xRange[1] - xRange[0]);
     const xPixel = plotLeft + xFraction * plotWidth;
 
-    const traces = chartDiv.data || [];
+    // Use pre-computed trace data
+    for (const [key, data] of traceData) {
+        const { seriesName, value } = data;
 
-    traces.forEach(trace => {
-        if (!trace.meta) return;
+        if (value <= 0) continue;
 
-        const { seriesName, aggType } = trace.meta;
-        if (!seriesName || seriesName.includes('FloorShadow')) return;
-
-        // Find value at this x position
-        const xArray = trace.x || [];
-        const yArray = trace.y || [];
-
-        // Find closest x index
-        let closestIdx = -1;
-        let closestDist = Infinity;
-
-        for (let i = 0; i < xArray.length; i++) {
-            const dist = Math.abs(xArray[i] - xRounded);
-            if (dist < closestDist) {
-                closestDist = dist;
-                closestIdx = i;
-            }
+        // Determine series type for marker style
+        let seriesType;
+        if (seriesName === 'corrects') {
+            seriesType = 'corrects';
+        } else if (seriesName === 'errors') {
+            seriesType = 'errors';
+        } else if (seriesName === 'timing') {
+            seriesType = 'timing';
+        } else {
+            seriesType = seriesName;
         }
 
-        // Only show marker if within 0.5 of an x position
-        if (closestIdx >= 0 && closestDist <= 0.5) {
-            const value = yArray[closestIdx];
-            if (value !== null && !isNaN(value) && value > 0) {
-                // Determine series type for marker style
-                // Use actual series name for misc series to get correct size from chartState
-                let seriesType;
-                if (seriesName === 'corrects') {
-                    seriesType = 'corrects';
-                } else if (seriesName === 'errors') {
-                    seriesType = 'errors';
-                } else if (seriesName === 'timing') {
-                    seriesType = 'timing';
-                } else {
-                    // Keep the actual misc ID (e.g., 'misc1') for size lookup
-                    seriesType = seriesName;
-                }
+        // Calculate y pixel position (log scale)
+        const yLog = Math.log10(value);
+        const yFraction = (yLog - yRange[0]) / (yRange[1] - yRange[0]);
+        const yPixel = plotBottom - yFraction * plotHeight;
 
-                // Calculate y pixel position (log scale)
-                const yLog = Math.log10(value);
-                const yFraction = (yLog - yRange[0]) / (yRange[1] - yRange[0]);
-                const yPixel = plotBottom - yFraction * plotHeight;
-
-                // Create and position marker
-                const marker = createMarker(seriesType);
-                marker.style.left = `${xPixel}px`;
-                marker.style.top = `${yPixel}px`;
-                container.appendChild(marker);
-            }
-        }
-    });
+        // Create and position marker
+        const marker = createMarker(seriesType);
+        marker.style.left = `${xPixel}px`;
+        marker.style.top = `${yPixel}px`;
+        container.appendChild(marker);
+    }
 }
 
 /**
  * Update the info panel with data at current position
  */
-function updateInfoPanel(xValue, yValue, chartDiv) {
+function updateInfoPanel(xRounded, yValue, chartDiv, traceData) {
     const infoContent = document.getElementById('crosshair-info');
     if (!infoContent) return;
 
     // Get date from x position
-    const xRounded = Math.round(xValue);
     const date = xPositionToDate(xRounded);
 
     // Build info HTML
     let html = '';
 
-    // Date section - format per report: "Mon | 15", "Jan | 01", "2024"
+    // Date section
     if (date) {
         const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
         const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -533,55 +636,13 @@ function updateInfoPanel(xValue, yValue, chartDiv) {
     html += `<div class="crosshair-row"><span class="crosshair-label">y:</span><span class="crosshair-value">${formatValue(yValue)}</span></div>`;
     html += `</div>`;
 
-    // Data values section - query each trace
-    const traces = chartDiv.data || [];
-    const dataBySeriesAgg = {};
-
-    traces.forEach(trace => {
-        if (!trace.meta) return;
-
-        const { seriesName, aggType } = trace.meta;
-        if (!seriesName || seriesName.includes('FloorShadow')) return;
-
-        // Find value at this x position
-        const xArray = trace.x || [];
-        const yArray = trace.y || [];
-
-        // Find closest x index
-        let closestIdx = -1;
-        let closestDist = Infinity;
-
-        for (let i = 0; i < xArray.length; i++) {
-            const dist = Math.abs(xArray[i] - xRounded);
-            if (dist < closestDist) {
-                closestDist = dist;
-                closestIdx = i;
-            }
-        }
-
-        // Only use if within 0.5 of an x position
-        if (closestIdx >= 0 && closestDist <= 0.5) {
-            const value = yArray[closestIdx];
-            if (value !== null && !isNaN(value)) {
-                const key = `${seriesName}-${aggType}`;
-                if (!dataBySeriesAgg[key]) {
-                    dataBySeriesAgg[key] = {
-                        seriesName,
-                        aggType,
-                        value
-                    };
-                }
-            }
-        }
-    });
-
-    // Render data values
-    if (Object.keys(dataBySeriesAgg).length > 0) {
+    // Render data values from pre-computed traceData
+    if (traceData && traceData.size > 0) {
         html += `<div class="crosshair-section">`;
         html += `<div class="crosshair-heading">Series</div>`;
 
-        for (const key in dataBySeriesAgg) {
-            const { seriesName, aggType, value } = dataBySeriesAgg[key];
+        for (const [key, data] of traceData) {
+            const { seriesName, aggType, value } = data;
             const displayName = formatSeriesName(seriesName);
 
             // For timing, show reciprocal (timing floor value)
@@ -603,15 +664,29 @@ function updateInfoPanel(xValue, yValue, chartDiv) {
 }
 
 /**
- * Format series name for display
+ * Format series name for display - looks up custom name from chartState
  */
-function formatSeriesName(name) {
-    const nameMap = {
+function formatSeriesName(seriesId) {
+    // Look up the actual display name from trace styles
+    let config;
+
+    if (seriesId && seriesId.startsWith('misc')) {
+        config = chartState.traceStyles.misc[seriesId];
+    } else if (seriesId) {
+        config = chartState.traceStyles[seriesId];
+    }
+
+    if (config && config.raw && config.raw.seriesName) {
+        return config.raw.seriesName;
+    }
+
+    // Fallback to defaults if no custom name found
+    const fallbackMap = {
         'corrects': 'Correct',
         'errors': 'Incorrect',
         'timing': 'Timing'
     };
-    return nameMap[name] || name;
+    return fallbackMap[seriesId] || seriesId;
 }
 
 

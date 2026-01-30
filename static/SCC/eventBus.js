@@ -100,7 +100,15 @@ export const EVENTS = {
     DATA_IMPORT_STARTED: 'data:import_started',
     DATA_IMPORT_FILE_PARSED: 'data:import_file_parsed',
     DATA_IMPORT_COMPLETED: 'data:import_completed',
-    DATA_IMPORT_FAILED: 'data:import_failed'
+    DATA_IMPORT_FAILED: 'data:import_failed',
+
+    // Plotly Wrapper Events (guaranteed to fire after render complete)
+    PLOTLY_RELAYOUT_COMPLETE: 'plotly:relayout_complete',
+    PLOTLY_REACT_COMPLETE: 'plotly:react_complete',
+    PLOTLY_RESTYLE_COMPLETE: 'plotly:restyle_complete',
+    PLOTLY_NEWPLOT_COMPLETE: 'plotly:newplot_complete',
+    PLOTLY_ADDTRACES_COMPLETE: 'plotly:addtraces_complete',
+    PLOTLY_DELETETRACES_COMPLETE: 'plotly:deletetraces_complete'
 };
 
 /**
