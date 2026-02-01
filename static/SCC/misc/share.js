@@ -2,8 +2,8 @@
 // Handles chart screenshot and data export functionality
 
 import { chartState } from '../chartState.js';
-import { createToast } from '../util/toaster.js';
-import { icons } from '../util/icons.js';
+import { createToast } from '../ui/toaster.js';
+import { icons } from '../ui/icons.js';
 import { getFirstConfig } from '../series/traceStyles.js';
 
 /**

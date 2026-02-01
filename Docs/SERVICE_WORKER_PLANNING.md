@@ -100,7 +100,7 @@ static/SCC/
 │   ├── openCeleratorImport.js   # Celerator format
 │   ├── jsonBackwardsCompatibility.js
 │   ├── plotlyWrapper.js         # Plotly abstraction
-│   └── resize_chart/resize-chart.js
+│   └── resize-chart.js
 │
 ├── storage/
 │   └── chartStorage.js          # IndexedDB persistence

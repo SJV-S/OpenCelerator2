@@ -17,8 +17,8 @@
 
 import { chartState } from '../chartState.js';
 import { CORRECTS, ERRORS } from '../config.js';
-import { xPositionToDate } from './dates.js';
-import { formatValue } from './format.js';
+import { xPositionToDate } from '../util/dates.js';
+import { formatValue } from '../util/format.js';
 
 // =============================================================================
 // State
@@ -318,7 +318,7 @@ function getMarkerSize(seriesId) {
         chartSize = config?.markerSize ?? 8;
         style = MARKER_STYLES.corrects;
     } else if (seriesId === ERRORS) {
-        chartSize = config?.textSize ?? 20;
+        chartSize = config?.markerSize ?? 20;
         style = MARKER_STYLES.errors;
     } else if (seriesId === 'timing') {
         chartSize = config?.markerSize ?? 30;

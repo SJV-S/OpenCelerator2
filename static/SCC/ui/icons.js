@@ -167,3 +167,37 @@ export const icons = {
         </svg>
     `
 };
+
+/**
+ * Apply SVG cursor to chart elements
+ * @param {HTMLElement} container - Chart container
+ * @param {string|Function} svgSource - SVG source
+ * @param {Object} options - Cursor options
+ */
+export function applySvgCursor(container, svgSource, options = {}) {
+    const {size = 32, hotspotX = 16, hotspotY = 16} = options;
+    const svgString = typeof svgSource === 'function' ? svgSource(size) : svgSource;
+    const encoded = encodeURIComponent(svgString.replace(/\s+/g, ' ').trim());
+    const cursor = `url("data:image/svg+xml,${encoded}") ${hotspotX} ${hotspotY}, crosshair`;
+
+    const plotArea = container.querySelector('.plotly .drag');
+    if (plotArea) {
+        plotArea.style.cursor = cursor;
+    }
+
+    const svgLayer = container.querySelector('.plotly .svg-container');
+    if (svgLayer) {
+        svgLayer.style.cursor = cursor;
+    }
+}
+
+/**
+ * Restore default cursor
+ * @param {HTMLElement} container - Chart container
+ */
+export function restoreCursor(container) {
+    ['.plotly .drag', '.plotly .svg-container'].forEach(sel => {
+        const el = container.querySelector(sel);
+        if (el) el.style.cursor = '';
+    });
+}

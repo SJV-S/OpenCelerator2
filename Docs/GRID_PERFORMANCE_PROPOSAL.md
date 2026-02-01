@@ -150,7 +150,7 @@ Plotly.restyle(chartDiv, { visible: false }, gridTraceIndices);
 
 ### Phase 3: Update Resize Logic
 
-**File:** `static/SCC/util/resize_chart/resize-chart.js`
+**File:** `static/SCC/util/resize-chart.js`
 
 Review and update any code that references grid shapes by name. Trace-based grid may require different handling for:
 - Line width scaling
@@ -182,7 +182,7 @@ Apply the same changes to:
 
 ### JavaScript (Runtime)
 - `static/SCC/misc/grid.js` - Grid visibility toggle
-- `static/SCC/util/resize_chart/resize-chart.js` - Resize handling
+- `static/SCC/util/resize-chart.js` - Resize handling
 - `static/SCC/util/panning_controls.js` - May need updates for dynamic spines
 
 ### Templates (If Any Reference Grid)

@@ -10,10 +10,9 @@
  */
 
 import { chartState } from '../chartState.js';
-import { createToast, createConfirmToast, createInfoToast, updateToastMessage } from '../util/toaster.js';
+import { createToast, createConfirmToast, createInfoToast, updateToastMessage } from '../ui/toaster.js';
 import { xPositionToDate, timestampsToXPositions } from '../util/dates.js';
-import { icons } from '../util/icons.js';
-import { applySvgCursor, restoreCursor } from '../util/cursorIcon.js';
+import { icons, applySvgCursor, restoreCursor } from '../ui/icons.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 
 // Cut lines mode state (ephemeral UI state)

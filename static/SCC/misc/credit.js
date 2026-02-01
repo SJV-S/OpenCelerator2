@@ -2,10 +2,10 @@
 // Renders credit lines in the chart's bottom margin and handles editing
 
 import { chartState } from '../chartState.js';
+import { MOBILE_BREAKPOINT, COLORS } from '../config.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 
-const CREDIT_COLOR = '#05c3de';
-const MOBILE_BREAKPOINT = 768;
+const CREDIT_COLOR = COLORS.FAN; // Using same color as fan
 const MAX_CREDIT_LENGTH = 160;
 
 function isMobile() {

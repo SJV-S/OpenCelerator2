@@ -60,7 +60,7 @@
 
 import { chartState } from '../chartState.js';
 import { eventBus, EVENTS } from '../eventBus.js';
-import { createToast } from './toaster.js';
+import { createToast } from '../ui/toaster.js';
 
 /**
  * Find the nearest Monday before (or at) a given date.
@@ -347,6 +347,8 @@ function xPositionToDate(xPosition) {
  * @returns {number} X-position for the chart
  */
 function dateToXPosition(date) {
+    if (!chartState.startDate) return 0;
+
     const chartType = (chartState.chartType || 'Daily').toLowerCase();
     const inputDate = parseLocalDate(date);
     const startDate = parseLocalDate(chartState.startDate);

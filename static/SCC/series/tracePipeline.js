@@ -11,8 +11,10 @@
  */
 
 import { chartState } from '../chartState.js';
-import { CORRECTS, ERRORS, AUTO_AGG_THRESHOLD } from '../config.js';
+import { CORRECTS, ERRORS, LIMITS, CHART_MATH } from '../config.js';
 import { median, mean, min, max, first, last, sum, aggregateByX } from '../util/agg.js';
+
+const AUTO_AGG_THRESHOLD = LIMITS.AUTO_AGG_THRESHOLD;
 
 // ============================================================================
 // TRACE CREATION FUNCTIONS
@@ -30,7 +32,7 @@ function correctsTrace(xValues, yValues, config) {
         marker: {
             symbol: config.markerSymbol,
             size: config.markerSize,
-            color: config.markerFaceColor,
+            color: config.markerColor,
             line: {
                 color: config.markerEdgeColor,
                 width: 1
@@ -55,7 +57,7 @@ function errorTrace(xValues, yValues, config) {
         text: Array(xValues.length).fill('x'),
         textposition: 'middle center',
         textfont: {
-            size: config.textSize,
+            size: config.markerSize,
             color: config.markerColor
         },
         name: config.seriesName,
@@ -99,7 +101,7 @@ function miscTrace(xValues, yValues, config) {
         marker: {
             symbol: config.markerSymbol,
             size: config.markerSize,
-            color: config.markerFaceColor,
+            color: config.markerColor,
             line: {
                 color: config.markerEdgeColor,
                 width: 1
@@ -113,25 +115,11 @@ function miscTrace(xValues, yValues, config) {
 }
 
 /**
- * Floor shadow trace functions - inherit all styling from original traces
- * but force lines off (markers/text only)
+ * Generic floor shadow trace - wraps any base trace function,
+ * stripping lines and hiding from legend
  */
-function correctsFloorTrace(xValues, yValues, config) {
-    const trace = correctsTrace(xValues, yValues, config);
-    trace.mode = trace.mode.replace('lines+', '').replace('+lines', '');
-    trace.showlegend = false;
-    return trace;
-}
-
-function errorsFloorTrace(xValues, yValues, config) {
-    const trace = errorTrace(xValues, yValues, config);
-    trace.mode = trace.mode.replace('lines+', '').replace('+lines', '');
-    trace.showlegend = false;
-    return trace;
-}
-
-function miscFloorTrace(xValues, yValues, config) {
-    const trace = miscTrace(xValues, yValues, config);
+function createFloorShadowTrace(baseTraceFn, xValues, yValues, config) {
+    const trace = baseTraceFn(xValues, yValues, config);
     trace.mode = trace.mode.replace('lines+', '').replace('+lines', '');
     trace.showlegend = false;
     return trace;
@@ -217,7 +205,7 @@ function placeBelowFloor(freq, timing) {
     }
     const threshold = 1 / floorTiming;
     if (freq === 0 || freq < threshold) {
-        return threshold * 0.75;
+        return threshold * CHART_MATH.FLOOR_MULTIPLIER;
     }
     return freq;
 }
@@ -383,7 +371,7 @@ function createFloorShadowTraces(xPositions, frequencies) {
     if (hasValidData(frequencies.correctsFloor)) {
         Object.entries(chartState.traceStyles[CORRECTS]).forEach(([aggType, config]) => {
             const { x, y } = applyAggregation(xPositions, frequencies.correctsFloor, aggType);
-            const trace = correctsFloorTrace(x, y, config);
+            const trace = createFloorShadowTrace(correctsTrace, x, y, config);
             trace.meta = {seriesName: 'correctsFloorShadow', aggType: aggType};
             floorShadowTraces.push(trace);
         });
@@ -393,7 +381,7 @@ function createFloorShadowTraces(xPositions, frequencies) {
     if (hasValidData(frequencies.errorsFloor)) {
         Object.entries(chartState.traceStyles[ERRORS]).forEach(([aggType, config]) => {
             const { x, y } = applyAggregation(xPositions, frequencies.errorsFloor, aggType);
-            const trace = errorsFloorTrace(x, y, config);
+            const trace = createFloorShadowTrace(errorTrace, x, y, config);
             trace.meta = {seriesName: 'errorsFloorShadow', aggType: aggType};
             floorShadowTraces.push(trace);
         });
@@ -403,7 +391,7 @@ function createFloorShadowTraces(xPositions, frequencies) {
     Object.entries(chartState.traceStyles.misc).forEach(([miscId, aggConfigs]) => {
         Object.entries(aggConfigs).forEach(([aggType, config]) => {
             const { x, y } = applyAggregation(xPositions, frequencies.miscFloor[miscId], aggType);
-            const trace = miscFloorTrace(x, y, config);
+            const trace = createFloorShadowTrace(miscTrace, x, y, config);
             trace.meta = {seriesName: `${miscId}FloorShadow`, aggType: aggType};
             floorShadowTraces.push(trace);
         });
@@ -493,9 +481,7 @@ export {
     errorTrace,
     timingFloorTrace,
     miscTrace,
-    correctsFloorTrace,
-    errorsFloorTrace,
-    miscFloorTrace,
+    createFloorShadowTrace,
     // Aggregation and frequency logic
     applyAggregation,
     timingToFrequency,

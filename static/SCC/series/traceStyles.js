@@ -9,16 +9,16 @@
  */
 
 import { chartState, defaultCorrectTraceConfig, defaultErrorTraceConfig, defaultTimingTraceConfig, createMiscTraceConfig } from '../chartState.js';
-import { CORRECTS, ERRORS, TIMING } from '../config.js';
+import { CORRECTS, ERRORS, TIMING, LIMITS, LINE_DEFAULTS } from '../config.js';
 import { getMiscSeriesIds } from './miscSeries.js';
-import { createToast } from '../util/toaster.js';
+import { createToast } from '../ui/toaster.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
 
-const MAX_TAB_NAME_LENGTH = 17;
+const MAX_TAB_NAME_LENGTH = LIMITS.MAX_TAB_NAME_LENGTH;
 
 /**
  * Truncate a series name for display in tab buttons.
@@ -140,45 +140,24 @@ function initializeSeriesInputs(seriesName) {
             block.dataset.agg = aggType;
         }
 
-        // Set common fields
+        // Set common fields (same for all series - standardized property names)
         const seriesNameInput = block.querySelector('.series-name-input');
         const showLineInput = block.querySelector('.show-line-input');
         const lineWidthInput = block.querySelector('.line-width-input');
         const lineColorInput = block.querySelector('.line-color-input');
+        const markerSizeInput = block.querySelector('.marker-size-input');
+        const markerColorInput = block.querySelector('.marker-color-input');
+        const markerEdgeColorInput = block.querySelector('.marker-edge-color-input');
+        const markerSymbolInput = block.querySelector('.marker-symbol-input');
 
         if (seriesNameInput) seriesNameInput.value = config.seriesName;
         if (showLineInput) showLineInput.checked = config.showLine;
         if (lineWidthInput) lineWidthInput.value = config.lineWidth;
         if (lineColorInput) lineColorInput.value = config.lineColor;
-
-        // Set series-specific fields
-        if (seriesName === ERRORS) {
-            const textSizeInput = block.querySelector('.text-size-input');
-            const markerColorInput = block.querySelector('.marker-color-input');
-            if (textSizeInput) textSizeInput.value = config.textSize;
-            if (markerColorInput) markerColorInput.value = config.markerColor;
-        } else if (seriesName === TIMING) {
-            const markerSizeInput = block.querySelector('.marker-size-input');
-            const markerColorInput = block.querySelector('.marker-color-input');
-            if (markerSizeInput) markerSizeInput.value = config.markerSize;
-            if (markerColorInput) markerColorInput.value = config.markerColor;
-        } else if (seriesName === CORRECTS) {
-            const markerSizeInput = block.querySelector('.marker-size-input');
-            const markerFaceColorInput = block.querySelector('.marker-face-color-input');
-            const markerEdgeColorInput = block.querySelector('.marker-edge-color-input');
-            if (markerSizeInput) markerSizeInput.value = config.markerSize;
-            if (markerFaceColorInput) markerFaceColorInput.value = config.markerFaceColor;
-            if (markerEdgeColorInput) markerEdgeColorInput.value = config.markerEdgeColor;
-        } else {
-            const markerSizeInput = block.querySelector('.marker-size-input');
-            const markerSymbolInput = block.querySelector('.marker-symbol-input');
-            const markerFaceColorInput = block.querySelector('.marker-face-color-input');
-            const markerEdgeColorInput = block.querySelector('.marker-edge-color-input');
-            if (markerSizeInput) markerSizeInput.value = config.markerSize;
-            if (markerSymbolInput) markerSymbolInput.value = config.markerSymbol;
-            if (markerFaceColorInput) markerFaceColorInput.value = config.markerFaceColor;
-            if (markerEdgeColorInput) markerEdgeColorInput.value = config.markerEdgeColor;
-        }
+        if (markerSizeInput) markerSizeInput.value = config.markerSize;
+        if (markerColorInput) markerColorInput.value = config.markerColor;
+        if (markerEdgeColorInput) markerEdgeColorInput.value = config.markerEdgeColor;
+        if (markerSymbolInput) markerSymbolInput.value = config.markerSymbol;
     });
 
     updateButtonVisibility(seriesName);
@@ -213,31 +192,17 @@ function applyTraceConfig(seriesName) {
     blocks.forEach(block => {
         const aggType = block.querySelector('.agg-type-select')?.value || 'raw';
 
+        // All series use standardized property names
         const config = {
             seriesName: block.querySelector('.series-name-input')?.value || seriesName,
             showLine: block.querySelector('.show-line-input')?.checked ?? true,
-            lineWidth: parseFloat(block.querySelector('.line-width-input')?.value) || 0.7,
-            lineColor: block.querySelector('.line-color-input')?.value || '#000000'
+            lineWidth: parseFloat(block.querySelector('.line-width-input')?.value) || LINE_DEFAULTS.TRACE_LINE_WIDTH,
+            lineColor: block.querySelector('.line-color-input')?.value || '#000000',
+            markerSize: parseInt(block.querySelector('.marker-size-input')?.value) || 8,
+            markerColor: block.querySelector('.marker-color-input')?.value || '#000000',
+            markerEdgeColor: block.querySelector('.marker-edge-color-input')?.value || '#000000',
+            markerSymbol: block.querySelector('.marker-symbol-input')?.value || 'circle'
         };
-
-        // Add series-specific fields
-        if (seriesName === ERRORS) {
-            config.textSize = parseInt(block.querySelector('.text-size-input')?.value) || 20;
-            config.markerColor = block.querySelector('.marker-color-input')?.value || '#000000';
-        } else if (seriesName === TIMING) {
-            config.markerSize = parseInt(block.querySelector('.marker-size-input')?.value) || 30;
-            config.markerColor = block.querySelector('.marker-color-input')?.value || '#000000';
-        } else if (seriesName === CORRECTS) {
-            config.markerSize = parseInt(block.querySelector('.marker-size-input')?.value) || 8;
-            config.markerSymbol = 'circle';
-            config.markerFaceColor = block.querySelector('.marker-face-color-input')?.value || '#000000';
-            config.markerEdgeColor = block.querySelector('.marker-edge-color-input')?.value || '#000000';
-        } else {
-            config.markerSize = parseInt(block.querySelector('.marker-size-input')?.value) || 8;
-            config.markerSymbol = block.querySelector('.marker-symbol-input')?.value || 'circle';
-            config.markerFaceColor = block.querySelector('.marker-face-color-input')?.value || '#000000';
-            config.markerEdgeColor = block.querySelector('.marker-edge-color-input')?.value || '#000000';
-        }
 
         // Store this config under its aggregation type
         if (isMiscSeries) {
@@ -599,8 +564,8 @@ function createMiscSeriesTab(id, index) {
         const symbolInput = panel.querySelector('.marker-symbol-input');
         if (symbolInput) symbolInput.value = config.markerSymbol;
 
-        const faceColorInput = panel.querySelector('.marker-face-color-input');
-        if (faceColorInput) faceColorInput.value = config.markerFaceColor;
+        const colorInput = panel.querySelector('.marker-color-input');
+        if (colorInput) colorInput.value = config.markerColor;
     }
 
     panel.querySelector('.apply-misc-btn')?.addEventListener('click', () => applyTraceConfig(id));

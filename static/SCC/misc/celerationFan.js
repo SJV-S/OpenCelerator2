@@ -78,15 +78,13 @@
  */
 
 import { chartState } from '../chartState.js';
+import { MOBILE_BREAKPOINT, COLORS, CHART_MATH } from '../config.js';
 import { eventBus, EVENTS } from '../eventBus.js';
-import { CHART_CONFIG } from '../util/resize_chart/resize-chart.js';
+import { CHART_CONFIG } from '../util/resize-chart.js';
 
 const CEL_VALUES = [16, 4, 2, 1.4, 1, 1/1.4, 1/2, 1/4, 1/16];
 const LABELS = ['×16', '×4', '×2', '×1.4', '×1', '÷1.4', '÷2', '÷4', '÷16'];
 const PERIOD_LABELS = { Daily: 'per week', Weekly: 'per month', Monthly: 'per 6 months', Yearly: 'per 5 years' };
-
-const FAN_COLOR = '#05c3de';
-const MOBILE_BREAKPOINT = 768;
 
 /**
  * Check if current viewport is mobile-sized
@@ -99,7 +97,7 @@ function isMobile() {
  * Step 1: Calculate angle (same formula for line AND text)
  */
 function getAngleDegrees(cel) {
-    return Math.atan(Math.log10(cel) / (Math.log10(2) / Math.tan(34 * Math.PI / 180))) * (180 / Math.PI);
+    return Math.atan(Math.log10(cel) / (Math.log10(2) / Math.tan(CHART_MATH.ANGLE_DEGREES * Math.PI / 180))) * (180 / Math.PI);
 }
 
 /**
@@ -165,7 +163,7 @@ export function generateFanElements(layout, isMinuteChart, chartType) {
             x0: p0.x, y0: p0.y,
             x1: p1.x, y1: p1.y,
             xref: 'paper', yref: 'paper',
-            line: { color: FAN_COLOR, width: 1.25 }
+            line: { color: COLORS.FAN, width: 1.25 }
         });
 
         // Step 3: Text position - SAME FORMULA, extended dx
@@ -191,7 +189,7 @@ export function generateFanElements(layout, isMinuteChart, chartType) {
             ax: 0,
             ay: 0,
             arrowcolor: 'rgba(0,0,0,0)',
-            font: { size: 10, color: FAN_COLOR, weight: 'bold' },
+            font: { size: 10, color: COLORS.FAN, weight: 'bold' },
             textangle: -visualAngleDeg,
             xanchor: 'center',
             yanchor: 'middle'
@@ -208,7 +206,7 @@ export function generateFanElements(layout, isMinuteChart, chartType) {
         xref: 'paper', yref: 'paper',
         text: '<b>Standard<br>change</b>',
         showarrow: false,
-        font: { size: 11, color: FAN_COLOR },
+        font: { size: 11, color: COLORS.FAN },
         xanchor: 'center', yanchor: 'bottom'
     });
 
@@ -222,7 +220,7 @@ export function generateFanElements(layout, isMinuteChart, chartType) {
         xref: 'paper', yref: 'paper',
         text: `<b>${periodLabel}</b>`,
         showarrow: false,
-        font: { size: 11, color: FAN_COLOR },
+        font: { size: 11, color: COLORS.FAN },
         xanchor: 'center', yanchor: 'top'
     });
 
@@ -375,7 +373,7 @@ function updateFanTooltip(show, x, y) {
         if (!fanHoverState.tooltip) {
             fanHoverState.tooltip = document.createElement('div');
             fanHoverState.tooltip.className = 'fixed px-2 py-1 text-xs rounded pointer-events-none z-[9999]';
-            fanHoverState.tooltip.style.cssText = `background: ${FAN_COLOR}; color: white;`;
+            fanHoverState.tooltip.style.cssText = `background: ${COLORS.FAN}; color: white;`;
             fanHoverState.tooltip.textContent = 'Drag to move';
             document.body.appendChild(fanHoverState.tooltip);
         }
@@ -395,7 +393,7 @@ function updateFanHighlight(chartDiv, isHovered) {
 
     (chartDiv.layout.shapes || []).forEach((shape, i) => {
         if (shape.name === 'fan-hitarea') {
-            updates[`shapes[${i}].fillcolor`] = isHovered ? 'rgba(5, 195, 222, 0.1)' : 'rgba(0,0,0,0)';
+            updates[`shapes[${i}].fillcolor`] = isHovered ? COLORS.FAN_HIGHLIGHT : 'rgba(0,0,0,0)';
         }
     });
 

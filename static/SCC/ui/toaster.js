@@ -2,13 +2,10 @@
  * toaster.js
  * Generalized toast notification utility for displaying temporary messages and confirmations
  *
- * Standard colors:
- * - Background: white
- * - Border: #6ad1e3 (default, can be customized)
- * - Text: #374151
- * - Primary button: #6ad1e3 (default, can be customized)
- * - Secondary button: #f3f4f6
+ * Colors and layout values are imported from config.js for centralized management.
  */
+
+import { COLORS, LAYOUT, FONT_SIZES, TIMING_MS, LIMITS } from '../config.js';
 
 // Track active toasts per position for stacking
 const activeToasts = {};
@@ -45,7 +42,7 @@ function ensureTrackingArray(position) {
     }
 }
 
-const TOAST_GAP = 10;
+const TOAST_GAP = LAYOUT.TOAST_GAP;
 
 /**
  * Recalculates and applies positions for all toasts at a position
@@ -58,7 +55,7 @@ function repositionToasts(position) {
     let offset = 0;
 
     toasts.forEach((toast, index) => {
-        const height = toast.offsetHeight || toast._expectedHeight || 60;
+        const height = toast.offsetHeight || toast._expectedHeight || LAYOUT.TOAST_EXPECTED_HEIGHT;
 
         if (isBottomPosition) {
             toast.style.top = 'auto';
@@ -97,7 +94,7 @@ function untrackToast(toast, position) {
  * @param {string} [options.buttons[].type='secondary'] - Button type: 'primary' or 'secondary'
  * @param {string} [options.buttons[].backgroundColor] - Custom background color (overrides type)
  * @param {string} [options.buttons[].hoverColor] - Custom hover color
- * @param {string} [options.borderColor='#6ad1e3'] - Border color
+ * @param {string} [options.borderColor=COLORS.PRIMARY] - Border color
  * @param {string} [options.layout='vertical'] - Layout direction: 'horizontal' or 'vertical'
  * @param {number} [options.duration] - Optional duration in milliseconds before auto-dismiss (no auto-dismiss if not specified)
  * @param {Object} [options.stateRef] - Optional state object to store toast reference
@@ -109,7 +106,7 @@ function createToast(options) {
     const {
         message,
         buttons = [],
-        borderColor = '#6ad1e3',
+        borderColor = COLORS.PRIMARY,
         layout = 'vertical',
         duration = null,
         stateRef = null,
@@ -125,7 +122,7 @@ function createToast(options) {
     // Calculate stack offset from existing toasts
     let stackOffset = 0;
     activeToasts[position].forEach(existingToast => {
-        const height = existingToast.offsetHeight || existingToast._expectedHeight || 60;
+        const height = existingToast.offsetHeight || existingToast._expectedHeight || LAYOUT.TOAST_EXPECTED_HEIGHT;
         stackOffset += height + TOAST_GAP;
     });
 
@@ -151,17 +148,17 @@ function createToast(options) {
         bottom: ${bottomValue};
         right: ${rightValue};
         left: ${leftValue};
-        background-color: white;
-        border: 2px solid ${borderColor};
-        border-radius: 8px;
-        padding: 12px 16px;
+        background-color: ${COLORS.BACKGROUND};
+        border: ${LAYOUT.TOAST_BORDER_WIDTH} solid ${borderColor};
+        border-radius: ${LAYOUT.TOAST_BORDER_RADIUS};
+        padding: ${LAYOUT.TOAST_PADDING};
         display: flex;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         font-family: Arial, sans-serif;
         pointer-events: auto;
         opacity: 0;
         transform: translateX(${slideDirection});
-        transition: transform 0.3s ease-out, opacity 0.3s ease-out, top 0.2s ease-out;
+        transition: transform ${TIMING_MS.TOAST_ANIMATION}ms ease-out, opacity ${TIMING_MS.TOAST_ANIMATION}ms ease-out, top 0.2s ease-out;
     `;
 
     // Layout-specific styles
@@ -175,8 +172,8 @@ function createToast(options) {
     const messageElement = document.createElement(layout === 'horizontal' ? 'span' : 'div');
     messageElement.textContent = message;
     messageElement.style.cssText = `
-        color: #374151;
-        font-size: 14px;
+        color: ${COLORS.TEXT};
+        font-size: ${FONT_SIZES.TOAST}px;
         font-weight: 500;
     `;
 
@@ -217,7 +214,7 @@ function createToast(options) {
     }
 
     // Store expected height for repositioning calculations
-    toast._expectedHeight = 60;
+    toast._expectedHeight = LAYOUT.TOAST_EXPECTED_HEIGHT;
 
     // Add to tracking array
     activeToasts[position].push(toast);
@@ -297,10 +294,10 @@ function createButton(config, defaultPrimaryColor) {
         borderStyle = 'none';
     } else {
         // Secondary button (gray)
-        bgColor = '#f3f4f6';
-        bgHoverColor = '#e5e7eb';
-        textColor = '#374151';
-        borderStyle = '1px solid #d1d5db';
+        bgColor = COLORS.BUTTON_SECONDARY_BG;
+        bgHoverColor = COLORS.BUTTON_SECONDARY_HOVER;
+        textColor = COLORS.TEXT;
+        borderStyle = `1px solid ${COLORS.BORDER_LIGHT}`;
     }
 
     button.style.cssText = `
@@ -308,9 +305,9 @@ function createButton(config, defaultPrimaryColor) {
         background-color: ${bgColor};
         color: ${textColor};
         border: ${borderStyle};
-        border-radius: 6px;
+        border-radius: ${LAYOUT.BUTTON_BORDER_RADIUS};
         padding: 8px 16px;
-        font-size: 14px;
+        font-size: ${FONT_SIZES.TOAST}px;
         font-weight: 500;
         cursor: pointer;
         transition: background-color 0.2s;
@@ -332,7 +329,7 @@ function createButton(config, defaultPrimaryColor) {
 
 /**
  * Darkens a hex color by a percentage
- * @param {string} color - Hex color (e.g., '#6ad1e3')
+ * @param {string} color - Hex color (e.g., COLORS.PRIMARY)
  * @param {number} percent - Percentage to darken (0-100)
  * @returns {string} Darkened hex color
  * @private
@@ -389,7 +386,7 @@ function removeAllToasts() {
  * @param {Function} options.onCancel - Cancel button handler
  * @param {string} [options.messageId] - Optional message element ID for updates
  * @param {Object} [options.stateRef] - Optional state reference
- * @param {string} [options.borderColor='#6ad1e3'] - Border color
+ * @param {string} [options.borderColor=COLORS.PRIMARY] - Border color
  * @param {string} [options.position='top-right'] - Position: 'top-right', 'top-left', 'bottom-right', 'bottom-left'
  * @returns {HTMLElement} The created toast element
  */
@@ -404,7 +401,7 @@ function createInfoToast(options) {
             }
         ],
         layout: 'horizontal',
-        borderColor: options.borderColor || '#6ad1e3',
+        borderColor: options.borderColor || COLORS.PRIMARY,
         stateRef: options.stateRef,
         position: options.position
     });
@@ -419,13 +416,13 @@ function createInfoToast(options) {
  * @param {string} [options.yesLabel='Yes'] - Yes button label
  * @param {string} [options.noLabel='No'] - No button label
  * @param {Object} [options.stateRef] - Optional state reference
- * @param {string} [options.borderColor='#6ad1e3'] - Border color
+ * @param {string} [options.borderColor=COLORS.PRIMARY] - Border color
  * @param {string} [options.primaryColor] - Custom primary button color
  * @param {string} [options.position='top-right'] - Position: 'top-right', 'top-left', 'bottom-right', 'bottom-left'
  * @returns {HTMLElement} The created toast element
  */
 function createConfirmToast(options) {
-    const borderColor = options.borderColor || '#6ad1e3';
+    const borderColor = options.borderColor || COLORS.PRIMARY;
     const primaryColor = options.primaryColor || borderColor;
 
     return createToast({
@@ -458,7 +455,7 @@ function createConfirmToast(options) {
  * @param {Function} options.onSubmit - Submit button handler (receives text value)
  * @param {Function} options.onCancel - Cancel button handler
  * @param {number} [options.maxLength=50] - Maximum input length
- * @param {string} [options.borderColor='#6ad1e3'] - Border color
+ * @param {string} [options.borderColor=COLORS.PRIMARY] - Border color
  * @param {Object} [options.stateRef] - Optional state reference
  * @param {string} [options.position='top-right'] - Position for stacking
  * @returns {HTMLElement} The created overlay element
@@ -469,8 +466,8 @@ function createTextInputDialog(options) {
         placeholder = 'Enter text...',
         onSubmit,
         onCancel,
-        maxLength = 50,
-        borderColor = '#6ad1e3',
+        maxLength = LIMITS.TEXT_INPUT_MAX_LENGTH,
+        borderColor = COLORS.PRIMARY,
         stateRef = null,
         position = 'top-right'
     } = options;
@@ -483,7 +480,7 @@ function createTextInputDialog(options) {
 
     let stackOffset = 0;
     activeToasts[position].forEach(existingToast => {
-        const height = existingToast.offsetHeight || existingToast._expectedHeight || 60;
+        const height = existingToast.offsetHeight || existingToast._expectedHeight || LAYOUT.TOAST_EXPECTED_HEIGHT;
         stackOffset += height + TOAST_GAP;
     });
 
@@ -505,26 +502,26 @@ function createTextInputDialog(options) {
         bottom: ${bottomValue};
         right: ${rightValue};
         left: ${leftValue};
-        background: white;
+        background: ${COLORS.BACKGROUND};
         padding: 15px 20px;
-        border: 2px solid ${borderColor};
-        border-radius: 8px;
+        border: ${LAYOUT.TOAST_BORDER_WIDTH} solid ${borderColor};
+        border-radius: ${LAYOUT.TOAST_BORDER_RADIUS};
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
         min-width: 250px;
         pointer-events: auto;
         opacity: 0;
         transform: translateX(${slideDirection});
-        transition: transform 0.3s ease-out, opacity 0.3s ease-out, top 0.2s ease-out;
+        transition: transform ${TIMING_MS.TOAST_ANIMATION}ms ease-out, opacity ${TIMING_MS.TOAST_ANIMATION}ms ease-out, top 0.2s ease-out;
     `;
 
     // Create elements
     const heading = document.createElement('h3');
-    heading.style.cssText = 'margin: 0 0 10px 0; color: #374151; font-size: 14px; font-weight: bold;';
+    heading.style.cssText = `margin: 0 0 10px 0; color: ${COLORS.TEXT_HEADING}; font-size: ${FONT_SIZES.TOAST}px; font-weight: bold;`;
     heading.textContent = title;
 
     const input = document.createElement('input');
     input.type = 'text';
-    input.style.cssText = 'width: 100%; padding: 8px; margin-bottom: 10px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;';
+    input.style.cssText = `width: 100%; padding: 8px; margin-bottom: 10px; font-size: ${FONT_SIZES.TOAST}px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;`;
     input.placeholder = placeholder;
     input.maxLength = maxLength;
 
@@ -532,11 +529,11 @@ function createTextInputDialog(options) {
     buttonContainer.style.cssText = 'display: flex; gap: 10px;';
 
     const submitBtn = document.createElement('button');
-    submitBtn.style.cssText = `flex: 1; padding: 8px; background: ${borderColor}; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;`;
+    submitBtn.style.cssText = `flex: 1; padding: 8px; background: ${borderColor}; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: ${FONT_SIZES.TOAST}px;`;
     submitBtn.textContent = 'Submit';
 
     const cancelBtn = document.createElement('button');
-    cancelBtn.style.cssText = 'flex: 1; padding: 8px; background: #ccc; color: black; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;';
+    cancelBtn.style.cssText = `flex: 1; padding: 8px; background: #ccc; color: black; border: none; border-radius: 4px; cursor: pointer; font-size: ${FONT_SIZES.TOAST}px;`;
     cancelBtn.textContent = 'Cancel';
 
     buttonContainer.appendChild(submitBtn);
@@ -546,7 +543,7 @@ function createTextInputDialog(options) {
     overlay.appendChild(buttonContainer);
 
     // Add to tracking and append to body
-    overlay._expectedHeight = 60;
+    overlay._expectedHeight = LAYOUT.TOAST_EXPECTED_HEIGHT;
     activeToasts[position].push(overlay);
     document.body.appendChild(overlay);
 
@@ -612,7 +609,7 @@ function createTextInputDialog(options) {
  * @param {number} [options.min] - Minimum allowed value
  * @param {number} [options.max] - Maximum allowed value
  * @param {number|string} [options.step='any'] - Step size for number input
- * @param {string} [options.borderColor='#6ad1e3'] - Border color
+ * @param {string} [options.borderColor=COLORS.PRIMARY] - Border color
  * @param {Object} [options.stateRef] - Optional state reference
  * @param {string} [options.position='top-right'] - Position for stacking
  * @returns {HTMLElement} The created overlay element
@@ -627,7 +624,7 @@ function createNumberInputDialog(options) {
         min,
         max,
         step = 'any',
-        borderColor = '#6ad1e3',
+        borderColor = COLORS.PRIMARY,
         stateRef = null,
         position = 'top-right'
     } = options;
@@ -640,7 +637,7 @@ function createNumberInputDialog(options) {
 
     let stackOffset = 0;
     activeToasts[position].forEach(existingToast => {
-        const height = existingToast.offsetHeight || existingToast._expectedHeight || 60;
+        const height = existingToast.offsetHeight || existingToast._expectedHeight || LAYOUT.TOAST_EXPECTED_HEIGHT;
         stackOffset += height + TOAST_GAP;
     });
 
@@ -662,26 +659,26 @@ function createNumberInputDialog(options) {
         bottom: ${bottomValue};
         right: ${rightValue};
         left: ${leftValue};
-        background: white;
+        background: ${COLORS.BACKGROUND};
         padding: 15px 20px;
-        border: 2px solid ${borderColor};
-        border-radius: 8px;
+        border: ${LAYOUT.TOAST_BORDER_WIDTH} solid ${borderColor};
+        border-radius: ${LAYOUT.TOAST_BORDER_RADIUS};
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
         min-width: 250px;
         pointer-events: auto;
         opacity: 0;
         transform: translateX(${slideDirection});
-        transition: transform 0.3s ease-out, opacity 0.3s ease-out, top 0.2s ease-out;
+        transition: transform ${TIMING_MS.TOAST_ANIMATION}ms ease-out, opacity ${TIMING_MS.TOAST_ANIMATION}ms ease-out, top 0.2s ease-out;
     `;
 
     // Create elements
     const heading = document.createElement('h3');
-    heading.style.cssText = 'margin: 0 0 10px 0; color: #374151; font-size: 14px; font-weight: bold;';
+    heading.style.cssText = `margin: 0 0 10px 0; color: ${COLORS.TEXT_HEADING}; font-size: ${FONT_SIZES.TOAST}px; font-weight: bold;`;
     heading.textContent = title;
 
     const input = document.createElement('input');
     input.type = 'number';
-    input.style.cssText = 'width: 100%; padding: 8px; margin-bottom: 10px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;';
+    input.style.cssText = `width: 100%; padding: 8px; margin-bottom: 10px; font-size: ${FONT_SIZES.TOAST}px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;`;
     input.placeholder = placeholder;
     input.step = step;
     if (min !== undefined) input.min = min;
@@ -692,11 +689,11 @@ function createNumberInputDialog(options) {
     buttonContainer.style.cssText = 'display: flex; gap: 10px;';
 
     const submitBtn = document.createElement('button');
-    submitBtn.style.cssText = `flex: 1; padding: 8px; background: ${borderColor}; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;`;
+    submitBtn.style.cssText = `flex: 1; padding: 8px; background: ${borderColor}; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: ${FONT_SIZES.TOAST}px;`;
     submitBtn.textContent = 'Submit';
 
     const cancelBtn = document.createElement('button');
-    cancelBtn.style.cssText = 'flex: 1; padding: 8px; background: #ccc; color: black; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;';
+    cancelBtn.style.cssText = `flex: 1; padding: 8px; background: #ccc; color: black; border: none; border-radius: 4px; cursor: pointer; font-size: ${FONT_SIZES.TOAST}px;`;
     cancelBtn.textContent = 'Cancel';
 
     buttonContainer.appendChild(submitBtn);
@@ -706,7 +703,7 @@ function createNumberInputDialog(options) {
     overlay.appendChild(buttonContainer);
 
     // Add to tracking and append to body
-    overlay._expectedHeight = 60;
+    overlay._expectedHeight = LAYOUT.TOAST_EXPECTED_HEIGHT;
     activeToasts[position].push(overlay);
     document.body.appendChild(overlay);
 
@@ -780,7 +777,7 @@ function createNumberInputDialog(options) {
  * @param {Object} options - Configuration options
  * @param {Function} options.onLeft - Left arrow click handler
  * @param {Function} options.onRight - Right arrow click handler
- * @param {string} [options.color='#6ad1e3'] - Arrow button color
+ * @param {string} [options.color=COLORS.PRIMARY] - Arrow button color
  * @param {Object} [options.stateRef] - Optional state reference
  * @returns {HTMLElement} The created controls element
  */
@@ -788,7 +785,7 @@ function createArrowControls(options) {
     const {
         onLeft,
         onRight,
-        color = '#6ad1e3',
+        color = COLORS.PRIMARY,
         stateRef = null
     } = options;
 

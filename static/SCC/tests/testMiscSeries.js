@@ -73,7 +73,7 @@ function testAddMiscSeries() {
     const config1 = chartState.traceStyles.misc['misc1'].raw;
     assertEqual(config1.seriesName, 'Misc 1', 'First series name is "Misc 1"');
     assertEqual(config1.markerSymbol, 'square', 'First series symbol is square');
-    assertEqual(config1.markerFaceColor, '#FFA500', 'First series color is orange');
+    assertEqual(config1.markerColor, '#FFA500', 'First series color is orange');
 
     // Add second series
     const id2 = addMiscSeries();
@@ -82,7 +82,7 @@ function testAddMiscSeries() {
     const config2 = chartState.traceStyles.misc['misc2'].raw;
     assertEqual(config2.seriesName, 'Misc 2', 'Second series name is "Misc 2"');
     assertEqual(config2.markerSymbol, 'triangle-up', 'Second series symbol is triangle-up');
-    assertEqual(config2.markerFaceColor, '#FF0000', 'Second series color is red');
+    assertEqual(config2.markerColor, '#FF0000', 'Second series color is red');
 
     // Check getMiscSeriesIds
     assertEqual(getMiscSeriesIds(), ['misc1', 'misc2'], 'getMiscSeriesIds returns sorted IDs');

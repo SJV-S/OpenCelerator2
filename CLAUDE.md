@@ -25,8 +25,9 @@
 | `static/SCC/series/traceStyles.js` | Trace appearance config |
 | `static/SCC/series/miscSeries.js` | Dynamic misc series management (max 10) |
 | `static/SCC/lines/*.js` | Phase/aim/cut/celeration line drawing |
+| `static/SCC/ui/toaster.js` | Toast notifications and dialogs |
+| `static/SCC/ui/crosshair.js` | Cursor tracking with canvas rendering |
 | `static/SCC/util/dates.js` | Date math, timestamp ↔ X-position conversion |
-| `static/SCC/util/toaster.js` | Toast notifications and dialogs |
 | `templates/SCC/chart.html` | Main chart page |
 | `templates/SCC/menu/*.html` | 7 sidebar tabs (counter, data, credit, lines, series, chart, share) |
 
@@ -38,7 +39,7 @@
 
 ### Chart Types
 - Daily, Weekly, Monthly, Yearly, FrequencyCollections
-- Each has minute/count variants and resize logic in `util/resize_chart/`
+- Each has minute/count variants and resize logic in `util/resize-chart.js`
 
 ### Line Types
 - **Phase lines**: Vertical + horizontal + text label (3-phase drawing)

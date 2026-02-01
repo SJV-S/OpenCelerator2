@@ -7,47 +7,52 @@
  * Accessible from: Import this module in other scripts
  */
 
-import { CORRECTS, ERRORS, TIMING } from './config.js';
+import { CORRECTS, ERRORS, TIMING, COLORS, LINE_DEFAULTS, LIMITS, FONT_SIZES } from './config.js';
 
 // ============================================================================
 // Trace Configurations (Defaults - Read-only)
 // ============================================================================
 
 // Default configurations (frozen to prevent modification)
+// All configs use standardized property names from TRACE_PROP in config.js
 export const defaultCorrectTraceConfig = Object.freeze({
     seriesName: 'correct',
     showLine: true,
-    lineWidth: 0.7,
+    lineWidth: LINE_DEFAULTS.TRACE_LINE_WIDTH,
     lineColor: 'black',
     markerSize: 8,
     markerSymbol: 'circle',
-    markerFaceColor: 'black',
+    markerColor: 'black',
     markerEdgeColor: 'black'
 });
 
 export const defaultErrorTraceConfig = Object.freeze({
     seriesName: 'incorrect',
     showLine: true,
-    lineWidth: 0.7,
+    lineWidth: LINE_DEFAULTS.TRACE_LINE_WIDTH,
     lineColor: 'black',
+    markerSize: 20,
+    markerSymbol: 'x',
     markerColor: 'black',
-    textSize: 20
+    markerEdgeColor: 'black'
 });
 
 export const defaultTimingTraceConfig = Object.freeze({
     seriesName: 'Timing',
     showLine: false,
-    lineWidth: 0.7,
+    lineWidth: LINE_DEFAULTS.TRACE_LINE_WIDTH,
     lineColor: 'black',
     markerSize: 30,
-    markerColor: 'black'
+    markerSymbol: '-',
+    markerColor: 'black',
+    markerEdgeColor: 'black'
 });
 
 // ============================================================================
 // Dynamic Misc Series Configuration
 // ============================================================================
 
-export const MAX_MISC_SERIES = 10;
+export const MAX_MISC_SERIES = LIMITS.MAX_MISC_SERIES;
 
 // Color and symbol arrays for cycling through misc series appearances
 export const MISC_COLORS = Object.freeze([
@@ -85,23 +90,23 @@ export function createMiscTraceConfig(index) {
     return {
         seriesName: `Misc ${index + 1}`,
         showLine: true,
-        lineWidth: 0.7,
+        lineWidth: LINE_DEFAULTS.TRACE_LINE_WIDTH,
         lineColor: 'black',
         markerSize: 8,
         markerSymbol: MISC_SYMBOLS[index % MISC_SYMBOLS.length],
-        markerFaceColor: MISC_COLORS[index % MISC_COLORS.length],
+        markerColor: MISC_COLORS[index % MISC_COLORS.length],
         markerEdgeColor: 'black'
     };
 }
 
 // ============================================================================
-// Line Styling Constants (Defaults - Read-only)
+// Line Styling Constants (from config.js)
 // ============================================================================
 
-export const DEFAULT_PHASE_LINE_COLOR = 'black';
-export const DEFAULT_PHASE_LINE_WIDTH = 2;
-export const DEFAULT_AIM_LINE_COLOR = 'black';
-export const DEFAULT_AIM_LINE_WIDTH = 2;
+export const DEFAULT_PHASE_LINE_COLOR = COLORS.PHASE_LINE;
+export const DEFAULT_PHASE_LINE_WIDTH = LINE_DEFAULTS.PHASE_WIDTH;
+export const DEFAULT_AIM_LINE_COLOR = COLORS.AIM_LINE;
+export const DEFAULT_AIM_LINE_WIDTH = LINE_DEFAULTS.AIM_WIDTH;
 
 // Default legend configuration
 export const DEFAULT_LEGEND_CONFIG = Object.freeze({
@@ -109,11 +114,11 @@ export const DEFAULT_LEGEND_CONFIG = Object.freeze({
     y: 1,
     xanchor: 'right',
     yanchor: 'top',
-    bgcolor: 'rgba(255, 255, 255, 0.8)',
-    bordercolor: 'black',
+    bgcolor: COLORS.LEGEND_BG,
+    bordercolor: COLORS.LEGEND_BORDER,
     borderwidth: 1,
     font: {
-        size: 12,
+        size: FONT_SIZES.LEGEND,
         family: 'Arial',
         color: 'black'
     }
@@ -198,16 +203,16 @@ export const chartState = {
         },
         trend: {
             [CORRECTS]: {
-                color: 'green',
-                width: 2,
+                color: COLORS.TREND_CORRECTS,
+                width: LINE_DEFAULTS.TREND_WIDTH,
             },
             [ERRORS]: {
-                color: 'red',
-                width: 2,
+                color: COLORS.TREND_ERRORS,
+                width: LINE_DEFAULTS.TREND_WIDTH,
             },
             [TIMING]: {
-                color: 'orange',
-                width: 2,
+                color: COLORS.TREND_TIMING,
+                width: LINE_DEFAULTS.TREND_WIDTH,
             },
             misc: {}    // Dynamic misc series trend styles, keyed by ID
         }

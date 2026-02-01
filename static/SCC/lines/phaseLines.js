@@ -16,30 +16,29 @@
  */
 
 import { chartState } from '../chartState.js';
-import { createToast, createTextInputDialog, createNumberInputDialog, createConfirmToast, createArrowControls } from '../util/toaster.js';
+import { COLORS } from '../config.js';
+import { createToast, createTextInputDialog, createNumberInputDialog, createConfirmToast, createArrowControls } from '../ui/toaster.js';
 import { xPositionToDate, timestampsToXPositions } from '../util/dates.js';
-import { icons } from '../util/icons.js';
-import { applySvgCursor, restoreCursor } from '../util/cursorIcon.js';
+import { icons, applySvgCursor, restoreCursor } from '../ui/icons.js';
 import { phaseLineMetadata, removeLine } from './allLines.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 
-// Phase line drawing state (ephemeral UI state)
 var phaseLineState = {
-    active: false,              // Whether phase line mode is active
-    direction: null,            // 'top' or 'bottom' - where line extends from
-    currentPhase: 0,            // Current phase (0=inactive, 1=vertical, 2=horizontal, 3=text)
-    clickHandler: null,         // Reference to click handler function
-    touchHandler: null,         // Reference to touch handler function
-    verticalLineX: null,        // X coordinate of vertical line
-    verticalLineY: null,        // Y coordinate of vertical line endpoint
-    horizontalEndX: null,       // X coordinate of horizontal line endpoint
-    horizontalEndY: null,       // Y coordinate of horizontal line endpoint
-    tempShapes: [],            // Track temporary shape indices
-    textInputOverlay: null,    // Reference to text input overlay element
-    tempAnnotationIndex: null, // Index of annotation awaiting save confirmation
-    saveToast: null,           // Reference to save confirmation toast element
-    arrowControls: null,       // Reference to arrow control UI element
-    modeToast: null            // Reference to "Phase mode" toaster element
+    active: false,
+    direction: null,
+    currentPhase: 0,
+    clickHandler: null,
+    touchHandler: null,
+    verticalLineX: null,
+    verticalLineY: null,
+    horizontalEndX: null,
+    horizontalEndY: null,
+    tempShapes: [],
+    textInputOverlay: null,
+    tempAnnotationIndex: null,
+    saveToast: null,
+    arrowControls: null,
+    modeToast: null
 };
 
 /**
@@ -116,7 +115,7 @@ function activatePhaseLineMode(direction) {
  */
 function showArrowControls(chartDiv) {
     phaseLineState.arrowControls = createArrowControls({
-        color: '#6ad1e3',
+        color: COLORS.PRIMARY,
         onLeft: () => adjustVerticalLineX(chartDiv, -1),
         onRight: () => adjustVerticalLineX(chartDiv, 1)
     });
@@ -618,7 +617,7 @@ function showTextInput(chartDiv) {
     phaseLineState.textInputOverlay = createTextInputDialog({
         title: 'Enter Count Marker Text',
         placeholder: 'Enter phase label...',
-        borderColor: '#6ad1e3',
+        borderColor: COLORS.PRIMARY,
         onSubmit: (text) => {
             addPhaseTextLabel(chartDiv, text);
         },
@@ -703,7 +702,7 @@ function addPhaseTextLabel(chartDiv, text) {
 function showSaveConfirmationToast(chartDiv) {
     phaseLineState.saveToast = createConfirmToast({
         message: 'Save line?',
-        borderColor: '#6ad1e3',
+        borderColor: COLORS.PRIMARY,
         onYes: () => {
             finalizePhaseLine(chartDiv);
             phaseLineState.saveToast = null;
@@ -883,7 +882,7 @@ function showPhaseModeToaster(phase) {
             }
         ],
         layout: 'horizontal',
-        borderColor: '#6ad1e3',
+        borderColor: COLORS.PRIMARY,
         position: 'top-right'
     });
 }

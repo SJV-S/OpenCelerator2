@@ -13,7 +13,7 @@
  */
 
 import { chartState } from './chartState.js';
-import { createToast, createInfoToast, createConfirmToast } from './util/toaster.js';
+import { createToast, createInfoToast, createConfirmToast } from './ui/toaster.js';
 import { eventBus, EVENTS } from './eventBus.js';
 
 window.chartState = chartState;

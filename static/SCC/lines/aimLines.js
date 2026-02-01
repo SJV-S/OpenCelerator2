@@ -13,31 +13,30 @@
  */
 
 import { chartState } from '../chartState.js';
-import { createToast, createTextInputDialog, createConfirmToast } from '../util/toaster.js';
+import { COLORS } from '../config.js';
+import { createToast, createTextInputDialog, createConfirmToast } from '../ui/toaster.js';
 import { xPositionToDate } from '../util/dates.js';
 import { aimLineMetadata, removeLine } from './allLines.js';
-import { icons } from '../util/icons.js';
-import { applySvgCursor, restoreCursor } from '../util/cursorIcon.js';
+import { icons, applySvgCursor, restoreCursor } from '../ui/icons.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 
-// Aim line drawing state (ephemeral UI state)
 var aimLineState = {
-    active: false,              // Whether aim line mode is active
-    direction: null,            // 'horizontal' or 'diagonal'
-    currentPhase: 0,            // Current phase (0=inactive, 1=first click, 2=second click, 3=text)
-    clickHandler: null,         // Reference to click handler function
-    touchHandler: null,         // Reference to touch handler function
-    x1: null,                   // X coordinate of first point
-    y1: null,                   // Y coordinate of first point
-    x2: null,                   // X coordinate of second point
-    y2: null,                   // Y coordinate of second point
-    tempShapes: [],            // Track temporary shape indices
-    tempDotIndex: null,        // Index of temporary dot marker at first click
-    textInputOverlay: null,    // Reference to text input overlay element
-    tempAnnotationIndex: null, // Index of annotation awaiting save confirmation
-    saveToast: null,           // Reference to save confirmation toast element
-    modeToast: null,           // Reference to "Aim mode" toaster element
-    previousDragMode: null     // Store previous dragmode to restore later
+    active: false,
+    direction: null,
+    currentPhase: 0,
+    clickHandler: null,
+    touchHandler: null,
+    x1: null,
+    y1: null,
+    x2: null,
+    y2: null,
+    tempShapes: [],
+    tempDotIndex: null,
+    textInputOverlay: null,
+    tempAnnotationIndex: null,
+    saveToast: null,
+    modeToast: null,
+    previousDragMode: null
 };
 
 /**
@@ -472,7 +471,7 @@ function showAimTextInput(chartDiv) {
     aimLineState.textInputOverlay = createTextInputDialog({
         title: 'Enter Event Marker Text',
         placeholder: 'Enter label...',
-        borderColor: '#6ad1e3',
+        borderColor: COLORS.PRIMARY,
         onSubmit: (text) => {
             addAimTextLabel(chartDiv, text);
         },
@@ -615,7 +614,7 @@ function addAimTextLabel(chartDiv, text) {
 function showAimSaveConfirmationToast(chartDiv) {
     aimLineState.saveToast = createConfirmToast({
         message: 'Save line?',
-        borderColor: '#6ad1e3',
+        borderColor: COLORS.PRIMARY,
         onYes: () => {
             finalizeAimLine(chartDiv);
             aimLineState.saveToast = null;
@@ -796,7 +795,7 @@ function showAimModeToaster(phase) {
             }
         ],
         layout: 'horizontal',
-        borderColor: '#6ad1e3',
+        borderColor: COLORS.PRIMARY,
         position: 'top-right'
     });
 }

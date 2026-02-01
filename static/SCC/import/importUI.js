@@ -12,7 +12,7 @@ import {
     cleanImportData,
     importToChartState
 } from './dataImport.js';
-import { createToast } from './toaster.js';
+import { createToast } from '../ui/toaster.js';
 import {
     isOpenCeleratorFormat,
     importOpenCeleratorFile

@@ -2,14 +2,11 @@
 // Handles tab switching, counter overlay control, and gesture/keyboard navigation
 
 import { chartState } from './chartState.js';
+import { TIMING_MS } from './config.js';
 import { updateDateDisplay, formatDateInputValue } from './util/dates.js';
-import { createToast, removeAllToasts } from './util/toaster.js';
-import { showDismissMenuHint } from './util/tooltip.js';
+import { createToast, removeAllToasts } from './ui/toaster.js';
+import { showDismissMenuHint } from './ui/tooltip.js';
 import { eventBus, EVENTS } from './eventBus.js';
-
-// ============================================================================
-// COUNTER OVERLAY CONTROL
-// ============================================================================
 
 /**
  * Shows the counter overlay
@@ -59,10 +56,6 @@ function hideCounter() {
     eventBus.emit(EVENTS.COUNTER_HIDE);
 }
 
-// ============================================================================
-// TAB SWITCHING
-// ============================================================================
-
 /**
  * Switches between tabs in the counter overlay
  * @param {string} tabName - The name of the tab to switch to ('counter', 'credit', or 'lines')
@@ -72,70 +65,52 @@ function hideCounter() {
  * Mechanism: Function attached to window object, called from template buttons
  */
 function switchTab(tabName) {
-    // Hide all tab contents - remove active class
     document.querySelectorAll('.chart-menu-tab-pane').forEach(content => {
         content.classList.remove('active');
     });
 
-    // Remove active styling from main tab buttons only (not sub-tabs)
     document.querySelectorAll('.chart-menu-tabs .chart-menu-tab-btn').forEach(button => {
         button.classList.remove('active');
     });
 
-    // Show selected tab content - add active class
     const activeContent = document.getElementById(tabName + '-content');
     if (activeContent) {
         activeContent.classList.add('active');
     }
 
-    // Add active styling to selected tab button
     const activeButton = document.querySelector(`[data-tab="${tabName}"]`);
     if (activeButton) {
         activeButton.classList.add('active');
     }
 
-    // Emit tab switch event - subscribers load data as needed
     eventBus.emit(EVENTS.NAV_TAB_SWITCH, { tab: tabName });
 }
-
-// ============================================================================
-// DATA SUB-TAB SWITCHING
-// ============================================================================
 
 /**
  * Switches between sub-tabs in the Data tab (New / Previous)
  * @param {string} subtab - The sub-tab to switch to ('new' or 'previous')
  */
 function switchDataSubtab(subtab) {
-    // Remove active class from all sub-tab buttons
     document.querySelectorAll('.data-subtabs .chart-menu-tab-btn').forEach(btn => {
         btn.classList.remove('active');
     });
 
-    // Hide all sub-panes
     document.querySelectorAll('.data-subpane').forEach(pane => {
         pane.classList.remove('active');
     });
 
-    // Activate selected button
     const activeBtn = document.querySelector(`[data-subtab="${subtab}"]`);
     if (activeBtn) {
         activeBtn.classList.add('active');
     }
 
-    // Show selected pane
     const activePane = document.getElementById(`${subtab}-subpane`);
     if (activePane) {
         activePane.classList.add('active');
     }
 
-    // Emit event for sub-tab switch
     eventBus.emit(EVENTS.NAV_DATA_SUBTAB_SWITCH, { subtab });
 }
-
-// ============================================================================
-// LINE DRAWING BUTTON FUNCTIONS
-// ============================================================================
 
 /**
  * Phase line button functions - coordinate between overlay and line drawing
@@ -182,11 +157,6 @@ function otherCeleration() {
     eventBus.emit(EVENTS.MODE_CEL_ACTIVATE);
 }
 
-// ============================================================================
-// LINE CLICKABILITY TOGGLE
-// ============================================================================
-
-// Track current state of line clickability
 let lineClickabilityEnabled = false;
 
 /**
@@ -195,7 +165,6 @@ let lineClickabilityEnabled = false;
  * @param {boolean} showToast - Whether to show the toast notification (default: true)
  */
 function toggleLineClickability(showToast = true) {
-    // Toggle state
     lineClickabilityEnabled = !lineClickabilityEnabled;
 
     // Emit event to toggle line clickability
@@ -212,16 +181,10 @@ function toggleLineClickability(showToast = true) {
     }
 }
 
-// ============================================================================
-// GESTURE AND KEYBOARD NAVIGATION
-// ============================================================================
-
 /**
  * Initialize Enter key handler for form submission
- * Allows pressing Enter in any number input field to submit data entry
  */
 function initFormKeyboardShortcuts() {
-    // Allow Enter key to submit from any number input field
     document.querySelectorAll('input[type="number"]').forEach(field => {
         field.addEventListener('keypress', function(event) {
             if (event.key === 'Enter') {
@@ -238,8 +201,6 @@ function initFormKeyboardShortcuts() {
 function initGestureNavigation() {
     let touchStartY = null;
     let touchStartX = null;
-    const SWIPE_THRESHOLD = 100; // minimum distance for a swipe
-    const LONG_PRESS_DURATION = 500; // milliseconds for long press
 
     let touchTimer = null;
     let mouseTimer = null;
@@ -271,7 +232,7 @@ function initGestureNavigation() {
                 if (!touchMoved) {
                     toggleLineClickability();
                 }
-            }, LONG_PRESS_DURATION);
+            }, TIMING_MS.LONG_PRESS_DURATION);
         }
     }, { passive: true });
 
@@ -281,8 +242,8 @@ function initGestureNavigation() {
             const deltaY = Math.abs(e.touches[0].clientY - touchStartY);
             const deltaX = Math.abs(e.touches[0].clientX - touchStartX);
 
-            // If moved more than 10px, consider it a move (not a long press)
-            if (deltaY > 10 || deltaX > 10) {
+            // If moved more than threshold, consider it a move (not a long press)
+            if (deltaY > TIMING_MS.LONG_PRESS_MOVEMENT_THRESHOLD || deltaX > TIMING_MS.LONG_PRESS_MOVEMENT_THRESHOLD) {
                 touchMoved = true;
                 if (touchTimer) {
                     clearTimeout(touchTimer);
@@ -310,17 +271,17 @@ function initGestureNavigation() {
         const deltaX = Math.abs(touchEndX - touchStartX);
 
         // Ensure vertical swipe (not horizontal)
-        if (deltaX < SWIPE_THRESHOLD) {
+        if (deltaX < TIMING_MS.SWIPE_THRESHOLD) {
             const counterOverlay = document.getElementById('counter-overlay');
             const counterVisible = counterOverlay && counterOverlay.style.display === 'flex';
 
-            if (deltaY > SWIPE_THRESHOLD) {
+            if (deltaY > TIMING_MS.SWIPE_THRESHOLD) {
                 // Swipe up - show counter
                 if (!counterVisible) {
                     console.log('Swipe up detected - showing counter');
                     showCounter();
                 }
-            } else if (deltaY < -SWIPE_THRESHOLD) {
+            } else if (deltaY < -TIMING_MS.SWIPE_THRESHOLD) {
                 // Swipe down - hide counter
                 if (counterVisible) {
                     console.log('Swipe down detected - hiding counter');
@@ -382,7 +343,7 @@ function initGestureNavigation() {
             if (!mouseMoved) {
                 toggleLineClickability();
             }
-        }, LONG_PRESS_DURATION);
+        }, TIMING_MS.LONG_PRESS_DURATION);
     });
 
     // Mouse move - cancel long press if significant movement
@@ -391,8 +352,8 @@ function initGestureNavigation() {
             const deltaX = Math.abs(e.clientX - mouseStartX);
             const deltaY = Math.abs(e.clientY - mouseStartY);
 
-            // If moved more than 10px, consider it a drag (not a long press)
-            if (deltaX > 10 || deltaY > 10) {
+            // If moved more than threshold, consider it a drag (not a long press)
+            if (deltaX > TIMING_MS.LONG_PRESS_MOVEMENT_THRESHOLD || deltaY > TIMING_MS.LONG_PRESS_MOVEMENT_THRESHOLD) {
                 mouseMoved = true;
                 if (mouseTimer) {
                     clearTimeout(mouseTimer);

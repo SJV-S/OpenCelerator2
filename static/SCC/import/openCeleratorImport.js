@@ -107,7 +107,7 @@ function extractUniversalStyles(dataPointStyles, userColName) {
 
                 switch (styleType) {
                     case 'face_colors':
-                        extractedStyles.markerFaceColor = value;
+                        extractedStyles.markerColor = value;
                         break;
                     case 'edge_colors':
                         extractedStyles.markerEdgeColor = value;

@@ -3,6 +3,8 @@
  * Simple, discrete menu hint tooltip with upward-pointing arrow
  */
 
+import { TIMING_MS } from '../config.js';
+
 // Global variable to control tooltip display
 let tooltipEnabled = false;
 
@@ -13,7 +15,7 @@ let tooltipEnabled = false;
  * @param {boolean} showArrow - Whether to show arrow (default: true, set false for desktop)
  * @param {number} duration - Duration in milliseconds before auto-dismiss (default: 4000)
  */
-function showMenuTooltip(message, arrowDirection = 'up', showArrow = true, duration = 4000) {
+function showMenuTooltip(message, arrowDirection = 'up', showArrow = true, duration = TIMING_MS.TOOLTIP_DISPLAY) {
     // Don't show tooltip if disabled
     if (!tooltipEnabled) {
         return;
@@ -50,14 +52,14 @@ function showMenuTooltip(message, arrowDirection = 'up', showArrow = true, durat
     // Fade in
     setTimeout(() => {
         hintElement.style.opacity = '1';
-    }, 10);
+    }, TIMING_MS.TOOLTIP_FADE_IN);
 
     // Fade out and hide after duration
     setTimeout(() => {
         hintElement.style.opacity = '0';
         setTimeout(() => {
             hintElement.style.display = 'none';
-        }, 300);
+        }, TIMING_MS.TOOLTIP_FADE_DURATION);
     }, duration);
 }
 
@@ -71,7 +73,7 @@ function showInitialMenuHint() {
                      (window.matchMedia("(pointer: coarse)").matches);
 
     const message = isMobile ? 'Swipe up for menu' : 'Press spacebar for menu';
-    showMenuTooltip(message, 'up', isMobile, 4000);
+    showMenuTooltip(message, 'up', isMobile, TIMING_MS.TOOLTIP_DISPLAY);
 }
 
 /**
@@ -84,7 +86,7 @@ function showDismissMenuHint() {
                      (window.matchMedia("(pointer: coarse)").matches);
 
     const message = isMobile ? 'Swipe down to remove menu' : 'Press spacebar to remove menu';
-    showMenuTooltip(message, 'down', isMobile, 4000);
+    showMenuTooltip(message, 'down', isMobile, TIMING_MS.TOOLTIP_DISPLAY);
 }
 
 // Export as ES module

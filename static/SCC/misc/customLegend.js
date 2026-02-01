@@ -10,7 +10,7 @@
 
 import { chartState } from '../chartState.js';
 import { CORRECTS, ERRORS, TIMING } from '../config.js';
-import { icons } from '../util/icons.js';
+import { icons } from '../ui/icons.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 import { toggleGrid } from './grid.js';
 
@@ -111,7 +111,7 @@ function getMarkerSVG(seriesKey, config, scale = 1) {
         };
 
         const iconFn = symbolMap[config.markerSymbol] || icons.markerCircle;
-        return iconFn(Math.round((config.markerSize || baseSize) * scale), config.markerFaceColor, config.markerEdgeColor);
+        return iconFn(Math.round((config.markerSize || baseSize) * scale), config.markerColor, config.markerEdgeColor);
     }
 }
 

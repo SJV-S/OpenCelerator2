@@ -25,7 +25,7 @@ import { openDB } from '../lib/idb.js';
 import { eventBus, EVENTS, EVENT_CATEGORIES } from '../eventBus.js';
 import { chartState } from '../chartState.js';
 import { findNearestMonday } from '../util/dates.js';
-import { jsonBackwardsCompatibilityCheck } from '../util/jsonBackwardsCompatibility.js';
+import { jsonBackwardsCompatibilityCheck } from '../import/jsonBackwardsCompatibility.js';
 
 const DB_NAME = 'SCC_Charts';
 const DB_VERSION = 1;

@@ -9,7 +9,7 @@
  */
 
 import { chartState } from '../chartState.js';
-import { removeAllToasts, createToast } from '../util/toaster.js';
+import { removeAllToasts, createToast } from '../ui/toaster.js';
 import {
     calculateFrequencies,
     createFrequencyTraces,

@@ -11,7 +11,7 @@
 
 // Import state and functions from modules
 import { chartState } from './chartState.js';
-import { CORRECTS, ERRORS, TIMING } from './config.js';
+import { CORRECTS, ERRORS, TIMING, MOBILE_BREAKPOINT, MIN_DESKTOP_WIDTH, MIN_DESKTOP_HEIGHT, TIMING_MS, CHART_MATH, LAYOUT } from './config.js';
 import './debug.js';
 import { eventBus, EVENTS } from './eventBus.js';
 import {
@@ -32,10 +32,10 @@ import {
     updateButtonVisibility
 } from './series/traceStyles.js';
 import { addMiscSeries, canAddMiscSeries } from './series/miscSeries.js';
-import { createToast } from './util/toaster.js';
+import { createToast } from './ui/toaster.js';
 import { refreshChart, init as replotInit } from './series/replot.js';
 import { alignStartDate, updateChartDateLabels, updateDateDisplay, adjustDateInput, initializeDateInput, updatePlotDateLabel } from './util/dates.js';
-import { initStartDateControls } from './util/startDateControls.js';
+import { initStartDateControls } from './ui/startDateControls.js';
 import { loadDataForDate, adjustTimestamp, updateCurrentEntry, deleteCurrentEntry, init as dataUpdateInit } from './series/dataUpdate.js';
 import {
     showCounter,
@@ -63,35 +63,27 @@ import { injectCelerationFan, initFanDrag, regenerateFan, toggleCelerationFan, i
 import { injectCredits, initCreditClick, regenerateCredits, init as creditInit } from './misc/credit.js';
 import { toggleLegend, renderCustomLegend, init as customLegendInit } from './misc/customLegend.js';
 import { setupPanConstraints } from './util/panning_controls.js';
-import { resizeChartByHeight, CHART_CONFIG } from './util/resize_chart/resize-chart.js';
+import { resizeChartByHeight, CHART_CONFIG } from './util/resize-chart.js';
 import { getTemplate } from './util/chartLayouts.js';
-import { showInitialMenuHint } from './util/tooltip.js';
-import { icons } from './util/icons.js';
+import { showInitialMenuHint } from './ui/tooltip.js';
+import { icons } from './ui/icons.js';
 import { initializeShareTab } from './misc/share.js';
-import { init as crosshairInit } from './util/crosshair.js';
+import { init as crosshairInit } from './ui/crosshair.js';
 import { initStorage } from './storage/chartStorage.js';
-import { initImportUI } from './util/importUI.js';
-
-// ============================================================================
-// CHART INITIALIZATION
-// ============================================================================
+import { initImportUI } from './import/importUI.js';
 
 /**
  * Initialize the chart using client-side templates
- * Template is loaded based on chartState.chartType and chartState.minuteChart
  */
 export function initializeChart() {
-    // Update UI based on chartState.minuteChart (already set in chartState.js)
     updateTimingVisibility();
 
-    // Get template from client-side module
     let plotData = getTemplate(chartState.chartType, chartState.minuteChart);
     if (!plotData) {
         console.error('Failed to load template for:', chartState.chartType, chartState.minuteChart);
         return;
     }
 
-    // Get maxWindowWidth from config
     const maxWindowWidth = (CHART_CONFIG[chartState.chartType]?.maxWindow || 140) + 0.4;
 
     const chartDiv = document.getElementById('chart');
@@ -110,20 +102,16 @@ export function initializeChart() {
     // Inject celeration fan shapes/annotations (margins already handled by resize)
     plotData = injectCelerationFan(plotData, chartState.minuteChart, chartState.chartType);
 
-    // Inject credit line annotations (margin already handled by resize)
     plotData = injectCredits(plotData);
 
-    // Disable mouse panning (use Pan Chart buttons instead)
     plotData.layout.xaxis.fixedrange = true;
 
-    // Create chart
     Plotly.newPlot(chartDiv, plotData.data, plotData.layout, {
         displayModeBar: false,
         scrollZoom: false,
         doubleClick: false
     });
 
-    // Re-apply CSS visibility after any Plotly render
     chartDiv.on('plotly_afterplot', syncVisibilityState);
 
     // Initialize chartState capacity and window from config and actual range
@@ -145,10 +133,6 @@ export function initializeChart() {
 
     // Observe container for resize (fullscreen, viewport changes)
     if (chartContainer) {
-        const MOBILE_BREAKPOINT = 768;
-        const MIN_DESKTOP_WIDTH = 900;
-        const MIN_DESKTOP_HEIGHT = 500;
-
         let resizeTimeout;
         const resizeObserver = new ResizeObserver((entries) => {
             clearTimeout(resizeTimeout);
@@ -165,13 +149,13 @@ export function initializeChart() {
                 }
                 chartDiv.style.visibility = 'visible';
 
-                const newHeight = entries[0].contentRect.height * 0.98;
+                const newHeight = entries[0].contentRect.height * LAYOUT.CHART_HEIGHT_MULTIPLIER;
                 const config = CHART_CONFIG[chartState.chartType];
                 // Use the current chart margins (already expanded for fan/credits)
                 const margin = chartDiv.layout.margin;
                 // Use chartState.chartWindow - the authoritative window width
                 const xmax = chartState.chartWindow;
-                const deg = 34;
+                const deg = CHART_MATH.ANGLE_DEGREES;
                 const yaxis_px = newHeight - (margin.t + margin.b);
                 const y_axis = Math.log10(config.yMax) - Math.log10(config.yMin);
                 const delta_y = Math.log10(2 ** (xmax / config.unit));
@@ -191,7 +175,7 @@ export function initializeChart() {
                     regenerateCredits();
                     renderCustomLegend();
                 });
-            }, 100);
+            }, TIMING_MS.RESIZE_DEBOUNCE);
         });
         resizeObserver.observe(chartContainer);
     }
@@ -211,7 +195,7 @@ export function initializeChart() {
     initGridToggle();
 
     // Show initial menu hint
-    setTimeout(showInitialMenuHint, 500);
+    setTimeout(showInitialMenuHint, TIMING_MS.MENU_HINT_DELAY);
 
     // Initialize date inputs
     initializeDateInputs();
@@ -254,11 +238,6 @@ function initializeDateInputs() {
 export function adjustDate(days) {
     adjustDateInput('entry-date', days);
 }
-
-
-// ============================================================================
-// INITIALIZATION
-// ============================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Main.js: Initializing application');
@@ -318,10 +297,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     console.log('Main.js: Application initialized');
 });
-
-// ============================================================================
-// EVENT LISTENERS
-// ============================================================================
 
 export function setupEventListeners() {
     // Tab navigation
@@ -446,8 +421,6 @@ export function setupEventListeners() {
             element.addEventListener('click', handler);
         }
     });
-
-    // Show line toggle checkboxes - now handled in initializeLineWidthToggles() in chartReplot.js
 
     // Legend toggle
     const legendToggle = document.getElementById('legend-toggle');
@@ -604,7 +577,6 @@ export function setupEventListeners() {
         chartWindowDisplay.textContent = chartState.chartWindow;
 
         let windowDebounceTimer = null;
-        const DEBOUNCE_DELAY = 150; // ms
         const chartDiv = document.getElementById('chart');
 
         const updateChartWindow = (newValue) => {
@@ -621,10 +593,10 @@ export function setupEventListeners() {
             // Debounce the relayout for fast clicking
             clearTimeout(windowDebounceTimer);
             windowDebounceTimer = setTimeout(() => {
-                // Recalculate width to maintain 34° diagonal (same as ResizeObserver)
+                // Recalculate width to maintain correct diagonal (same as ResizeObserver)
                 const margin = chartDiv.layout.margin;
                 const height = chartDiv.layout.height;
-                const deg = 34;
+                const deg = CHART_MATH.ANGLE_DEGREES;
                 const yaxis_px = height - (margin.t + margin.b);
                 const y_axis = Math.log10(config.yMax) - Math.log10(config.yMin);
                 const delta_y = Math.log10(2 ** (newValue / config.unit));
@@ -633,14 +605,14 @@ export function setupEventListeners() {
                 const newWidth = xaxis_px + (margin.l + margin.r);
 
                 Plotly.relayout(chartDiv, {
-                    'xaxis.range': [-0.2, newValue + 0.2],
+                    'xaxis.range': [-LAYOUT.X_AXIS_MARGIN_OFFSET, newValue + LAYOUT.X_AXIS_MARGIN_OFFSET],
                     width: newWidth
                 }).then(() => {
                     regenerateFan();
                     regenerateCredits();
                     renderCustomLegend();
                 });
-            }, DEBOUNCE_DELAY);
+            }, TIMING_MS.CHART_WINDOW_DEBOUNCE);
         };
 
         document.querySelector('[data-action="chart-window-dec"]')?.addEventListener('click', () => {
@@ -662,7 +634,7 @@ export function setupEventListeners() {
     const updatePanDisplay = () => {
         if (panDisplay) {
             // Show start position (range[0] + margin offset, rounded)
-            panDisplay.textContent = Math.round(chartDiv.layout.xaxis.range[0] + 0.2);
+            panDisplay.textContent = Math.round(chartDiv.layout.xaxis.range[0] + LAYOUT.X_AXIS_MARGIN_OFFSET);
         }
     };
 
@@ -689,8 +661,8 @@ export function setupEventListeners() {
         const currentRange = chartDiv.layout.xaxis.range;
         const rangeWidth = currentRange[1] - currentRange[0];
         Plotly.relayout(chartDiv, {
-            'xaxis.range[0]': -0.2,
-            'xaxis.range[1]': -0.2 + rangeWidth
+            'xaxis.range[0]': -LAYOUT.X_AXIS_MARGIN_OFFSET,
+            'xaxis.range[1]': -LAYOUT.X_AXIS_MARGIN_OFFSET + rangeWidth
         }).then(updatePanDisplay);
     });
 

@@ -10,8 +10,9 @@
  */
 
 import { chartState } from '../chartState.js';
+import { TIMING_MS, COLORS, CHART_MATH } from '../config.js';
 import { eventBus, EVENTS } from '../eventBus.js';
-import { snapToChartBoundary, formatDateInputValue, xPositionToDate } from '../util/dates.js';
+import { snapToChartBoundary, formatDateInputValue, xPositionToDate, dateToXPosition } from '../util/dates.js';
 import { relayout } from '../util/plotlyWrapper.js';
 import { getFirstConfig } from './traceStyles.js';
 
@@ -20,7 +21,6 @@ const ENTRY_DATE_INDICATOR_NAME = 'entry-date-indicator';
 
 // Timer for auto-hiding the indicator
 let indicatorTimer = null;
-const INDICATOR_TIMEOUT = 5000; // 5 seconds
 
 // Track whether the Data tab is currently active (for click-to-set-date feature)
 // Initialized in init() based on DOM state
@@ -162,46 +162,6 @@ function updateTimingVisibility() {
 // ============================================================================
 
 /**
- * Convert a date string (YYYY-MM-DD) to an x-position on the chart.
- * Uses chart-type-specific calculations matching timestampsToXPositions():
- * - Daily: X = day offset from startDate
- * - Weekly: X = week offset (days / 7, floored)
- * - Monthly: X = month offset from startDate
- * - Yearly: X = year offset from startDate
- *
- * @param {string} dateString - Date in YYYY-MM-DD format
- * @returns {number} X-position for the chart
- */
-function dateToXPosition(dateString) {
-    if (!chartState.startDate) return 0;
-
-    const date = new Date(dateString);
-    date.setHours(0, 0, 0, 0);
-
-    const startDate = new Date(chartState.startDate);
-    startDate.setHours(0, 0, 0, 0);
-
-    const daysDiff = Math.floor((date - startDate) / (1000 * 60 * 60 * 24));
-    const chartType = (chartState.chartType || 'Daily').toLowerCase();
-
-    switch (chartType) {
-        case 'weekly':
-            return Math.floor(daysDiff / 7);
-        case 'monthly':
-            const startYear = startDate.getFullYear();
-            const startMonth = startDate.getMonth();
-            const dateYear = date.getFullYear();
-            const dateMonth = date.getMonth();
-            return (dateYear - startYear) * 12 + (dateMonth - startMonth);
-        case 'yearly':
-            return date.getFullYear() - startDate.getFullYear();
-        case 'daily':
-        default:
-            return daysDiff;
-    }
-}
-
-/**
  * Draw or update the entry date indicator line on the chart
  * @param {string} dateString - Date in YYYY-MM-DD format
  */
@@ -230,8 +190,8 @@ async function updateEntryDateIndicator(dateString) {
                 y0: 0,
                 y1: 1,
                 yref: 'paper',
-                opacity: 0.25,
-                line: { color: '#9333ea', width: 3 }
+                opacity: CHART_MATH.ENTRY_INDICATOR_OPACITY,
+                line: { color: COLORS.ENTRY_INDICATOR, width: CHART_MATH.ENTRY_INDICATOR_WIDTH }
             }
         });
     }
@@ -242,7 +202,7 @@ async function updateEntryDateIndicator(dateString) {
     }
     indicatorTimer = setTimeout(() => {
         removeEntryDateIndicator();
-    }, INDICATOR_TIMEOUT);
+    }, TIMING_MS.INDICATOR_TIMEOUT);
 }
 
 /**

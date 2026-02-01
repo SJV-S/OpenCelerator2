@@ -4,7 +4,7 @@
  * Also handles margin expansion for celeration fan
  */
 
-const MOBILE_BREAKPOINT = 768;
+import { MOBILE_BREAKPOINT, CHART_MATH, LAYOUT } from '../config.js';
 
 /**
  * Check if current viewport is mobile-sized
@@ -187,8 +187,8 @@ function resizeChartByHeight(chartJson, containerWidth, containerHeight, chartTy
         return resizeChartByHeight(chartJson, containerWidth, containerHeight, 'Daily', options);
     }
 
-    // Use 98% of container height for padding
-    const height = containerHeight * 0.98;
+    // Use configured multiplier of container height for padding
+    const height = containerHeight * LAYOUT.CHART_HEIGHT_MULTIPLIER;
 
     const margin = chartJson.layout.margin;
 
@@ -196,11 +196,11 @@ function resizeChartByHeight(chartJson, containerWidth, containerHeight, chartTy
     const originalXmax = Math.round(chartJson.layout.xaxis.range[1]);
 
     // Calculate what xmax fits the viewport (using pre-margin-adjustment values)
-    const peelHeight = containerHeight * 0.90;
+    const peelHeight = containerHeight * LAYOUT.CHART_PEEL_MULTIPLIER;
     const peelYaxisPx = peelHeight - (margin.t + margin.b);
     const peelXaxisPx = containerWidth - (margin.l + margin.r);
     const yAxisRange = Math.log10(config.yMax) - Math.log10(config.yMin);
-    const deg = 34;
+    const deg = CHART_MATH.ANGLE_DEGREES;
     const deltaYPx = peelXaxisPx * Math.tan(deg * Math.PI / 180);
     const deltaY = (deltaYPx / peelYaxisPx) * yAxisRange;
     let newXmax = Math.floor(config.unit * deltaY / Math.log10(2));

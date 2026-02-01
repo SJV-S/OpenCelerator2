@@ -61,39 +61,6 @@ function aimLineMetadata(direction, date1, y1, date2, y2, text, shapeIndices, an
 }
 
 /**
- * Creates a cel line metadata object
- * @param {number} x1 - Start X coordinate
- * @param {number} y1 - Start Y coordinate
- * @param {number} x2 - End X coordinate
- * @param {number} y2 - End Y coordinate
- * @param {Date} date1 - Start date
- * @param {Date} date2 - End date
- * @param {number} slope - Slope in log space
- * @param {number} intercept - Intercept in log space
- * @param {string} celeration - Celeration value (slope * 7)
- * @param {string} text - Text label
- * @param {Array<number>} shapeIndices - Index of the shape [lineIndex]
- * @param {number} annotationIndex - Index of the annotation
- */
-function celLineMetadata(x1, y1, x2, y2, date1, date2, slope, intercept, celeration, text, shapeIndices, annotationIndex) {
-    return {
-        id: Date.now(),
-        x1: x1,
-        y1: y1,
-        x2: x2,
-        y2: y2,
-        date1: date1,
-        date2: date2,
-        slope: slope,
-        intercept: intercept,
-        celeration: celeration,
-        text: text,
-        shapeIndices: shapeIndices,
-        annotationIndex: annotationIndex
-    };
-}
-
-/**
  * Removes a specific line from chartState and the chart
  * Step 1: Find the line by ID and get its shape/annotation indices
  * Step 2: Remove the clickable trace (if it exists)

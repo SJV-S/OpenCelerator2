@@ -501,29 +501,6 @@ export function formatCelerationLabel(slope, timeUnit = 'weekly') {
     return `${symbol}${cel.toFixed(2)}`;
 }
 
-/**
- * Format celeration value with unit suffix
- *
- * @param {number} slope - Slope in log-space per x-unit (day)
- * @param {string} timeUnit - Time unit for display
- * @returns {string} Formatted label like "×2.50 / w" or "÷1.25 / d"
- */
-export function formatCelerationLabelWithUnit(slope, timeUnit = 'weekly') {
-    const unitAbbrev = {
-        'daily': 'd',
-        'weekly': 'w',
-        'monthly': '4w',
-        'six-monthly': '26w',
-        'yearly': 'y',
-        'five-yearly': '5y'
-    };
-
-    const unit = unitAbbrev[timeUnit] || 'w';
-    const label = formatCelerationLabel(slope, timeUnit);
-
-    return `${label} / ${unit}`;
-}
-
 // ============================================================================
 // Backward Compatibility Export
 // ============================================================================

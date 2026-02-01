@@ -3,7 +3,8 @@ import { eventBus, EVENTS } from '../eventBus.js';
 // Dynamic spine configuration
 const LEFT_SPINE_NAME = 'dynamic-left-spine';
 const RIGHT_SPINE_NAME = 'dynamic-right-spine';
-const SPINE_COLOR = '#6ad1e3';
+import { COLORS } from '../config.js';
+const SPINE_COLOR = COLORS.PRIMARY;
 const SPINE_WIDTH = 2.5;
 let gridVisible = true;
 

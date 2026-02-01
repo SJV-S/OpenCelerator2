@@ -11,9 +11,8 @@
  * Emits events instead of calling peer modules directly.
  */
 
-import { createToast } from '../util/toaster.js';
-import { icons } from '../util/icons.js';
-import { applySvgCursor, restoreCursor } from '../util/cursorIcon.js';
+import { createToast } from '../ui/toaster.js';
+import { icons, applySvgCursor, restoreCursor } from '../ui/icons.js';
 import { chartState } from '../chartState.js';
 import { CORRECTS, ERRORS, TIMING } from '../config.js';
 import { xPositionToDate, dateToXPosition } from '../util/dates.js';
@@ -108,14 +107,8 @@ function getCelLineColor(seriesKey) {
     const config = getFirstConfig(seriesKey);
     if (!config) return 'orange'; // Fallback
 
-    // Get the data series marker color
-    let dataColor;
-    if (seriesKey === ERRORS || seriesKey === TIMING) {
-        dataColor = config.markerColor || 'black';
-    } else {
-        // corrects and misc use markerFaceColor
-        dataColor = config.markerFaceColor || 'black';
-    }
+    // Get the data series marker color (standardized: all series use markerColor)
+    const dataColor = config.markerColor || 'black';
 
     // If dark, use predefined contrasting colors
     if (isColorDark(dataColor)) {

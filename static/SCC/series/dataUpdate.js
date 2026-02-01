@@ -9,7 +9,7 @@
 
 import { chartState } from '../chartState.js';
 import { eventBus, EVENTS } from '../eventBus.js';
-import { createToast, createConfirmToast } from '../util/toaster.js';
+import { createToast, createConfirmToast } from '../ui/toaster.js';
 import { getFirstConfig } from './traceStyles.js';
 
 // Track current state

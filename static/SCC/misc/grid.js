@@ -58,13 +58,6 @@ export function toggleGrid(show) {
 }
 
 /**
- * Remove grid (hide grid traces)
- */
-export function rmGrid() {
-    toggleGrid(false);
-}
-
-/**
  * Toggle thick vertical lines (date lines)
  */
 export function toggleDateLines(show) {
