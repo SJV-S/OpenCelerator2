@@ -18,3 +18,6 @@ To-do
 * Is the cel line added even when there's less than 5 data points?
 * I need to check that my PWA is not relying on CDN that will break the app in offline mode
 * We might need a button for line editing instead of long press...
+* Cel line won't appear in misc all_monthly data
+-- reintroduces segments of the fan
+-- Doesn't show names for the misc series when selected trend type.

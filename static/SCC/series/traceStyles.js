@@ -256,6 +256,7 @@ function applyTraceConfig(seriesName) {
 
     eventBus.emit(EVENTS.DATA_CHART_REFRESH);
     eventBus.emit(EVENTS.UI_LEGEND_RENDER);
+    eventBus.emit(EVENTS.UI_TRACE_STYLE_CHANGED);
     createToast({ message: `${seriesName} configurations updated.`, duration: 2000 });
 }
 
@@ -309,6 +310,7 @@ function resetTraceConfig(seriesName) {
 
     eventBus.emit(EVENTS.DATA_CHART_REFRESH);
     eventBus.emit(EVENTS.UI_LEGEND_RENDER);
+    eventBus.emit(EVENTS.UI_TRACE_STYLE_CHANGED);
     createToast({ message: `${seriesName} reset to defaults.`, duration: 2000 });
 }
 
@@ -501,6 +503,7 @@ function removeAggregationBlock(block) {
     // Refresh chart
     eventBus.emit(EVENTS.DATA_CHART_REFRESH);
     eventBus.emit(EVENTS.UI_LEGEND_RENDER);
+    eventBus.emit(EVENTS.UI_TRACE_STYLE_CHANGED);
 }
 
 // ============================================================================
