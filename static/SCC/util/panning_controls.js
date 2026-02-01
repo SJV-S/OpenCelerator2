@@ -1,4 +1,5 @@
 import { eventBus, EVENTS } from '../eventBus.js';
+import { chartState } from '../chartState.js';
 
 // Dynamic spine configuration
 const LEFT_SPINE_NAME = 'dynamic-left-spine';
@@ -11,7 +12,6 @@ let gridVisible = true;
 // Chart boundary configuration
 const CHART_MARGIN = 0.2;
 const CHART_X_MIN = -CHART_MARGIN;
-const DEFAULT_MAX_WINDOW_WIDTH = 28.4;  // Default maximum allowed window width
 
 // Chart-type specific configuration
 const CHART_CONFIG = {
@@ -28,17 +28,13 @@ function snapToNearest(value, interval) {
 }
 
 // Constrain panning to x-axis range
-function setupPanConstraints(plotDiv, maxWindowWidth, chartType) {
-    // Use provided value or fall back to default
-    const MAX_WINDOW_WIDTH = maxWindowWidth || DEFAULT_MAX_WINDOW_WIDTH;
-
+function setupPanConstraints(plotDiv, chartType) {
     // Get chart-type specific config
     const config = CHART_CONFIG[chartType] || CHART_CONFIG.Daily;
     const CHART_X_MAX = config.xMax + CHART_MARGIN;
     const SNAP_INTERVAL = config.snapInterval;
 
     let isProgrammaticUpdate = false;
-    let defaultWindowWidth = MAX_WINDOW_WIDTH;
     let isDragging = false;
 
     // Subscribe to panning enabled/disabled changes
@@ -103,7 +99,7 @@ function setupPanConstraints(plotDiv, maxWindowWidth, chartType) {
             isProgrammaticUpdate = true;
             Plotly.relayout(plotDiv, {
                 'xaxis.autorange': false,
-                'xaxis.range': [CHART_X_MIN, CHART_X_MIN + defaultWindowWidth]
+                'xaxis.range': [CHART_X_MIN, CHART_X_MIN + chartState.chartWindow + CHART_MARGIN]
             });
             return;
         }
@@ -116,9 +112,10 @@ function setupPanConstraints(plotDiv, maxWindowWidth, chartType) {
 
             let needsUpdate = false;
 
-            // Check if window width exceeds maximum - snap back to max width
-            if (rangeWidth > MAX_WINDOW_WIDTH) {
-                rangeWidth = MAX_WINDOW_WIDTH;
+            // Check if window width exceeds current chart window - snap back
+            const maxAllowedWidth = chartState.chartWindow + CHART_MARGIN;
+            if (rangeWidth > maxAllowedWidth) {
+                rangeWidth = maxAllowedWidth;
                 needsUpdate = true;
             }
 

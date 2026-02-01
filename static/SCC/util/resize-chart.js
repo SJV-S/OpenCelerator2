@@ -5,6 +5,7 @@
  */
 
 import { MOBILE_BREAKPOINT, CHART_MATH, LAYOUT } from '../config.js';
+import { chartState } from '../chartState.js';
 
 /**
  * Check if current viewport is mobile-sized
@@ -213,6 +214,11 @@ function resizeChartByHeight(chartJson, containerWidth, containerHeight, chartTy
     // Clamp to min/max bounds
     newXmax = Math.max(newXmax, config.minXmax || config.snapTo);
     newXmax = Math.min(newXmax, originalXmax);
+
+    // Use saved chartWindow for loaded charts
+    if (chartState.id) {
+        newXmax = chartState.chartWindow;
+    }
 
     // Move right spine from originalXmax to newXmax
     chartJson.layout.shapes.forEach(shape => {

@@ -77,6 +77,7 @@ export const EVENTS = {
     // Chart Settings Events
     CHART_PANNING_ENABLED_CHANGED: 'chart:panning_enabled_changed',
     CHART_NAME_CHANGED: 'chart:name_changed',
+    CHART_WINDOW_CHANGED: 'chart:window_changed',
     CHART_GRID_VISIBILITY_CHANGED: 'chart:grid_visibility_changed',
 
     // Counter Events
@@ -143,6 +144,7 @@ const EVENT_CATEGORY_MAP = {
 
     // Chart settings
     [EVENTS.CHART_NAME_CHANGED]: [EVENT_CATEGORIES.STATE_MUTATING],
+    [EVENTS.CHART_WINDOW_CHANGED]: [EVENT_CATEGORIES.STATE_MUTATING],
 
     // Data import
     [EVENTS.DATA_IMPORT_COMPLETED]: [EVENT_CATEGORIES.STATE_MUTATING],

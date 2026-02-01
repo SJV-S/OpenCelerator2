@@ -103,6 +103,5 @@ function removeLine(lineType, lineId) {
 export {
     phaseLineMetadata,
     aimLineMetadata,
-    celLineMetadata,
     removeLine
 };

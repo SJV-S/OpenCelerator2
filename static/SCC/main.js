@@ -84,8 +84,6 @@ export function initializeChart() {
         return;
     }
 
-    const maxWindowWidth = (CHART_CONFIG[chartState.chartType]?.maxWindow || 140) + 0.4;
-
     const chartDiv = document.getElementById('chart');
 
     // Get container dimensions: use #chart-container on desktop, window dimensions on mobile
@@ -114,16 +112,18 @@ export function initializeChart() {
 
     chartDiv.on('plotly_afterplot', syncVisibilityState);
 
-    // Initialize chartState capacity and window from config and actual range
+    // Initialize chartState capacity from config
     const chartConfig = CHART_CONFIG[chartState.chartType];
     chartState.chartCapacity = chartConfig?.capacity || 280;
-    chartState.chartWindow = Math.round(chartDiv.layout.xaxis.range[1]);
+    if (!chartState.id) {
+        chartState.chartWindow = chartConfig?.maxWindow || 140;
+    }
 
     // Update display elements (setupEventListeners ran before initializeChart)
     const windowDisplay = document.getElementById('chart-window');
     if (windowDisplay) windowDisplay.textContent = chartState.chartWindow;
 
-    setupPanConstraints(chartDiv, maxWindowWidth, chartState.chartType);
+    setupPanConstraints(chartDiv, chartState.chartType);
 
     // Initialize draggable fan
     initFanDrag();
@@ -611,6 +611,7 @@ export function setupEventListeners() {
                     regenerateFan();
                     regenerateCredits();
                     renderCustomLegend();
+                    eventBus.emit(EVENTS.CHART_WINDOW_CHANGED, newValue);
                 });
             }, TIMING_MS.CHART_WINDOW_DEBOUNCE);
         };
