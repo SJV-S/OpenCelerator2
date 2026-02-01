@@ -52,7 +52,8 @@ function getLegendItems() {
                 displayName: config.seriesName,
                 visible: visibilityState[uniqueKey],
                 config: config,
-                baseSeriesKey: seriesKey
+                baseSeriesKey: seriesKey,
+                aggType: aggType
             });
         });
     });
@@ -76,7 +77,8 @@ function getLegendItems() {
                 displayName: config.seriesName,
                 visible: visibilityState[uniqueKey],
                 config: config,
-                baseSeriesKey: miscId
+                baseSeriesKey: miscId,
+                aggType: aggType
             });
         });
     });
@@ -135,7 +137,8 @@ function createLegendItem(item, scale = 1) {
 
     // Create label
     const label = document.createElement('span');
-    label.textContent = item.displayName;
+    const aggSuffix = item.aggType && item.aggType !== 'raw' ? ` (${item.aggType})` : '';
+    label.textContent = item.displayName + aggSuffix;
     label.className = 'legend-label';
     label.style.fontSize = `${Math.round(14 * scale)}px`;
 

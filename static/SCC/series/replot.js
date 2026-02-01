@@ -9,13 +9,15 @@
  */
 
 import { chartState } from '../chartState.js';
-import { removeAllToasts } from '../util/toaster.js';
+import { removeAllToasts, createToast } from '../util/toaster.js';
 import {
     calculateFrequencies,
     createFrequencyTraces,
     createTimingTraces,
     createFloorShadowTraces
 } from './tracePipeline.js';
+import { initializeAllSeriesInputs } from './traceStyles.js';
+import { AUTO_AGG_THRESHOLD } from '../config.js';
 import { timestampsToXPositions, updateChartDateLabels } from '../util/dates.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 
@@ -50,7 +52,36 @@ function refreshChart() {
     };
 
     // Create all frequency traces (segmented by line cuts)
-    const dataTraces = createFrequencyTraces(xPositions, frequencies, timestampsToXPositions);
+    const { traces: dataTraces, autoAggregatedSeries } = createFrequencyTraces(xPositions, frequencies, timestampsToXPositions);
+
+    // Update chartState.traceStyles only for series that were auto-aggregated
+    if (autoAggregatedSeries.size > 0) {
+        if (!chartState._autoAggNotified) chartState._autoAggNotified = new Set();
+
+        const displayNames = [];
+        autoAggregatedSeries.forEach(seriesName => {
+            if (chartState._autoAggNotified.has(seriesName)) return;
+
+            const isMisc = seriesName.startsWith('misc');
+            const styles = isMisc
+                ? chartState.traceStyles.misc[seriesName]
+                : chartState.traceStyles[seriesName];
+            if (styles?.raw) {
+                displayNames.push(styles.raw.seriesName);
+                styles.median = styles.raw;
+                delete styles.raw;
+                chartState._autoAggNotified.add(seriesName);
+            }
+        });
+
+        if (displayNames.length > 0) {
+            initializeAllSeriesInputs();
+            createToast({
+                message: `Auto-aggregated to median: ${displayNames.join(', ')} (>${AUTO_AGG_THRESHOLD} points/position)`,
+                duration: 4000
+            });
+        }
+    }
 
     // Add timing traces (no segmenting) - returns array now
     const timingTraces = createTimingTraces(xPositions);

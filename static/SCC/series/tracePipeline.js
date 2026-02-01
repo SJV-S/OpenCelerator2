@@ -11,7 +11,7 @@
  */
 
 import { chartState } from '../chartState.js';
-import { CORRECTS, ERRORS } from '../config.js';
+import { CORRECTS, ERRORS, AUTO_AGG_THRESHOLD } from '../config.js';
 import { median, mean, min, max, first, last, sum, aggregateByX } from '../util/agg.js';
 
 // ============================================================================
@@ -158,17 +158,24 @@ function hasValidData(arr) {
  * @param {Array<number>} xPositions - X position array
  * @param {Array<number>} yData - Frequency data array (same length as xPositions)
  * @param {string} aggType - Aggregation type (e.g., 'raw', 'median', 'min', 'max', 'mean', 'first', 'last', 'sum')
- * @returns {{x: Array<number>, y: Array<number>}} Aggregated x and y arrays
+ * @returns {{x: Array<number>, y: Array<number>, autoAggregated: boolean}} Aggregated x and y arrays
  */
 function applyAggregation(xPositions, yData, aggType) {
-    // If "raw", return data unchanged
+    // If "raw", check if we need to auto-aggregate
     if (aggType === 'raw') {
-        return { x: xPositions, y: yData };
+        const xCounts = new Map();
+        xPositions.forEach(x => xCounts.set(x, (xCounts.get(x) || 0) + 1));
+        const maxPerX = xCounts.size > 0 ? Math.max(...xCounts.values()) : 0;
+
+        if (maxPerX > AUTO_AGG_THRESHOLD) {
+            return { ...aggregateByX(xPositions, yData, median), autoAggregated: true };
+        }
+        return { x: xPositions, y: yData, autoAggregated: false };
     }
 
     // Sum is only meaningful for non-minute charts
     if (aggType === 'sum' && chartState.minuteChart) {
-        return { x: xPositions, y: yData };
+        return { x: xPositions, y: yData, autoAggregated: false };
     }
 
     // Map aggType to aggregation function
@@ -184,11 +191,10 @@ function applyAggregation(xPositions, yData, aggType) {
 
     const aggFn = aggFunctions[aggType];
     if (!aggFn) {
-        // Unknown aggregation type, return raw data
-        return { x: xPositions, y: yData };
+        return { x: xPositions, y: yData, autoAggregated: false };
     }
 
-    return aggregateByX(xPositions, yData, aggFn);
+    return { ...aggregateByX(xPositions, yData, aggFn), autoAggregated: false };
 }
 
 /**
@@ -411,10 +417,11 @@ function createFloorShadowTraces(xPositions, frequencies) {
  * @param {Array<number>} xPositions - X-axis positions
  * @param {Object} frequencies - Frequency data for all series
  * @param {Function} timestampsToXPositions - Function to convert timestamps to x-positions
- * @returns {Array} Array of all frequency traces
+ * @returns {{traces: Array, autoAggregated: boolean}} Traces and auto-aggregation flag
  */
 function createFrequencyTraces(xPositions, frequencies, timestampsToXPositions) {
     const dataTraces = [];
+    const autoAggregatedSeries = new Set();
 
     // Get cut x-positions if any cuts exist
     let cutXPositions = [];
@@ -428,7 +435,8 @@ function createFrequencyTraces(xPositions, frequencies, timestampsToXPositions) 
     // CORRECTS (skip if no valid data)
     if (hasValidData(frequencies.corrects)) {
         Object.entries(chartState.traceStyles[CORRECTS]).forEach(([aggType, config]) => {
-            const { x, y } = applyAggregation(xPositions, frequencies.corrects, aggType);
+            const { x, y, autoAggregated: aa } = applyAggregation(xPositions, frequencies.corrects, aggType);
+            if (aa) autoAggregatedSeries.add(CORRECTS);
             const segments = createSegments(x, y, cutXPositions, 'corrects');
 
             segments.forEach(seg => {
@@ -442,7 +450,8 @@ function createFrequencyTraces(xPositions, frequencies, timestampsToXPositions) 
     // ERRORS/INCORRECTS (skip if no valid data)
     if (hasValidData(frequencies.errors)) {
         Object.entries(chartState.traceStyles[ERRORS]).forEach(([aggType, config]) => {
-            const { x, y } = applyAggregation(xPositions, frequencies.errors, aggType);
+            const { x, y, autoAggregated: aa } = applyAggregation(xPositions, frequencies.errors, aggType);
+            if (aa) autoAggregatedSeries.add(ERRORS);
             const segments = createSegments(x, y, cutXPositions, 'errors');
 
             segments.forEach(seg => {
@@ -456,7 +465,8 @@ function createFrequencyTraces(xPositions, frequencies, timestampsToXPositions) 
     // MISC (dynamic)
     Object.entries(chartState.traceStyles.misc).forEach(([miscId, aggConfigs]) => {
         Object.entries(aggConfigs).forEach(([aggType, config]) => {
-            const { x, y } = applyAggregation(xPositions, frequencies.misc[miscId], aggType);
+            const { x, y, autoAggregated: aa } = applyAggregation(xPositions, frequencies.misc[miscId], aggType);
+            if (aa) autoAggregatedSeries.add(miscId);
             const segments = createSegments(x, y, cutXPositions, miscId);
 
             segments.forEach(seg => {
@@ -467,7 +477,7 @@ function createFrequencyTraces(xPositions, frequencies, timestampsToXPositions) 
         });
     });
 
-    return dataTraces;
+    return { traces: dataTraces, autoAggregatedSeries };
 }
 
 // ============================================================================
