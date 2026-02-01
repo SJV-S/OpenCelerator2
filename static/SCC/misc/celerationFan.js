@@ -464,30 +464,23 @@ function getFanIndices(chartDiv) {
 /**
  * Get Plotly's SVG elements for the fan
  *
- * Fan shapes are added AFTER template shapes via injectCelerationFan(),
- * so they appear at the END of the SVG element list in layer-above.
+ * Uses shape indices looked up by name (fan-*) to select the correct SVG elements.
+ * Plotly maintains 1:1 mapping between layout.shapes indices and SVG elements.
  */
 function getFanSvgElements(chartDiv) {
     const { shapeIndices, annotationIndices } = getFanIndices(chartDiv);
     const elements = [];
 
-    // Find the layer-above shapelayer
-    const aboveLayer = chartDiv.querySelector('.layer-above .shapelayer');
-    if (aboveLayer) {
-        const allShapes = aboveLayer.querySelectorAll('path, rect');
-        const numFanShapes = shapeIndices.length;
+    // Select shapes by data-index attribute (set by Plotly to match layout.shapes index)
+    shapeIndices.forEach(i => {
+        const el = chartDiv.querySelector(`[data-index="${i}"]`);
+        if (el) elements.push(el);
+    });
 
-        // Fan shapes are at the END - select last N elements
-        const startIndex = allShapes.length - numFanShapes;
-        for (let i = startIndex; i < allShapes.length; i++) {
-            if (allShapes[i]) elements.push(allShapes[i]);
-        }
-    }
-
-    // Get annotation groups by index
-    const annotations = chartDiv.querySelectorAll('.annotation');
+    // Select annotations by data-index attribute
     annotationIndices.forEach(i => {
-        if (annotations[i]) elements.push(annotations[i]);
+        const el = chartDiv.querySelector(`.annotation[data-index="${i}"]`);
+        if (el) elements.push(el);
     });
 
     return elements;

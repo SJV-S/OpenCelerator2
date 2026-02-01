@@ -10,6 +10,7 @@
 import { chartState } from '../chartState.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 import { createToast, createConfirmToast } from '../util/toaster.js';
+import { getFirstConfig } from './traceStyles.js';
 
 // Track current state
 let currentDataForDate = [];
@@ -149,7 +150,7 @@ function renderCurrentEntry() {
     if (miscIds.length > 0) {
         miscFieldsHtml = '<div class="mb-6 grid grid-cols-2 gap-4">';
         miscIds.forEach(miscId => {
-            const config = chartState.traceStyles.misc[miscId]?.raw;
+            const config = getFirstConfig(miscId, true);
             const label = config?.seriesName || miscId;
             const value = isNaN(point.misc[miscId]) ? '' : point.misc[miscId];
             miscFieldsHtml += `

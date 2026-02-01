@@ -167,8 +167,13 @@ function parseLocalDate(date) {
         return new Date(year, month - 1, day);
     }
     // Fallback - parse and normalize to local midnight
+    // BUG INVESTIGATION: ISO strings with time component can shift dates across timezone boundaries
     const d = new Date(date);
-    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const result = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    if (typeof date === 'string' && date.includes('T')) {
+        console.log('[CEL DEBUG] parseLocalDate ISO fallback: input="' + date + '" -> parsed=' + d.toISOString() + ' -> result=' + result.toISOString());
+    }
+    return result;
 }
 
 /**
@@ -302,26 +307,65 @@ function timestampsToXPositions(xValues) {
  */
 function xPositionToDate(xPosition) {
     const chartType = (chartState.chartType || 'Daily').toLowerCase();
-    const resultDate = new Date(chartState.startDate);
+    // Use parseLocalDate to get a clean local date without timezone issues
+    const startDate = parseLocalDate(chartState.startDate);
 
     switch (chartType) {
-        case 'weekly':
-            resultDate.setDate(chartState.startDate.getDate() + (xPosition * 7));
-            break;
-        case 'monthly':
-            resultDate.setMonth(chartState.startDate.getMonth() + xPosition);
-            break;
+        case 'weekly': {
+            const resultDate = new Date(startDate);
+            resultDate.setDate(startDate.getDate() + (xPosition * 7));
+            return resultDate;
+        }
+        case 'monthly': {
+            // Use first of month to avoid timezone boundary issues
+            const resultDate = new Date(startDate.getFullYear(), startDate.getMonth() + xPosition, 1);
+            return resultDate;
+        }
+        case 'yearly': {
+            // Use January 1 to avoid timezone boundary issues (Dec 31 23:00 UTC becomes Jan 1 in UTC+1)
+            const resultDate = new Date(startDate.getFullYear() + xPosition, 0, 1);
+            return resultDate;
+        }
+        case 'daily':
+        default: {
+            const resultDate = new Date(startDate);
+            resultDate.setDate(startDate.getDate() + xPosition);
+            return resultDate;
+        }
+    }
+}
+
+/**
+ * Convert a Date object to an x-position on the chart (inverse of xPositionToDate).
+ * Uses chart-type-specific calculations matching timestampsToXPositions:
+ * - Daily: X = day offset from startDate
+ * - Weekly: X = floor(daysDiff / 7)
+ * - Monthly: X = month offset from startDate
+ * - Yearly: X = year offset from startDate
+ *
+ * @param {Date|string} date - Date object or ISO string to convert
+ * @returns {number} X-position for the chart
+ */
+function dateToXPosition(date) {
+    const chartType = (chartState.chartType || 'Daily').toLowerCase();
+    const inputDate = parseLocalDate(date);
+    const startDate = parseLocalDate(chartState.startDate);
+
+    // Calculate days difference (used by daily and weekly)
+    const daysDiff = Math.floor((inputDate - startDate) / (1000 * 60 * 60 * 24));
+
+    switch (chartType) {
         case 'yearly':
-            resultDate.setFullYear(chartState.startDate.getFullYear() + xPosition);
-            break;
+            return inputDate.getFullYear() - startDate.getFullYear();
+        case 'monthly':
+            return (inputDate.getFullYear() - startDate.getFullYear()) * 12 +
+                   (inputDate.getMonth() - startDate.getMonth());
+        case 'weekly':
+            return Math.floor(daysDiff / 7);
         case 'daily':
         default:
-            resultDate.setDate(chartState.startDate.getDate() + xPosition);
-            break;
+            return daysDiff;
     }
-
-    resultDate.setHours(0, 0, 0, 0);
-    return resultDate;
 }
 
 /**
@@ -450,7 +494,6 @@ function handleOtherDateChange() {
         position: 'top-right'
     });
 
-    console.log('Start date updated to:', otherDateInput.value);
 }
 
 /**
@@ -547,6 +590,7 @@ export {
     snapToChartBoundary,
     timestampsToXPositions,
     xPositionToDate,
+    dateToXPosition,
     updateChartDateLabels,
     formatDateDisplay,
     formatDateInputValue,
@@ -557,5 +601,3 @@ export {
     initializeDateInput,
     updatePlotDateLabel
 };
-
-console.log('dates.js loaded');

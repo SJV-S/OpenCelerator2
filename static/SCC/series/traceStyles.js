@@ -70,20 +70,26 @@ function updateSumOptionVisibility() {
 // TRACE CONFIGURATION UI
 // ============================================================================
 
-function updateCounterLabels() {
-    // Get the first available aggregation config for each series for UI labels
-    const getFirstConfig = (seriesName, isMisc = false) => {
-        const configs = isMisc
-            ? chartState.traceStyles.misc[seriesName]
-            : chartState.traceStyles[seriesName];
-        if (!configs) return null;
-        const firstAggType = Object.keys(configs)[0];
-        return configs[firstAggType];
-    };
+/**
+ * Get the first available aggregation config for a series.
+ * Handles cases where 'raw' may not exist (e.g., after auto-aggregation).
+ * @param {string} seriesName - The series key (e.g., 'corrects', 'misc1')
+ * @param {boolean} isMisc - Whether this is a misc series
+ * @returns {Object|null} The first aggregation config object, or null if not found
+ */
+function getFirstConfig(seriesName, isMisc = false) {
+    const configs = isMisc
+        ? chartState.traceStyles.misc[seriesName]
+        : chartState.traceStyles[seriesName];
+    if (!configs) return null;
+    const firstAggType = Object.keys(configs)[0];
+    return firstAggType ? configs[firstAggType] : null;
+}
 
-    document.getElementById('corrects-series-label').textContent = getFirstConfig(CORRECTS).seriesName;
-    document.getElementById('errors-series-label').textContent = getFirstConfig(ERRORS).seriesName;
-    document.getElementById('timing-series-label').textContent = getFirstConfig(TIMING).seriesName;
+function updateCounterLabels() {
+    document.getElementById('corrects-series-label').textContent = getFirstConfig(CORRECTS)?.seriesName || 'Corrects';
+    document.getElementById('errors-series-label').textContent = getFirstConfig(ERRORS)?.seriesName || 'Errors';
+    document.getElementById('timing-series-label').textContent = getFirstConfig(TIMING)?.seriesName || 'Timing';
 
     // Update labels for dynamic misc series
     getMiscSeriesIds().forEach(miscId => {
@@ -246,11 +252,9 @@ function applyTraceConfig(seriesName) {
     // Update tab button text (for all series, truncated for display)
     const tabButton = document.querySelector(`[data-series-tab="${seriesName}"]`);
     if (tabButton) {
-        const rawConfig = isMiscSeries
-            ? chartState.traceStyles.misc[seriesName]?.raw
-            : chartState.traceStyles[seriesName]?.raw;
-        if (rawConfig?.seriesName) {
-            tabButton.textContent = truncateTabName(rawConfig.seriesName);
+        const config = getFirstConfig(seriesName, isMiscSeries);
+        if (config?.seriesName) {
+            tabButton.textContent = truncateTabName(config.seriesName);
         }
     }
 
@@ -300,11 +304,9 @@ function resetTraceConfig(seriesName) {
     // Update tab button text (for all series, truncated for display)
     const tabButton = document.querySelector(`[data-series-tab="${seriesName}"]`);
     if (tabButton) {
-        const rawConfig = isMiscSeries
-            ? chartState.traceStyles.misc[seriesName]?.raw
-            : chartState.traceStyles[seriesName]?.raw;
-        if (rawConfig?.seriesName) {
-            tabButton.textContent = truncateTabName(rawConfig.seriesName);
+        const config = getFirstConfig(seriesName, isMiscSeries);
+        if (config?.seriesName) {
+            tabButton.textContent = truncateTabName(config.seriesName);
         }
     }
 
@@ -572,7 +574,7 @@ function createMiscSeriesTab(id, index) {
     const tabButton = document.createElement('button');
     tabButton.className = 'series-subtab';
     tabButton.dataset.seriesTab = id;
-    const config = chartState.traceStyles.misc[id]?.raw;
+    const config = getFirstConfig(id, true);
     tabButton.textContent = truncateTabName(config?.seriesName || `Misc ${index + 1}`);
     tabButton.addEventListener('click', () => switchSeriesTab(id));
     tabContainer.insertBefore(tabButton, addBtn);
@@ -655,5 +657,6 @@ export {
     updateButtonVisibility,
     removeAggregationBlock,
     getAvailableAggTypes,
-    updateSumOptionVisibility
+    updateSumOptionVisibility,
+    getFirstConfig
 };

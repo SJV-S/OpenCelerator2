@@ -312,18 +312,19 @@ function buildSeriesConfigs() {
 function getMarkerSize(seriesId) {
     let chartSize;
     let style;
+    const config = getFirstConfig(seriesId);
 
     if (seriesId === CORRECTS) {
-        chartSize = chartState.traceStyles[CORRECTS]?.raw?.markerSize ?? 8;
+        chartSize = config?.markerSize ?? 8;
         style = MARKER_STYLES.corrects;
     } else if (seriesId === ERRORS) {
-        chartSize = chartState.traceStyles[ERRORS]?.raw?.textSize ?? 20;
+        chartSize = config?.textSize ?? 20;
         style = MARKER_STYLES.errors;
     } else if (seriesId === 'timing') {
-        chartSize = chartState.traceStyles.timing?.raw?.markerSize ?? 30;
+        chartSize = config?.markerSize ?? 30;
         style = MARKER_STYLES.timing;
     } else if (seriesId.startsWith('misc')) {
-        chartSize = chartState.traceStyles.misc?.[seriesId]?.raw?.markerSize ?? 8;
+        chartSize = config?.markerSize ?? 8;
         style = MARKER_STYLES.misc;
     } else {
         chartSize = 8;
@@ -794,19 +795,30 @@ function updateInfoPanel(xRounded, yLogValue, traceData) {
 }
 
 /**
+ * Get the first aggregation config for a series (handles cases where 'raw' may not exist)
+ */
+function getFirstConfig(seriesId) {
+    let configs;
+
+    if (seriesId && seriesId.startsWith('misc')) {
+        configs = chartState.traceStyles.misc?.[seriesId];
+    } else if (seriesId) {
+        configs = chartState.traceStyles?.[seriesId];
+    }
+
+    if (!configs) return null;
+    const firstAggType = Object.keys(configs)[0];
+    return firstAggType ? configs[firstAggType] : null;
+}
+
+/**
  * Get display name for a series from chartState
  */
 function formatSeriesName(seriesId) {
-    let config;
+    const config = getFirstConfig(seriesId);
 
-    if (seriesId && seriesId.startsWith('misc')) {
-        config = chartState.traceStyles.misc?.[seriesId];
-    } else if (seriesId) {
-        config = chartState.traceStyles?.[seriesId];
-    }
-
-    if (config?.raw?.seriesName) {
-        return config.raw.seriesName;
+    if (config?.seriesName) {
+        return config.seriesName;
     }
 
     // Fallback

@@ -13,6 +13,7 @@ import { chartState } from '../chartState.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 import { snapToChartBoundary, formatDateInputValue, xPositionToDate } from '../util/dates.js';
 import { relayout } from '../util/plotlyWrapper.js';
+import { getFirstConfig } from './traceStyles.js';
 
 // Shape name for the entry date indicator line
 const ENTRY_DATE_INDICATOR_NAME = 'entry-date-indicator';
@@ -47,7 +48,7 @@ function generateMiscInputs() {
     container.style.display = 'grid';
 
     miscIds.forEach(miscId => {
-        const config = chartState.traceStyles.misc[miscId]?.raw;
+        const config = getFirstConfig(miscId, true);
         const label = config?.seriesName || miscId;
 
         const div = document.createElement('div');

@@ -7,6 +7,8 @@
  * - Uses ES6 module standard with event delegation
  */
 
+// Debug logger must be imported first to capture all logs
+
 // Import state and functions from modules
 import { chartState } from './chartState.js';
 import { CORRECTS, ERRORS, TIMING } from './config.js';
@@ -110,24 +112,6 @@ export function initializeChart() {
 
     // Inject credit line annotations (margin already handled by resize)
     plotData = injectCredits(plotData);
-
-    // DEBUG: Log grid traces before render
-    console.log('=== GRID DEBUG ===');
-    console.log('Chart type:', chartState.chartType);
-    plotData.data.forEach((trace, i) => {
-        if (trace.name && trace.name.includes('horizontal')) {
-            console.log(`Trace ${i}: ${trace.name}`);
-            console.log(`  x first 6: ${trace.x?.slice(0, 6).join(', ')}`);
-            console.log(`  y first 6: ${trace.y?.slice(0, 6).join(', ')}`);
-            console.log(`  line:`, trace.line);
-            console.log(`  mode:`, trace.mode);
-        }
-    });
-    console.log('X-axis range:', plotData.layout.xaxis.range);
-    console.log('Y-axis type:', plotData.layout.yaxis.type);
-    console.log('Y-axis range:', plotData.layout.yaxis.range);
-    console.log('Y-axis2 tickvals:', plotData.layout.yaxis2?.tickvals?.slice(0, 5));
-    console.log('=================');
 
     // Disable mouse panning (use Pan Chart buttons instead)
     plotData.layout.xaxis.fixedrange = true;

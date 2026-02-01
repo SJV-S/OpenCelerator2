@@ -16,10 +16,117 @@ import { icons } from '../util/icons.js';
 import { applySvgCursor, restoreCursor } from '../util/cursorIcon.js';
 import { chartState } from '../chartState.js';
 import { CORRECTS, ERRORS, TIMING } from '../config.js';
-import { xPositionToDate } from '../util/dates.js';
+import { xPositionToDate, dateToXPosition } from '../util/dates.js';
 import { removeLine } from './allLines.js';
 import { fit, FIT_METHODS, BOUNCE_ENVELOPES, DEFAULT_FIT_METHOD, DEFAULT_BOUNCE_ENVELOPE, calculateBounceBounds, calculateBounceLines, formatCelerationLabel } from '../util/fit_lines.js';
 import { eventBus, EVENTS } from '../eventBus.js';
+
+// ============================================
+// Color Inverse Helpers
+// ============================================
+
+/** Darkness threshold (0-255). Colors with luminance below this are "black-ish" */
+const DARK_THRESHOLD = 60;
+
+/**
+ * Parse a color string to RGB values
+ * @param {string} color - Color in hex (#RGB, #RRGGBB) or rgb(r,g,b) format
+ * @returns {{r: number, g: number, b: number}|null} RGB values or null if unparseable
+ */
+function parseColor(color) {
+    if (!color) return null;
+    color = color.toLowerCase().trim();
+
+    // Named color: black
+    if (color === 'black') return { r: 0, g: 0, b: 0 };
+
+    // Hex format
+    if (color.startsWith('#')) {
+        const hex = color.slice(1);
+        if (hex.length === 3) {
+            return {
+                r: parseInt(hex[0] + hex[0], 16),
+                g: parseInt(hex[1] + hex[1], 16),
+                b: parseInt(hex[2] + hex[2], 16)
+            };
+        } else if (hex.length === 6) {
+            return {
+                r: parseInt(hex.slice(0, 2), 16),
+                g: parseInt(hex.slice(2, 4), 16),
+                b: parseInt(hex.slice(4, 6), 16)
+            };
+        }
+    }
+
+    // RGB format
+    const match = color.match(/rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+    if (match) {
+        return {
+            r: parseInt(match[1]),
+            g: parseInt(match[2]),
+            b: parseInt(match[3])
+        };
+    }
+
+    return null;
+}
+
+/**
+ * Check if a color is "dark" (black-ish) based on perceived luminance
+ * @param {string} color - Color string
+ * @returns {boolean} True if color is dark enough to need a contrasting cel line
+ */
+function isColorDark(color) {
+    const rgb = parseColor(color);
+    if (!rgb) return true; // Assume dark if we can't parse
+
+    // Perceived luminance formula (weighted for human perception)
+    const luminance = 0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b;
+    return luminance < DARK_THRESHOLD;
+}
+
+/**
+ * Compute the RGB complement of a color
+ * @param {string} color - Color string
+ * @returns {string} Complementary color as rgb() string, or fallback
+ */
+function getComplementaryColor(color) {
+    const rgb = parseColor(color);
+    if (!rgb) return 'orange'; // Fallback
+
+    return `rgb(${255 - rgb.r}, ${255 - rgb.g}, ${255 - rgb.b})`;
+}
+
+/**
+ * Get the appropriate cel line color for a data series.
+ * For dark colors: uses predefined contrasting colors (green/red/orange)
+ * For light colors: computes the RGB complement
+ * @param {string} seriesKey - The series key (corrects, errors, timing, misc1, etc.)
+ * @returns {string} The color to use for the cel line
+ */
+function getCelLineColor(seriesKey) {
+    const config = getFirstConfig(seriesKey);
+    if (!config) return 'orange'; // Fallback
+
+    // Get the data series marker color
+    let dataColor;
+    if (seriesKey === ERRORS || seriesKey === TIMING) {
+        dataColor = config.markerColor || 'black';
+    } else {
+        // corrects and misc use markerFaceColor
+        dataColor = config.markerFaceColor || 'black';
+    }
+
+    // If dark, use predefined contrasting colors
+    if (isColorDark(dataColor)) {
+        if (seriesKey === CORRECTS) return 'green';
+        if (seriesKey === ERRORS) return 'red';
+        return 'orange'; // timing and misc
+    }
+
+    // For light colors, compute complement
+    return getComplementaryColor(dataColor);
+}
 
 // Cel line drawing state (ephemeral UI state)
 var celLineState = {
@@ -47,7 +154,6 @@ var celLineState = {
  * Step 1: Show toast with buttons for available data series
  */
 function activateCelLineMode() {
-    console.log('Activating cel line mode');
 
     const chartDiv = document.getElementById('chart');
     if (!chartDiv) {
@@ -94,7 +200,23 @@ function activateCelLineMode() {
         layout: 'horizontal'
     });
 
-    console.log('Cel line mode activated - awaiting series selection');
+}
+
+/**
+ * Get the first aggregation config for a series (handles cases where 'raw' may not exist)
+ */
+function getFirstConfig(seriesId) {
+    let configs;
+
+    if (seriesId && seriesId.startsWith('misc')) {
+        configs = chartState.traceStyles.misc?.[seriesId];
+    } else if (seriesId) {
+        configs = chartState.traceStyles?.[seriesId];
+    }
+
+    if (!configs) return null;
+    const firstAggType = Object.keys(configs)[0];
+    return firstAggType ? configs[firstAggType] : null;
 }
 
 /**
@@ -105,7 +227,7 @@ function getAvailableSeriesButtons() {
 
     // Check fixed series
     if (chartState.series.corrects && chartState.series.corrects.some(v => v !== null)) {
-        const config = chartState.traceStyles[CORRECTS]?.raw;
+        const config = getFirstConfig(CORRECTS);
         buttons.push({
             label: config?.seriesName || 'Corrects',
             onClick: () => selectSeriesAndEnableDrag(CORRECTS),
@@ -114,7 +236,7 @@ function getAvailableSeriesButtons() {
     }
 
     if (chartState.series.errors && chartState.series.errors.some(v => v !== null)) {
-        const config = chartState.traceStyles[ERRORS]?.raw;
+        const config = getFirstConfig(ERRORS);
         buttons.push({
             label: config?.seriesName || 'Errors',
             onClick: () => selectSeriesAndEnableDrag(ERRORS),
@@ -123,7 +245,7 @@ function getAvailableSeriesButtons() {
     }
 
     if (chartState.series.timing && chartState.series.timing.some(v => v !== null)) {
-        const config = chartState.traceStyles[TIMING]?.raw;
+        const config = getFirstConfig(TIMING);
         buttons.push({
             label: config?.seriesName || 'Timing',
             onClick: () => selectSeriesAndEnableDrag(TIMING),
@@ -134,7 +256,7 @@ function getAvailableSeriesButtons() {
     // Check misc series
     Object.entries(chartState.series.misc).forEach(([miscId, data]) => {
         if (data && data.some(v => v !== null)) {
-            const config = chartState.traceStyles.misc[miscId]?.raw;
+            const config = getFirstConfig(miscId);
             buttons.push({
                 label: config?.seriesName || miscId,
                 onClick: () => selectSeriesAndEnableDrag(miscId),
@@ -150,6 +272,8 @@ function getAvailableSeriesButtons() {
  * Called when user selects a series from the toast buttons
  */
 function selectSeriesAndEnableDrag(seriesKey) {
+    const displayName = getFirstConfig(seriesKey)?.seriesName || seriesKey;
+    console.log('[CEL DEBUG] SERIES SELECTED: "' + displayName + '" (id=' + seriesKey + ')');
     celLineState.selectedSeriesKey = seriesKey;
 
     // Remove series selection toast using stored reference
@@ -229,14 +353,12 @@ function enableDragMode() {
         position: 'top-right'
     });
 
-    console.log('Drag mode enabled for cel line');
 }
 
 /**
  * Deactivates cel line mode
  */
 function deactivateCelLineMode() {
-    console.log('Deactivating cel line mode');
 
     const chartDiv = document.getElementById('chart');
     if (!chartDiv) return;
@@ -295,7 +417,6 @@ function deactivateCelLineMode() {
     celLineState.x1Pixel = null;
     celLineState.shadeShape = null;
 
-    console.log('Cel line mode deactivated');
 }
 
 function handleCelLineMouseDown(event, chartDiv) {
@@ -314,7 +435,6 @@ function handleCelLineMouseDown(event, chartDiv) {
     document.addEventListener('mousemove', celLineState.mouseMoveHandler);
     document.addEventListener('mouseup', celLineState.mouseUpHandler);
 
-    console.log(`Started drag at x1=${celLineState.x1}`);
 }
 
 function handleCelLineMouseMove(event, chartDiv) {
@@ -419,8 +539,8 @@ function handleCelLineTouchEnd(event, chartDiv) {
  */
 function finalizeCelLine() {
     const baseKey = celLineState.selectedSeriesKey;
+
     if (!baseKey) {
-        console.error('No series selected');
         deactivateCelLineMode();
         return;
     }
@@ -714,23 +834,44 @@ function cleanupSeriesSelectionMode() {
 
 function getDataInRangeForSeries(x1, x2, baseKey) {
     const chartDiv = document.getElementById('chart');
+
     if (!chartDiv || !chartDiv.data) {
         return null;
     }
+
+    // Get display name for the target series
+    const targetDisplayName = getFirstConfig(baseKey)?.seriesName || baseKey;
+
+    // Build map of trace seriesNames to display names
+    const uniqueSeriesIds = [...new Set(chartDiv.data.filter(t => t.meta?.seriesName).map(t => t.meta.seriesName))];
+    const seriesWithNames = uniqueSeriesIds
+        .filter(id => !id.includes('FloorShadow'))
+        .map(id => {
+            const name = getFirstConfig(id)?.seriesName || id;
+            return name + ' (' + id + ')';
+        });
+
+    console.log('[CEL DEBUG] TRACE MATCHING: Looking for "' + targetDisplayName + '" (' + baseKey + ')');
+    console.log('[CEL DEBUG] Available series in chart: ' + seriesWithNames.join(', '));
 
     // baseKey is now consistent: 'corrects', 'errors', 'timing', or misc ID
     const targetSeriesName = baseKey;
     const xValues = [];
     const yValues = [];
+    let matchingTraceCount = 0;
 
     for (let traceIdx = 0; traceIdx < chartDiv.data.length; traceIdx++) {
         const trace = chartDiv.data[traceIdx];
 
-        if (!trace.x || !trace.y || !trace.meta) continue;
+        if (!trace.x || !trace.y || !trace.meta) {
+            continue;
+        }
 
         if (trace.meta.seriesName !== targetSeriesName) {
             continue;
         }
+
+        matchingTraceCount++;
 
         for (let i = 0; i < trace.x.length; i++) {
             const x = trace.x[i];
@@ -743,12 +884,16 @@ function getDataInRangeForSeries(x1, x2, baseKey) {
         }
     }
 
+    console.log('[CEL DEBUG] RESULT: Found ' + xValues.length + ' points from ' + matchingTraceCount + ' trace(s)');
+
     return { x: xValues, y: yValues };
 }
 
 function handleCelLineConfirm(data, baseKey) {
     const chartDiv = document.getElementById('chart');
-    if (!chartDiv) return;
+    if (!chartDiv) {
+        return;
+    }
 
     const validPairs = [];
     for (let i = 0; i < data.x.length; i++) {
@@ -798,7 +943,17 @@ function handleCelLineConfirm(data, baseKey) {
     const lineId = Date.now();
     const lineName = `cel-${lineId}`;
 
-    const trendStyle = chartState.lineStyles.trend[baseKey] || chartState.lineStyles.trend[TIMING];
+    // Get trend style for width/dash, but compute color as inverse of data series
+    const trendStyle = baseKey.startsWith('misc')
+        ? (chartState.lineStyles.trend.misc[baseKey] || chartState.lineStyles.trend[TIMING])
+        : (chartState.lineStyles.trend[baseKey] || chartState.lineStyles.trend[TIMING]);
+
+    if (!trendStyle) {
+        console.error('[CEL DEBUG] trendStyle is undefined for:', baseKey);
+    }
+
+    // Compute inverse color based on data series marker color
+    const celLineColor = getCelLineColor(baseKey);
 
     // Build shapes array - main trend line first
     const newShapes = [];
@@ -812,7 +967,7 @@ function handleCelLineConfirm(data, baseKey) {
         yref: 'y',
         name: lineName,
         line: {
-            color: trendStyle.color,
+            color: celLineColor,
             width: trendStyle.width,
             dash: trendStyle.dash
         }
@@ -842,7 +997,7 @@ function handleCelLineConfirm(data, baseKey) {
                 yref: 'y',
                 name: `${lineName}-upper`,
                 line: {
-                    color: trendStyle.color,
+                    color: celLineColor,
                     width: 1,
                     dash: 'dot'
                 }
@@ -859,7 +1014,7 @@ function handleCelLineConfirm(data, baseKey) {
                 yref: 'y',
                 name: `${lineName}-lower`,
                 line: {
-                    color: trendStyle.color,
+                    color: celLineColor,
                     width: 1,
                     dash: 'dot'
                 }
@@ -890,7 +1045,7 @@ function handleCelLineConfirm(data, baseKey) {
         name: lineName,
         hovertext: labelText,
         hoverlabel: {
-            bgcolor: trendStyle.color,
+            bgcolor: celLineColor,
             font: { color: 'white', size: 14 }
         }
     };
@@ -901,6 +1056,8 @@ function handleCelLineConfirm(data, baseKey) {
     Plotly.relayout(chartDiv, {
         shapes: [...currentShapes, ...newShapes],
         annotations: [...currentAnnotations, annotation]
+    }).catch(err => {
+        console.error('[CEL DEBUG] Plotly.relayout FAILED:', err);
     });
 
     // Store shape indices for all shapes (trend + bounce lines)
@@ -909,12 +1066,21 @@ function handleCelLineConfirm(data, baseKey) {
         shapeIndices.push(shapeIndex + i);
     }
 
+    // Store dates as YYYY-MM-DD strings to avoid timezone issues with ISO serialization
+    const date1 = xPositionToDate(firstX);
+    const date2 = xPositionToDate(lastX);
+    const date1Str = date1.getFullYear() + '-' + String(date1.getMonth() + 1).padStart(2, '0') + '-' + String(date1.getDate()).padStart(2, '0');
+    const date2Str = date2.getFullYear() + '-' + String(date2.getMonth() + 1).padStart(2, '0') + '-' + String(date2.getDate()).padStart(2, '0');
+
+    const displayName = getFirstConfig(baseKey)?.seriesName || baseKey;
+    console.log('[CEL DEBUG] LINE CREATED: "' + displayName + '" x1=' + firstX + ' x2=' + lastX + ' as ' + date1Str);
+
     const metadata = {
         id: lineId,
         seriesKey: baseKey,
-        date1: xPositionToDate(firstX),
+        date1: date1Str,
         y1: y1_display,
-        date2: xPositionToDate(lastX),
+        date2: date2Str,
         y2: y2_display,
         slope: fitResult.slope,
         intercept: fitResult.intercept,
@@ -1015,10 +1181,19 @@ function redrawCelLines() {
         const metadata = entry;
         const lineName = `cel-${metadata.id}`;
 
-        const x1 = Math.floor((metadata.date1 - chartState.startDate) / (1000 * 60 * 60 * 24));
-        const x2 = Math.floor((metadata.date2 - chartState.startDate) / (1000 * 60 * 60 * 24));
+        const x1 = dateToXPosition(metadata.date1);
+        const x2 = dateToXPosition(metadata.date2);
 
-        const trendStyle = chartState.lineStyles.trend[metadata.seriesKey] || chartState.lineStyles.trend.timing;
+        const displayName = getFirstConfig(metadata.seriesKey)?.seriesName || metadata.seriesKey;
+        console.log('[CEL DEBUG] REDRAW: "' + displayName + '" date1=' + metadata.date1 + ' -> x1=' + x1);
+
+        // Get trend style for width/dash, compute inverse color for visibility
+        const trendStyle = metadata.seriesKey.startsWith('misc')
+            ? (chartState.lineStyles.trend.misc[metadata.seriesKey] || chartState.lineStyles.trend.timing)
+            : (chartState.lineStyles.trend[metadata.seriesKey] || chartState.lineStyles.trend.timing);
+
+        // Compute inverse color based on data series marker color
+        const celLineColor = getCelLineColor(metadata.seriesKey);
 
         // Main trend line
         const lineShape = {
@@ -1031,7 +1206,7 @@ function redrawCelLines() {
             yref: 'y',
             name: lineName,
             line: {
-                color: trendStyle.color,
+                color: celLineColor,
                 width: trendStyle.width,
                 dash: trendStyle.dash
             }
@@ -1050,7 +1225,7 @@ function redrawCelLines() {
                 yref: 'y',
                 name: `${lineName}-upper`,
                 line: {
-                    color: trendStyle.color,
+                    color: celLineColor,
                     width: 1,
                     dash: 'dot'
                 }
@@ -1068,7 +1243,7 @@ function redrawCelLines() {
                 yref: 'y',
                 name: `${lineName}-lower`,
                 line: {
-                    color: trendStyle.color,
+                    color: celLineColor,
                     width: 1,
                     dash: 'dot'
                 }
@@ -1097,7 +1272,7 @@ function redrawCelLines() {
             name: lineName,
             hovertext: metadata.text,
             hoverlabel: {
-                bgcolor: trendStyle.color,
+                bgcolor: celLineColor,
                 font: { color: 'white', size: 14 }
             }
         };
@@ -1180,4 +1355,3 @@ function init() {
 
 export { activateCelLineMode, deactivateCelLineMode, handleCelLineClick, init };
 
-console.log('celLine.js loaded');

@@ -284,9 +284,11 @@ function calculateFrequencies() {
     // Calculate frequencies for dynamic misc series (convert zeros to NaN if setting is off)
     Object.entries(chartState.series.misc).forEach(([miscId, data]) => {
         const miscFreqRaw = data.map((count, i) => handleZero(count / timingMinutes[i]));
+
         result.misc[miscId] = miscFreqRaw.map((freq, i) =>
             isBelowFloor(freq, timingMinutes[i]) ? NaN : freq
         );
+
         result.miscFloor[miscId] = miscFreqRaw.map((freq, i) =>
             isBelowFloor(freq, timingMinutes[i]) ? placeBelowFloor(freq, timingMinutes[i]) : NaN
         );
@@ -466,6 +468,7 @@ function createFrequencyTraces(xPositions, frequencies, timestampsToXPositions) 
     Object.entries(chartState.traceStyles.misc).forEach(([miscId, aggConfigs]) => {
         Object.entries(aggConfigs).forEach(([aggType, config]) => {
             const { x, y, autoAggregated: aa } = applyAggregation(xPositions, frequencies.misc[miscId], aggType);
+
             if (aa) autoAggregatedSeries.add(miscId);
             const segments = createSegments(x, y, cutXPositions, miscId);
 

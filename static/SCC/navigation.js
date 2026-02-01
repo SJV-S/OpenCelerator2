@@ -147,13 +147,11 @@ function switchDataSubtab(subtab) {
  */
 
 function phaseTextTop() {
-    console.log('Phase Text Top button clicked');
     hideCounter();
     eventBus.emit(EVENTS.MODE_PHASE_ACTIVATE, { direction: 'top' });
 }
 
 function phaseTextBottom() {
-    console.log('Phase Text Bottom button clicked');
     hideCounter();
     eventBus.emit(EVENTS.MODE_PHASE_ACTIVATE, { direction: 'bottom' });
 }
@@ -162,13 +160,11 @@ function phaseTextBottom() {
  * Aim button functions - activate aim line mode
  */
 function aimDiagonal() {
-    console.log('Aim Diagonal button clicked');
     hideCounter();
     eventBus.emit(EVENTS.MODE_AIM_ACTIVATE, { direction: 'diagonal' });
 }
 
 function aimHorizontal() {
-    console.log('Aim Horizontal button clicked');
     hideCounter();
     eventBus.emit(EVENTS.MODE_AIM_ACTIVATE, { direction: 'horizontal' });
 }
@@ -177,13 +173,11 @@ function aimHorizontal() {
  * Other button functions - activate drawing modes
  */
 function otherScissors() {
-    console.log('Other Scissors button clicked');
     hideCounter();
     eventBus.emit(EVENTS.MODE_CUT_ACTIVATE);
 }
 
 function otherCeleration() {
-    console.log('Other Celeration button clicked');
     hideCounter();
     eventBus.emit(EVENTS.MODE_CEL_ACTIVATE);
 }

@@ -155,6 +155,30 @@ You may suggest (but never add without permission) additional helper functions f
 
 See `Docs/plotly-shape-surgical-updates.md` for full context.
 
+## Plotly DOM Element Selection - CRITICAL
+
+**Never assume `layout.shapes` indices match DOM element order.** Plotly renders shapes to different SVG layers based on properties. A `querySelectorAll` returns elements in DOM order, which differs from `layout.shapes` array order.
+
+```javascript
+// WRONG - assumes DOM order matches layout.shapes order
+const allShapes = chartDiv.querySelectorAll('.shapelayer path');
+allShapes[79]  // Gets wrong element
+
+// RIGHT - use data-index attribute (Plotly stamps each shape with its layout.shapes index)
+chartDiv.querySelector('[data-index="79"]')  // Gets correct element
+```
+
+**Pattern for finding shape DOM elements by name:**
+```javascript
+// 1. Look up by name in layout.shapes → get index
+const index = layout.shapes.findIndex(s => s.name === 'my-shape');
+
+// 2. Query by data-index attribute → get correct DOM element
+const element = chartDiv.querySelector(`[data-index="${index}"]`);
+```
+
+See `Docs/plotly-shapes-vs-dom.md` for full explanation.
+
 ## Debugging
 
 `static/SCC/debug.js` exposes internals to `window` for console access. This is the ONE exception to the "no window object" rule - debugging utilities are allowed.

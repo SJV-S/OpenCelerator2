@@ -4,6 +4,7 @@
 import { chartState } from '../chartState.js';
 import { createToast } from '../util/toaster.js';
 import { icons } from '../util/icons.js';
+import { getFirstConfig } from '../series/traceStyles.js';
 
 /**
  * Takes a screenshot of the Plotly chart and downloads it as PNG
@@ -99,7 +100,7 @@ function exportDataToCSV() {
         // Add header row based on which series have data
         csvContent += 'Date,Corrects,Errors,Minutes';
         miscSeriesWithData.forEach(miscId => {
-            const config = chartState.traceStyles.misc[miscId]?.raw;
+            const config = getFirstConfig(miscId, true);
             const name = config?.seriesName || miscId;
             csvContent += `,${name}`;
         });
