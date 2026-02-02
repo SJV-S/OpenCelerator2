@@ -59,11 +59,11 @@ import { init as aimLinesInit } from './lines/aimLines.js';
 import { init as cutLinesInit } from './lines/cutLines.js';
 import { init as celLineInit } from './lines/celLine.js';
 import { initGridToggle, toggleDateLines, toggleCountLines, toggleMinorGrid } from './misc/grid.js';
-import { injectCelerationFan, initFanDrag, regenerateFan, toggleCelerationFan, init as celerationFanInit } from './misc/celerationFan.js';
+import { injectCelerationFan, initFanDrag, toggleCelerationFan, init as celerationFanInit } from './misc/celerationFan.js';
 import { injectCredits, initCreditClick, regenerateCredits, init as creditInit } from './misc/credit.js';
 import { toggleLegend, renderCustomLegend, init as customLegendInit } from './misc/customLegend.js';
 import { setupPanConstraints } from './util/panning_controls.js';
-import { resizeChartByHeight, CHART_CONFIG } from './util/resize-chart.js';
+import { resizeChartByHeight, CHART_CONFIG, emitFanReposition } from './util/resize-chart.js';
 import { getTemplate } from './util/chartLayouts.js';
 import { showInitialMenuHint } from './ui/tooltip.js';
 import { icons } from './ui/icons.js';
@@ -171,7 +171,7 @@ export function initializeChart() {
                     width: newWidth,
                     'xaxis.range': [currentRange[0], currentRange[1]]
                 }).then(() => {
-                    regenerateFan();
+                    emitFanReposition();
                     regenerateCredits();
                     renderCustomLegend();
                 });
@@ -608,7 +608,7 @@ export function setupEventListeners() {
                     'xaxis.range': [-LAYOUT.X_AXIS_MARGIN_OFFSET, newValue + LAYOUT.X_AXIS_MARGIN_OFFSET],
                     width: newWidth
                 }).then(() => {
-                    regenerateFan();
+                    emitFanReposition();
                     regenerateCredits();
                     renderCustomLegend();
                     eventBus.emit(EVENTS.CHART_WINDOW_CHANGED, newValue);

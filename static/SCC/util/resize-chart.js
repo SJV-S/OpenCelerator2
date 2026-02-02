@@ -6,6 +6,7 @@
 
 import { MOBILE_BREAKPOINT, CHART_MATH, LAYOUT } from '../config.js';
 import { chartState } from '../chartState.js';
+import { eventBus, EVENTS } from '../eventBus.js';
 
 /**
  * Check if current viewport is mobile-sized
@@ -49,9 +50,9 @@ const CHART_CONFIG = {
     Weekly: {
         yMin: 0.001 * 0.69,
         yMax: 1000,
-        unit: 4,
-        snapTo: 8,  // Snap to multiples of 8 (8, 16, 24...)
-        minXmax: 8,
+        unit: 5,
+        snapTo: 5,  // Snap to multiples of 5 (5-week months: 5, 10, 15...)
+        minXmax: 10,
         maxWindow: 100,
         capacity: 200,
         creditMarginMultiplier: 0.10,
@@ -414,4 +415,30 @@ function resizeChartByHeight(chartJson, containerWidth, containerHeight, chartTy
     return chartJson;
 }
 
-export { resizeChartByHeight, CHART_CONFIG };
+/**
+ * Calculate fan position and emit event to reposition the fan
+ * Called after resize or chart window change
+ */
+function emitFanReposition() {
+    const chartType = chartState.chartType;
+    const isMinuteChart = chartState.minuteChart;
+    const chartWindow = chartState.chartWindow;
+    const config = CHART_CONFIG[chartType] || CHART_CONFIG.Daily;
+
+    const xMid = isMinuteChart
+        ? chartWindow * config.fanXMultiplierMinute
+        : chartWindow * config.fanXMultiplier;
+
+    const yMid = isMinuteChart
+        ? config.fanYPositionMinute
+        : config.fanYPosition;
+
+    eventBus.emit(EVENTS.FAN_REPOSITION, {
+        xMid,
+        yMid,
+        chartType,
+        isMinuteChart
+    });
+}
+
+export { resizeChartByHeight, CHART_CONFIG, emitFanReposition };

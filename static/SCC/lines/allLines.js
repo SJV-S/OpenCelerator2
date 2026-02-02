@@ -67,7 +67,7 @@ function aimLineMetadata(direction, date1, y1, date2, y2, text, shapeIndices, an
  * Step 3: Remove those specific shapes and annotation from the chart
  * Step 4: Remove the line from chartState
  *
- * @param {string} lineType - The type of line ('PhaseLines', 'AimLines', or 'CelLines')
+ * @param {string} lineType - The type of line ('PhaseLines', 'AimLines', 'CelLines', or 'LineCuts')
  * @param {number} lineId - The ID of the line to remove
  * @returns {boolean} True if successful, false otherwise
  */
@@ -79,7 +79,8 @@ function removeLine(lineType, lineId) {
     const categoryMap = {
         'PhaseLines': 'phase',
         'AimLines': 'aim',
-        'CelLines': 'cel'
+        'CelLines': 'cel',
+        'LineCuts': 'cut'
     };
     const category = categoryMap[lineType];
 
@@ -89,6 +90,14 @@ function removeLine(lineType, lineId) {
     }
 
     eventBus.emit(EVENTS.LINE_REMOVE_CLICKABLE, { lineName: `${category}-${lineId}` });
+
+    // Cut lines don't have shapes/annotations in the same way - they affect data aggregation
+    if (lineType === 'LineCuts') {
+        delete chartState[lineType][lineId];
+        // Trigger chart refresh to recalculate aggregations
+        eventBus.emit(EVENTS.DATA_CHART_REFRESH);
+        return true;
+    }
 
     const lineIdStr = `${category}-${lineId}`;
     const shapes = (chartDiv.layout.shapes || []).filter(s => s.name !== lineIdStr);

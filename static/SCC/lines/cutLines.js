@@ -380,52 +380,9 @@ function removeCutLineToast() {
 }
 
 /**
- * Handles click events on cut lines (called via event subscription)
- * @param {string} lineName - Name of the clicked line
- */
-function handleCutLineClick(lineName) {
-    console.log(`[CUT LINE CLICK] Cut line clicked: ${lineName}`);
-
-    const lineId = parseInt(lineName.split('-')[1]);
-    if (isNaN(lineId)) {
-        console.error(`[CUT LINE CLICK] Invalid lineName format: ${lineName}`);
-        return;
-    }
-
-    createToast({
-        message: 'Cut line',
-        buttons: [
-            {
-                label: 'Remove',
-                onClick: () => {
-                    console.log(`[CUT LINE CLICK] Remove clicked for ${lineName}`);
-
-                    if (chartState.LineCuts && chartState.LineCuts[lineId]) {
-                        eventBus.emit(EVENTS.LINE_REMOVE_CLICKABLE, { lineName: `cut-${lineId}` });
-                        delete chartState.LineCuts[lineId];
-                        console.log(`[CUT LINE CLICK] Removed cut with ID ${lineId}`);
-                        eventBus.emit(EVENTS.DATA_CHART_REFRESH);
-                    } else {
-                        console.error(`[CUT LINE CLICK] Invalid cut ID: ${lineId}`);
-                    }
-                },
-                type: 'secondary'
-            }
-        ],
-        layout: 'horizontal',
-        duration: 3000
-    });
-}
-
-/**
  * Initialize subscriptions for this module
  */
 function init() {
-    // Subscribe to line click events
-    eventBus.subscribe(EVENTS.LINE_CUT_CLICKED, (data) => {
-        handleCutLineClick(data.lineName);
-    }, true);
-
     // Subscribe to mode activation events from navigation
     eventBus.subscribe(EVENTS.MODE_CUT_ACTIVATE, () => {
         activateCutLinesMode();
@@ -439,6 +396,6 @@ function init() {
     });
 }
 
-export { activateCutLinesMode, deactivateCutLinesMode, handleCutLineClick, init };
+export { activateCutLinesMode, deactivateCutLinesMode, init };
 
 console.log('cutLines.js loaded');

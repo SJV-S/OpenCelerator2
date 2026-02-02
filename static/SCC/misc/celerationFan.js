@@ -110,7 +110,7 @@ function toPaper(x, y, xMin, xMax, yMinLog, yMaxLog) {
     };
 }
 
-export function generateFanElements(layout, isMinuteChart, chartType) {
+export function generateFanElements(layout, isMinuteChart, chartType, position = null) {
     const xMin = layout.xaxis.range[0];
     const xMax = layout.xaxis.range[1];
     const yMinLog = layout.yaxis.range[0]; // Already log10
@@ -124,10 +124,9 @@ export function generateFanElements(layout, isMinuteChart, chartType) {
     const plotWidth = layout.width - layout.margin.l - layout.margin.r;
     const plotHeight = layout.height - layout.margin.t - layout.margin.b;
 
-    // Fan center in DATA coordinates (use capacity for fixed position)
-    const capacity = config.capacity || xMax;
-    const xMid = isMinuteChart ? capacity * config.fanXMultiplierMinute : capacity * config.fanXMultiplier;
-    const yMid = isMinuteChart ? config.fanYPositionMinute : config.fanYPosition;
+    // Fan center in DATA coordinates - use provided position or fall back to config
+    const xMid = position?.xMid ?? (isMinuteChart ? config.capacity * config.fanXMultiplierMinute : config.capacity * config.fanXMultiplier);
+    const yMid = position?.yMid ?? (isMinuteChart ? config.fanYPositionMinute : config.fanYPosition);
 
     // Line length based on chart height (constant visual size)
     const lineLengthPx = plotHeight * config.fanLineLengthMultiplier;
@@ -340,6 +339,43 @@ export function regenerateFan() {
 }
 
 /**
+ * Handle fan reposition event from resize-chart.js
+ * @param {Object} data - Event data with xMid, yMid, chartType, isMinuteChart
+ */
+function handleFanReposition(data) {
+    // On mobile, remove fan if it exists
+    if (isMobile()) {
+        if (chartState.fanVisible) {
+            removeCelerationFan();
+        }
+        return;
+    }
+
+    if (!chartState.fanVisible) return;
+
+    const chartDiv = document.getElementById('chart');
+    if (!chartDiv?.layout) return;
+
+    // Remove existing fan shapes and annotations
+    const existingShapes = (chartDiv.layout.shapes || []).filter(s => !s.name?.startsWith('fan-'));
+    const existingAnnotations = (chartDiv.layout.annotations || []).filter(a => !a.name?.startsWith('fan-'));
+
+    // Generate new fan with position from resize-chart.js
+    const { shapes, annotations } = generateFanElements(
+        chartDiv.layout,
+        data.isMinuteChart,
+        data.chartType,
+        { xMid: data.xMid, yMid: data.yMid }
+    );
+
+    // Update in single relayout call
+    Plotly.relayout(chartDiv, {
+        shapes: [...existingShapes, ...shapes],
+        annotations: [...existingAnnotations, ...annotations]
+    });
+}
+
+/**
  * Initialize fan module - subscribe to events
  * Called by main.js coordinator
  */
@@ -347,6 +383,8 @@ export function init() {
     eventBus.subscribe(EVENTS.FAN_VISIBILITY_CHANGED, (data) => {
         toggleCelerationFan(data.visible);
     }, true);
+
+    eventBus.subscribe(EVENTS.FAN_REPOSITION, handleFanReposition, true);
 }
 
 // =============================================================================

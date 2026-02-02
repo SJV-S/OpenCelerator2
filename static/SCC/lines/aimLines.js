@@ -16,7 +16,7 @@ import { chartState } from '../chartState.js';
 import { COLORS } from '../config.js';
 import { createToast, createTextInputDialog, createConfirmToast } from '../ui/toaster.js';
 import { xPositionToDate } from '../util/dates.js';
-import { aimLineMetadata, removeLine } from './allLines.js';
+import { aimLineMetadata } from './allLines.js';
 import { icons, applySvgCursor, restoreCursor } from '../ui/icons.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 
@@ -737,47 +737,6 @@ function removeAimShapes(chartDiv) {
 }
 
 /**
- * Removes an aim line by its lineName (e.g., "aim-456")
- * @param {string} lineName - Name of the line (format: "aim-{id}")
- * @returns {boolean} True if successful, false otherwise
- */
-function removeAimLineById(lineName) {
-    // Extract ID from lineName (format: "aim-456" -> 456)
-    const lineId = parseInt(lineName.split('-')[1]);
-    if (isNaN(lineId)) {
-        console.error(`[REMOVE AIM LINE] Invalid lineName format: ${lineName}`);
-        return false;
-    }
-
-    return removeLine('AimLines', lineId);
-}
-
-/**
- * Handles click events on aim lines
- * @param {string} lineName - Name of the clicked line (e.g., "aim-456")
- */
-function handleAimLineClick(lineName) {
-    console.log(`[AIM LINE CLICK] Aim line clicked: ${lineName}`);
-
-    // Show toaster with Remove button, auto-dismiss after 3 seconds
-    createToast({
-        message: 'Event marker',
-        buttons: [
-            {
-                label: 'Remove',
-                onClick: () => {
-                    console.log(`[AIM LINE CLICK] Remove clicked for ${lineName}`);
-                    removeAimLineById(lineName);
-                },
-                type: 'secondary'
-            }
-        ],
-        layout: 'horizontal',
-        duration: 3000  // Auto-dismiss after 3 seconds
-    });
-}
-
-/**
  * Shows "Aim mode" toaster on the left side with step indicator
  * @param {number} phase - Current phase (1 or 2)
  */
@@ -940,11 +899,6 @@ function setAimLineVisibility(visible) {
  * Called by main.js coordinator
  */
 function init() {
-    // Subscribe to aim line click events from lineClickHandler
-    eventBus.subscribe(EVENTS.LINE_AIM_CLICKED, (data) => {
-        handleAimLineClick(data.lineName);
-    }, true);
-
     // Subscribe to mode activation events from navigation
     eventBus.subscribe(EVENTS.MODE_AIM_ACTIVATE, (data) => {
         activateAimLineMode(data.direction);
@@ -966,6 +920,6 @@ function init() {
 }
 
 // Export functions for ES modules
-export { activateAimLineMode, deactivateAimLineMode, handleAimLineClick, init };
+export { activateAimLineMode, deactivateAimLineMode, init };
 
 console.log('aimLines.js loaded');

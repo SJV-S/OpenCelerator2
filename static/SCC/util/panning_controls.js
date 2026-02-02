@@ -16,7 +16,7 @@ const CHART_X_MIN = -CHART_MARGIN;
 // Chart-type specific configuration
 const CHART_CONFIG = {
     Daily:    { xMax: 280, snapInterval: 7 },
-    Weekly:   { xMax: 200, snapInterval: 4 },
+    Weekly:   { xMax: 200, snapInterval: 5 },
     Monthly:  { xMax: 240, snapInterval: 6 },
     Yearly:   { xMax: 200, snapInterval: 5 },
     FrequencyCollections: { xMax: 280, snapInterval: 7 },

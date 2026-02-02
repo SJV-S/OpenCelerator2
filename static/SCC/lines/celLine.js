@@ -16,7 +16,6 @@ import { icons, applySvgCursor, restoreCursor } from '../ui/icons.js';
 import { chartState } from '../chartState.js';
 import { CORRECTS, ERRORS, TIMING } from '../config.js';
 import { xPositionToDate, dateToXPosition } from '../util/dates.js';
-import { removeLine } from './allLines.js';
 import { fit, FIT_METHODS, BOUNCE_ENVELOPES, DEFAULT_FIT_METHOD, DEFAULT_BOUNCE_ENVELOPE, calculateBounceBounds, calculateBounceLines, formatCelerationLabel } from '../util/fit_lines.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 
@@ -1106,54 +1105,6 @@ function handleCelLineCancel() {
     celLineState.x1Pixel = null;
 }
 
-function handleCelLineClick(lineName) {
-    const lineId = parseInt(lineName.split('-')[1]);
-    if (isNaN(lineId)) {
-        console.error(`Invalid lineName format: ${lineName}`);
-        return;
-    }
-
-    const metadata = chartState.CelLines[lineId];
-    if (!metadata) {
-        console.error(`No metadata found for line ID: ${lineId}`);
-        return;
-    }
-
-    // Build info message including fit method and forecast
-    let message = `Celeration: ${metadata.text}`;
-    if (metadata.fitMethod) {
-        message += ` (${metadata.fitMethod}`;
-        if (metadata.forecast && metadata.forecast > 0) {
-            message += `, +${metadata.forecast}d`;
-        }
-        message += ')';
-    }
-
-    createToast({
-        message: message,
-        buttons: [
-            {
-                label: 'Remove',
-                onClick: () => {
-                    removeCelLineById(lineName);
-                },
-                type: 'secondary'
-            }
-        ],
-        layout: 'horizontal',
-        duration: 3000
-    });
-}
-
-function removeCelLineById(lineName) {
-    const lineId = parseInt(lineName.split('-')[1]);
-    if (isNaN(lineId)) {
-        return false;
-    }
-
-    return removeLine('CelLines', lineId);
-}
-
 function redrawCelLines() {
     const chartDiv = document.getElementById('chart');
     if (!chartDiv) return;
@@ -1318,10 +1269,6 @@ function setCelLineVisibility(visible) {
  * Initialize subscriptions for this module
  */
 function init() {
-    eventBus.subscribe(EVENTS.LINE_CEL_CLICKED, (data) => {
-        handleCelLineClick(data.lineName);
-    }, true);
-
     // Subscribe to mode activation events from navigation
     eventBus.subscribe(EVENTS.MODE_CEL_ACTIVATE, () => {
         activateCelLineMode();
@@ -1346,5 +1293,5 @@ function init() {
     }, true);
 }
 
-export { activateCelLineMode, deactivateCelLineMode, handleCelLineClick, init };
+export { activateCelLineMode, deactivateCelLineMode, init };
 

@@ -20,7 +20,7 @@ import { COLORS } from '../config.js';
 import { createToast, createTextInputDialog, createNumberInputDialog, createConfirmToast, createArrowControls } from '../ui/toaster.js';
 import { xPositionToDate, timestampsToXPositions } from '../util/dates.js';
 import { icons, applySvgCursor, restoreCursor } from '../ui/icons.js';
-import { phaseLineMetadata, removeLine } from './allLines.js';
+import { phaseLineMetadata } from './allLines.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 
 var phaseLineState = {
@@ -824,47 +824,6 @@ function removePhaseShapes(chartDiv) {
 }
 
 /**
- * Removes a phase line by its lineName (e.g., "phase-123")
- * @param {string} lineName - Name of the line (format: "phase-{id}")
- * @returns {boolean} True if successful, false otherwise
- */
-function removePhaseLineById(lineName) {
-    // Extract ID from lineName (format: "phase-123" -> 123)
-    const lineId = parseInt(lineName.split('-')[1]);
-    if (isNaN(lineId)) {
-        console.error(`[REMOVE PHASE LINE] Invalid lineName format: ${lineName}`);
-        return false;
-    }
-
-    return removeLine('PhaseLines', lineId);
-}
-
-/**
- * Handles click events on phase lines
- * @param {string} lineName - Name of the clicked line (e.g., "phase-123")
- */
-function handlePhaseLineClick(lineName) {
-    console.log(`[PHASE LINE CLICK] Phase line clicked: ${lineName}`);
-
-    // Show toaster with Remove button, auto-dismiss after 3 seconds
-    createToast({
-        message: 'Count marker',
-        buttons: [
-            {
-                label: 'Remove',
-                onClick: () => {
-                    console.log(`[PHASE LINE CLICK] Remove clicked for ${lineName}`);
-                    removePhaseLineById(lineName);
-                },
-                type: 'secondary'
-            }
-        ],
-        layout: 'horizontal',
-        duration: 3000  // Auto-dismiss after 3 seconds
-    });
-}
-
-/**
  * Shows "Phase mode" toaster on the left side with step indicator
  * @param {number} phase - Current phase (1, 2, 3, or 4)
  */
@@ -960,11 +919,6 @@ function setPhaseLineVisibility(visible) {
  * Called by main.js coordinator
  */
 function init() {
-    // Subscribe to phase line click events from lineClickHandler
-    eventBus.subscribe(EVENTS.LINE_PHASE_CLICKED, (data) => {
-        handlePhaseLineClick(data.lineName);
-    }, true);
-
     // Subscribe to mode activation events from navigation
     eventBus.subscribe(EVENTS.MODE_PHASE_ACTIVATE, (data) => {
         activatePhaseLineMode(data.direction);
@@ -986,4 +940,4 @@ function init() {
 }
 
 // Export functions for ES modules
-export { activatePhaseLineMode, deactivatePhaseLineMode, handlePhaseLineClick, init };
+export { activatePhaseLineMode, deactivatePhaseLineMode, init };

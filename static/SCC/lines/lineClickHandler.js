@@ -1,13 +1,17 @@
 /**
  * Click Handler for Chart Lines
  *
- * This module sets up click event handling for Plotly chart lines.
- * Emits events when lines are clicked - subscribers handle the response.
+ * This module handles all line click interactions:
+ * - Creates clickable marker overlays when edit mode is enabled
+ * - Handles click events and shows removal toasts
+ * - Removes lines when user confirms
  */
 
 import { chartState } from '../chartState.js';
-import { timestampsToXPositions } from '../util/dates.js';
+import { timestampsToXPositions, dateToXPosition } from '../util/dates.js';
 import { eventBus, EVENTS } from '../eventBus.js';
+import { createToast } from '../ui/toaster.js';
+import { removeLine } from './allLines.js';
 
 /**
  * Initialize click event listener on the chart
@@ -28,22 +32,7 @@ function setupClickHandler() {
 
         if (meta && meta.type === 'clickableLine') {
             console.log(`Line clicked: ${meta.lineName}`);
-
-            const lineName = meta.lineName;
-            const category = lineName.split('-')[0];
-
-            // Emit event based on category - let subscribers handle it
-            if (category === 'phase') {
-                eventBus.emit(EVENTS.LINE_PHASE_CLICKED, { lineName });
-            } else if (category === 'aim') {
-                eventBus.emit(EVENTS.LINE_AIM_CLICKED, { lineName });
-            } else if (category === 'cel') {
-                eventBus.emit(EVENTS.LINE_CEL_CLICKED, { lineName });
-            } else if (category === 'cut') {
-                eventBus.emit(EVENTS.LINE_CUT_CLICKED, { lineName });
-            } else {
-                console.warn(`No event for category: ${category}`);
-            }
+            handleLineClick(meta.lineName);
         }
     });
 
@@ -66,7 +55,72 @@ function setupClickHandler() {
 }
 
 /**
- * Make a line clickable by overlaying invisible marker traces
+ * Handle a line click - show toast with info and remove button
+ * @param {string} lineName - Name of the clicked line (e.g., "phase-123", "cel-456")
+ */
+function handleLineClick(lineName) {
+    const [category, idStr] = lineName.split('-');
+    const lineId = parseInt(idStr);
+
+    if (isNaN(lineId)) {
+        console.error(`Invalid lineName format: ${lineName}`);
+        return;
+    }
+
+    // Map category to chartState property and display info
+    const lineTypeMap = {
+        'phase': { stateKey: 'PhaseLines', label: 'Count marker' },
+        'aim': { stateKey: 'AimLines', label: 'Event marker' },
+        'cel': { stateKey: 'CelLines', label: null }, // Dynamic label from metadata
+        'cut': { stateKey: 'LineCuts', label: 'Cut line' }
+    };
+
+    const lineType = lineTypeMap[category];
+    if (!lineType) {
+        console.warn(`Unknown line category: ${category}`);
+        return;
+    }
+
+    // Build the toast message
+    let message = lineType.label;
+
+    // Cel lines have dynamic label from metadata
+    if (category === 'cel') {
+        const metadata = chartState.CelLines[lineId];
+        if (metadata) {
+            message = `Celeration: ${metadata.text}`;
+            if (metadata.fitMethod) {
+                message += ` (${metadata.fitMethod}`;
+                if (metadata.forecast && metadata.forecast > 0) {
+                    message += `, +${metadata.forecast}d`;
+                }
+                message += ')';
+            }
+        } else {
+            message = 'Celeration line';
+        }
+    }
+
+    // Show toast with remove button
+    createToast({
+        message: message,
+        buttons: [
+            {
+                label: 'Remove',
+                onClick: () => {
+                    console.log(`Remove clicked for ${lineName}`);
+                    removeLine(lineType.stateKey, lineId);
+                },
+                type: 'secondary'
+            }
+        ],
+        layout: 'horizontal',
+        duration: 3000
+    });
+}
+
+/**
+ * Make a line clickable by overlaying marker traces
  * @param {Object} lineData - { lineName, points: Array<{x, y}> }
  */
 function makeLineClickable(lineData) {
@@ -203,6 +257,27 @@ function setLineClickability(makeClickable) {
 
                     return makeLineClickable({
                         lineName: `aim-${aimLine.id}`,
+                        points: points
+                    });
+                });
+            });
+        }
+
+        // Cel lines (change/trend lines)
+        if (chartState.CelLines) {
+            Object.entries(chartState.CelLines).forEach(([key, celLine]) => {
+                // Skip the settings object
+                if (key === 'settings') return;
+
+                clickablePromise = clickablePromise.then(() => {
+                    // Cel lines store dates as YYYY-MM-DD strings
+                    const x1 = dateToXPosition(celLine.date1);
+                    const x2 = dateToXPosition(celLine.date2);
+
+                    const points = [interpolateLinePoints(x1, celLine.y1, x2, celLine.y2, isLogY)];
+
+                    return makeLineClickable({
+                        lineName: `cel-${celLine.id}`,
                         points: points
                     });
                 });

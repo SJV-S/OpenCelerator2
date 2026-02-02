@@ -21,7 +21,7 @@
  *
  * Naming convention: namespace:action
  * - data: Data-related events (entries, dates, chart refresh)
- * - line: Line interaction events (clicks on phase/aim/cel/cut lines)
+ * - line: Line events (save, remove, visibility)
  * - mode: Drawing mode activation/deactivation
  * - nav: Navigation and UI state events
  * - ui: UI component updates (legend, styles)
@@ -33,11 +33,7 @@ export const EVENTS = {
     DATA_CHART_REFRESH: 'data:chart_refresh',
     DATA_CHART_REPLOT_COMPLETE: 'data:chart_replot_complete',
 
-    // Line Click Events
-    LINE_PHASE_CLICKED: 'line:phase_clicked',
-    LINE_AIM_CLICKED: 'line:aim_clicked',
-    LINE_CEL_CLICKED: 'line:cel_clicked',
-    LINE_CUT_CLICKED: 'line:cut_clicked',
+    // Line Events
     LINE_REMOVE_CLICKABLE: 'line:remove_clickable',
     LINE_VISIBILITY_CHANGED: 'line:visibility_changed',
 
@@ -73,6 +69,7 @@ export const EVENTS = {
 
     // Fan Events
     FAN_VISIBILITY_CHANGED: 'fan:visibility_changed',
+    FAN_REPOSITION: 'fan:reposition',
 
     // Chart Settings Events
     CHART_PANNING_ENABLED_CHANGED: 'chart:panning_enabled_changed',
@@ -141,6 +138,7 @@ const EVENT_CATEGORY_MAP = {
 
     // Fan
     [EVENTS.FAN_VISIBILITY_CHANGED]: [EVENT_CATEGORIES.STATE_MUTATING],
+    [EVENTS.FAN_REPOSITION]: [EVENT_CATEGORIES.STATE_MUTATING],
 
     // Chart settings
     [EVENTS.CHART_NAME_CHANGED]: [EVENT_CATEGORIES.STATE_MUTATING],
