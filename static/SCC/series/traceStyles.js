@@ -11,7 +11,7 @@
 import { chartState, defaultCorrectTraceConfig, defaultErrorTraceConfig, defaultTimingTraceConfig, createMiscTraceConfig } from '../chartState.js';
 import { CORRECTS, ERRORS, TIMING, LIMITS, LINE_DEFAULTS } from '../config.js';
 import { getMiscSeriesIds } from './miscSeries.js';
-import { createToast } from '../ui/toaster.js';
+import { createToast, createConfirmToast } from '../ui/toaster.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 
 // ============================================================================
@@ -64,6 +64,29 @@ function updateSumOptionVisibility() {
             option.parentElement.value = 'raw';
         }
     });
+}
+
+/**
+ * Update visibility of timing series tab.
+ * Timing is only relevant for minute charts.
+ * Panel visibility is controlled solely by switchSeriesTab().
+ */
+function updateTimingSeriesVisibility() {
+    const shouldShow = chartState.minuteChart;
+
+    // Hide/show the timing subtab button
+    const timingTab = document.querySelector('.series-subtab[data-series-tab="timing"]');
+    if (timingTab) {
+        timingTab.style.display = shouldShow ? '' : 'none';
+    }
+
+    // If hiding timing and it's the active panel, switch to corrects
+    if (!shouldShow) {
+        const timingPanel = document.getElementById('timing-series-config');
+        if (timingPanel && timingPanel.style.display === 'flex') {
+            switchSeriesTab(CORRECTS);
+        }
+    }
 }
 
 // ============================================================================
@@ -164,8 +187,9 @@ function initializeSeriesInputs(seriesName) {
 }
 
 function initializeAllSeriesInputs() {
-    // Update sum option visibility based on chart type
+    // Update visibility based on chart type
     updateSumOptionVisibility();
+    updateTimingSeriesVisibility();
     // Initialize fixed series
     [CORRECTS, ERRORS, TIMING].forEach(initializeSeriesInputs);
     // Initialize dynamic misc series
@@ -226,7 +250,8 @@ function applyTraceConfig(seriesName) {
     eventBus.emit(EVENTS.DATA_CHART_REFRESH);
     eventBus.emit(EVENTS.UI_LEGEND_RENDER);
     eventBus.emit(EVENTS.UI_TRACE_STYLE_CHANGED);
-    createToast({ message: `${seriesName} configurations updated.`, duration: 2000 });
+    const displayName = getFirstConfig(seriesName, isMiscSeries)?.seriesName || seriesName;
+    createToast({ message: `${displayName} configurations updated.`, duration: 2000 });
 }
 
 function resetTraceConfig(seriesName) {
@@ -278,7 +303,8 @@ function resetTraceConfig(seriesName) {
     eventBus.emit(EVENTS.DATA_CHART_REFRESH);
     eventBus.emit(EVENTS.UI_LEGEND_RENDER);
     eventBus.emit(EVENTS.UI_TRACE_STYLE_CHANGED);
-    createToast({ message: `${seriesName} reset to defaults.`, duration: 2000 });
+    const displayName = getFirstConfig(seriesName, isMiscSeries)?.seriesName || seriesName;
+    createToast({ message: `${displayName} reset to defaults.`, duration: 2000 });
 }
 
 function toggleLineWidth(seriesName) {
@@ -328,7 +354,7 @@ function switchSeriesTab(seriesName) {
     });
 
     // Show selected series config panel
-    document.getElementById(seriesName + '-series-config').style.display = 'block';
+    document.getElementById(seriesName + '-series-config').style.display = 'flex';
 
     // Add active styling to selected sub-tab
     const activeButton = document.querySelector(`[data-series-tab="${seriesName}"]`);
@@ -571,8 +597,18 @@ function createMiscSeriesTab(id, index) {
     panel.querySelector('.apply-misc-btn')?.addEventListener('click', () => applyTraceConfig(id));
     panel.querySelector('.reset-misc-btn')?.addEventListener('click', () => resetTraceConfig(id));
     panel.querySelector('.delete-misc-btn')?.addEventListener('click', () => {
-        import('./miscSeries.js').then(({ removeMiscSeries }) => {
-            removeMiscSeries(id);
+        const seriesName = getFirstConfig(id, true)?.seriesName || id;
+        createConfirmToast({
+            message: `Delete "${seriesName}" series?`,
+            onYes: () => {
+                import('./miscSeries.js').then(({ removeMiscSeries }) => {
+                    removeMiscSeries(id);
+                });
+            },
+            onNo: () => {},
+            yesLabel: 'Delete',
+            noLabel: 'Cancel',
+            primaryColor: '#ef4444'
         });
     });
     panel.querySelector('.add-block-btn')?.addEventListener('click', () => addAggregationBlock(id));
@@ -623,5 +659,6 @@ export {
     removeAggregationBlock,
     getAvailableAggTypes,
     updateSumOptionVisibility,
+    updateTimingSeriesVisibility,
     getFirstConfig
 };

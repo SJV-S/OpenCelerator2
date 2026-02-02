@@ -555,4 +555,14 @@
     overflow-x: hidden;
     padding: 5%;
     box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+}
+
+.series-config-panel {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 100%;
+    padding-bottom: 60px; /* Space for the floating add button */
 }

@@ -265,7 +265,13 @@ function init() {
         generateMiscInputs();
     });
 
-    // Generate initial misc inputs
+    // Regenerate inputs when chart is loaded from storage
+    eventBus.subscribe(EVENTS.STORAGE_CHART_LOADED, () => {
+        generateMiscInputs();
+        updateTimingVisibility();
+    }, true);
+
+    // Generate initial misc inputs (may be empty if chart not yet loaded)
     generateMiscInputs();
 
     // ========================================================================
@@ -287,7 +293,10 @@ function init() {
     // Handle tab switching - track state and hide indicator when leaving data tab
     eventBus.subscribe(EVENTS.NAV_TAB_SWITCH, (data) => {
         dataTabActive = (data.tab === 'data');
-        if (!dataTabActive) {
+        if (dataTabActive) {
+            // Regenerate misc inputs when navigating to data tab
+            generateMiscInputs();
+        } else {
             removeEntryDateIndicator();
         }
     }, true);
