@@ -67,14 +67,14 @@ const CHART_CONFIG = {
         yAxisTitlePosition: 0.5,
         yAxisTitlePositionMinute: 0.7,
         annotations: {
-            'month-label': { offsetMultiplier: 3.05, useGeneral: true, fontScale: 0.85, prefix: true },
-            'month-count': { offsetMultiplier: 5.93, useGeneral: true },
+            'month-label': { offsetMultiplier: 2.8, useGeneral: true, fontScale: 0.85, prefix: true },
+            'month-count': { offsetMultiplier: 5, useGeneral: true },
             'top_x_title': { offsetMultiplier: 5.93, useTitle: true, yDirection: 'above' },
             'bottom_x_title': { offsetMultiplier: 4.44, useTitle: true, yDirection: 'below' }
         },
         shapes: {
             hasTopXTick: true,
-            topXTickMultiplier: 4
+            topXTickMultiplier: 3
         }
     },
     Monthly: {

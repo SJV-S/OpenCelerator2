@@ -146,9 +146,11 @@ function alignStartDate(date, chartType) {
  * @returns {string} Formatted month-year string
  */
 function formatMonthYear(date) {
+    console.log('ran')
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return `${months[date.getMonth()]} ${date.getFullYear()}`;
+    const year = date.getFullYear().toString().slice(-2);
+    return `${months[date.getMonth()]}<br>${year}`;
 }
 
 /**
