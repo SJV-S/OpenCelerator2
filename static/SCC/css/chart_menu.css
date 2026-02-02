@@ -626,8 +626,15 @@
     display: flex;
 }
 
+/* Aggregation item row (contains item + optional remove button) */
+.agg-item-row {
+    display: flex;
+    align-items: center;
+}
+
 /* Individual aggregation item */
 .agg-item {
+    flex: 1;
     padding: 0.375rem 0.75rem 0.375rem 1.25rem;
     font-size: 0.8rem;
     color: #4b5563;
@@ -645,6 +652,23 @@
 .agg-item.active {
     background-color: #6ad1e3;
     color: black;
+}
+
+/* Remove aggregation button */
+.agg-remove-btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.9rem;
+    font-weight: bold;
+    color: #9ca3af;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    line-height: 1;
+    transition: color 0.15s ease;
+}
+
+.agg-remove-btn:hover {
+    color: #ef4444;
 }
 
 /* Add aggregation button in expanded list */

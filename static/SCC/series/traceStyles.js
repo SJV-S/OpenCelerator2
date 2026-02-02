@@ -155,9 +155,13 @@ function renderAggList(item, seriesName, aggTypes) {
     if (!listContainer) return;
 
     listContainer.innerHTML = '';
+    const canRemove = aggTypes.length > 1;
 
     // Add aggregation items
     aggTypes.forEach(aggType => {
+        const aggRow = document.createElement('div');
+        aggRow.className = 'agg-item-row';
+
         const aggBtn = document.createElement('button');
         aggBtn.className = 'agg-item';
         aggBtn.dataset.series = seriesName;
@@ -173,7 +177,22 @@ function renderAggList(item, seriesName, aggTypes) {
             selectAggregation(seriesName, aggType);
         });
 
-        listContainer.appendChild(aggBtn);
+        aggRow.appendChild(aggBtn);
+
+        // Add minus button if removable
+        if (canRemove) {
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'agg-remove-btn';
+            removeBtn.innerHTML = '−';
+            removeBtn.title = 'Remove aggregation';
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                removeAggregationByType(seriesName, aggType);
+            });
+            aggRow.appendChild(removeBtn);
+        }
+
+        listContainer.appendChild(aggRow);
     });
 
     // Add "+" button if more aggregation types available
@@ -187,7 +206,7 @@ function renderAggList(item, seriesName, aggTypes) {
         addBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> Add`;
         addBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            addAggregation(seriesName);
+            showAddAggregationDialog(seriesName);
         });
         listContainer.appendChild(addBtn);
     }
@@ -320,13 +339,6 @@ function loadConfigPanel(seriesName, aggType) {
         }
     }
 
-    // Show/hide remove aggregation button
-    const removeAggBtn = document.getElementById('remove-agg-btn');
-    if (removeAggBtn) {
-        const aggCount = getAggCount(seriesName);
-        removeAggBtn.classList.toggle('hidden', aggCount <= 1);
-    }
-
     // Populate form fields
     document.getElementById('config-series-name').value = config.seriesName || '';
     document.getElementById('config-agg-type').value = aggType;
@@ -436,18 +448,33 @@ function resetConfig() {
 // AGGREGATION MANAGEMENT
 // ============================================================================
 
-function addAggregation(seriesName) {
+function showAddAggregationDialog(seriesName) {
     const usedAggs = getAggTypes(seriesName);
     const availableAggs = getAvailableAggTypes();
-    const unusedAgg = availableAggs.find(a => !usedAggs.includes(a));
+    const unusedAggs = availableAggs.filter(a => !usedAggs.includes(a));
 
-    if (!unusedAgg) return;
+    if (unusedAggs.length === 0) return;
 
+    // Create selection buttons for the toast
+    const buttons = unusedAggs.map(aggType => ({
+        label: aggType.charAt(0).toUpperCase() + aggType.slice(1),
+        onClick: () => addAggregationOfType(seriesName, aggType),
+        type: 'secondary'
+    }));
+
+    createToast({
+        message: 'Select aggregation type:',
+        buttons: buttons,
+        layout: 'vertical'
+    });
+}
+
+function addAggregationOfType(seriesName, aggType) {
     // Get base config from first aggregation
     const firstConfig = getFirstConfig(seriesName, isMiscSeries(seriesName));
     const newConfig = { ...firstConfig };
 
-    setConfig(seriesName, unusedAgg, newConfig);
+    setConfig(seriesName, aggType, newConfig);
 
     // Re-render and select the new aggregation
     renderSeriesItem(seriesName);
@@ -465,24 +492,21 @@ function addAggregation(seriesName) {
         if (item) item.classList.add('expanded');
     }
 
-    selectAggregation(seriesName, unusedAgg);
+    selectAggregation(seriesName, aggType);
 
     eventBus.emit(EVENTS.DATA_CHART_REFRESH);
     eventBus.emit(EVENTS.UI_LEGEND_RENDER);
 }
 
-function removeAggregation() {
-    const seriesName = currentSeries;
-    const aggType = currentAggType;
+function removeAggregationByType(seriesName, aggType) {
     const aggCount = getAggCount(seriesName);
-
     if (aggCount <= 1) return;
 
     deleteConfig(seriesName, aggType);
 
     // Select first remaining aggregation
     const remainingAggs = getAggTypes(seriesName);
-    currentAggType = remainingAggs[0];
+    const newAggType = remainingAggs[0];
 
     // Re-render
     renderSeriesItem(seriesName);
@@ -498,7 +522,10 @@ function removeAggregation() {
         }
     }
 
-    selectAggregation(seriesName, currentAggType);
+    // If removed the currently selected agg, select another
+    if (currentSeries === seriesName && currentAggType === aggType) {
+        selectAggregation(seriesName, newAggType);
+    }
 
     eventBus.emit(EVENTS.DATA_CHART_REFRESH);
     eventBus.emit(EVENTS.UI_LEGEND_RENDER);
@@ -606,7 +633,6 @@ function initializeSeriesNav() {
     // Set up config panel buttons
     document.getElementById('apply-config-btn')?.addEventListener('click', applyConfig);
     document.getElementById('reset-config-btn')?.addEventListener('click', resetConfig);
-    document.getElementById('remove-agg-btn')?.addEventListener('click', removeAggregation);
     document.getElementById('delete-series-btn')?.addEventListener('click', deleteMiscSeries);
 
     // Set up plus icon click for single-agg series (adds new aggregation)
@@ -614,7 +640,7 @@ function initializeSeriesNav() {
         icon.addEventListener('click', (e) => {
             e.stopPropagation();
             const seriesName = e.target.closest('.series-item').dataset.series;
-            addAggregation(seriesName);
+            showAddAggregationDialog(seriesName);
         });
     });
 
