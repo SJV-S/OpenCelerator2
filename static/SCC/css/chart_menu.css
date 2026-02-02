@@ -524,45 +524,158 @@
     background-color: white;
     border-right: 1px solid #d1d5db;
     flex-shrink: 0;
-    min-width: 80px;
-    position: relative;
+    min-width: 100px;
+    max-width: 140px;
+    overflow-y: auto;
 }
 
-.series-subtab {
-    padding: 0.5rem 1rem;
+/* Series item container */
+.series-item {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Main series row (clickable) */
+.series-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
     font-size: 0.875rem;
     font-weight: 400;
     color: black;
     background-color: transparent;
     border: none;
     text-align: left;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+    width: 100%;
+}
+
+.series-row:hover {
+    background-color: #96deeb;
+}
+
+.series-row.active {
+    background-color: #6ad1e3;
+}
+
+.series-name {
+    flex: 1;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Icon container - shows either chevron or plus */
+.series-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+}
+
+/* By default hide both icons */
+.series-icon .chevron-icon,
+.series-icon .plus-icon {
+    display: none;
+}
+
+/* Show plus when single aggregation (default) */
+.series-item.single-agg .plus-icon {
+    display: block;
+}
+
+/* Show chevron when multiple aggregations */
+.series-item.multi-agg .chevron-icon {
+    display: block;
+    transition: transform 0.2s ease;
+}
+
+/* Rotate chevron when expanded */
+.series-item.multi-agg.expanded .chevron-icon {
+    transform: rotate(90deg);
+}
+
+/* Always visible plus icon (for add series button) */
+.plus-icon.always-visible {
+    display: block !important;
+}
+
+/* Add series button styling */
+.add-series-btn {
+    border-top: 1px solid #e5e7eb;
+    margin-top: auto;
+    color: #6b7280;
+}
+
+.add-series-btn:hover {
+    color: black;
+}
+
+/* Expandable aggregation list */
+.series-agg-list {
+    display: none;
+    flex-direction: column;
+    background-color: #f9fafb;
+}
+
+.series-item.expanded .series-agg-list {
+    display: flex;
+}
+
+/* Individual aggregation item */
+.agg-item {
+    padding: 0.375rem 0.75rem 0.375rem 1.25rem;
+    font-size: 0.8rem;
+    color: #4b5563;
+    background: transparent;
+    border: none;
+    text-align: left;
     cursor: pointer;
     transition: background-color 0.15s ease;
 }
 
-.series-subtab:hover {
-    background-color: #96deeb;
+.agg-item:hover {
+    background-color: #e5e7eb;
 }
 
-.series-subtab.active {
+.agg-item.active {
     background-color: #6ad1e3;
+    color: black;
 }
 
+/* Add aggregation button in expanded list */
+.add-agg-btn {
+    padding: 0.375rem 0.75rem 0.375rem 1.25rem;
+    font-size: 0.8rem;
+    color: #6b7280;
+    background: transparent;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.add-agg-btn:hover {
+    background-color: #e5e7eb;
+    color: black;
+}
+
+/* Series content area */
 .series-content {
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
     padding: 5%;
     box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
 }
 
 .series-config-panel {
     display: flex;
     flex-direction: column;
-    flex: 1;
-    min-height: 100%;
-    padding-bottom: 60px; /* Space for the floating add button */
 }

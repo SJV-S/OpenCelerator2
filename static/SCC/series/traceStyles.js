@@ -2,10 +2,9 @@
  * Trace Styles Configuration
  *
  * This module handles:
- * - Reading and writing trace configuration objects
- * - Syncing trace configs with HTML form inputs
- * - Series configuration UI management
- * - Aggregation block management (adding/removing config blocks)
+ * - Hierarchical series navigation (series -> aggregations)
+ * - Single aggregation config panel
+ * - Adding/removing aggregation methods per series
  */
 
 import { chartState, defaultCorrectTraceConfig, defaultErrorTraceConfig, defaultTimingTraceConfig, createMiscTraceConfig } from '../chartState.js';
@@ -15,16 +14,19 @@ import { createToast, createConfirmToast } from '../ui/toaster.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 
 // ============================================================================
+// STATE
+// ============================================================================
+
+// Currently selected series and aggregation
+let currentSeries = CORRECTS;
+let currentAggType = 'raw';
+
+// ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
 
 const MAX_TAB_NAME_LENGTH = LIMITS.MAX_TAB_NAME_LENGTH;
 
-/**
- * Truncate a series name for display in tab buttons.
- * @param {string} name - The series name to truncate
- * @returns {string} Truncated name with "..." if over limit
- */
 function truncateTabName(name) {
     if (!name || name.length <= MAX_TAB_NAME_LENGTH) {
         return name;
@@ -32,15 +34,6 @@ function truncateTabName(name) {
     return name.slice(0, MAX_TAB_NAME_LENGTH) + '...';
 }
 
-// ============================================================================
-// AGGREGATION OPTIONS
-// ============================================================================
-
-/**
- * Get available aggregation types based on chart type.
- * 'sum' is only available for non-minute charts (where frequency = raw count).
- * @returns {string[]} Array of available aggregation type keys
- */
 function getAvailableAggTypes() {
     const baseAggs = ['raw', 'mean', 'median', 'min', 'max', 'first', 'last'];
     if (!chartState.minuteChart) {
@@ -49,57 +42,42 @@ function getAvailableAggTypes() {
     return baseAggs;
 }
 
-/**
- * Update visibility of sum option in all aggregation select dropdowns.
- * Called on initialization and when chart type could change.
- */
-function updateSumOptionVisibility() {
-    const sumOptions = document.querySelectorAll('.agg-type-select .sum-option');
-    const shouldShow = !chartState.minuteChart;
-
-    sumOptions.forEach(option => {
-        option.style.display = shouldShow ? '' : 'none';
-        // If sum was selected on a minute chart, reset to 'raw'
-        if (!shouldShow && option.selected) {
-            option.parentElement.value = 'raw';
-        }
-    });
+function isMiscSeries(seriesName) {
+    return seriesName.startsWith('misc');
 }
 
-/**
- * Update visibility of timing series tab.
- * Timing is only relevant for minute charts.
- * Panel visibility is controlled solely by switchSeriesTab().
- */
-function updateTimingSeriesVisibility() {
-    const shouldShow = chartState.minuteChart;
+function getSeriesConfigs(seriesName) {
+    return isMiscSeries(seriesName)
+        ? chartState.traceStyles.misc[seriesName]
+        : chartState.traceStyles[seriesName];
+}
 
-    // Hide/show the timing subtab button
-    const timingTab = document.querySelector('.series-subtab[data-series-tab="timing"]');
-    if (timingTab) {
-        timingTab.style.display = shouldShow ? '' : 'none';
-    }
-
-    // If hiding timing and it's the active panel, switch to corrects
-    if (!shouldShow) {
-        const timingPanel = document.getElementById('timing-series-config');
-        if (timingPanel && timingPanel.style.display === 'flex') {
-            switchSeriesTab(CORRECTS);
-        }
+function setSeriesConfigs(seriesName, configs) {
+    if (isMiscSeries(seriesName)) {
+        chartState.traceStyles.misc[seriesName] = configs;
+    } else {
+        chartState.traceStyles[seriesName] = configs;
     }
 }
 
-// ============================================================================
-// TRACE CONFIGURATION UI
-// ============================================================================
+function getConfig(seriesName, aggType) {
+    const configs = getSeriesConfigs(seriesName);
+    return configs ? configs[aggType] : null;
+}
 
-/**
- * Get the first available aggregation config for a series.
- * Handles cases where 'raw' may not exist (e.g., after auto-aggregation).
- * @param {string} seriesName - The series key (e.g., 'corrects', 'misc1')
- * @param {boolean} isMisc - Whether this is a misc series
- * @returns {Object|null} The first aggregation config object, or null if not found
- */
+function setConfig(seriesName, aggType, config) {
+    const configs = getSeriesConfigs(seriesName) || {};
+    configs[aggType] = config;
+    setSeriesConfigs(seriesName, configs);
+}
+
+function deleteConfig(seriesName, aggType) {
+    const configs = getSeriesConfigs(seriesName);
+    if (configs && configs[aggType]) {
+        delete configs[aggType];
+    }
+}
+
 function getFirstConfig(seriesName, isMisc = false) {
     const configs = isMisc
         ? chartState.traceStyles.misc[seriesName]
@@ -109,12 +87,488 @@ function getFirstConfig(seriesName, isMisc = false) {
     return firstAggType ? configs[firstAggType] : null;
 }
 
-function updateCounterLabels() {
-    document.getElementById('corrects-series-label').textContent = getFirstConfig(CORRECTS)?.seriesName || 'Corrects';
-    document.getElementById('errors-series-label').textContent = getFirstConfig(ERRORS)?.seriesName || 'Errors';
-    document.getElementById('timing-series-label').textContent = getFirstConfig(TIMING)?.seriesName || 'Timing';
+function getAggCount(seriesName) {
+    const configs = getSeriesConfigs(seriesName);
+    return configs ? Object.keys(configs).length : 0;
+}
 
-    // Update labels for dynamic misc series
+function getAggTypes(seriesName) {
+    const configs = getSeriesConfigs(seriesName);
+    return configs ? Object.keys(configs) : [];
+}
+
+// ============================================================================
+// LEFT NAV RENDERING
+// ============================================================================
+
+function renderSeriesNav() {
+    const fixedSeries = [CORRECTS, ERRORS, TIMING];
+    const miscIds = getMiscSeriesIds();
+
+    // Render fixed series
+    fixedSeries.forEach(seriesName => {
+        renderSeriesItem(seriesName);
+    });
+
+    // Render misc series
+    const miscContainer = document.getElementById('misc-series-container');
+    if (miscContainer) {
+        miscContainer.innerHTML = '';
+        miscIds.forEach(id => {
+            const item = createMiscSeriesItem(id);
+            miscContainer.appendChild(item);
+        });
+    }
+
+    // Update timing visibility
+    updateTimingSeriesVisibility();
+}
+
+function renderSeriesItem(seriesName) {
+    const item = document.querySelector(`.series-item[data-series="${seriesName}"]`);
+    if (!item) return;
+
+    const aggCount = getAggCount(seriesName);
+    const aggTypes = getAggTypes(seriesName);
+    const config = getFirstConfig(seriesName, isMiscSeries(seriesName));
+
+    // Update series name display
+    const nameSpan = item.querySelector('.series-name');
+    if (nameSpan && config?.seriesName) {
+        nameSpan.textContent = truncateTabName(config.seriesName);
+    }
+
+    // Update icon visibility based on aggregation count
+    item.classList.remove('single-agg', 'multi-agg');
+    if (aggCount > 1) {
+        item.classList.add('multi-agg');
+    } else {
+        item.classList.add('single-agg');
+    }
+
+    // Render aggregation list
+    renderAggList(item, seriesName, aggTypes);
+}
+
+function renderAggList(item, seriesName, aggTypes) {
+    const listContainer = item.querySelector('.series-agg-list');
+    if (!listContainer) return;
+
+    listContainer.innerHTML = '';
+
+    // Add aggregation items
+    aggTypes.forEach(aggType => {
+        const aggBtn = document.createElement('button');
+        aggBtn.className = 'agg-item';
+        aggBtn.dataset.series = seriesName;
+        aggBtn.dataset.agg = aggType;
+        aggBtn.textContent = aggType.charAt(0).toUpperCase() + aggType.slice(1);
+
+        if (seriesName === currentSeries && aggType === currentAggType) {
+            aggBtn.classList.add('active');
+        }
+
+        aggBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            selectAggregation(seriesName, aggType);
+        });
+
+        listContainer.appendChild(aggBtn);
+    });
+
+    // Add "+" button if more aggregation types available
+    const usedAggs = aggTypes;
+    const availableAggs = getAvailableAggTypes();
+    const unusedAggs = availableAggs.filter(a => !usedAggs.includes(a));
+
+    if (unusedAggs.length > 0) {
+        const addBtn = document.createElement('button');
+        addBtn.className = 'add-agg-btn';
+        addBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> Add`;
+        addBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            addAggregation(seriesName);
+        });
+        listContainer.appendChild(addBtn);
+    }
+}
+
+function createMiscSeriesItem(id) {
+    const template = document.getElementById('misc-series-item-template');
+    const item = template.content.firstElementChild.cloneNode(true);
+
+    item.dataset.series = id;
+    const row = item.querySelector('.series-row');
+    row.dataset.seriesTab = id;
+
+    const config = getFirstConfig(id, true);
+    const nameSpan = item.querySelector('.series-name');
+    nameSpan.textContent = truncateTabName(config?.seriesName || id);
+
+    const aggCount = getAggCount(id);
+    const aggTypes = getAggTypes(id);
+
+    item.classList.add(aggCount > 1 ? 'multi-agg' : 'single-agg');
+
+    // Set up click handler
+    row.addEventListener('click', () => handleSeriesClick(id));
+
+    // Render aggregation list
+    renderAggList(item, id, aggTypes);
+
+    return item;
+}
+
+// ============================================================================
+// INTERACTION HANDLERS
+// ============================================================================
+
+function handleSeriesClick(seriesName) {
+    const item = document.querySelector(`.series-item[data-series="${seriesName}"]`);
+    if (!item) return;
+
+    const aggCount = getAggCount(seriesName);
+
+    if (aggCount === 1) {
+        // Single aggregation - select it directly
+        const aggTypes = getAggTypes(seriesName);
+        selectAggregation(seriesName, aggTypes[0]);
+    } else {
+        // Multiple aggregations - toggle expansion
+        toggleExpand(seriesName);
+    }
+}
+
+function toggleExpand(seriesName) {
+    const item = document.querySelector(`.series-item[data-series="${seriesName}"]`);
+    if (!item) return;
+
+    const wasExpanded = item.classList.contains('expanded');
+
+    // Collapse all other expanded items
+    document.querySelectorAll('.series-item.expanded').forEach(i => {
+        i.classList.remove('expanded');
+    });
+
+    // Toggle this item
+    if (!wasExpanded) {
+        item.classList.add('expanded');
+    }
+}
+
+function selectAggregation(seriesName, aggType) {
+    currentSeries = seriesName;
+    currentAggType = aggType;
+
+    // Update active states in nav
+    document.querySelectorAll('.series-row').forEach(row => {
+        row.classList.remove('active');
+    });
+    document.querySelectorAll('.agg-item').forEach(item => {
+        item.classList.remove('active');
+    });
+
+    const aggCount = getAggCount(seriesName);
+
+    if (aggCount === 1) {
+        // Highlight the series row
+        const row = document.querySelector(`.series-item[data-series="${seriesName}"] .series-row`);
+        if (row) row.classList.add('active');
+    } else {
+        // Highlight the aggregation item
+        const aggItem = document.querySelector(`.agg-item[data-series="${seriesName}"][data-agg="${aggType}"]`);
+        if (aggItem) aggItem.classList.add('active');
+    }
+
+    // Load config into panel
+    loadConfigPanel(seriesName, aggType);
+}
+
+// ============================================================================
+// CONFIG PANEL
+// ============================================================================
+
+function loadConfigPanel(seriesName, aggType) {
+    const config = getConfig(seriesName, aggType);
+    if (!config) return;
+
+    const isMisc = isMiscSeries(seriesName);
+
+    // Show/hide marker symbol row (only for misc series)
+    const symbolRow = document.getElementById('marker-symbol-row');
+    if (symbolRow) {
+        symbolRow.style.display = isMisc ? '' : 'none';
+    }
+
+    // Show/hide marker edge color row (only for corrects and misc)
+    const edgeColorRow = document.getElementById('marker-edge-color-row');
+    if (edgeColorRow) {
+        edgeColorRow.style.display = (seriesName === CORRECTS || isMisc) ? '' : 'none';
+    }
+
+    // Show/hide panel header for misc series
+    const panelHeader = document.getElementById('panel-header');
+    const deleteBtn = document.getElementById('delete-series-btn');
+    if (panelHeader && deleteBtn) {
+        if (isMisc) {
+            panelHeader.classList.remove('hidden');
+            deleteBtn.classList.remove('hidden');
+            document.getElementById('panel-title').textContent = config.seriesName || seriesName;
+        } else {
+            panelHeader.classList.add('hidden');
+            deleteBtn.classList.add('hidden');
+        }
+    }
+
+    // Show/hide remove aggregation button
+    const removeAggBtn = document.getElementById('remove-agg-btn');
+    if (removeAggBtn) {
+        const aggCount = getAggCount(seriesName);
+        removeAggBtn.classList.toggle('hidden', aggCount <= 1);
+    }
+
+    // Populate form fields
+    document.getElementById('config-series-name').value = config.seriesName || '';
+    document.getElementById('config-agg-type').value = aggType;
+    document.getElementById('config-marker-size').value = config.markerSize || 8;
+    document.getElementById('config-line-width').value = config.lineWidth || 0.7;
+    document.getElementById('config-show-line').checked = config.showLine ?? true;
+    document.getElementById('config-line-color').value = config.lineColor || '#000000';
+    document.getElementById('config-marker-color').value = config.markerColor || '#000000';
+    document.getElementById('config-marker-edge-color').value = config.markerEdgeColor || '#000000';
+    document.getElementById('config-marker-symbol').value = config.markerSymbol || 'circle';
+
+    // Update sum option visibility
+    updateSumOptionVisibility();
+}
+
+function applyConfig() {
+    const seriesName = currentSeries;
+    const oldAggType = currentAggType;
+    const newAggType = document.getElementById('config-agg-type').value;
+
+    const config = {
+        seriesName: document.getElementById('config-series-name').value || seriesName,
+        showLine: document.getElementById('config-show-line').checked,
+        lineWidth: parseFloat(document.getElementById('config-line-width').value) || LINE_DEFAULTS.TRACE_LINE_WIDTH,
+        lineColor: document.getElementById('config-line-color').value || '#000000',
+        markerSize: parseInt(document.getElementById('config-marker-size').value) || 8,
+        markerColor: document.getElementById('config-marker-color').value || '#000000',
+        markerEdgeColor: document.getElementById('config-marker-edge-color').value || '#000000',
+        markerSymbol: document.getElementById('config-marker-symbol').value || 'circle'
+    };
+
+    // If aggregation type changed, delete old and create new
+    if (oldAggType !== newAggType) {
+        deleteConfig(seriesName, oldAggType);
+        currentAggType = newAggType;
+    }
+
+    setConfig(seriesName, newAggType, config);
+
+    // Re-render nav and refresh
+    renderSeriesItem(seriesName);
+    if (isMiscSeries(seriesName)) {
+        // Re-render misc item in container
+        const miscContainer = document.getElementById('misc-series-container');
+        const oldItem = miscContainer.querySelector(`[data-series="${seriesName}"]`);
+        if (oldItem) {
+            const newItem = createMiscSeriesItem(seriesName);
+            oldItem.replaceWith(newItem);
+            // Re-expand if was expanded
+            if (getAggCount(seriesName) > 1) {
+                newItem.classList.add('expanded');
+            }
+        }
+    }
+
+    updateCounterLabels();
+    eventBus.emit(EVENTS.DATA_CHART_REFRESH);
+    eventBus.emit(EVENTS.UI_LEGEND_RENDER);
+    eventBus.emit(EVENTS.UI_TRACE_STYLE_CHANGED);
+    createToast({ message: `${config.seriesName} updated.`, duration: 2000 });
+
+    // Re-select to update active states
+    selectAggregation(seriesName, newAggType);
+}
+
+function resetConfig() {
+    const seriesName = currentSeries;
+    const isMisc = isMiscSeries(seriesName);
+
+    const defaultsMap = {
+        [CORRECTS]: defaultCorrectTraceConfig,
+        [ERRORS]: defaultErrorTraceConfig,
+        [TIMING]: defaultTimingTraceConfig
+    };
+
+    if (isMisc) {
+        const num = parseInt(seriesName.slice(4));
+        const index = num - 1;
+        setSeriesConfigs(seriesName, { raw: createMiscTraceConfig(index) });
+    } else {
+        setSeriesConfigs(seriesName, { raw: { ...defaultsMap[seriesName] } });
+    }
+
+    currentAggType = 'raw';
+
+    // Re-render and select
+    renderSeriesItem(seriesName);
+    if (isMisc) {
+        const miscContainer = document.getElementById('misc-series-container');
+        const oldItem = miscContainer.querySelector(`[data-series="${seriesName}"]`);
+        if (oldItem) {
+            const newItem = createMiscSeriesItem(seriesName);
+            oldItem.replaceWith(newItem);
+        }
+    }
+
+    selectAggregation(seriesName, 'raw');
+    updateCounterLabels();
+
+    eventBus.emit(EVENTS.DATA_CHART_REFRESH);
+    eventBus.emit(EVENTS.UI_LEGEND_RENDER);
+    eventBus.emit(EVENTS.UI_TRACE_STYLE_CHANGED);
+    createToast({ message: `Reset to defaults.`, duration: 2000 });
+}
+
+// ============================================================================
+// AGGREGATION MANAGEMENT
+// ============================================================================
+
+function addAggregation(seriesName) {
+    const usedAggs = getAggTypes(seriesName);
+    const availableAggs = getAvailableAggTypes();
+    const unusedAgg = availableAggs.find(a => !usedAggs.includes(a));
+
+    if (!unusedAgg) return;
+
+    // Get base config from first aggregation
+    const firstConfig = getFirstConfig(seriesName, isMiscSeries(seriesName));
+    const newConfig = { ...firstConfig };
+
+    setConfig(seriesName, unusedAgg, newConfig);
+
+    // Re-render and select the new aggregation
+    renderSeriesItem(seriesName);
+    if (isMiscSeries(seriesName)) {
+        const miscContainer = document.getElementById('misc-series-container');
+        const oldItem = miscContainer.querySelector(`[data-series="${seriesName}"]`);
+        if (oldItem) {
+            const newItem = createMiscSeriesItem(seriesName);
+            newItem.classList.add('expanded');
+            oldItem.replaceWith(newItem);
+        }
+    } else {
+        // Ensure expanded
+        const item = document.querySelector(`.series-item[data-series="${seriesName}"]`);
+        if (item) item.classList.add('expanded');
+    }
+
+    selectAggregation(seriesName, unusedAgg);
+
+    eventBus.emit(EVENTS.DATA_CHART_REFRESH);
+    eventBus.emit(EVENTS.UI_LEGEND_RENDER);
+}
+
+function removeAggregation() {
+    const seriesName = currentSeries;
+    const aggType = currentAggType;
+    const aggCount = getAggCount(seriesName);
+
+    if (aggCount <= 1) return;
+
+    deleteConfig(seriesName, aggType);
+
+    // Select first remaining aggregation
+    const remainingAggs = getAggTypes(seriesName);
+    currentAggType = remainingAggs[0];
+
+    // Re-render
+    renderSeriesItem(seriesName);
+    if (isMiscSeries(seriesName)) {
+        const miscContainer = document.getElementById('misc-series-container');
+        const oldItem = miscContainer.querySelector(`[data-series="${seriesName}"]`);
+        if (oldItem) {
+            const newItem = createMiscSeriesItem(seriesName);
+            if (remainingAggs.length > 1) {
+                newItem.classList.add('expanded');
+            }
+            oldItem.replaceWith(newItem);
+        }
+    }
+
+    selectAggregation(seriesName, currentAggType);
+
+    eventBus.emit(EVENTS.DATA_CHART_REFRESH);
+    eventBus.emit(EVENTS.UI_LEGEND_RENDER);
+    eventBus.emit(EVENTS.UI_TRACE_STYLE_CHANGED);
+}
+
+// ============================================================================
+// MISC SERIES MANAGEMENT
+// ============================================================================
+
+function deleteMiscSeries() {
+    const seriesName = currentSeries;
+    if (!isMiscSeries(seriesName)) return;
+
+    const config = getFirstConfig(seriesName, true);
+    const displayName = config?.seriesName || seriesName;
+
+    createConfirmToast({
+        message: `Delete "${displayName}" series?`,
+        onYes: () => {
+            import('./miscSeries.js').then(({ removeMiscSeries }) => {
+                removeMiscSeries(seriesName);
+            });
+        },
+        onNo: () => {},
+        yesLabel: 'Delete',
+        noLabel: 'Cancel',
+        primaryColor: '#ef4444'
+    });
+}
+
+// ============================================================================
+// VISIBILITY FUNCTIONS
+// ============================================================================
+
+function updateSumOptionVisibility() {
+    const sumOption = document.querySelector('#config-agg-type .sum-option');
+    if (sumOption) {
+        sumOption.style.display = chartState.minuteChart ? 'none' : '';
+    }
+}
+
+function updateTimingSeriesVisibility() {
+    const shouldShow = chartState.minuteChart;
+    const timingItem = document.querySelector('.series-item[data-series="timing"]');
+
+    if (timingItem) {
+        timingItem.style.display = shouldShow ? '' : 'none';
+    }
+
+    // If timing was selected and now hidden, switch to corrects
+    if (!shouldShow && currentSeries === TIMING) {
+        selectAggregation(CORRECTS, 'raw');
+    }
+}
+
+function updateCounterLabels() {
+    const labels = [
+        { id: 'corrects-series-label', series: CORRECTS },
+        { id: 'errors-series-label', series: ERRORS },
+        { id: 'timing-series-label', series: TIMING }
+    ];
+
+    labels.forEach(({ id, series }) => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.textContent = getFirstConfig(series)?.seriesName || series;
+        }
+    });
+
     getMiscSeriesIds().forEach(miscId => {
         const label = document.getElementById(`${miscId}-series-label`);
         const config = getFirstConfig(miscId, true);
@@ -124,523 +578,92 @@ function updateCounterLabels() {
     });
 }
 
-function updateTraceConfig(seriesName, newConfig) {
-    // Update "raw" aggregation config by default for now
-    // TODO: In future, allow UI to select which aggregation to update
-    const configObj = chartState.traceStyles[seriesName]["raw"];
-    Object.assign(configObj, newConfig);
-}
+// ============================================================================
+// INITIALIZATION
+// ============================================================================
 
-function initializeSeriesInputs(seriesName) {
-    // Initialize all aggregation blocks for this series from chartState
-    const container = document.getElementById(`${seriesName}-blocks-container`);
-    if (!container) return;
-
-    // Get all aggregation configs for this series (handle nested misc structure)
-    const isMiscSeries = seriesName.startsWith('misc');
-    const aggConfigs = isMiscSeries
-        ? chartState.traceStyles.misc[seriesName]
-        : chartState.traceStyles[seriesName];
-
-    if (!aggConfigs) return;
-
-    // Get template block, clear all blocks, rebuild from chartState
-    const existingBlocks = Array.from(container.querySelectorAll('.agg-config-block'));
-    const templateBlock = existingBlocks[0]?.cloneNode(true);
-    if (!templateBlock) return;
-
-    existingBlocks.forEach(block => block.remove());
-
-    // Create and initialize a block for each entry in aggConfigs
-    Object.entries(aggConfigs).forEach(([aggType, config]) => {
-        const block = templateBlock.cloneNode(true);
-        container.appendChild(block);
-
-        // Set the aggregation type
-        const aggSelect = block.querySelector('.agg-type-select');
-        if (aggSelect) {
-            aggSelect.value = aggType;
-            block.dataset.agg = aggType;
-        }
-
-        // Set common fields (same for all series - standardized property names)
-        const seriesNameInput = block.querySelector('.series-name-input');
-        const showLineInput = block.querySelector('.show-line-input');
-        const lineWidthInput = block.querySelector('.line-width-input');
-        const lineColorInput = block.querySelector('.line-color-input');
-        const markerSizeInput = block.querySelector('.marker-size-input');
-        const markerColorInput = block.querySelector('.marker-color-input');
-        const markerEdgeColorInput = block.querySelector('.marker-edge-color-input');
-        const markerSymbolInput = block.querySelector('.marker-symbol-input');
-
-        if (seriesNameInput) seriesNameInput.value = config.seriesName;
-        if (showLineInput) showLineInput.checked = config.showLine;
-        if (lineWidthInput) lineWidthInput.value = config.lineWidth;
-        if (lineColorInput) lineColorInput.value = config.lineColor;
-        if (markerSizeInput) markerSizeInput.value = config.markerSize;
-        if (markerColorInput) markerColorInput.value = config.markerColor;
-        if (markerEdgeColorInput) markerEdgeColorInput.value = config.markerEdgeColor;
-        if (markerSymbolInput) markerSymbolInput.value = config.markerSymbol;
+function initializeSeriesNav() {
+    // Set up click handlers for fixed series rows
+    document.querySelectorAll('.series-item[data-series] .series-row').forEach(row => {
+        const seriesName = row.closest('.series-item').dataset.series;
+        row.addEventListener('click', () => handleSeriesClick(seriesName));
     });
 
-    updateButtonVisibility(seriesName);
-}
-
-function initializeAllSeriesInputs() {
-    // Update visibility based on chart type
-    updateSumOptionVisibility();
-    updateTimingSeriesVisibility();
-    // Initialize fixed series
-    [CORRECTS, ERRORS, TIMING].forEach(initializeSeriesInputs);
-    // Initialize dynamic misc series
-    getMiscSeriesIds().forEach(initializeSeriesInputs);
-}
-
-function applyTraceConfig(seriesName) {
-    // Read configuration from all blocks for this series
-    const container = document.getElementById(`${seriesName}-blocks-container`);
-    if (!container) return;
-
-    const blocks = container.querySelectorAll('.agg-config-block');
-
-    // Check if this is a misc series
-    const isMiscSeries = seriesName.startsWith('misc');
-
-    // Clear existing configs and rebuild from blocks
-    if (isMiscSeries) {
-        chartState.traceStyles.misc[seriesName] = {};
-    } else {
-        chartState.traceStyles[seriesName] = {};
-    }
-
-    blocks.forEach(block => {
-        const aggType = block.querySelector('.agg-type-select')?.value || 'raw';
-
-        // All series use standardized property names
-        const config = {
-            seriesName: block.querySelector('.series-name-input')?.value || seriesName,
-            showLine: block.querySelector('.show-line-input')?.checked ?? true,
-            lineWidth: parseFloat(block.querySelector('.line-width-input')?.value) || LINE_DEFAULTS.TRACE_LINE_WIDTH,
-            lineColor: block.querySelector('.line-color-input')?.value || '#000000',
-            markerSize: parseInt(block.querySelector('.marker-size-input')?.value) || 8,
-            markerColor: block.querySelector('.marker-color-input')?.value || '#000000',
-            markerEdgeColor: block.querySelector('.marker-edge-color-input')?.value || '#000000',
-            markerSymbol: block.querySelector('.marker-symbol-input')?.value || 'circle'
-        };
-
-        // Store this config under its aggregation type
-        if (isMiscSeries) {
-            chartState.traceStyles.misc[seriesName][aggType] = config;
-        } else {
-            chartState.traceStyles[seriesName][aggType] = config;
-        }
-    });
-
-    updateCounterLabels();
-
-    // Update tab button text (for all series, truncated for display)
-    const tabButton = document.querySelector(`[data-series-tab="${seriesName}"]`);
-    if (tabButton) {
-        const config = getFirstConfig(seriesName, isMiscSeries);
-        if (config?.seriesName) {
-            tabButton.textContent = truncateTabName(config.seriesName);
-        }
-    }
-
-    eventBus.emit(EVENTS.DATA_CHART_REFRESH);
-    eventBus.emit(EVENTS.UI_LEGEND_RENDER);
-    eventBus.emit(EVENTS.UI_TRACE_STYLE_CHANGED);
-    const displayName = getFirstConfig(seriesName, isMiscSeries)?.seriesName || seriesName;
-    createToast({ message: `${displayName} configurations updated.`, duration: 2000 });
-}
-
-function resetTraceConfig(seriesName) {
-    // Reset to default "raw" aggregation only
-    const defaultsMap = {
-        [CORRECTS]: defaultCorrectTraceConfig,
-        [ERRORS]: defaultErrorTraceConfig,
-        [TIMING]: defaultTimingTraceConfig
-    };
-
-    // Check if this is a misc series
-    const isMiscSeries = seriesName.startsWith('misc');
-
-    if (isMiscSeries) {
-        // Extract the number from miscN and create default config
-        const num = parseInt(seriesName.slice(4));
-        const index = num - 1;
-        chartState.traceStyles.misc[seriesName] = {
-            "raw": createMiscTraceConfig(index)
-        };
-    } else {
-        // Reset traceStyles to have only "raw" aggregation
-        chartState.traceStyles[seriesName] = {
-            "raw": { ...defaultsMap[seriesName] }
-        };
-    }
-
-    // Remove all blocks except the first one
-    const container = document.getElementById(`${seriesName}-blocks-container`);
-    if (container) {
-        const blocks = Array.from(container.querySelectorAll('.agg-config-block'));
-        // Remove all but the first block
-        blocks.slice(1).forEach(block => block.remove());
-    }
-
-    // Re-initialize the remaining block
-    initializeSeriesInputs(seriesName);
-    updateCounterLabels();
-
-    // Update tab button text (for all series, truncated for display)
-    const tabButton = document.querySelector(`[data-series-tab="${seriesName}"]`);
-    if (tabButton) {
-        const config = getFirstConfig(seriesName, isMiscSeries);
-        if (config?.seriesName) {
-            tabButton.textContent = truncateTabName(config.seriesName);
-        }
-    }
-
-    eventBus.emit(EVENTS.DATA_CHART_REFRESH);
-    eventBus.emit(EVENTS.UI_LEGEND_RENDER);
-    eventBus.emit(EVENTS.UI_TRACE_STYLE_CHANGED);
-    const displayName = getFirstConfig(seriesName, isMiscSeries)?.seriesName || seriesName;
-    createToast({ message: `${displayName} reset to defaults.`, duration: 2000 });
-}
-
-function toggleLineWidth(seriesName) {
-    // This function is now handled per-block in the event listeners
-    // Left as a no-op for compatibility
-}
-
-function initializeLineWidthToggles() {
-    // Toggle line width inputs for all blocks across all series
-    document.querySelectorAll('.agg-config-block').forEach(block => {
-        const showLineCheckbox = block.querySelector('.show-line-input');
-        const lineWidthInput = block.querySelector('.line-width-input');
-
-        if (showLineCheckbox && lineWidthInput) {
-            const lineWidthContainer = lineWidthInput.parentElement;
-            const lineWidthLabel = lineWidthContainer?.querySelector('label');
-
-            const updateState = () => {
-                lineWidthInput.disabled = !showLineCheckbox.checked;
-                if (showLineCheckbox.checked) {
-                    lineWidthInput.classList.remove('opacity-50', 'cursor-not-allowed');
-                    if (lineWidthLabel) lineWidthLabel.classList.remove('opacity-50');
-                } else {
-                    lineWidthInput.classList.add('opacity-50', 'cursor-not-allowed');
-                    if (lineWidthLabel) lineWidthLabel.classList.add('opacity-50');
+    // Set up add misc series button
+    const addSeriesBtn = document.querySelector('[data-action="add-misc-series"]');
+    if (addSeriesBtn) {
+        addSeriesBtn.addEventListener('click', () => {
+            import('./miscSeries.js').then(({ addMiscSeries, canAddMiscSeries }) => {
+                if (!canAddMiscSeries()) {
+                    createToast({ message: 'Maximum of 10 misc series reached.', duration: 3000 });
+                    return;
                 }
-            };
-
-            // Initialize state
-            updateState();
-
-            // Add event listener
-            showLineCheckbox.addEventListener('change', updateState);
-        }
-    });
-}
-
-function switchSeriesTab(seriesName) {
-    // Hide all series config panels
-    document.querySelectorAll('.series-config-panel').forEach(panel => {
-        panel.style.display = 'none';
-    });
-
-    // Remove active styling from all series sub-tabs
-    document.querySelectorAll('.series-subtab').forEach(button => {
-        button.classList.remove('active');
-    });
-
-    // Show selected series config panel
-    document.getElementById(seriesName + '-series-config').style.display = 'flex';
-
-    // Add active styling to selected sub-tab
-    const activeButton = document.querySelector(`[data-series-tab="${seriesName}"]`);
-    if (activeButton) {
-        activeButton.classList.add('active');
-    }
-}
-
-// ============================================================================
-// AGGREGATION BLOCK MANAGEMENT
-// ============================================================================
-
-/**
- * Add a new aggregation configuration block for a series
- * @param {string} seriesName - Name of the series (correct, incorrect, timing, misc1, misc2)
- */
-function addAggregationBlock(seriesName) {
-    const container = document.getElementById(`${seriesName}-blocks-container`);
-    if (!container) return;
-
-    // Check if all aggregation types are already in use
-    const usedAggs = Array.from(container.querySelectorAll('.agg-config-block .agg-type-select'))
-        .map(select => select.value);
-
-    const availableAggs = getAvailableAggTypes();
-
-    // If all aggregation types are used, don't allow adding more blocks
-    if (usedAggs.length >= availableAggs.length) {
-        return;
-    }
-
-    // Get the first block as a template
-    const templateBlock = container.querySelector('.agg-config-block');
-    if (!templateBlock) return;
-
-    // Clone the template block
-    const newBlock = templateBlock.cloneNode(true);
-
-    // Reset the aggregation type to a default unused value
-    const aggSelect = newBlock.querySelector('.agg-type-select');
-    if (aggSelect) {
-        // Find an unused aggregation type
-        const unusedAgg = availableAggs.find(agg => !usedAggs.includes(agg));
-
-        if (unusedAgg) {
-            aggSelect.value = unusedAgg;
-            newBlock.dataset.agg = unusedAgg;
-        }
-    }
-
-    // Add the new block to the container
-    container.appendChild(newBlock);
-
-    // Re-attach line width toggle for the new block's checkbox
-    const showLineCheckbox = newBlock.querySelector('.show-line-input');
-    if (showLineCheckbox) {
-        showLineCheckbox.addEventListener('change', (e) => {
-            const seriesName = e.currentTarget.dataset.seriesToggle;
-            if (seriesName) {
-                toggleLineWidth(seriesName);
-            }
+                addMiscSeries();
+            });
         });
     }
 
-    // Update button visibility for both + and - buttons
-    updateButtonVisibility(seriesName);
-}
+    // Set up config panel buttons
+    document.getElementById('apply-config-btn')?.addEventListener('click', applyConfig);
+    document.getElementById('reset-config-btn')?.addEventListener('click', resetConfig);
+    document.getElementById('remove-agg-btn')?.addEventListener('click', removeAggregation);
+    document.getElementById('delete-series-btn')?.addEventListener('click', deleteMiscSeries);
 
-/**
- * Update the visibility of add and remove buttons based on available aggregation types
- * @param {string} seriesName - Name of the series
- */
-function updateButtonVisibility(seriesName) {
-    const container = document.getElementById(`${seriesName}-blocks-container`);
-    const addButton = document.querySelector(`.add-block-btn[data-series="${seriesName}"]`);
-
-    if (!container) return;
-
-    const blocks = container.querySelectorAll('.agg-config-block');
-    const availableAggs = getAvailableAggTypes();
-
-    // Hide/show the + button based on whether all aggregation types are used
-    if (addButton) {
-        if (blocks.length >= availableAggs.length) {
-            addButton.style.display = 'none';
-        } else {
-            addButton.style.display = 'flex';
-        }
-    }
-
-    // Hide/show the - buttons based on whether there's only one block
-    blocks.forEach(block => {
-        const removeButton = block.querySelector('.remove-block-btn');
-        if (removeButton) {
-            if (blocks.length <= 1) {
-                removeButton.style.display = 'none';
-            } else {
-                removeButton.style.display = 'flex';
-            }
-        }
+    // Set up plus icon click for single-agg series (adds new aggregation)
+    document.querySelectorAll('.series-item .plus-icon').forEach(icon => {
+        icon.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const seriesName = e.target.closest('.series-item').dataset.series;
+            addAggregation(seriesName);
+        });
     });
+
+    // Initial render
+    renderSeriesNav();
+
+    // Select corrects/raw by default
+    selectAggregation(CORRECTS, 'raw');
 }
 
-/**
- * Remove an aggregation configuration block
- * @param {HTMLElement} block - The block element to remove
- */
-function removeAggregationBlock(block) {
-    const container = block.parentElement;
+function initializeAllSeriesInputs() {
+    renderSeriesNav();
+    updateSumOptionVisibility();
 
-    // Don't allow removing the last block (this shouldn't happen since button is hidden)
-    const remainingBlocks = container.querySelectorAll('.agg-config-block');
-    if (remainingBlocks.length <= 1) {
-        return;
+    // Re-select current if valid, otherwise default to corrects/raw
+    const configs = getSeriesConfigs(currentSeries);
+    if (configs && configs[currentAggType]) {
+        selectAggregation(currentSeries, currentAggType);
+    } else {
+        selectAggregation(CORRECTS, 'raw');
     }
-
-    // Get the series name and aggType before removing
-    const seriesName = block.dataset.series;
-    const aggType = block.dataset.agg;
-
-    // Remove the block from DOM
-    block.remove();
-
-    // Remove from chartState
-    if (seriesName && aggType) {
-        const isMiscSeries = seriesName.startsWith('misc');
-        if (isMiscSeries) {
-            delete chartState.traceStyles.misc[seriesName][aggType];
-        } else {
-            delete chartState.traceStyles[seriesName][aggType];
-        }
-    }
-
-    // Update button visibility
-    if (seriesName) {
-        updateButtonVisibility(seriesName);
-    }
-
-    // Refresh chart
-    eventBus.emit(EVENTS.DATA_CHART_REFRESH);
-    eventBus.emit(EVENTS.UI_LEGEND_RENDER);
-    eventBus.emit(EVENTS.UI_TRACE_STYLE_CHANGED);
 }
 
 // ============================================================================
 // EVENT SUBSCRIPTIONS
 // ============================================================================
 
-// For manual "Add Misc Series" button - creates single series
-eventBus.subscribe(EVENTS.MISC_SERIES_ADDED, ({ id, index }) => {
-    createMiscSeriesTab(id, index);
-    updateSumOptionVisibility();
+eventBus.subscribe(EVENTS.MISC_SERIES_ADDED, ({ id }) => {
+    renderSeriesNav();
+    selectAggregation(id, 'raw');
     eventBus.emit(EVENTS.DATA_CHART_REFRESH);
     eventBus.emit(EVENTS.UI_LEGEND_RENDER);
-}, true);
-
-// Sync misc series UI after import completes
-eventBus.subscribe(EVENTS.DATA_IMPORT_COMPLETED, () => {
-    syncMiscSeriesUI();
-    initializeAllSeriesInputs();
-}, true);
-
-/**
- * Sync misc series UI tabs/panels with chartState.series.misc
- * Creates missing tabs, removes orphaned tabs
- */
-function syncMiscSeriesUI() {
-    const tabContainer = document.getElementById('series-tab-container');
-    const panelContainer = document.getElementById('misc-panels-container');
-    const template = document.getElementById('misc-series-template');
-
-    if (!tabContainer || !panelContainer || !template) return;
-
-    const miscIdsInState = Object.keys(chartState.series.misc || {});
-    const existingTabs = tabContainer.querySelectorAll('[data-series-tab^="misc"]');
-    const existingTabIds = Array.from(existingTabs).map(t => t.dataset.seriesTab);
-
-    // Remove tabs that no longer exist in chartState
-    for (const tabId of existingTabIds) {
-        if (!miscIdsInState.includes(tabId)) {
-            document.querySelector(`[data-series-tab="${tabId}"]`)?.remove();
-            document.getElementById(`${tabId}-series-config`)?.remove();
-        }
-    }
-
-    // Create tabs for misc series that don't have UI yet
-    for (const id of miscIdsInState) {
-        if (!existingTabIds.includes(id)) {
-            const num = parseInt(id.slice(4));
-            const index = num - 1;
-            createMiscSeriesTab(id, index);
-        }
-    }
-}
-
-/**
- * Create a single misc series tab and panel
- */
-function createMiscSeriesTab(id, index) {
-    const tabContainer = document.getElementById('series-tab-container');
-    const panelContainer = document.getElementById('misc-panels-container');
-    const template = document.getElementById('misc-series-template');
-
-    if (!tabContainer || !panelContainer || !template) return;
-
-    // Create tab button
-    const addBtn = tabContainer.querySelector('[data-action="add-misc-series"]');
-    const tabButton = document.createElement('button');
-    tabButton.className = 'series-subtab';
-    tabButton.dataset.seriesTab = id;
-    const config = getFirstConfig(id, true);
-    tabButton.textContent = truncateTabName(config?.seriesName || `Misc ${index + 1}`);
-    tabButton.addEventListener('click', () => switchSeriesTab(id));
-    tabContainer.insertBefore(tabButton, addBtn);
-
-    // Clone and configure panel from template
-    const panel = template.content.firstElementChild.cloneNode(true);
-    panel.id = `${id}-series-config`;
-
-    panel.querySelectorAll('[data-series="misc-template"]').forEach(el => {
-        el.dataset.series = id;
-    });
-
-    const blocksContainer = panel.querySelector('.misc-blocks-container');
-    if (blocksContainer) {
-        blocksContainer.id = `${id}-blocks-container`;
-    }
-
-    if (config) {
-        const nameInput = panel.querySelector('.series-name-input');
-        if (nameInput) nameInput.value = config.seriesName;
-
-        const symbolInput = panel.querySelector('.marker-symbol-input');
-        if (symbolInput) symbolInput.value = config.markerSymbol;
-
-        const colorInput = panel.querySelector('.marker-color-input');
-        if (colorInput) colorInput.value = config.markerColor;
-    }
-
-    panel.querySelector('.apply-misc-btn')?.addEventListener('click', () => applyTraceConfig(id));
-    panel.querySelector('.reset-misc-btn')?.addEventListener('click', () => resetTraceConfig(id));
-    panel.querySelector('.delete-misc-btn')?.addEventListener('click', () => {
-        const seriesName = getFirstConfig(id, true)?.seriesName || id;
-        createConfirmToast({
-            message: `Delete "${seriesName}" series?`,
-            onYes: () => {
-                import('./miscSeries.js').then(({ removeMiscSeries }) => {
-                    removeMiscSeries(id);
-                });
-            },
-            onNo: () => {},
-            yesLabel: 'Delete',
-            noLabel: 'Cancel',
-            primaryColor: '#ef4444'
-        });
-    });
-    panel.querySelector('.add-block-btn')?.addEventListener('click', () => addAggregationBlock(id));
-    panel.querySelectorAll('.remove-block-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => removeAggregationBlock(e.target.closest('.agg-config-block')));
-    });
-
-    panelContainer.appendChild(panel);
-    updateButtonVisibility(id);
-}
-
-// Sync UI with chartState after chart loads from storage
-eventBus.subscribe(EVENTS.STORAGE_CHART_LOADED, () => {
-    syncMiscSeriesUI();
-    initializeAllSeriesInputs();
 }, true);
 
 eventBus.subscribe(EVENTS.MISC_SERIES_REMOVED, ({ id }) => {
-    // Remove tab button
-    const tabButton = document.querySelector(`[data-series-tab="${id}"]`);
-    if (tabButton) tabButton.remove();
-
-    // Remove config panel
-    const panel = document.getElementById(`${id}-series-config`);
-    if (panel) panel.remove();
-
-    // Switch to correct tab if needed
-    const activePanel = document.querySelector('.series-config-panel[style*="display: block"]');
-    if (!activePanel) switchSeriesTab(CORRECTS);
-
+    renderSeriesNav();
+    if (currentSeries === id) {
+        selectAggregation(CORRECTS, 'raw');
+    }
     eventBus.emit(EVENTS.DATA_CHART_REFRESH);
     eventBus.emit(EVENTS.UI_LEGEND_RENDER);
+}, true);
+
+eventBus.subscribe(EVENTS.STORAGE_CHART_LOADED, () => {
+    initializeAllSeriesInputs();
+}, true);
+
+eventBus.subscribe(EVENTS.DATA_IMPORT_COMPLETED, () => {
+    initializeAllSeriesInputs();
 }, true);
 
 // ============================================================================
@@ -648,17 +671,12 @@ eventBus.subscribe(EVENTS.MISC_SERIES_REMOVED, ({ id }) => {
 // ============================================================================
 
 export {
+    initializeSeriesNav,
     initializeAllSeriesInputs,
-    applyTraceConfig,
-    resetTraceConfig,
-    switchSeriesTab,
-    toggleLineWidth,
-    initializeLineWidthToggles,
-    addAggregationBlock,
-    updateButtonVisibility,
-    removeAggregationBlock,
     getAvailableAggTypes,
     updateSumOptionVisibility,
     updateTimingSeriesVisibility,
     getFirstConfig
 };
+
+console.log('traceStyles.js loaded');

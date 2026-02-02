@@ -20,18 +20,7 @@ import {
     updateTimingVisibility,
     init as dataEntryInit
 } from './series/dataEntry.js';
-import {
-    initializeAllSeriesInputs,
-    applyTraceConfig,
-    resetTraceConfig,
-    switchSeriesTab,
-    toggleLineWidth,
-    initializeLineWidthToggles,
-    addAggregationBlock,
-    removeAggregationBlock,
-    updateButtonVisibility
-} from './series/traceStyles.js';
-import { addMiscSeries, canAddMiscSeries } from './series/miscSeries.js';
+import { initializeSeriesNav } from './series/traceStyles.js';
 import { createToast } from './ui/toaster.js';
 import { refreshChart, init as replotInit } from './series/replot.js';
 import { alignStartDate, updateChartDateLabels, updateDateDisplay, adjustDateInput, initializeDateInput, updatePlotDateLabel } from './util/dates.js';
@@ -288,12 +277,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize import tab UI
     initImportUI();
 
-    // Initialize series input controls
-    initializeAllSeriesInputs();
-    initializeLineWidthToggles();
-
-    // Initialize button visibility for core series
-    [CORRECTS, ERRORS, TIMING].forEach(updateButtonVisibility);
+    // Initialize series navigation and config panel
+    initializeSeriesNav();
 
     console.log('Main.js: Application initialized');
 });
@@ -304,44 +289,6 @@ export function setupEventListeners() {
         button.addEventListener('click', (e) => {
             const tabName = e.currentTarget.dataset.tab;
             switchTab(tabName);
-        });
-    });
-
-    // Series subtabs
-    document.querySelectorAll('.series-subtab[data-series-tab]').forEach(button => {
-        button.addEventListener('click', (e) => {
-            const seriesName = e.currentTarget.dataset.seriesTab;
-            switchSeriesTab(seriesName);
-        });
-    });
-
-    // Add misc series button
-    const addMiscSeriesBtn = document.querySelector('[data-action="add-misc-series"]');
-    if (addMiscSeriesBtn) {
-        addMiscSeriesBtn.addEventListener('click', () => {
-            if (!canAddMiscSeries()) {
-                createToast({ message: 'Maximum of 10 misc series reached.', duration: 3000 });
-                return;
-            }
-            addMiscSeries();
-        });
-    }
-
-    // Add aggregation block buttons (inside each series panel)
-    document.querySelectorAll('.add-block-btn[data-series]').forEach(button => {
-        button.addEventListener('click', (e) => {
-            const seriesName = e.currentTarget.dataset.series;
-            addAggregationBlock(seriesName);
-        });
-    });
-
-    // Remove aggregation block buttons
-    document.querySelectorAll('.remove-block-btn').forEach(button => {
-        button.addEventListener('click', (e) => {
-            const block = e.target.closest('.agg-config-block');
-            if (block) {
-                removeAggregationBlock(block);
-            }
         });
     });
 
@@ -404,23 +351,6 @@ export function setupEventListeners() {
     if (deleteDataBtn) {
         deleteDataBtn.addEventListener('click', deleteCurrentEntry);
     }
-
-    // Apply and Reset buttons for each series
-    const traceActions = {
-        'apply-corrects-trace': () => applyTraceConfig(CORRECTS),
-        'apply-errors-trace': () => applyTraceConfig(ERRORS),
-        'apply-timing-trace': () => applyTraceConfig(TIMING),
-        'reset-trace-corrects': () => resetTraceConfig(CORRECTS),
-        'reset-trace-errors': () => resetTraceConfig(ERRORS),
-        'reset-trace-timing': () => resetTraceConfig(TIMING)
-    };
-
-    Object.entries(traceActions).forEach(([action, handler]) => {
-        const element = document.querySelector(`[data-action="${action}"]`);
-        if (element) {
-            element.addEventListener('click', handler);
-        }
-    });
 
     // Legend toggle
     const legendToggle = document.getElementById('legend-toggle');
