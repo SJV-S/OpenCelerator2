@@ -133,6 +133,9 @@ export const DEFAULT_LEGEND_CONFIG = Object.freeze({
 export const chartState = {
     // Chart identity
     id: null,  // UUID assigned on first save
+    chartKey: null,  // Encryption key for this chart (hex string)
+    shared: false,  // If true, this chart syncs with server
+    lastModified: null,  // Unix timestamp of last modification
 
     // Raw data series (append-only arrays, all same length)
     series: {

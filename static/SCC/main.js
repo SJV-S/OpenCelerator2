@@ -60,6 +60,7 @@ import { initializeShareTab } from './misc/share.js';
 import { init as crosshairInit } from './ui/crosshair.js';
 import { initStorage } from './storage/chartStorage.js';
 import { initImportUI } from './import/importUI.js';
+import { initServerSync } from '../Server/init.js';
 
 /**
  * Initialize the chart using client-side templates
@@ -256,6 +257,9 @@ document.addEventListener('DOMContentLoaded', () => {
             console.warn('Main.js: Storage initialization failed');
         }
     });
+
+    // Initialize server sync (generates passphrase if needed)
+    initServerSync().catch(err => console.warn('Main.js: Server sync init failed:', err));
 
     // Initialize icons in buttons with data-icon attributes
     document.querySelectorAll('[data-icon]').forEach(button => {
@@ -541,6 +545,7 @@ export function setupEventListeners() {
                     emitFanReposition();
                     regenerateCredits();
                     renderCustomLegend();
+                    updatePanDisplay();
                     eventBus.emit(EVENTS.CHART_WINDOW_CHANGED, newValue);
                 });
             }, TIMING_MS.CHART_WINDOW_DEBOUNCE);

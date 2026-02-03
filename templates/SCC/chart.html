@@ -56,24 +56,37 @@
     <script type="module">
         import { initializeChart, setupEventListeners } from '/static/SCC/main.js';
         import { initStorage, loadChart } from '/static/SCC/storage/chartStorage.js';
+        import { joinSharedChart, startSyncPolling } from '/static/Server/syncClient.js';
+        import { initServerSync } from '/static/Server/init.js';
 
         const chartId = '{{ chart_id }}';
+        const shareSecret = window.location.pathname.split('/')[3]; // /chart/{uuid}/{secret}
 
         async function init() {
             await initStorage();
+            await initServerSync();
+
+            if (shareSecret) {
+                try {
+                    await joinSharedChart(chartId, shareSecret);
+                    window.history.replaceState({}, '', `/chart/${chartId}`);
+                } catch (err) {
+                    console.error('Share link failed:', err);
+                    window.location.href = '/';
+                    return;
+                }
+            }
 
             const success = await loadChart(chartId);
             if (!success) {
-                console.warn('Failed to load chart:', chartId);
                 window.location.href = '/';
                 return;
             }
 
-            // Set up event listeners (chartState now populated)
+            document.getElementById('chart-menu-content').classList.remove('menu-loading');
             setupEventListeners();
-
-            // Initialize chart (templates loaded client-side)
             initializeChart();
+            startSyncPolling(chartId);
         }
 
         init();

@@ -1,9 +1,10 @@
 // share.js
-// Handles chart screenshot and data export functionality
+// Handles chart screenshot, data export, and share link generation
 
 import { chartState } from '../chartState.js';
 import { createToast } from '../ui/toaster.js';
 import { icons } from '../ui/icons.js';
+import { createViewLink, createEditLink, isInitialized } from '../../Server/syncClient.js';
 import { getFirstConfig } from '../series/traceStyles.js';
 
 /**
@@ -183,29 +184,41 @@ function exportDataToCSV() {
 }
 
 /**
- * Handles share link option click
- * Shows "Copied" feedback on the clicked option
- *
+ * Handles share link option click - generates link and copies to clipboard
  * @param {string} type - 'view' or 'edit'
  */
-function handleShareLinkClick(type) {
+async function handleShareLinkClick(type) {
     const viewStatus = document.getElementById('share-view-status');
     const editStatus = document.getElementById('share-edit-status');
+    const status = type === 'view' ? viewStatus : editStatus;
 
     // Hide both statuses first
     viewStatus?.classList.add('invisible');
     editStatus?.classList.add('invisible');
 
-    // Show status for clicked option
-    const status = type === 'view' ? viewStatus : editStatus;
-    status?.classList.remove('invisible');
+    if (!chartState.id) {
+        createToast({ message: 'Save chart first', duration: 2000, position: 'top-right' });
+        return;
+    }
 
-    // Hide after 3 seconds
-    setTimeout(() => {
-        status?.classList.add('invisible');
-    }, 3000);
+    if (!isInitialized()) {
+        createToast({ message: 'Sync not enabled', duration: 2000, position: 'top-right' });
+        return;
+    }
 
-    // TODO: Actual clipboard copy will go here
+    try {
+        const url = type === 'view'
+            ? await createViewLink(chartState.id)
+            : await createEditLink(chartState.id);
+
+        await navigator.clipboard.writeText(url);
+
+        status?.classList.remove('invisible');
+        setTimeout(() => status?.classList.add('invisible'), 3000);
+    } catch (error) {
+        console.error('Share link error:', error);
+        createToast({ message: 'Failed to create link', duration: 2000, position: 'top-right' });
+    }
 }
 
 /**

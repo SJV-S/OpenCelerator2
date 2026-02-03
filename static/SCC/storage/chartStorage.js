@@ -26,6 +26,14 @@ import { eventBus, EVENTS, EVENT_CATEGORIES } from '../eventBus.js';
 import { chartState } from '../chartState.js';
 import { findNearestMonday } from '../util/dates.js';
 import { jsonBackwardsCompatibilityCheck } from '../import/jsonBackwardsCompatibility.js';
+import { generateChartKey } from '../../Server/crypto.js';
+import { pushChart, isInitialized } from '../../Server/syncClient.js';
+
+// Convert CryptoKey to hex string for storage
+async function exportKeyToHex(key) {
+    const raw = await crypto.subtle.exportKey('raw', key);
+    return Array.from(new Uint8Array(raw)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
 
 const DB_NAME = 'SCC_Charts';
 const DB_VERSION = 1;
@@ -75,8 +83,8 @@ function serializeValue(value) {
 function serializeChart(id, state) {
     const serialized = serializeValue(state);
     serialized.id = id;
-    serialized._updatedAt = Date.now();
-    serialized._createdAt = state._createdAt || serialized._updatedAt;
+    serialized.lastModified = Math.floor(Date.now() / 1000);
+    serialized._createdAt = state._createdAt || serialized.lastModified;
     return serialized;
 }
 
@@ -109,7 +117,7 @@ function deserializeValue(value) {
 function deserializeChart(data) {
     const deserialized = deserializeValue(data);
     for (const key in deserialized) {
-        if (key !== 'id' && key !== '_updatedAt' && key !== '_createdAt') {
+        if (key !== 'id' && key !== '_createdAt') {
             chartState[key] = deserialized[key];
         }
     }
@@ -225,7 +233,7 @@ export async function listCharts() {
             chartName: chart.chartName,
             chartType: chart.chartType,
             minuteChart: chart.minuteChart,
-            updatedAt: chart._updatedAt,
+            updatedAt: chart.lastModified,
             createdAt: chart._createdAt,
             credits: chart.credits || {},
             tags: chart.tags || []
@@ -327,6 +335,10 @@ export async function createChart(name, chartType, minuteChart) {
     startDate.setHours(0, 0, 0, 0);
     const now = Date.now();
 
+    // Generate encryption key for this chart
+    const cryptoKey = await generateChartKey();
+    const chartKey = await exportKeyToHex(cryptoKey);
+
     // TODO: Remove test data - to disable hardcoded test data in chartState.js:
     // 1. Uncomment `hasTimestamps: false` below
     // 2. Uncomment the `series: {...}` block below to reset series to empty arrays
@@ -337,6 +349,8 @@ export async function createChart(name, chartType, minuteChart) {
         chartType,
         minuteChart,
         chartName: name.trim(),
+        chartKey,
+        shared: false,
         // hasTimestamps: false,  // Commented out for test data - uncomment to disable
         // series: { xValues: [], corrects: [], errors: [], timing: [], misc: {} },
         // startDate,  // Commented out for test data - uncomment to disable
@@ -369,9 +383,12 @@ function debouncedSaveToIndexedDB() {
         clearTimeout(saveTimeout);
     }
 
-    saveTimeout = setTimeout(() => {
+    saveTimeout = setTimeout(async () => {
         if (chartState.id) {
-            saveChart(chartState.id);
+            await saveChart(chartState.id);
+            if (chartState.shared && isInitialized()) {
+                pushChart(chartState.id).catch(err => console.warn('[Storage] Push failed:', err));
+            }
         }
     }, SAVE_DEBOUNCE_MS);
 }

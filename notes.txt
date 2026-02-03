@@ -23,3 +23,14 @@ To-do
 -- Doesn't show names for the misc series when selected trend type.
 * Check whether the underlying daily celeraiton is calculated in each case to get the right one
 * Toggle for placing below floor can be slow to respond
+* Simplify the trend line coloring system
+* When exporting from a non-minute chart, discard minutes
+* Reset panning when changing chart capacity
+* First data point is set on the right date
+* Legend still uses phase and aim names
+* timing inputs in data entry is not hidden immediately
+* The click to add date lines is driving me nuts
+-- Maybe make it work temporarily on a timer after having 1) just navigated to the data entry menu or 2) used the arrows or dates?
+* Show the interactivity recentangle (should be slightly longer) BEFORE clicking, but not when dragging.
+* Phase line feedback shouldn't have double notifications when adding phase lines
+* Chart dimensions changes across browswers, at least with fonts, but maybe more

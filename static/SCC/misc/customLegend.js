@@ -171,9 +171,9 @@ function createLinesSection(scale = 1) {
 
     // Line type items - use main icons with scaled size and showText=false
     const lineTypes = [
-        { key: 'aim', label: 'Aim', icon: icons.aimDiagonal(scaledIconSize, false) },
-        { key: 'phase', label: 'Phase', icon: icons.phaseTextTop(scaledIconSize, false) },
-        { key: 'change', label: 'Change', icon: icons.scatterLine(scaledIconSize) },
+        { key: 'aim', label: 'Count markers', icon: icons.aimDiagonal(scaledIconSize, false) },
+        { key: 'phase', label: 'Event markers', icon: icons.phaseTextTop(scaledIconSize, false) },
+        { key: 'change', label: 'Change lines', icon: icons.scatterLine(scaledIconSize) },
         { key: 'grid', label: 'Grid', icon: icons.grid(scaledIconSize) }
     ];
 
