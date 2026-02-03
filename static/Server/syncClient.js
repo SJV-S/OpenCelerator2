@@ -113,7 +113,7 @@ export async function pushChart(chartUuid) {
             uploads: [{
                 chart_uuid: chartUuid,
                 data: encryptedData,
-                updated_at: chart.lastModified,
+                updated_at: chart.lastModified || Math.floor(Date.now() / 1000),
                 wrapped_key: wrappedKey,
                 role: 'owner'
             }]
@@ -162,7 +162,7 @@ export async function createEditLink(chartUuid) {
             data: encryptedData,
             wrapped_key: wrappedKeyForUser,
             wrapped_key_for_share: wrappedKeyForShare,
-            last_modified: chart.lastModified
+            last_modified: chart.lastModified || Math.floor(Date.now() / 1000)
         })
     });
     if (!response.ok) throw new Error(`Failed to create edit link: ${response.status}`);
