@@ -87,25 +87,13 @@ export async function sync(localCharts) {
 export async function pushChart(chartUuid) {
     const chart = await getChartFromIndexedDB(chartUuid);
     if (!chart) throw new Error('Chart not found in local storage');
+    if (!chart.chartKey) throw new Error('Chart has no encryption key');
 
-    let chartKey;
-    if (!chart.chartKey) {
-        // Old chart without key - generate one
-        chartKey = await generateChartKey();
-        const raw = await crypto.subtle.exportKey('raw', chartKey);
-        chart.chartKey = Array.from(new Uint8Array(raw)).map(b => b.toString(16).padStart(2, '0')).join('');
-        // Save the new key
-        const db = await openDB('SCC_Charts', 1);
-        await db.put('charts', chart);
-    } else {
-        const chartKeyBytes = new Uint8Array(chart.chartKey.match(/.{1,2}/g).map(b => parseInt(b, 16)));
-        chartKey = await crypto.subtle.importKey('raw', chartKeyBytes, { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
-    }
+    const chartKeyBytes = new Uint8Array(chart.chartKey.match(/.{1,2}/g).map(b => parseInt(b, 16)));
+    const chartKey = await crypto.subtle.importKey('raw', chartKeyBytes, { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
 
     const encryptedData = await encrypt(chartKey, chart);
     const wrappedKey = await wrapKey(chartKey, userKey);
-
-    console.log('[Sync] Sender chartKey:', chart.chartKey?.slice(0, 16) + '...');
 
     const response = await fetch('/api/sync', {
         method: 'POST',
@@ -122,7 +110,6 @@ export async function pushChart(chartUuid) {
             }]
         })
     });
-    console.log('[Sync] Push response:', response.status);
 }
 
 export async function createViewLink(chartUuid) {
@@ -133,25 +120,15 @@ export async function createViewLink(chartUuid) {
 export async function createEditLink(chartUuid) {
     const chart = await getChartFromIndexedDB(chartUuid);
     if (!chart) throw new Error('Chart not found in local storage');
+    if (!chart.chartKey) throw new Error('Chart has no encryption key - reload the chart first');
 
-    let chartKey;
-    if (!chart.chartKey) {
-        // Old chart without key - generate one
-        chartKey = await generateChartKey();
-        const raw = await crypto.subtle.exportKey('raw', chartKey);
-        chart.chartKey = Array.from(new Uint8Array(raw)).map(b => b.toString(16).padStart(2, '0')).join('');
-    } else {
-        // Import existing key
-        const chartKeyBytes = new Uint8Array(chart.chartKey.match(/.{1,2}/g).map(b => parseInt(b, 16)));
-        chartKey = await crypto.subtle.importKey('raw', chartKeyBytes, { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
-    }
+    const chartKeyBytes = new Uint8Array(chart.chartKey.match(/.{1,2}/g).map(b => parseInt(b, 16)));
+    const chartKey = await crypto.subtle.importKey('raw', chartKeyBytes, { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
 
     // Generate share secret and derive key from it
     const shareSecret = Array.from(crypto.getRandomValues(new Uint8Array(32)))
         .map(b => b.toString(16).padStart(2, '0')).join('');
     const shareKey = await deriveKey(shareSecret, chartUuid);
-
-    console.log('[Sync] createEditLink using chartKey:', chart.chartKey?.slice(0, 16) + '...');
 
     // Encrypt chart and wrap key for both user and share recipient
     const encryptedData = await encrypt(chartKey, chart);
@@ -224,8 +201,6 @@ export async function joinSharedChart(chartUuid, shareSecret) {
     chartData.shared = true;
     chartData.lastModified = updated_at;
 
-    console.log('[Sync] joinSharedChart saving chartKey:', chartKeyHex?.slice(0, 16) + '...');
-
     // Save to local IndexedDB
     const db = await openDB('SCC_Charts', 1);
     await db.put('charts', chartData);
@@ -236,24 +211,17 @@ export async function joinSharedChart(chartUuid, shareSecret) {
 let syncInterval = null;
 
 export async function syncChart(chartId) {
-    if (!isInitialized()) {
-        console.log('[Sync] Not initialized');
-        return false;
-    }
+    if (!isInitialized()) return false;
 
     const db = await openDB('SCC_Charts', 1);
     const chart = await db.get('charts', chartId);
-    if (!chart || !chart.shared || !chart.chartKey) {
-        console.log('[Sync] Skipping - shared:', chart?.shared, 'hasKey:', !!chart?.chartKey);
-        return false;
-    }
+    if (!chart || !chart.shared || !chart.chartKey) return false;
 
     try {
         // Lightweight poll first
         const pollResponse = await fetch(`/api/chart/${chartId}/poll?t=${chart.lastModified || 0}`);
         if (!pollResponse.ok) return false;
         const { changed, updated_at } = await pollResponse.json();
-        console.log('[Sync] Poll result - changed:', changed, 'local:', chart.lastModified, 'server:', updated_at);
         if (!changed) return false;
 
         // Fetch full data only if changed
@@ -261,7 +229,6 @@ export async function syncChart(chartId) {
         if (!response.ok) return false;
         const { data } = await response.json();
 
-        console.log('[Sync] Receiver chartKey from IndexedDB:', chart.chartKey?.slice(0, 16) + '...');
         const chartKeyBytes = new Uint8Array(chart.chartKey.match(/.{1,2}/g).map(b => parseInt(b, 16)));
         const chartKey = await crypto.subtle.importKey('raw', chartKeyBytes, { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
         const chartData = await decrypt(chartKey, data);
@@ -272,7 +239,6 @@ export async function syncChart(chartId) {
         chartData.lastModified = updated_at;
 
         await db.put('charts', chartData);
-        console.log('[Sync] Emitting SYNC_CHART_UPDATED for:', chartId);
         eventBus.emit(EVENTS.SYNC_CHART_UPDATED, { chartId, chartData });
         return true;
     } catch (err) {

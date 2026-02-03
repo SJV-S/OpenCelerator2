@@ -203,9 +203,15 @@ export async function loadChart(id) {
             return false;
         }
 
-        jsonBackwardsCompatibilityCheck(data);
+        const wasModified = await jsonBackwardsCompatibilityCheck(data);
         deserializeChart(data);
         chartState.id = id;
+
+        // Save if backwards compat made any migrations
+        if (wasModified) {
+            await db.put(STORE_NAME, data);
+            console.log(`[Storage] Migrated chart: ${id}`);
+        }
 
         console.log(`[Storage] Loaded chart: ${id}`);
         eventBus.emit(EVENTS.STORAGE_CHART_LOADED, { id, name: data.chartName });
@@ -388,9 +394,7 @@ function debouncedSaveToIndexedDB() {
     saveTimeout = setTimeout(async () => {
         if (chartState.id) {
             await saveChart(chartState.id);
-            console.log('[Storage] Auto-save - shared:', chartState.shared, 'initialized:', isInitialized());
             if (chartState.shared && isInitialized()) {
-                console.log('[Storage] Pushing to server...');
                 pushChart(chartState.id).catch(err => console.warn('[Storage] Push failed:', err));
             }
         }

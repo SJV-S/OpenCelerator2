@@ -1,12 +1,13 @@
 import { chartState } from '../chartState.js';
 import { generateChartKey } from '../../Server/crypto.js';
 
-function fillMissing(target, reference) {
+function fillMissing(target, reference, skipKeys = ['id', '_createdAt', 'lastModified']) {
     for (const key in reference) {
-        if (!(key in target) || target[key] == null || typeof target[key] !== typeof reference[key]) {
+        if (skipKeys.includes(key)) continue;
+        if (!(key in target) || target[key] == null) {
             target[key] = reference[key];
-        } else if (typeof reference[key] === 'object' && !Array.isArray(reference[key])) {
-            fillMissing(target[key], reference[key]);
+        } else if (typeof reference[key] === 'object' && reference[key] !== null && !Array.isArray(reference[key])) {
+            fillMissing(target[key], reference[key], []);
         }
     }
 }
@@ -58,6 +59,8 @@ function migrateTraceStyles(traceStyles) {
 }
 
 export async function jsonBackwardsCompatibilityCheck(loadedChart) {
+    let modified = false;
+
     // Migrate renamed properties before fillMissing
     migrateTraceStyles(loadedChart.traceStyles);
 
@@ -67,7 +70,15 @@ export async function jsonBackwardsCompatibilityCheck(loadedChart) {
         const raw = await crypto.subtle.exportKey('raw', cryptoKey);
         loadedChart.chartKey = Array.from(new Uint8Array(raw))
             .map(b => b.toString(16).padStart(2, '0')).join('');
+        modified = true;
     }
 
+    // Track keys before fillMissing
+    const keysBefore = Object.keys(loadedChart).length;
     fillMissing(loadedChart, chartState);
+    if (Object.keys(loadedChart).length !== keysBefore) {
+        modified = true;
+    }
+
+    return modified;
 }
