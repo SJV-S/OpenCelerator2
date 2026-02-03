@@ -207,9 +207,17 @@ async function handleShareLinkClick(type) {
     }
 
     try {
-        const url = type === 'view'
+        const result = type === 'view'
             ? await createViewLink(chartState.id)
             : await createEditLink(chartState.id);
+
+        const url = result.url || result;  // createViewLink returns string, createEditLink returns object
+
+        // Update in-memory state so auto-save triggers pushes
+        chartState.shared = true;
+        if (result.chartKey) {
+            chartState.chartKey = result.chartKey;
+        }
 
         await navigator.clipboard.writeText(url);
 

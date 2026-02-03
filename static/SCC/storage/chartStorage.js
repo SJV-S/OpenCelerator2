@@ -168,7 +168,9 @@ export async function saveChart(id = null) {
     try {
         const chartId = id || chartState.id || uuid();
         chartState.id = chartId;
+        console.log('[Storage] saveChart - chartState.chartKey:', chartState.chartKey?.slice(0, 16) + '...');
         const data = serializeChart(chartId, chartState);
+        console.log('[Storage] saveChart - serialized chartKey:', data.chartKey?.slice(0, 16) + '...');
 
         await db.put(STORE_NAME, data);
 
@@ -386,7 +388,9 @@ function debouncedSaveToIndexedDB() {
     saveTimeout = setTimeout(async () => {
         if (chartState.id) {
             await saveChart(chartState.id);
+            console.log('[Storage] Auto-save - shared:', chartState.shared, 'initialized:', isInitialized());
             if (chartState.shared && isInitialized()) {
+                console.log('[Storage] Pushing to server...');
                 pushChart(chartState.id).catch(err => console.warn('[Storage] Push failed:', err));
             }
         }

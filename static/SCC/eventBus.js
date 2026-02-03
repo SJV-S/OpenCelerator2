@@ -94,6 +94,9 @@ export const EVENTS = {
     STORAGE_CHART_DELETED: 'storage:chart_deleted',
     STORAGE_ERROR: 'storage:error',
 
+    // Sync Events
+    SYNC_CHART_UPDATED: 'sync:chart_updated',
+
     // Data Import Events
     DATA_IMPORT_STARTED: 'data:import_started',
     DATA_IMPORT_FILE_PARSED: 'data:import_file_parsed',

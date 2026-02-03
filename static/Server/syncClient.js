@@ -5,6 +5,7 @@
 import { encrypt, decrypt, generateChartKey, wrapKey, unwrapKey, deriveKey } from './crypto.js';
 import { getUserId, getUserKey } from './passphrase.js';
 import { openDB } from '../SCC/lib/idb.js';
+import { eventBus, EVENTS } from '../SCC/eventBus.js';
 
 async function getChartFromIndexedDB(chartId) {
     const db = await openDB('SCC_Charts', 1);
@@ -104,7 +105,9 @@ export async function pushChart(chartUuid) {
     const encryptedData = await encrypt(chartKey, chart);
     const wrappedKey = await wrapKey(chartKey, userKey);
 
-    await fetch('/api/sync', {
+    console.log('[Sync] Sender chartKey:', chart.chartKey?.slice(0, 16) + '...');
+
+    const response = await fetch('/api/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -119,6 +122,7 @@ export async function pushChart(chartUuid) {
             }]
         })
     });
+    console.log('[Sync] Push response:', response.status);
 }
 
 export async function createViewLink(chartUuid) {
@@ -147,6 +151,8 @@ export async function createEditLink(chartUuid) {
         .map(b => b.toString(16).padStart(2, '0')).join('');
     const shareKey = await deriveKey(shareSecret, chartUuid);
 
+    console.log('[Sync] createEditLink using chartKey:', chart.chartKey?.slice(0, 16) + '...');
+
     // Encrypt chart and wrap key for both user and share recipient
     const encryptedData = await encrypt(chartKey, chart);
     const wrappedKeyForUser = await wrapKey(chartKey, userKey);
@@ -172,7 +178,7 @@ export async function createEditLink(chartUuid) {
     const db = await openDB('SCC_Charts', 1);
     await db.put('charts', chart);
 
-    return `${window.location.origin}/chart/${chartUuid}/${shareSecret}`;
+    return { url: `${window.location.origin}/chart/${chartUuid}/${shareSecret}`, chartKey: chart.chartKey };
 }
 
 export async function deleteChart(chartUuid) {
@@ -218,6 +224,8 @@ export async function joinSharedChart(chartUuid, shareSecret) {
     chartData.shared = true;
     chartData.lastModified = updated_at;
 
+    console.log('[Sync] joinSharedChart saving chartKey:', chartKeyHex?.slice(0, 16) + '...');
+
     // Save to local IndexedDB
     const db = await openDB('SCC_Charts', 1);
     await db.put('charts', chartData);
@@ -228,17 +236,24 @@ export async function joinSharedChart(chartUuid, shareSecret) {
 let syncInterval = null;
 
 export async function syncChart(chartId) {
-    if (!isInitialized()) return false;
+    if (!isInitialized()) {
+        console.log('[Sync] Not initialized');
+        return false;
+    }
 
     const db = await openDB('SCC_Charts', 1);
     const chart = await db.get('charts', chartId);
-    if (!chart || !chart.shared || !chart.chartKey) return false;
+    if (!chart || !chart.shared || !chart.chartKey) {
+        console.log('[Sync] Skipping - shared:', chart?.shared, 'hasKey:', !!chart?.chartKey);
+        return false;
+    }
 
     try {
         // Lightweight poll first
         const pollResponse = await fetch(`/api/chart/${chartId}/poll?t=${chart.lastModified || 0}`);
         if (!pollResponse.ok) return false;
         const { changed, updated_at } = await pollResponse.json();
+        console.log('[Sync] Poll result - changed:', changed, 'local:', chart.lastModified, 'server:', updated_at);
         if (!changed) return false;
 
         // Fetch full data only if changed
@@ -246,6 +261,7 @@ export async function syncChart(chartId) {
         if (!response.ok) return false;
         const { data } = await response.json();
 
+        console.log('[Sync] Receiver chartKey from IndexedDB:', chart.chartKey?.slice(0, 16) + '...');
         const chartKeyBytes = new Uint8Array(chart.chartKey.match(/.{1,2}/g).map(b => parseInt(b, 16)));
         const chartKey = await crypto.subtle.importKey('raw', chartKeyBytes, { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
         const chartData = await decrypt(chartKey, data);
@@ -256,6 +272,8 @@ export async function syncChart(chartId) {
         chartData.lastModified = updated_at;
 
         await db.put('charts', chartData);
+        console.log('[Sync] Emitting SYNC_CHART_UPDATED for:', chartId);
+        eventBus.emit(EVENTS.SYNC_CHART_UPDATED, { chartId, chartData });
         return true;
     } catch (err) {
         console.warn(`[Sync] Failed:`, err);

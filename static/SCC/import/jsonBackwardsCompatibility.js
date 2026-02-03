@@ -1,4 +1,5 @@
 import { chartState } from '../chartState.js';
+import { generateChartKey } from '../../Server/crypto.js';
 
 function fillMissing(target, reference) {
     for (const key in reference) {
@@ -56,9 +57,17 @@ function migrateTraceStyles(traceStyles) {
     }
 }
 
-export function jsonBackwardsCompatibilityCheck(loadedChart) {
+export async function jsonBackwardsCompatibilityCheck(loadedChart) {
     // Migrate renamed properties before fillMissing
     migrateTraceStyles(loadedChart.traceStyles);
+
+    // Generate chartKey for old charts that don't have one
+    if (!loadedChart.chartKey) {
+        const cryptoKey = await generateChartKey();
+        const raw = await crypto.subtle.exportKey('raw', cryptoKey);
+        loadedChart.chartKey = Array.from(new Uint8Array(raw))
+            .map(b => b.toString(16).padStart(2, '0')).join('');
+    }
 
     fillMissing(loadedChart, chartState);
 }

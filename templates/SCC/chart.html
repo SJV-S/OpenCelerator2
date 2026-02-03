@@ -58,6 +58,8 @@
         import { initStorage, loadChart } from '/static/SCC/storage/chartStorage.js';
         import { joinSharedChart, startSyncPolling } from '/static/Server/syncClient.js';
         import { initServerSync } from '/static/Server/init.js';
+        import { eventBus, EVENTS } from '/static/SCC/eventBus.js';
+        import { refreshChart } from '/static/SCC/series/replot.js';
 
         const chartId = '{{ chart_id }}';
         const shareSecret = window.location.pathname.split('/')[3]; // /chart/{uuid}/{secret}
@@ -86,6 +88,16 @@
             document.getElementById('chart-menu-content').classList.remove('menu-loading');
             setupEventListeners();
             initializeChart();
+
+            // When sync fetches new data, reload into memory and replot
+            eventBus.subscribe(EVENTS.SYNC_CHART_UPDATED, async ({ chartId: updatedId }) => {
+                console.log('[Sync] Received update event for:', updatedId);
+                if (updatedId === chartId) {
+                    await loadChart(chartId);
+                    refreshChart();
+                }
+            }, true);
+
             startSyncPolling(chartId);
         }
 

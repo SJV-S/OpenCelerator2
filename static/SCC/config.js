@@ -112,8 +112,12 @@ export const LINE_DEFAULTS = Object.freeze({
 });
 
 // ============================================================================
-// FONT SIZES
+// FONTS
 // ============================================================================
+export const FONTS = Object.freeze({
+    PRIMARY: '"Open Sans", sans-serif',
+});
+
 export const FONT_SIZES = Object.freeze({
     TOAST: 14,
     LEGEND: 12,

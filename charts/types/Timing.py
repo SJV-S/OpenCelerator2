@@ -12,7 +12,7 @@ class TimingSCC:
         self.height = 675  # Layout height (arbitrary). Width will be calculated.
         self.style_color = '#05c3de'  # Color for spines, ticks, and labels
         self.grid_color = '#6ad1e3'  # Color for grid lines
-        self.font_family = 'Tahoma, DejaVu Sans, Verdana, sans-serif'
+        self.font_family = '"Open Sans", sans-serif'
         self.font_size = 22
         self.font_weight = 'bold'
         self.grid_width = 1
