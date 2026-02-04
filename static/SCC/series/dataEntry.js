@@ -166,6 +166,7 @@ function updateTimingVisibility() {
  * @param {string} dateString - Date in YYYY-MM-DD format
  */
 async function updateEntryDateIndicator(dateString) {
+    return;  // Disabled
     const chartDiv = document.getElementById('chart');
     if (!chartDiv || !chartDiv.layout) return;
 

@@ -7,20 +7,94 @@
         </div>
     </div>
 
-    <!-- Start Date Section -->
+    <!-- Navigation Group -->
     <div class="mb-4 lg:mb-3 border-t border-gray-300 pt-4 lg:pt-3">
-        <label id="start-date-label" class="block text-sm font-semibold text-gray-600 mb-3 lg:mb-2 text-center">Start Date</label>
+        <label class="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-3 lg:mb-2 text-center">Navigation</label>
 
-        <!-- Monday dropdown (Daily only) -->
-        <div id="start-monday-row" class="mb-3" style="display: none;">
+        <!-- Start Date Section -->
+        <div class="mb-4 lg:mb-3">
+            <label id="start-date-label" class="block text-sm font-semibold text-gray-600 mb-3 lg:mb-2 text-center">Start Date</label>
+
+            <!-- Monday dropdown (Daily only) -->
+            <div id="start-monday-row" class="mb-3" style="display: none;">
+                <div class="flex items-center justify-center gap-2">
+                    <button type="button" data-action="start-monday-dec" class="px-3 py-3 lg:px-2 lg:py-2 text-black border-2 border-gray-300 rounded hover:bg-gray-100 active:bg-gray-200 transition-colors flex items-center justify-center">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 4L6 10L12 16" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+                    <div id="start-monday" data-value="" class="w-20 px-3 py-3 lg:px-2 lg:py-2 flex items-center justify-center border-2 border-gray-300 rounded text-lg lg:text-base font-medium bg-white"></div>
+                    <button type="button" data-action="start-monday-inc" class="px-3 py-3 lg:px-2 lg:py-2 text-black border-2 border-gray-300 rounded hover:bg-gray-100 active:bg-gray-200 transition-colors flex items-center justify-center">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M8 4L14 10L8 16" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Month input (Daily, Weekly) -->
+            <div id="start-month-row" class="mb-3" style="display: none;">
+                <div class="flex items-center justify-center gap-2">
+                    <button type="button" data-action="start-month-dec" class="px-3 py-3 lg:px-2 lg:py-2 text-black border-2 border-gray-300 rounded hover:bg-gray-100 active:bg-gray-200 transition-colors flex items-center justify-center">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 4L6 10L12 16" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+                    <div id="start-month" data-value="" class="w-20 px-3 py-3 lg:px-2 lg:py-2 flex items-center justify-center border-2 border-gray-300 rounded text-lg lg:text-base font-medium bg-white"></div>
+                    <button type="button" data-action="start-month-inc" class="px-3 py-3 lg:px-2 lg:py-2 text-black border-2 border-gray-300 rounded hover:bg-gray-100 active:bg-gray-200 transition-colors flex items-center justify-center">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M8 4L14 10L8 16" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Year input (Daily, Weekly, Monthly) -->
+            <div id="start-year-row" class="mb-3" style="display: none;">
+                <div class="flex items-center justify-center gap-2">
+                    <button type="button" data-action="start-year-dec" class="px-3 py-3 lg:px-2 lg:py-2 text-black border-2 border-gray-300 rounded hover:bg-gray-100 active:bg-gray-200 transition-colors flex items-center justify-center">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 4L6 10L12 16" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+                    <input type="text" id="start-year" data-value="" style="width: 5rem;" class="px-3 py-3 lg:px-2 lg:py-2 text-center border-2 border-gray-300 rounded text-lg lg:text-base font-medium bg-white focus:outline-none focus:border-[#6ad1e3] transition-colors">
+                    <button type="button" data-action="start-year-inc" class="px-3 py-3 lg:px-2 lg:py-2 text-black border-2 border-gray-300 rounded hover:bg-gray-100 active:bg-gray-200 transition-colors flex items-center justify-center">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M8 4L14 10L8 16" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Decade input (Yearly only) -->
+            <div id="start-decade-row" style="display: none;">
+                <div class="flex items-center justify-center gap-2">
+                    <button type="button" data-action="start-decade-dec" class="px-3 py-3 lg:px-2 lg:py-2 text-black border-2 border-gray-300 rounded hover:bg-gray-100 active:bg-gray-200 transition-colors flex items-center justify-center">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 4L6 10L12 16" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+                    <input type="text" inputmode="numeric" id="start-decade" data-value="" style="width: 5rem;" class="px-3 py-3 lg:px-2 lg:py-2 text-center border-2 border-gray-300 rounded text-lg lg:text-base font-medium bg-white focus:outline-none focus:border-[#6ad1e3] transition-colors">
+                    <button type="button" data-action="start-decade-inc" class="px-3 py-3 lg:px-2 lg:py-2 text-black border-2 border-gray-300 rounded hover:bg-gray-100 active:bg-gray-200 transition-colors flex items-center justify-center">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M8 4L14 10L8 16" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chart Window -->
+        <div class="mb-4 lg:mb-3">
+            <label class="block text-sm font-semibold text-gray-600 mb-3 lg:mb-2 text-center">Chart Window</label>
             <div class="flex items-center justify-center gap-2">
-                <button type="button" data-action="start-monday-dec" class="px-3 py-3 lg:px-2 lg:py-2 text-black border-2 border-gray-300 rounded hover:bg-gray-100 active:bg-gray-200 transition-colors flex items-center justify-center">
+                <button type="button" data-action="chart-window-dec" class="px-3 py-3 lg:px-2 lg:py-2 text-black border-2 border-gray-300 rounded hover:bg-gray-100 active:bg-gray-200 transition-colors flex items-center justify-center">
                     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M12 4L6 10L12 16" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
                 </button>
-                <div id="start-monday" data-value="" class="w-20 px-3 py-3 lg:px-2 lg:py-2 flex items-center justify-center border-2 border-gray-300 rounded text-lg lg:text-base font-medium bg-white"></div>
-                <button type="button" data-action="start-monday-inc" class="px-3 py-3 lg:px-2 lg:py-2 text-black border-2 border-gray-300 rounded hover:bg-gray-100 active:bg-gray-200 transition-colors flex items-center justify-center">
+                <div id="chart-window" class="w-20 px-3 py-3 lg:px-2 lg:py-2 flex items-center justify-center border-2 border-gray-300 rounded text-lg lg:text-base font-medium bg-white"></div>
+                <button type="button" data-action="chart-window-inc" class="px-3 py-3 lg:px-2 lg:py-2 text-black border-2 border-gray-300 rounded hover:bg-gray-100 active:bg-gray-200 transition-colors flex items-center justify-center">
                     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M8 4L14 10L8 16" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
@@ -28,54 +102,48 @@
             </div>
         </div>
 
-        <!-- Month input (Daily, Weekly) -->
-        <div id="start-month-row" class="mb-3" style="display: none;">
+        <!-- Pan Chart -->
+        <div>
+            <label class="block text-sm font-semibold text-gray-600 mb-3 lg:mb-2 text-center">Pan Chart</label>
             <div class="flex items-center justify-center gap-2">
-                <button type="button" data-action="start-month-dec" class="px-3 py-3 lg:px-2 lg:py-2 text-black border-2 border-gray-300 rounded hover:bg-gray-100 active:bg-gray-200 transition-colors flex items-center justify-center">
+                <button type="button" data-action="chart-pan-left" class="px-3 py-3 lg:px-2 lg:py-2 text-black border-2 border-gray-300 rounded hover:bg-gray-100 active:bg-gray-200 transition-colors flex items-center justify-center">
                     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M12 4L6 10L12 16" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
                 </button>
-                <div id="start-month" data-value="" class="w-20 px-3 py-3 lg:px-2 lg:py-2 flex items-center justify-center border-2 border-gray-300 rounded text-lg lg:text-base font-medium bg-white"></div>
-                <button type="button" data-action="start-month-inc" class="px-3 py-3 lg:px-2 lg:py-2 text-black border-2 border-gray-300 rounded hover:bg-gray-100 active:bg-gray-200 transition-colors flex items-center justify-center">
+                <div id="chart-pan-position" class="w-20 px-3 py-3 lg:px-2 lg:py-2 flex items-center justify-center border-2 border-gray-300 rounded text-lg lg:text-base font-medium bg-white">0</div>
+                <button type="button" data-action="chart-pan-right" class="px-3 py-3 lg:px-2 lg:py-2 text-black border-2 border-gray-300 rounded hover:bg-gray-100 active:bg-gray-200 transition-colors flex items-center justify-center">
                     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M8 4L14 10L8 16" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
                 </button>
             </div>
         </div>
+    </div>
 
-        <!-- Year input (Daily, Weekly, Monthly) -->
-        <div id="start-year-row" class="mb-3" style="display: none;">
-            <div class="flex items-center justify-center gap-2">
-                <button type="button" data-action="start-year-dec" class="px-3 py-3 lg:px-2 lg:py-2 text-black border-2 border-gray-300 rounded hover:bg-gray-100 active:bg-gray-200 transition-colors flex items-center justify-center">
-                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12 4L6 10L12 16" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                </button>
-                <input type="text" id="start-year" data-value="" class="w-28 px-2 py-3 lg:px-1 lg:py-2 text-center border-2 border-gray-300 rounded text-lg lg:text-base font-medium bg-white focus:outline-none focus:border-[#6ad1e3] transition-colors">
-                <button type="button" data-action="start-year-inc" class="px-3 py-3 lg:px-2 lg:py-2 text-black border-2 border-gray-300 rounded hover:bg-gray-100 active:bg-gray-200 transition-colors flex items-center justify-center">
-                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M8 4L14 10L8 16" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                </button>
+    <!-- Other Group -->
+    <div class="mb-4 lg:mb-3 border-t border-gray-300 pt-4 lg:pt-3">
+        <label class="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-3 lg:mb-2 text-center">Other</label>
+
+        <!-- Celeration Fan Toggle (hidden on mobile - screen too small for fan) -->
+        <div class="mb-4 lg:mb-3 hidden md:block">
+            <label class="block text-sm font-semibold text-gray-600 mb-3 lg:mb-2 text-center">Celeration Fan</label>
+            <div class="flex items-center justify-center">
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="fan-toggle" class="sr-only peer" checked>
+                    <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#6ad1e3]"></div>
+                </label>
             </div>
         </div>
 
-        <!-- Decade input (Yearly only) -->
-        <div id="start-decade-row" style="display: none;">
-            <div class="flex items-center justify-center gap-2">
-                <button type="button" data-action="start-decade-dec" class="px-3 py-3 lg:px-2 lg:py-2 text-black border-2 border-gray-300 rounded hover:bg-gray-100 active:bg-gray-200 transition-colors flex items-center justify-center">
-                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12 4L6 10L12 16" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                </button>
-                <input type="text" inputmode="numeric" id="start-decade" data-value="" class="w-20 px-3 py-3 lg:px-2 lg:py-2 text-center border-2 border-gray-300 rounded text-lg lg:text-base font-medium bg-white focus:outline-none focus:border-[#6ad1e3] transition-colors">
-                <button type="button" data-action="start-decade-inc" class="px-3 py-3 lg:px-2 lg:py-2 text-black border-2 border-gray-300 rounded hover:bg-gray-100 active:bg-gray-200 transition-colors flex items-center justify-center">
-                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M8 4L14 10L8 16" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                </button>
+        <!-- Place Zeros Below Floor Toggle -->
+        <div>
+            <label class="block text-sm font-semibold text-gray-600 mb-3 lg:mb-2 text-center">Place Zeros Below Floor</label>
+            <div class="flex items-center justify-center">
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="place-zeros-below-floor-toggle" class="sr-only peer" checked>
+                    <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#6ad1e3]"></div>
+                </label>
             </div>
         </div>
     </div>
@@ -94,28 +162,6 @@
                 <option value="bottom-right">Bottom Right</option>
                 <option value="bottom-left">Bottom Left</option>
             </select>
-        </div>
-    </div>
-
-    <!-- Celeration Fan Toggle (hidden on mobile - screen too small for fan) -->
-    <div class="mb-4 lg:mb-3 border-t border-gray-300 pt-4 lg:pt-3 hidden md:block">
-        <label class="block text-sm font-semibold text-gray-600 mb-3 lg:mb-2 text-center">Celeration Fan</label>
-        <div class="flex items-center justify-center">
-            <label class="relative inline-flex items-center cursor-pointer">
-                <input type="checkbox" id="fan-toggle" class="sr-only peer" checked>
-                <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#6ad1e3]"></div>
-            </label>
-        </div>
-    </div>
-
-    <!-- Place Zeros Below Floor Toggle -->
-    <div class="mb-4 lg:mb-3 border-t border-gray-300 pt-4 lg:pt-3">
-        <label class="block text-sm font-semibold text-gray-600 mb-3 lg:mb-2 text-center">Place Zeros Below Floor</label>
-        <div class="flex items-center justify-center">
-            <label class="relative inline-flex items-center cursor-pointer">
-                <input type="checkbox" id="place-zeros-below-floor-toggle" class="sr-only peer" checked>
-                <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#6ad1e3]"></div>
-            </label>
         </div>
     </div>
 
@@ -181,42 +227,6 @@
                 <input type="number" id="trend-forecast" min="0" max="100" value="0" class="w-16 px-2 py-2 lg:py-1 text-sm text-center border-2 border-gray-300 rounded focus:outline-none focus:border-[#6ad1e3] transition-colors">
                 <span class="text-sm text-gray-500">days</span>
             </div>
-        </div>
-    </div>
-
-    <!-- Chart Window -->
-    <div class="mb-4 lg:mb-3 border-t border-gray-300 pt-4 lg:pt-3">
-        <label class="block text-sm font-semibold text-gray-600 mb-3 lg:mb-2 text-center">Chart Window</label>
-        <div class="flex items-center justify-center gap-2">
-            <button type="button" data-action="chart-window-dec" class="px-3 py-3 lg:px-2 lg:py-2 text-black border-2 border-gray-300 rounded hover:bg-gray-100 active:bg-gray-200 transition-colors flex items-center justify-center">
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 4L6 10L12 16" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-            </button>
-            <div id="chart-window" class="w-20 px-3 py-3 lg:px-2 lg:py-2 flex items-center justify-center border-2 border-gray-300 rounded text-lg lg:text-base font-medium bg-white"></div>
-            <button type="button" data-action="chart-window-inc" class="px-3 py-3 lg:px-2 lg:py-2 text-black border-2 border-gray-300 rounded hover:bg-gray-100 active:bg-gray-200 transition-colors flex items-center justify-center">
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M8 4L14 10L8 16" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-            </button>
-        </div>
-    </div>
-
-    <!-- Pan Chart -->
-    <div class="mb-4 lg:mb-3 border-t border-gray-300 pt-4 lg:pt-3">
-        <label class="block text-sm font-semibold text-gray-600 mb-3 lg:mb-2 text-center">Pan Chart</label>
-        <div class="flex items-center justify-center gap-2">
-            <button type="button" data-action="chart-pan-left" class="px-3 py-3 lg:px-2 lg:py-2 text-black border-2 border-gray-300 rounded hover:bg-gray-100 active:bg-gray-200 transition-colors flex items-center justify-center">
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 4L6 10L12 16" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-            </button>
-            <div id="chart-pan-position" class="w-20 px-3 py-3 lg:px-2 lg:py-2 flex items-center justify-center border-2 border-gray-300 rounded text-lg lg:text-base font-medium bg-white">0</div>
-            <button type="button" data-action="chart-pan-right" class="px-3 py-3 lg:px-2 lg:py-2 text-black border-2 border-gray-300 rounded hover:bg-gray-100 active:bg-gray-200 transition-colors flex items-center justify-center">
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M8 4L14 10L8 16" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-            </button>
         </div>
     </div>
 

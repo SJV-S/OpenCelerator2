@@ -19,105 +19,17 @@ import { xPositionToDate, dateToXPosition } from '../util/dates.js';
 import { fit, FIT_METHODS, BOUNCE_ENVELOPES, DEFAULT_FIT_METHOD, DEFAULT_BOUNCE_ENVELOPE, calculateBounceBounds, calculateBounceLines, formatCelerationLabel } from '../util/fit_lines.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 
-// ============================================
-// Color Inverse Helpers
-// ============================================
-
-/** Darkness threshold (0-255). Colors with luminance below this are "black-ish" */
-const DARK_THRESHOLD = 60;
-
 /**
- * Parse a color string to RGB values
- * @param {string} color - Color in hex (#RGB, #RRGGBB) or rgb(r,g,b) format
- * @returns {{r: number, g: number, b: number}|null} RGB values or null if unparseable
- */
-function parseColor(color) {
-    if (!color) return null;
-    color = color.toLowerCase().trim();
-
-    // Named color: black
-    if (color === 'black') return { r: 0, g: 0, b: 0 };
-
-    // Hex format
-    if (color.startsWith('#')) {
-        const hex = color.slice(1);
-        if (hex.length === 3) {
-            return {
-                r: parseInt(hex[0] + hex[0], 16),
-                g: parseInt(hex[1] + hex[1], 16),
-                b: parseInt(hex[2] + hex[2], 16)
-            };
-        } else if (hex.length === 6) {
-            return {
-                r: parseInt(hex.slice(0, 2), 16),
-                g: parseInt(hex.slice(2, 4), 16),
-                b: parseInt(hex.slice(4, 6), 16)
-            };
-        }
-    }
-
-    // RGB format
-    const match = color.match(/rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
-    if (match) {
-        return {
-            r: parseInt(match[1]),
-            g: parseInt(match[2]),
-            b: parseInt(match[3])
-        };
-    }
-
-    return null;
-}
-
-/**
- * Check if a color is "dark" (black-ish) based on perceived luminance
- * @param {string} color - Color string
- * @returns {boolean} True if color is dark enough to need a contrasting cel line
- */
-function isColorDark(color) {
-    const rgb = parseColor(color);
-    if (!rgb) return true; // Assume dark if we can't parse
-
-    // Perceived luminance formula (weighted for human perception)
-    const luminance = 0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b;
-    return luminance < DARK_THRESHOLD;
-}
-
-/**
- * Compute the RGB complement of a color
- * @param {string} color - Color string
- * @returns {string} Complementary color as rgb() string, or fallback
- */
-function getComplementaryColor(color) {
-    const rgb = parseColor(color);
-    if (!rgb) return 'orange'; // Fallback
-
-    return `rgb(${255 - rgb.r}, ${255 - rgb.g}, ${255 - rgb.b})`;
-}
-
-/**
- * Get the appropriate cel line color for a data series.
- * For dark colors: uses predefined contrasting colors (green/red/orange)
- * For light colors: computes the RGB complement
+ * Get the cel line color for a data series.
+ * Simple fixed colors: green for corrects, red for errors, orange for timing, black for misc
  * @param {string} seriesKey - The series key (corrects, errors, timing, misc1, etc.)
  * @returns {string} The color to use for the cel line
  */
 function getCelLineColor(seriesKey) {
-    const config = getFirstConfig(seriesKey);
-    if (!config) return 'orange'; // Fallback
-
-    // Get the data series marker color (standardized: all series use markerColor)
-    const dataColor = config.markerColor || 'black';
-
-    // If dark, use predefined contrasting colors
-    if (isColorDark(dataColor)) {
-        if (seriesKey === CORRECTS) return 'green';
-        if (seriesKey === ERRORS) return 'red';
-        return 'orange'; // timing and misc
-    }
-
-    // For light colors, compute complement
-    return getComplementaryColor(dataColor);
+    if (seriesKey === CORRECTS) return 'green';
+    if (seriesKey === ERRORS) return 'red';
+    if (seriesKey === TIMING) return 'orange';
+    return 'black'; // misc series
 }
 
 // Cel line drawing state (ephemeral UI state)

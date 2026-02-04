@@ -265,9 +265,9 @@ function setLineClickability(makeClickable) {
 
         // Cel lines (change/trend lines)
         if (chartState.CelLines) {
-            Object.entries(chartState.CelLines).forEach(([key, celLine]) => {
-                // Skip the settings object
-                if (key === 'settings') return;
+            Object.values(chartState.CelLines).forEach(celLine => {
+                // Skip the settings object (it doesn't have an id property)
+                if (!celLine.id) return;
 
                 clickablePromise = clickablePromise.then(() => {
                     // Cel lines store dates as YYYY-MM-DD strings
@@ -317,6 +317,15 @@ function setLineClickability(makeClickable) {
         }
 
         clickablePromise.then(() => {
+            // Move all clickable traces to the end so they're on top of data series
+            const clickableIndices = [];
+            chartDiv.data.forEach((trace, i) => {
+                if (trace.meta?.type === 'clickableLine') clickableIndices.push(i);
+            });
+            if (clickableIndices.length > 0) {
+                return Plotly.moveTraces(chartDiv, clickableIndices, clickableIndices.map(() => -1));
+            }
+        }).then(() => {
             console.log('All lines made clickable');
         });
 
