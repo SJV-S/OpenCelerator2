@@ -248,12 +248,25 @@ function setLineCategoryClickability(category, makeClickable) {
     }
 
     if (makeClickable) {
+        // Count objects to determine if we need delays
+        let objectCount = 0;
+        if (category === 'phase' && chartState.PhaseLines) {
+            objectCount = Object.keys(chartState.PhaseLines).length;
+        } else if (category === 'aim' && chartState.AimLines) {
+            objectCount = Object.keys(chartState.AimLines).length;
+        } else if (category === 'cel' && chartState.CelLines) {
+            objectCount = Object.values(chartState.CelLines).filter(l => l.id).length;
+        } else if (category === 'cut' && chartState.LineCuts) {
+            objectCount = Object.keys(chartState.LineCuts).length;
+        }
+        const useDelay = objectCount > 5;
+
         let clickablePromise = Promise.resolve();
 
         if (category === 'phase' && chartState.PhaseLines) {
             Object.values(chartState.PhaseLines).forEach(phaseLine => {
                 clickablePromise = clickablePromise
-                    .then(() => delay(TRACE_DRAW_DELAY))
+                    .then(() => useDelay ? delay(TRACE_DRAW_DELAY) : Promise.resolve())
                     .then(() => {
                         const verticalTimestamp = Math.floor(phaseLine.verticalLineDate.getTime() / 1000);
                         const horizontalEndTimestamp = Math.floor(phaseLine.horizontalEndDate.getTime() / 1000);
@@ -283,7 +296,7 @@ function setLineCategoryClickability(category, makeClickable) {
         if (category === 'aim' && chartState.AimLines) {
             Object.values(chartState.AimLines).forEach(aimLine => {
                 clickablePromise = clickablePromise
-                    .then(() => delay(TRACE_DRAW_DELAY))
+                    .then(() => useDelay ? delay(TRACE_DRAW_DELAY) : Promise.resolve())
                     .then(() => {
                         const timestamp1 = Math.floor(aimLine.date1.getTime() / 1000);
                         const timestamp2 = Math.floor(aimLine.date2.getTime() / 1000);
@@ -306,7 +319,7 @@ function setLineCategoryClickability(category, makeClickable) {
                 if (!celLine.id) return;
 
                 clickablePromise = clickablePromise
-                    .then(() => delay(TRACE_DRAW_DELAY))
+                    .then(() => useDelay ? delay(TRACE_DRAW_DELAY) : Promise.resolve())
                     .then(() => {
                         // Cel lines store dates as YYYY-MM-DD strings
                         const x1 = dateToXPosition(celLine.date1);
@@ -337,7 +350,7 @@ function setLineCategoryClickability(category, makeClickable) {
                         let cutPromise = Promise.resolve();
                         Object.values(chartState.LineCuts).forEach(cut => {
                             cutPromise = cutPromise
-                                .then(() => delay(TRACE_DRAW_DELAY))
+                                .then(() => useDelay ? delay(TRACE_DRAW_DELAY) : Promise.resolve())
                                 .then(() => {
                                     const timestamp = Math.floor(cut.date.getTime() / 1000);
                                     const xPos = timestampsToXPositions([timestamp])[0] - 0.5;
