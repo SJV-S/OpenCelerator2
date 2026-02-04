@@ -1,7 +1,7 @@
 import os
 import time
 import secrets
-from flask import Flask, render_template, request, jsonify, redirect, url_for, send_from_directory
+from flask import Flask, render_template, request, jsonify, redirect, url_for, send_from_directory, make_response
 
 from models import db, Chart, ChartAccess, ViewToken, ChartTombstone, init_db
 
@@ -28,7 +28,12 @@ init_db(app)
 
 @app.route('/service-worker.js')
 def service_worker():
-    return send_from_directory(app.root_path, 'service-worker.js')
+    response = make_response(send_from_directory(app.root_path, 'service-worker.js'))
+    # Prevent browser from caching the SW file - always check for updates
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 
 # =============================================================================

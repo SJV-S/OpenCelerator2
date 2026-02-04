@@ -4,7 +4,7 @@
 // DEVELOPMENT NOTE: Verbose console logging is intentional for debugging.
 // These logs use [SW] prefix for filtering. Remove or reduce logging in production.
 
-const SW_VERSION = '2.2.1';
+const SW_VERSION = '2.3.0';
 const CACHE_NAME = `scc-cache-v${SW_VERSION}`;
 
 // HTML pages to precache
@@ -130,46 +130,35 @@ function isChartPage(url) {
 }
 
 self.addEventListener('install', (event) => {
-    console.log(`[SW ${SW_VERSION}] Installing...`);
+    console.log(`[SW ${SW_VERSION}] Installing`);
 
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then(async (cache) => {
-                // Precache local pages
-                console.log(`[SW ${SW_VERSION}] Precaching ${PRECACHE_PAGES.length} pages...`);
                 await cache.addAll(PRECACHE_PAGES);
-
-                // Precache local static assets
-                console.log(`[SW ${SW_VERSION}] Precaching ${PRECACHE_STATIC.length} static assets...`);
                 await cache.addAll(PRECACHE_STATIC);
 
                 // Precache CDN resources (fetch individually to handle failures gracefully)
-                console.log(`[SW ${SW_VERSION}] Precaching ${PRECACHE_CDN.length} CDN resources...`);
                 for (const url of PRECACHE_CDN) {
                     try {
                         const response = await fetch(url, { mode: 'cors' });
                         if (response.ok) {
                             await cache.put(url, response);
-                            console.log(`[SW ${SW_VERSION}] CDN cached: ${url.substring(0, 60)}...`);
-                        } else {
-                            console.warn(`[SW ${SW_VERSION}] CDN fetch not ok: ${url}`);
                         }
                     } catch (err) {
-                        console.warn(`[SW ${SW_VERSION}] CDN fetch failed (will retry on use): ${url}`, err.message);
+                        // CDN will be cached on first use if precache fails
                     }
                 }
-
-                console.log(`[SW ${SW_VERSION}] Precache complete`);
             })
             .then(() => self.skipWaiting())
             .catch(err => {
-                console.error(`[SW ${SW_VERSION}] Precache failed:`, err);
+                console.error(`[SW ${SW_VERSION}] Install failed:`, err);
             })
     );
 });
 
 self.addEventListener('activate', (event) => {
-    console.log(`[SW ${SW_VERSION}] Activating...`);
+    console.log(`[SW ${SW_VERSION}] Activated`);
 
     event.waitUntil(
         caches.keys()
@@ -177,16 +166,10 @@ self.addEventListener('activate', (event) => {
                 // Delete old caches
                 const deletePromises = cacheNames
                     .filter(name => name.startsWith('scc-cache-') && name !== CACHE_NAME)
-                    .map(name => {
-                        console.log(`[SW ${SW_VERSION}] Deleting old cache: ${name}`);
-                        return caches.delete(name);
-                    });
+                    .map(name => caches.delete(name));
                 return Promise.all(deletePromises);
             })
-            .then(() => {
-                console.log(`[SW ${SW_VERSION}] Claiming clients`);
-                return self.clients.claim();
-            })
+            .then(() => self.clients.claim())
     );
 });
 
@@ -206,19 +189,19 @@ self.addEventListener('fetch', (event) => {
 
     // Strategy: Navigation requests (HTML pages) - Network first, cache fallback
     if (isNavigationRequest(request)) {
-        event.respondWith(networkFirstWithCache(request, 'navigation'));
+        event.respondWith(networkFirstWithCache(request));
         return;
     }
 
     // Strategy: CDN resources - Cache first, network fallback
     if (isCachableCDN(url)) {
-        event.respondWith(cacheFirstWithNetwork(request, 'cdn'));
+        event.respondWith(cacheFirstWithNetwork(request));
         return;
     }
 
     // Strategy: Static assets - Cache first, network fallback
     if (isStaticAsset(url)) {
-        event.respondWith(cacheFirstWithNetwork(request, 'static'));
+        event.respondWith(cacheFirstWithNetwork(request));
         return;
     }
 
@@ -227,30 +210,20 @@ self.addEventListener('fetch', (event) => {
 });
 
 // Network first, fall back to cache (for HTML pages)
-async function networkFirstWithCache(request, type) {
-    const url = new URL(request.url).pathname;
-    console.log(`[SW ${SW_VERSION}] ${type.toUpperCase()} fetch: ${url}`);
-
+async function networkFirstWithCache(request) {
     try {
         const networkResponse = await fetchWithTimeout(request, 3000);
 
         if (networkResponse.ok) {
-            console.log(`[SW ${SW_VERSION}] ${type.toUpperCase()} from network: ${url}`);
-
-            // Cache the response for offline use
             const cache = await caches.open(CACHE_NAME);
             cache.put(request, networkResponse.clone());
-
             return networkResponse;
         }
 
         throw new Error(`Network response not ok: ${networkResponse.status}`);
     } catch (err) {
-        console.log(`[SW ${SW_VERSION}] ${type.toUpperCase()} network failed, trying cache: ${url}`);
-
         const cachedResponse = await caches.match(request);
         if (cachedResponse) {
-            console.log(`[SW ${SW_VERSION}] ${type.toUpperCase()} from cache: ${url}`);
             return cachedResponse;
         }
 
@@ -259,41 +232,32 @@ async function networkFirstWithCache(request, type) {
         if (isChartPage(request.url)) {
             const fallback = await caches.match('/');
             if (fallback) {
-                console.log(`[SW ${SW_VERSION}] ${type.toUpperCase()} fallback to cached /: ${url}`);
                 return fallback;
             }
         }
 
-        console.error(`[SW ${SW_VERSION}] ${type.toUpperCase()} no cache available: ${url}`);
         throw err;
     }
 }
 
 // Cache first, fall back to network (for static assets and CDN)
-async function cacheFirstWithNetwork(request, type) {
-    const url = request.url;
-    const shortUrl = url.length > 80 ? url.substring(0, 80) + '...' : url;
-
+async function cacheFirstWithNetwork(request) {
     const cachedResponse = await caches.match(request);
     if (cachedResponse) {
-        console.log(`[SW ${SW_VERSION}] ${type.toUpperCase()} from cache: ${shortUrl}`);
         return cachedResponse;
     }
-
-    console.log(`[SW ${SW_VERSION}] ${type.toUpperCase()} fetching: ${shortUrl}`);
 
     try {
         const networkResponse = await fetch(request);
 
         if (networkResponse.ok) {
-            console.log(`[SW ${SW_VERSION}] ${type.toUpperCase()} caching: ${shortUrl}`);
             const cache = await caches.open(CACHE_NAME);
             cache.put(request, networkResponse.clone());
         }
 
         return networkResponse;
     } catch (err) {
-        console.error(`[SW ${SW_VERSION}] ${type.toUpperCase()} fetch failed: ${shortUrl}`, err);
+        console.error(`[SW ${SW_VERSION}] Fetch failed: ${request.url.substring(0, 60)}...`, err);
         throw err;
     }
 }
