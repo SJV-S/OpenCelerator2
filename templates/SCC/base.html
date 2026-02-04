@@ -4,128 +4,27 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#05c3de">
-    <title>{% block title %}Daily Chart{% endblock %}</title>
+    <title>{% block title %}Standard Change Chart{% endblock %}</title>
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="{{ url_for('static', filename='SCC/lib/xlsx.full.min.js') }}"></script>
-    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
-
-    <!-- Main ES Module entry point - loads all other modules -->
-    <script type="module" src="{{ url_for('static', filename='SCC/main.js') }}"></script>
-    <!-- Sidebar styles -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='SCC/css/chart_menu.css') }}">
+    {% block head_scripts %}{% endblock %}
     <style>
         html, body {
-            height: 100%;
             margin: 0;
             padding: 0;
-            overflow: hidden;
             font-family: "Open Sans", sans-serif;
-        }
-        body {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        .date-centered {
-            text-align: center;
-        }
-        .date-centered::-webkit-calendar-picker-indicator {
-            display: none;
-        }
-        .date-centered::-webkit-datetime-edit {
-            text-align: center;
         }
         input:focus {
             border-color: #6ad1e3 !important;
         }
-
-        /* Custom Legend Styles */
-        #custom-legend {
-            position: absolute;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            padding: 10px;
-            border: 1px solid #ccc;
-            background: rgba(255, 255, 255, 0.9);
-            border-radius: 4px;
-            min-width: 120px;
-            z-index: 1000;
-            pointer-events: all;
-        }
-
-        /* Position variants */
-        #custom-legend.legend-top-right {
-            top: 10px;
-            right: 10px;
-        }
-
-        #custom-legend.legend-top-left {
-            top: 10px;
-            left: 10px;
-        }
-
-        #custom-legend.legend-bottom-right {
-            bottom: 10px;
-            right: 10px;
-        }
-
-        #custom-legend.legend-bottom-left {
-            bottom: 10px;
-            left: 10px;
-        }
-
-        .legend-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            cursor: pointer;
-            padding: 4px 8px;
-            border-radius: 3px;
-            transition: background-color 0.2s;
-        }
-
-        .legend-item:hover {
-            background-color: rgba(0, 0, 0, 0.05);
-        }
-
-        .legend-item-hidden {
-            opacity: 0.5;
-        }
-
-        .legend-marker {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-        }
-
-        .legend-label {
-            font-size: 14px;
-            font-family: Arial, sans-serif;
-            user-select: none;
-        }
-
-        /* Legend lines section - hidden by default, shows on hover/tap */
-        .legend-lines-section {
-            display: none;
-            flex-direction: column;
-            gap: 4px;
-        }
-
-        #custom-legend:hover .legend-lines-section,
-        #custom-legend.touched .legend-lines-section {
-            display: flex;
-        }
-
-        {% block extra_style %}{% endblock %}
+        {% block base_style %}{% endblock %}
     </style>
+    {% block extra_style %}{% endblock %}
 </head>
-<body>
+<body class="{% block body_class %}{% endblock %}">
     {% block content %}{% endblock %}
     {% block scripts %}{% endblock %}
     <script>
