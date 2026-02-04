@@ -4,6 +4,32 @@ A comprehensive analysis of the SCC application for implementing offline-first P
 
 ---
 
+## Implementation Progress
+
+### Phase 1: Install Experience (COMPLETE)
+
+**Status**: Done
+
+**Files created/modified**:
+- `service-worker.js` - Minimal SW (no caching, just install/activate) - in project root
+- `static/manifest.json` - PWA manifest with app name, icons, theme
+- `static/SCC/icons/icon-192.png` - App icon (192x192)
+- `static/SCC/icons/icon-512.png` - App icon (512x512)
+- `static/SCC/icons/celeration.svg` - Source SVG with #05c3de fill
+- `app.py` - Added `/service-worker.js` route with `Cache-Control: max-age=0`
+- `templates/SCC/base.html` - Added manifest link, theme-color meta, SW registration script
+
+**Testing**:
+1. Run `python app.py`
+2. Open Chrome DevTools > Application tab
+3. Check "Service Workers" section shows registration
+4. Check "Manifest" section shows app info and icons
+5. Look for install button in address bar (desktop) or "Add to Home Screen" prompt (mobile)
+
+**Next Phase**: Phase 2 - Basic caching for offline viewing
+
+---
+
 ## Table of Contents
 
 1. [Application Overview](#1-application-overview)
@@ -404,21 +430,13 @@ const TEMPLATES = {
 
 ## 9. Open Questions
 
-### Question 1: Service Worker Placement
+### Question 1: Service Worker Placement (RESOLVED)
 
 **Context**: SW must be at root (`/`) to intercept all routes.
 
-**Options**:
-A. Add Flask route for `/service-worker.js`
-B. Configure reverse proxy (nginx) to serve SW from root
-C. Change Flask static folder configuration
+**Decision**: Option A - Flask route for `/service-worker.js`
 
-**Trade-offs**:
-- Option A: Simple, but adds Python in the request path
-- Option B: More complex setup, but proper separation
-- Option C: May affect other static file behavior
-
-**Your preference?**
+**Implementation**: Added route in `app.py` using `send_from_directory(app.root_path, 'service-worker.js')`. File lives in project root.
 
 ---
 

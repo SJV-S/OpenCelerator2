@@ -40,6 +40,118 @@ var aimLineState = {
 };
 
 /**
+ * Builds the shape and annotation objects for an aim line.
+ * Used by both initial draw (finalizeAimLine) and redraw (redrawAimLines).
+ *
+ * @param {Object} metadata - Aim line metadata
+ * @param {number} metadata.id - Unique line ID
+ * @param {string} metadata.direction - 'horizontal' or 'diagonal'
+ * @param {Date|string} metadata.date1 - Start date
+ * @param {number} metadata.y1 - Start y value
+ * @param {Date|string} metadata.date2 - End date
+ * @param {number} metadata.y2 - End y value
+ * @param {string} metadata.text - Label text
+ * @param {HTMLElement} chartDiv - Chart container element
+ * @returns {Object} { shape, annotation } - Complete Plotly shape and annotation objects
+ */
+function buildAimLineElements(metadata, chartDiv) {
+    const lineName = `aim-${metadata.id}`;
+    const x1 = dateToXPosition(metadata.date1);
+    const x2 = dateToXPosition(metadata.date2);
+
+    // Build the shape
+    const shape = {
+        type: 'line',
+        x0: x1,
+        y0: metadata.y1,
+        x1: x2,
+        y1: metadata.y2,
+        xref: 'x',
+        yref: 'y',
+        name: lineName,
+        line: {
+            color: chartState.lineStyles.aim.color,
+            width: chartState.lineStyles.aim.width
+        }
+    };
+
+    // Build the annotation (if text is provided)
+    let annotation = null;
+    if (metadata.text && metadata.text.trim() !== '') {
+        const yaxis = chartDiv._fullLayout.yaxis;
+        const isLogY = yaxis.type === 'log';
+
+        // Calculate center point
+        const centerX = (x1 + x2) / 2;
+
+        // For log scale, center is the geometric mean (average in log space)
+        let annotationY;
+        if (isLogY) {
+            const logY1 = Math.log10(metadata.y1);
+            const logY2 = Math.log10(metadata.y2);
+            annotationY = (logY1 + logY2) / 2;
+        } else {
+            annotationY = (metadata.y1 + metadata.y2) / 2;
+        }
+
+        // Calculate text angle for diagonal lines
+        let textAngle = 0;
+        if (metadata.direction === 'diagonal') {
+            const xaxis = chartDiv._fullLayout.xaxis;
+
+            // Calculate change in data coordinates
+            const dx_data = x2 - x1;
+
+            // For y, use log space if log scale
+            let dy_data;
+            if (isLogY) {
+                dy_data = Math.log10(metadata.y2) - Math.log10(metadata.y1);
+            } else {
+                dy_data = metadata.y2 - metadata.y1;
+            }
+
+            // Get axis ranges and pixel dimensions
+            const xRange = xaxis.range[1] - xaxis.range[0];
+            const yRange = yaxis.range[1] - yaxis.range[0];
+            const plotWidth = xaxis._length;
+            const plotHeight = yaxis._length;
+
+            // Convert to pixel space
+            const dx_pixels = (dx_data / xRange) * plotWidth;
+            const dy_pixels = (dy_data / yRange) * plotHeight;
+
+            // Calculate angle (negate dy because screen y increases downward)
+            textAngle = Math.atan2(-dy_pixels, dx_pixels) * (180 / Math.PI);
+        }
+
+        annotation = {
+            x: centerX,
+            y: annotationY,
+            xref: 'x',
+            yref: 'y',
+            text: metadata.text,
+            showarrow: false,
+            font: {
+                color: chartState.lineStyles.aim.color,
+                size: 12,
+                family: 'Arial, sans-serif'
+            },
+            bgcolor: 'rgba(255, 255, 255, 1.0)',
+            bordercolor: chartState.lineStyles.aim.color,
+            borderwidth: 1,
+            borderpad: 4,
+            textangle: textAngle,
+            xanchor: 'center',
+            yanchor: 'bottom',
+            yshift: 5,
+            name: lineName
+        };
+    }
+
+    return { shape, annotation };
+}
+
+/**
  * Activates aim line drawing mode
  * @param {string} direction - 'horizontal' or 'diagonal'
  */
@@ -630,44 +742,17 @@ function showAimSaveConfirmationToast(chartDiv) {
 }
 
 /**
- * Finalizes the aim line by changing colors from blue to black
+ * Finalizes the aim line by replacing temp shapes/annotations with finalized versions
  * @param {HTMLElement} chartDiv - Chart container element
  */
 function finalizeAimLine(chartDiv) {
     const lineId = Date.now();
-    const lineName = `aim-${lineId}`;
 
-    let shapes = [...(chartDiv.layout.shapes || [])];
-    for (const index of aimLineState.tempShapes) {
-        if (shapes[index]) {
-            shapes[index] = {
-                ...shapes[index],
-                name: lineName,
-                line: {
-                    ...shapes[index].line,
-                    color: chartState.lineStyles.aim.color,
-                    width: chartState.lineStyles.aim.width
-                }
-            };
-        }
-    }
+    // Get annotation text before removing temp shapes
+    const currentAnnotations = chartDiv.layout.annotations || [];
+    const annotationText = currentAnnotations[aimLineState.tempAnnotationIndex]?.text || '';
 
-    let annotations = [...(chartDiv.layout.annotations || [])];
-    const annotationText = annotations[aimLineState.tempAnnotationIndex]?.text || '';
-    if (aimLineState.tempAnnotationIndex !== null && annotations[aimLineState.tempAnnotationIndex]) {
-        annotations[aimLineState.tempAnnotationIndex] = {
-            ...annotations[aimLineState.tempAnnotationIndex],
-            name: lineName,
-            font: {
-                ...annotations[aimLineState.tempAnnotationIndex].font,
-                color: chartState.lineStyles.aim.color
-            },
-            bordercolor: chartState.lineStyles.aim.color
-        };
-    }
-
-    Plotly.relayout(chartDiv, { shapes, annotations });
-
+    // Build metadata object
     const metadata = aimLineMetadata(
         aimLineState.direction,
         xPositionToDate(aimLineState.x1),
@@ -679,6 +764,39 @@ function finalizeAimLine(chartDiv) {
         aimLineState.tempAnnotationIndex
     );
     metadata.id = lineId;
+
+    // Use builder to get finalized shape and annotation
+    const elements = buildAimLineElements(metadata, chartDiv);
+
+    // Remove temp shapes/annotations and add finalized versions
+    let shapes = [...(chartDiv.layout.shapes || [])];
+    let annotations = [...currentAnnotations];
+
+    // Remove temp annotation first (if it exists)
+    if (aimLineState.tempAnnotationIndex !== null) {
+        annotations.splice(aimLineState.tempAnnotationIndex, 1);
+    }
+
+    // Remove temp shapes in reverse order to maintain indices
+    const indicesToRemove = [...aimLineState.tempShapes].sort((a, b) => b - a);
+    for (const index of indicesToRemove) {
+        shapes.splice(index, 1);
+    }
+
+    // Add finalized shape
+    shapes.push(elements.shape);
+    metadata.shapeIndices = [shapes.length - 1];
+
+    // Add finalized annotation (if exists)
+    if (elements.annotation) {
+        annotations.push(elements.annotation);
+        metadata.annotationIndex = annotations.length - 1;
+    } else {
+        metadata.annotationIndex = null;
+    }
+
+    Plotly.relayout(chartDiv, { shapes, annotations });
+
     chartState.AimLines[lineId] = metadata;
     eventBus.emit(EVENTS.LINE_AIM_SAVED, { lineId, metadata });
 
@@ -906,56 +1024,17 @@ function redrawAimLines() {
     const shapes = (chartDiv.layout.shapes || []).filter(s => !s.name?.startsWith('aim-'));
     const annotations = (chartDiv.layout.annotations || []).filter(a => !a.name?.startsWith('aim-'));
 
-    const yaxis = chartDiv._fullLayout.yaxis;
-    const isLogY = yaxis.type === 'log';
-
-    // Rebuild shapes and annotations from chartState
+    // Rebuild shapes and annotations from chartState using the builder
     Object.values(chartState.AimLines).forEach(metadata => {
-        const lineName = `aim-${metadata.id}`;
-        const x1 = dateToXPosition(metadata.date1);
-        const x2 = dateToXPosition(metadata.date2);
+        const elements = buildAimLineElements(metadata, chartDiv);
 
-        // Aim line shape
-        shapes.push({
-            type: 'line',
-            x0: x1,
-            y0: metadata.y1,
-            x1: x2,
-            y1: metadata.y2,
-            xref: 'x',
-            yref: 'y',
-            name: lineName,
-            line: {
-                color: chartState.lineStyles.aim.color,
-                width: chartState.lineStyles.aim.width
-            }
-        });
+        // Add shape
+        shapes.push(elements.shape);
 
-        // Annotation (text label at midpoint)
-        const midX = (x1 + x2) / 2;
-        const midY = (metadata.y1 + metadata.y2) / 2;
-        const annotationY = isLogY ? Math.log10(midY) : midY;
-
-        annotations.push({
-            x: midX,
-            y: annotationY,
-            xref: 'x',
-            yref: 'y',
-            text: metadata.text,
-            showarrow: false,
-            name: lineName,
-            font: {
-                color: chartState.lineStyles.aim.color,
-                size: 12,
-                family: 'Arial, sans-serif'
-            },
-            bgcolor: 'rgba(255, 255, 255, 0.8)',
-            bordercolor: chartState.lineStyles.aim.color,
-            borderwidth: 1,
-            borderpad: 4,
-            xanchor: 'center',
-            yanchor: 'bottom'
-        });
+        // Add annotation (if exists)
+        if (elements.annotation) {
+            annotations.push(elements.annotation);
+        }
     });
 
     Plotly.relayout(chartDiv, { shapes, annotations });

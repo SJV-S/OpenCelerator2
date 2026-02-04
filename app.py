@@ -1,7 +1,7 @@
 import os
 import time
 import secrets
-from flask import Flask, render_template, request, jsonify, redirect, url_for
+from flask import Flask, render_template, request, jsonify, redirect, url_for, send_from_directory
 
 from models import db, Chart, ChartAccess, ViewToken, ChartTombstone, init_db
 
@@ -20,6 +20,15 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize database
 init_db(app)
+
+
+# =============================================================================
+# Service Worker (must be served from root for full scope)
+# =============================================================================
+
+@app.route('/service-worker.js')
+def service_worker():
+    return send_from_directory(app.root_path, 'service-worker.js')
 
 
 # =============================================================================

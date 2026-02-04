@@ -54,6 +54,128 @@ var celLineState = {
 };
 
 /**
+ * Builds the shapes and annotation objects for a cel line.
+ * Used by both initial draw (handleCelLineConfirm) and redraw (redrawCelLines).
+ *
+ * @param {Object} metadata - Cel line metadata
+ * @param {number} metadata.id - Unique line ID
+ * @param {string} metadata.seriesKey - Series key (corrects, errors, timing, misc1, etc.)
+ * @param {Date|string} metadata.date1 - Start date
+ * @param {number} metadata.y1 - Start y value (display scale)
+ * @param {Date|string} metadata.date2 - End date
+ * @param {number} metadata.y2 - End y value (display scale)
+ * @param {number|null} metadata.bounceUpperY1 - Upper bounce line start y (if envelope enabled)
+ * @param {number|null} metadata.bounceUpperY2 - Upper bounce line end y
+ * @param {number|null} metadata.bounceLowerY1 - Lower bounce line start y
+ * @param {number|null} metadata.bounceLowerY2 - Lower bounce line end y
+ * @param {string} metadata.text - Label text (celeration value)
+ * @param {HTMLElement} chartDiv - Chart container element
+ * @returns {Object} { shapes: [main, upperBounce?, lowerBounce?], annotation }
+ */
+function buildCelLineElements(metadata, chartDiv) {
+    const lineName = `cel-${metadata.id}`;
+    const x1 = dateToXPosition(metadata.date1);
+    const x2 = dateToXPosition(metadata.date2);
+
+    // Get trend style for width/dash
+    const trendStyle = metadata.seriesKey.startsWith('misc')
+        ? (chartState.lineStyles.trend.misc[metadata.seriesKey] || chartState.lineStyles.trend.timing)
+        : (chartState.lineStyles.trend[metadata.seriesKey] || chartState.lineStyles.trend.timing);
+
+    // Get cel line color based on series
+    const celLineColor = getCelLineColor(metadata.seriesKey);
+
+    // Build shapes array - main trend line first
+    const shapes = [];
+
+    // Main trend line
+    const mainShape = {
+        type: 'line',
+        x0: x1,
+        y0: metadata.y1,
+        x1: x2,
+        y1: metadata.y2,
+        xref: 'x',
+        yref: 'y',
+        name: lineName,
+        line: {
+            color: celLineColor,
+            width: trendStyle.width,
+            dash: trendStyle.dash
+        }
+    };
+    shapes.push(mainShape);
+
+    // Upper bounce line (if exists in metadata)
+    if (metadata.bounceUpperY1 != null && metadata.bounceUpperY2 != null) {
+        shapes.push({
+            type: 'line',
+            x0: x1,
+            y0: metadata.bounceUpperY1,
+            x1: x2,
+            y1: metadata.bounceUpperY2,
+            xref: 'x',
+            yref: 'y',
+            name: `${lineName}-upper`,
+            line: {
+                color: celLineColor,
+                width: 1,
+                dash: 'dot'
+            }
+        });
+    }
+
+    // Lower bounce line (if exists in metadata)
+    if (metadata.bounceLowerY1 != null && metadata.bounceLowerY2 != null) {
+        shapes.push({
+            type: 'line',
+            x0: x1,
+            y0: metadata.bounceLowerY1,
+            x1: x2,
+            y1: metadata.bounceLowerY2,
+            xref: 'x',
+            yref: 'y',
+            name: `${lineName}-lower`,
+            line: {
+                color: celLineColor,
+                width: 1,
+                dash: 'dot'
+            }
+        });
+    }
+
+    // Annotation (invisible text with hover label)
+    const centerX = (x1 + x2) / 2;
+    const logY1 = Math.log10(metadata.y1);
+    const logY2 = Math.log10(metadata.y2);
+    const centerLogY = (logY1 + logY2) / 2;
+
+    const annotation = {
+        x: centerX,
+        y: centerLogY,
+        xref: 'x',
+        yref: 'y',
+        text: metadata.text,
+        showarrow: false,
+        font: { color: 'rgba(0,0,0,0)', size: 12 },
+        bgcolor: 'rgba(0,0,0,0)',
+        bordercolor: 'rgba(0,0,0,0)',
+        borderwidth: 0,
+        borderpad: 8,
+        xanchor: 'center',
+        yanchor: 'middle',
+        name: lineName,
+        hovertext: metadata.text,
+        hoverlabel: {
+            bgcolor: celLineColor,
+            font: { color: 'white', size: 14 }
+        }
+    };
+
+    return { shapes, annotation };
+}
+
+/**
  * Activates cel line mode
  * Step 1: Show toast with buttons for available data series
  */
@@ -844,41 +966,7 @@ function handleCelLineConfirm(data, baseKey) {
     // Calculate bounce bounds if envelope is enabled
     const bounceBounds = calculateBounceBounds(filteredLogY, filteredX, fitResult.slope, fitResult.intercept, bounceEnvelope);
 
-    const lineId = Date.now();
-    const lineName = `cel-${lineId}`;
-
-    // Get trend style for width/dash, but compute color as inverse of data series
-    const trendStyle = baseKey.startsWith('misc')
-        ? (chartState.lineStyles.trend.misc[baseKey] || chartState.lineStyles.trend[TIMING])
-        : (chartState.lineStyles.trend[baseKey] || chartState.lineStyles.trend[TIMING]);
-
-    if (!trendStyle) {
-        console.error('[CEL DEBUG] trendStyle is undefined for:', baseKey);
-    }
-
-    // Compute inverse color based on data series marker color
-    const celLineColor = getCelLineColor(baseKey);
-
-    // Build shapes array - main trend line first
-    const newShapes = [];
-    const lineShape = {
-        type: 'line',
-        x0: firstX,
-        y0: y1_display,
-        x1: lastX,
-        y1: y2_display,
-        xref: 'x',
-        yref: 'y',
-        name: lineName,
-        line: {
-            color: celLineColor,
-            width: trendStyle.width,
-            dash: trendStyle.dash
-        }
-    };
-    newShapes.push(lineShape);
-
-    // Add bounce line shapes if bounds exist
+    // Calculate bounce line Y values
     let bounceUpperY1 = null, bounceUpperY2 = null;
     let bounceLowerY1 = null, bounceLowerY2 = null;
 
@@ -889,86 +977,10 @@ function handleCelLineConfirm(data, baseKey) {
             bounceUpperY2 = bounceLines.upperY[1];
             bounceLowerY1 = bounceLines.lowerY[0];
             bounceLowerY2 = bounceLines.lowerY[1];
-
-            // Upper bounce line
-            newShapes.push({
-                type: 'line',
-                x0: firstX,
-                y0: bounceUpperY1,
-                x1: lastX,
-                y1: bounceUpperY2,
-                xref: 'x',
-                yref: 'y',
-                name: `${lineName}-upper`,
-                line: {
-                    color: celLineColor,
-                    width: 1,
-                    dash: 'dot'
-                }
-            });
-
-            // Lower bounce line
-            newShapes.push({
-                type: 'line',
-                x0: firstX,
-                y0: bounceLowerY1,
-                x1: lastX,
-                y1: bounceLowerY2,
-                xref: 'x',
-                yref: 'y',
-                name: `${lineName}-lower`,
-                line: {
-                    color: celLineColor,
-                    width: 1,
-                    dash: 'dot'
-                }
-            });
         }
     }
 
-    const currentShapes = chartDiv.layout.shapes || [];
-    const shapeIndex = currentShapes.length;
-
-    const centerX = (firstX + lastX) / 2;
-    const centerLogY = (logY1 + logY2) / 2;
-
-    const annotation = {
-        x: centerX,
-        y: centerLogY,
-        xref: 'x',
-        yref: 'y',
-        text: labelText,
-        showarrow: false,
-        font: { color: 'rgba(0,0,0,0)', size: 12 },
-        bgcolor: 'rgba(0,0,0,0)',
-        bordercolor: 'rgba(0,0,0,0)',
-        borderwidth: 0,
-        borderpad: 8,
-        xanchor: 'center',
-        yanchor: 'middle',
-        name: lineName,
-        hovertext: labelText,
-        hoverlabel: {
-            bgcolor: celLineColor,
-            font: { color: 'white', size: 14 }
-        }
-    };
-
-    const currentAnnotations = chartDiv.layout.annotations || [];
-    const annotationIndex = currentAnnotations.length;
-
-    Plotly.relayout(chartDiv, {
-        shapes: [...currentShapes, ...newShapes],
-        annotations: [...currentAnnotations, annotation]
-    }).catch(err => {
-        console.error('[CEL DEBUG] Plotly.relayout FAILED:', err);
-    });
-
-    // Store shape indices for all shapes (trend + bounce lines)
-    const shapeIndices = [];
-    for (let i = 0; i < newShapes.length; i++) {
-        shapeIndices.push(shapeIndex + i);
-    }
+    const lineId = Date.now();
 
     // Store dates as YYYY-MM-DD strings to avoid timezone issues with ISO serialization
     const date1 = xPositionToDate(firstX);
@@ -976,9 +988,7 @@ function handleCelLineConfirm(data, baseKey) {
     const date1Str = date1.getFullYear() + '-' + String(date1.getMonth() + 1).padStart(2, '0') + '-' + String(date1.getDate()).padStart(2, '0');
     const date2Str = date2.getFullYear() + '-' + String(date2.getMonth() + 1).padStart(2, '0') + '-' + String(date2.getDate()).padStart(2, '0');
 
-    const displayName = getFirstConfig(baseKey)?.seriesName || baseKey;
-    console.log('[CEL DEBUG] LINE CREATED: "' + displayName + '" x1=' + firstX + ' x2=' + lastX + ' as ' + date1Str);
-
+    // Build metadata object
     const metadata = {
         id: lineId,
         seriesKey: baseKey,
@@ -996,9 +1006,31 @@ function handleCelLineConfirm(data, baseKey) {
         bounceLowerY1: bounceLowerY1,
         bounceLowerY2: bounceLowerY2,
         text: labelText,
-        shapeIndices: shapeIndices,
-        annotationIndex: annotationIndex
+        shapeIndices: [],
+        annotationIndex: null
     };
+
+    // Use builder to get shapes and annotation
+    const elements = buildCelLineElements(metadata, chartDiv);
+
+    const currentShapes = chartDiv.layout.shapes || [];
+    const currentAnnotations = chartDiv.layout.annotations || [];
+    const shapeIndex = currentShapes.length;
+    const annotationIndex = currentAnnotations.length;
+
+    Plotly.relayout(chartDiv, {
+        shapes: [...currentShapes, ...elements.shapes],
+        annotations: [...currentAnnotations, elements.annotation]
+    }).catch(err => {
+        console.error('[CEL DEBUG] Plotly.relayout FAILED:', err);
+    });
+
+    // Update shape indices in metadata
+    metadata.shapeIndices = elements.shapes.map((_, i) => shapeIndex + i);
+    metadata.annotationIndex = annotationIndex;
+
+    const displayName = getFirstConfig(baseKey)?.seriesName || baseKey;
+    console.log('[CEL DEBUG] LINE CREATED: "' + displayName + '" x1=' + firstX + ' x2=' + lastX + ' as ' + date1Str);
 
     chartState.CelLines[lineId] = metadata;
     eventBus.emit(EVENTS.LINE_CEL_SAVED, { lineId, metadata });
@@ -1021,119 +1053,32 @@ function redrawCelLines() {
     const chartDiv = document.getElementById('chart');
     if (!chartDiv) return;
 
-    const shapes = chartDiv.layout.shapes || [];
-    const annotations = chartDiv.layout.annotations || [];
+    const currentShapes = chartDiv.layout.shapes || [];
+    const currentAnnotations = chartDiv.layout.annotations || [];
 
-    const nonCelShapes = shapes.filter(s => !s.name || !s.name.startsWith('cel-'));
-    const nonCelAnnotations = annotations.filter(a => !a.name || !a.name.startsWith('cel-'));
+    const nonCelShapes = currentShapes.filter(s => !s.name || !s.name.startsWith('cel-'));
+    const nonCelAnnotations = currentAnnotations.filter(a => !a.name || !a.name.startsWith('cel-'));
 
     const celShapes = [];
     const celAnnotations = [];
 
+    // Rebuild shapes and annotations from chartState using the builder
     Object.values(chartState.CelLines).forEach(entry => {
         // Skip the settings object
         if (entry === chartState.CelLines.settings) return;
 
         const metadata = entry;
-        const lineName = `cel-${metadata.id}`;
-
-        const x1 = dateToXPosition(metadata.date1);
-        const x2 = dateToXPosition(metadata.date2);
 
         const displayName = getFirstConfig(metadata.seriesKey)?.seriesName || metadata.seriesKey;
-        console.log('[CEL DEBUG] REDRAW: "' + displayName + '" date1=' + metadata.date1 + ' -> x1=' + x1);
+        console.log('[CEL DEBUG] REDRAW: "' + displayName + '" date1=' + metadata.date1);
 
-        // Get trend style for width/dash, compute inverse color for visibility
-        const trendStyle = metadata.seriesKey.startsWith('misc')
-            ? (chartState.lineStyles.trend.misc[metadata.seriesKey] || chartState.lineStyles.trend.timing)
-            : (chartState.lineStyles.trend[metadata.seriesKey] || chartState.lineStyles.trend.timing);
+        const elements = buildCelLineElements(metadata, chartDiv);
 
-        // Compute inverse color based on data series marker color
-        const celLineColor = getCelLineColor(metadata.seriesKey);
+        // Add shapes
+        celShapes.push(...elements.shapes);
 
-        // Main trend line
-        const lineShape = {
-            type: 'line',
-            x0: x1,
-            y0: metadata.y1,
-            x1: x2,
-            y1: metadata.y2,
-            xref: 'x',
-            yref: 'y',
-            name: lineName,
-            line: {
-                color: celLineColor,
-                width: trendStyle.width,
-                dash: trendStyle.dash
-            }
-        };
-        celShapes.push(lineShape);
-
-        // Bounce lines if they exist in metadata
-        if (metadata.bounceUpperY1 != null && metadata.bounceUpperY2 != null) {
-            celShapes.push({
-                type: 'line',
-                x0: x1,
-                y0: metadata.bounceUpperY1,
-                x1: x2,
-                y1: metadata.bounceUpperY2,
-                xref: 'x',
-                yref: 'y',
-                name: `${lineName}-upper`,
-                line: {
-                    color: celLineColor,
-                    width: 1,
-                    dash: 'dot'
-                }
-            });
-        }
-
-        if (metadata.bounceLowerY1 != null && metadata.bounceLowerY2 != null) {
-            celShapes.push({
-                type: 'line',
-                x0: x1,
-                y0: metadata.bounceLowerY1,
-                x1: x2,
-                y1: metadata.bounceLowerY2,
-                xref: 'x',
-                yref: 'y',
-                name: `${lineName}-lower`,
-                line: {
-                    color: celLineColor,
-                    width: 1,
-                    dash: 'dot'
-                }
-            });
-        }
-
-        const centerX = (x1 + x2) / 2;
-        const logY1 = Math.log10(metadata.y1);
-        const logY2 = Math.log10(metadata.y2);
-        const centerLogY = (logY1 + logY2) / 2;
-
-        const annotation = {
-            x: centerX,
-            y: centerLogY,
-            xref: 'x',
-            yref: 'y',
-            text: metadata.text,
-            showarrow: false,
-            font: { color: 'rgba(0,0,0,0)', size: 12 },
-            bgcolor: 'rgba(0,0,0,0)',
-            bordercolor: 'rgba(0,0,0,0)',
-            borderwidth: 0,
-            borderpad: 8,
-            xanchor: 'center',
-            yanchor: 'middle',
-            name: lineName,
-            hovertext: metadata.text,
-            hoverlabel: {
-                bgcolor: celLineColor,
-                font: { color: 'white', size: 14 }
-            }
-        };
-
-        celAnnotations.push(annotation);
+        // Add annotation
+        celAnnotations.push(elements.annotation);
     });
 
     Plotly.relayout(chartDiv, {

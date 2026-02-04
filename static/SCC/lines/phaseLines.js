@@ -42,6 +42,90 @@ var phaseLineState = {
 };
 
 /**
+ * Builds the shapes and annotation objects for a phase line.
+ * Used by both initial draw (finalizePhaseLine) and redraw (redrawPhaseLines).
+ *
+ * @param {Object} metadata - Phase line metadata
+ * @param {number} metadata.id - Unique line ID
+ * @param {string} metadata.direction - 'top' or 'bottom'
+ * @param {Date|string} metadata.verticalLineDate - Date for vertical line
+ * @param {number} metadata.verticalLineY - Y value where horizontal meets vertical
+ * @param {Date|string} metadata.horizontalEndDate - End date of horizontal line
+ * @param {string} metadata.text - Label text
+ * @param {HTMLElement} chartDiv - Chart container element
+ * @returns {Object} { shapes: [vertical, horizontal], annotation }
+ */
+function buildPhaseLineElements(metadata, chartDiv) {
+    const lineName = `phase-${metadata.id}`;
+    const verticalX = dateToXPosition(metadata.verticalLineDate);
+    const horizontalEndX = dateToXPosition(metadata.horizontalEndDate);
+    const y = metadata.verticalLineY;
+
+    // Get y-axis info for vertical line endpoints
+    const yaxis = chartDiv._fullLayout.yaxis;
+    const isLogY = yaxis.type === 'log';
+    const yBottom = isLogY ? Math.pow(10, yaxis.range[0]) : yaxis.range[0];
+    const yTop = isLogY ? Math.pow(10, yaxis.range[1]) : yaxis.range[1];
+
+    // Vertical line shape
+    const verticalShape = {
+        type: 'line',
+        x0: verticalX,
+        y0: metadata.direction === 'top' ? yBottom : yTop,
+        x1: verticalX,
+        y1: y,
+        xref: 'x',
+        yref: 'y',
+        name: lineName,
+        line: {
+            color: chartState.lineStyles.phase.color,
+            width: chartState.lineStyles.phase.width
+        }
+    };
+
+    // Horizontal line shape
+    const horizontalShape = {
+        type: 'line',
+        x0: verticalX,
+        y0: y,
+        x1: horizontalEndX,
+        y1: y,
+        xref: 'x',
+        yref: 'y',
+        name: lineName,
+        line: {
+            color: chartState.lineStyles.phase.color,
+            width: chartState.lineStyles.phase.width
+        }
+    };
+
+    // Annotation (text label at end of horizontal line)
+    const annotationY = isLogY ? Math.log10(y) : y;
+    const annotation = {
+        x: horizontalEndX,
+        y: annotationY,
+        xref: 'x',
+        yref: 'y',
+        text: metadata.text,
+        showarrow: false,
+        name: lineName,
+        font: {
+            color: chartState.lineStyles.phase.color,
+            size: 12,
+            family: 'Arial, sans-serif'
+        },
+        bgcolor: 'rgba(255, 255, 255, 0.8)',
+        bordercolor: chartState.lineStyles.phase.color,
+        borderwidth: 1,
+        borderpad: 4,
+        xanchor: 'left',
+        yanchor: 'middle'
+    };
+
+    return { shapes: [verticalShape, horizontalShape], annotation };
+}
+
+/**
  * Activates phase line drawing mode
  * @param {string} direction - 'top' or 'bottom'
  */
@@ -718,44 +802,17 @@ function showSaveConfirmationToast(chartDiv) {
 }
 
 /**
- * Finalizes the phase line by changing colors from purple to black
+ * Finalizes the phase line by replacing temp shapes/annotations with finalized versions
  * @param {HTMLElement} chartDiv - Chart container element
  */
 function finalizePhaseLine(chartDiv) {
     const lineId = Date.now();
-    const lineName = `phase-${lineId}`;
 
-    let shapes = [...(chartDiv.layout.shapes || [])];
-    for (const index of phaseLineState.tempShapes) {
-        if (shapes[index]) {
-            shapes[index] = {
-                ...shapes[index],
-                name: lineName,
-                line: {
-                    ...shapes[index].line,
-                    color: chartState.lineStyles.phase.color,
-                    width: chartState.lineStyles.phase.width
-                }
-            };
-        }
-    }
+    // Get annotation text before removing temp shapes
+    const currentAnnotations = chartDiv.layout.annotations || [];
+    const annotationText = currentAnnotations[phaseLineState.tempAnnotationIndex]?.text || '';
 
-    let annotations = [...(chartDiv.layout.annotations || [])];
-    const annotationText = annotations[phaseLineState.tempAnnotationIndex]?.text || '';
-    if (phaseLineState.tempAnnotationIndex !== null && annotations[phaseLineState.tempAnnotationIndex]) {
-        annotations[phaseLineState.tempAnnotationIndex] = {
-            ...annotations[phaseLineState.tempAnnotationIndex],
-            name: lineName,
-            font: {
-                ...annotations[phaseLineState.tempAnnotationIndex].font,
-                color: chartState.lineStyles.phase.color
-            },
-            bordercolor: chartState.lineStyles.phase.color
-        };
-    }
-
-    Plotly.relayout(chartDiv, { shapes, annotations });
-
+    // Build metadata object
     const metadata = phaseLineMetadata(
         phaseLineState.direction,
         xPositionToDate(phaseLineState.verticalLineX),
@@ -766,6 +823,36 @@ function finalizePhaseLine(chartDiv) {
         phaseLineState.tempAnnotationIndex
     );
     metadata.id = lineId;
+
+    // Use builder to get finalized shapes and annotation
+    const elements = buildPhaseLineElements(metadata, chartDiv);
+
+    // Remove temp shapes/annotations and add finalized versions
+    let shapes = [...(chartDiv.layout.shapes || [])];
+    let annotations = [...currentAnnotations];
+
+    // Remove temp annotation first (if it exists)
+    if (phaseLineState.tempAnnotationIndex !== null) {
+        annotations.splice(phaseLineState.tempAnnotationIndex, 1);
+    }
+
+    // Remove temp shapes in reverse order to maintain indices
+    const indicesToRemove = [...phaseLineState.tempShapes].sort((a, b) => b - a);
+    for (const index of indicesToRemove) {
+        shapes.splice(index, 1);
+    }
+
+    // Add finalized shapes
+    const startShapeIndex = shapes.length;
+    shapes.push(...elements.shapes);
+    metadata.shapeIndices = elements.shapes.map((_, i) => startShapeIndex + i);
+
+    // Add finalized annotation
+    annotations.push(elements.annotation);
+    metadata.annotationIndex = annotations.length - 1;
+
+    Plotly.relayout(chartDiv, { shapes, annotations });
+
     chartState.PhaseLines[lineId] = metadata;
     console.log('[LINE SAVE] 1. Phase line added to chartState:', lineId);
     eventBus.emit(EVENTS.LINE_PHASE_SAVED, { lineId, metadata });
@@ -928,73 +1015,15 @@ function redrawPhaseLines() {
     const shapes = (chartDiv.layout.shapes || []).filter(s => !s.name?.startsWith('phase-'));
     const annotations = (chartDiv.layout.annotations || []).filter(a => !a.name?.startsWith('phase-'));
 
-    // Get y-axis info for vertical line endpoints
-    const yaxis = chartDiv._fullLayout.yaxis;
-    const isLogY = yaxis.type === 'log';
-    const yBottom = isLogY ? Math.pow(10, yaxis.range[0]) : yaxis.range[0];
-    const yTop = isLogY ? Math.pow(10, yaxis.range[1]) : yaxis.range[1];
-
-    // Rebuild shapes and annotations from chartState
+    // Rebuild shapes and annotations from chartState using the builder
     Object.values(chartState.PhaseLines).forEach(metadata => {
-        const lineName = `phase-${metadata.id}`;
-        const verticalX = dateToXPosition(metadata.verticalLineDate);
-        const horizontalEndX = dateToXPosition(metadata.horizontalEndDate);
-        const y = metadata.verticalLineY;
+        const elements = buildPhaseLineElements(metadata, chartDiv);
 
-        // Vertical line
-        shapes.push({
-            type: 'line',
-            x0: verticalX,
-            y0: metadata.direction === 'top' ? yBottom : yTop,
-            x1: verticalX,
-            y1: y,
-            xref: 'x',
-            yref: 'y',
-            name: lineName,
-            line: {
-                color: chartState.lineStyles.phase.color,
-                width: chartState.lineStyles.phase.width
-            }
-        });
+        // Add shapes
+        shapes.push(...elements.shapes);
 
-        // Horizontal line
-        shapes.push({
-            type: 'line',
-            x0: verticalX,
-            y0: y,
-            x1: horizontalEndX,
-            y1: y,
-            xref: 'x',
-            yref: 'y',
-            name: lineName,
-            line: {
-                color: chartState.lineStyles.phase.color,
-                width: chartState.lineStyles.phase.width
-            }
-        });
-
-        // Annotation (text label)
-        const annotationY = isLogY ? Math.log10(y) : y;
-        annotations.push({
-            x: horizontalEndX,
-            y: annotationY,
-            xref: 'x',
-            yref: 'y',
-            text: metadata.text,
-            showarrow: false,
-            name: lineName,
-            font: {
-                color: chartState.lineStyles.phase.color,
-                size: 12,
-                family: 'Arial, sans-serif'
-            },
-            bgcolor: 'rgba(255, 255, 255, 0.8)',
-            bordercolor: chartState.lineStyles.phase.color,
-            borderwidth: 1,
-            borderpad: 4,
-            xanchor: 'left',
-            yanchor: 'middle'
-        });
+        // Add annotation
+        annotations.push(elements.annotation);
     });
 
     Plotly.relayout(chartDiv, { shapes, annotations });
