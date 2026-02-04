@@ -18,7 +18,7 @@
 import { chartState } from '../chartState.js';
 import { COLORS } from '../config.js';
 import { createToast, createTextInputDialog, createNumberInputDialog, createConfirmToast, createArrowControls } from '../ui/toaster.js';
-import { xPositionToDate, timestampsToXPositions } from '../util/dates.js';
+import { xPositionToDate, timestampsToXPositions, dateToXPosition } from '../util/dates.js';
 import { icons, applySvgCursor, restoreCursor } from '../ui/icons.js';
 import { phaseLineMetadata } from './allLines.js';
 import { eventBus, EVENTS } from '../eventBus.js';
@@ -767,7 +767,9 @@ function finalizePhaseLine(chartDiv) {
     );
     metadata.id = lineId;
     chartState.PhaseLines[lineId] = metadata;
+    console.log('[LINE SAVE] 1. Phase line added to chartState:', lineId);
     eventBus.emit(EVENTS.LINE_PHASE_SAVED, { lineId, metadata });
+    console.log('[LINE SAVE] 2. LINE_PHASE_SAVED event emitted');
 
     phaseLineState.tempShapes = [];
     phaseLineState.tempAnnotationIndex = null;
@@ -915,6 +917,90 @@ function setPhaseLineVisibility(visible) {
 }
 
 /**
+ * Redraw all phase lines from chartState.PhaseLines
+ * Called after chart replot to restore saved lines
+ */
+function redrawPhaseLines() {
+    const chartDiv = document.getElementById('chart');
+    if (!chartDiv) return;
+
+    // Filter out existing phase shapes/annotations
+    const shapes = (chartDiv.layout.shapes || []).filter(s => !s.name?.startsWith('phase-'));
+    const annotations = (chartDiv.layout.annotations || []).filter(a => !a.name?.startsWith('phase-'));
+
+    // Get y-axis info for vertical line endpoints
+    const yaxis = chartDiv._fullLayout.yaxis;
+    const isLogY = yaxis.type === 'log';
+    const yBottom = isLogY ? Math.pow(10, yaxis.range[0]) : yaxis.range[0];
+    const yTop = isLogY ? Math.pow(10, yaxis.range[1]) : yaxis.range[1];
+
+    // Rebuild shapes and annotations from chartState
+    Object.values(chartState.PhaseLines).forEach(metadata => {
+        const lineName = `phase-${metadata.id}`;
+        const verticalX = dateToXPosition(metadata.verticalLineDate);
+        const horizontalEndX = dateToXPosition(metadata.horizontalEndDate);
+        const y = metadata.verticalLineY;
+
+        // Vertical line
+        shapes.push({
+            type: 'line',
+            x0: verticalX,
+            y0: metadata.direction === 'top' ? yBottom : yTop,
+            x1: verticalX,
+            y1: y,
+            xref: 'x',
+            yref: 'y',
+            name: lineName,
+            line: {
+                color: chartState.lineStyles.phase.color,
+                width: chartState.lineStyles.phase.width
+            }
+        });
+
+        // Horizontal line
+        shapes.push({
+            type: 'line',
+            x0: verticalX,
+            y0: y,
+            x1: horizontalEndX,
+            y1: y,
+            xref: 'x',
+            yref: 'y',
+            name: lineName,
+            line: {
+                color: chartState.lineStyles.phase.color,
+                width: chartState.lineStyles.phase.width
+            }
+        });
+
+        // Annotation (text label)
+        const annotationY = isLogY ? Math.log10(y) : y;
+        annotations.push({
+            x: horizontalEndX,
+            y: annotationY,
+            xref: 'x',
+            yref: 'y',
+            text: metadata.text,
+            showarrow: false,
+            name: lineName,
+            font: {
+                color: chartState.lineStyles.phase.color,
+                size: 12,
+                family: 'Arial, sans-serif'
+            },
+            bgcolor: 'rgba(255, 255, 255, 0.8)',
+            bordercolor: chartState.lineStyles.phase.color,
+            borderwidth: 1,
+            borderpad: 4,
+            xanchor: 'left',
+            yanchor: 'middle'
+        });
+    });
+
+    Plotly.relayout(chartDiv, { shapes, annotations });
+}
+
+/**
  * Initialize subscriptions for this module
  * Called by main.js coordinator
  */
@@ -937,6 +1023,11 @@ function init() {
             setPhaseLineVisibility(data.visible);
         }
     }, true);
+
+    // Redraw phase lines after chart replot completes
+    eventBus.subscribe(EVENTS.DATA_CHART_REPLOT_COMPLETE, () => {
+        redrawPhaseLines();
+    });
 }
 
 // Export functions for ES modules

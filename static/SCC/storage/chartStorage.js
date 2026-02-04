@@ -190,6 +190,7 @@ export async function saveChart(id = null) {
  * @returns {Promise<boolean>} Success status
  */
 export async function loadChart(id) {
+    console.log('[LINE SAVE] LOAD 1. loadChart called:', id);
     if (!db) {
         console.warn('[Storage] Database not initialized');
         return false;
@@ -197,6 +198,8 @@ export async function loadChart(id) {
 
     try {
         const data = await db.get(STORE_NAME, id);
+        console.log('[LINE SAVE] LOAD 2. IndexedDB PhaseLines count:', Object.keys(data?.PhaseLines || {}).length);
+        console.log('[LINE SAVE] LOAD 2b. PhaseLines keys:', Object.keys(data?.PhaseLines || {}));
 
         if (!data) {
             console.warn(`[Storage] Chart not found: ${id}`);
@@ -206,6 +209,7 @@ export async function loadChart(id) {
         const wasModified = await jsonBackwardsCompatibilityCheck(data);
         deserializeChart(data);
         chartState.id = id;
+        console.log('[LINE SAVE] LOAD 3. After deserialize, chartState.PhaseLines count:', Object.keys(chartState.PhaseLines).length);
 
         // Save if backwards compat made any migrations
         if (wasModified) {
@@ -392,8 +396,10 @@ function debouncedSaveToIndexedDB() {
     }
 
     saveTimeout = setTimeout(async () => {
+        console.log('[LINE SAVE] 4. Debounce fired, PhaseLines count:', Object.keys(chartState.PhaseLines).length);
         if (chartState.id) {
             await saveChart(chartState.id);
+            console.log('[LINE SAVE] 5. saveChart completed for id:', chartState.id);
             if (chartState.shared && isInitialized()) {
                 pushChart(chartState.id).catch(err => console.warn('[Storage] Push failed:', err));
             }
@@ -406,6 +412,7 @@ function debouncedSaveToIndexedDB() {
  * Chart always has an ID (created before user sees it)
  */
 function onStateMutation() {
+    console.log('[LINE SAVE] 3. onStateMutation triggered, PhaseLines count:', Object.keys(chartState.PhaseLines).length);
     if (!chartState.id) {
         console.warn('[Storage] No chart ID - chart should be created before mutations');
         return;

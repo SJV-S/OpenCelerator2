@@ -24,7 +24,7 @@ import { initializeSeriesNav } from './series/traceStyles.js';
 import { createToast } from './ui/toaster.js';
 import { refreshChart, init as replotInit } from './series/replot.js';
 import { alignStartDate, updateChartDateLabels, updateDateDisplay, adjustDateInput, initializeDateInput, updatePlotDateLabel } from './util/dates.js';
-import { initStartDateControls } from './ui/startDateControls.js';
+import { initStartDateModal } from './ui/startDateModal.js';
 import { loadDataForDate, adjustTimestamp, updateCurrentEntry, deleteCurrentEntry, init as dataUpdateInit } from './series/dataUpdate.js';
 import {
     showCounter,
@@ -217,8 +217,8 @@ function initializeDateInputs() {
     // Update the "Plot Date" label based on chart type
     updatePlotDateLabel();
 
-    // Initialize start date controls in Chart tab
-    initStartDateControls();
+    // Initialize start date modal
+    initStartDateModal();
 }
 
 /**
@@ -505,65 +505,47 @@ export function setupEventListeners() {
         });
     }
 
-    // Chart window controls (chevron buttons with debouncing)
-    const chartWindowDisplay = document.getElementById('chart-window');
-    if (chartWindowDisplay) {
-        chartWindowDisplay.textContent = chartState.chartWindow;
+    // Chart window update handler - subscribes to CHART_WINDOW_CHANGED event
+    const chartDiv = document.getElementById('chart');
 
-        let windowDebounceTimer = null;
-        const chartDiv = document.getElementById('chart');
+    const applyChartWindow = (newValue) => {
+        const config = CHART_CONFIG[chartState.chartType];
+        const minWindow = config?.minXmax || config?.snapTo || 14;
 
-        const updateChartWindow = (newValue) => {
-            const config = CHART_CONFIG[chartState.chartType];
-            const minWindow = config?.minXmax || config?.snapTo || 14;
+        // Clamp value between min and capacity
+        if (newValue < minWindow) newValue = minWindow;
+        if (newValue > chartState.chartCapacity) newValue = chartState.chartCapacity;
 
-            // Clamp value between min and capacity
-            if (newValue < minWindow) newValue = minWindow;
-            if (newValue > chartState.chartCapacity) newValue = chartState.chartCapacity;
+        chartState.chartWindow = newValue;
 
-            chartState.chartWindow = newValue;
-            chartWindowDisplay.textContent = newValue;
+        // Recalculate width to maintain correct diagonal (same as ResizeObserver)
+        const margin = chartDiv.layout.margin;
+        const height = chartDiv.layout.height;
+        const deg = CHART_MATH.ANGLE_DEGREES;
+        const yaxis_px = height - (margin.t + margin.b);
+        const y_axis = Math.log10(config.yMax) - Math.log10(config.yMin);
+        const delta_y = Math.log10(2 ** (newValue / config.unit));
+        const delta_y_px = (delta_y / y_axis) * yaxis_px;
+        const xaxis_px = delta_y_px / Math.tan((deg * Math.PI) / 180);
+        const newWidth = xaxis_px + (margin.l + margin.r);
 
-            // Debounce the relayout for fast clicking
-            clearTimeout(windowDebounceTimer);
-            windowDebounceTimer = setTimeout(() => {
-                // Recalculate width to maintain correct diagonal (same as ResizeObserver)
-                const margin = chartDiv.layout.margin;
-                const height = chartDiv.layout.height;
-                const deg = CHART_MATH.ANGLE_DEGREES;
-                const yaxis_px = height - (margin.t + margin.b);
-                const y_axis = Math.log10(config.yMax) - Math.log10(config.yMin);
-                const delta_y = Math.log10(2 ** (newValue / config.unit));
-                const delta_y_px = (delta_y / y_axis) * yaxis_px;
-                const xaxis_px = delta_y_px / Math.tan((deg * Math.PI) / 180);
-                const newWidth = xaxis_px + (margin.l + margin.r);
-
-                Plotly.relayout(chartDiv, {
-                    'xaxis.range': [-LAYOUT.X_AXIS_MARGIN_OFFSET, newValue + LAYOUT.X_AXIS_MARGIN_OFFSET],
-                    width: newWidth
-                }).then(() => {
-                    emitFanReposition();
-                    regenerateCredits();
-                    renderCustomLegend();
-                    updatePanDisplay();
-                    eventBus.emit(EVENTS.CHART_WINDOW_CHANGED, newValue);
-                });
-            }, TIMING_MS.CHART_WINDOW_DEBOUNCE);
-        };
-
-        document.querySelector('[data-action="chart-window-dec"]')?.addEventListener('click', () => {
-            const increment = CHART_CONFIG[chartState.chartType]?.snapTo || 14;
-            updateChartWindow(chartState.chartWindow - increment);
+        Plotly.relayout(chartDiv, {
+            'xaxis.range': [-LAYOUT.X_AXIS_MARGIN_OFFSET, newValue + LAYOUT.X_AXIS_MARGIN_OFFSET],
+            width: newWidth
+        }).then(() => {
+            emitFanReposition();
+            regenerateCredits();
+            renderCustomLegend();
+            updatePanDisplay();
         });
+    };
 
-        document.querySelector('[data-action="chart-window-inc"]')?.addEventListener('click', () => {
-            const increment = CHART_CONFIG[chartState.chartType]?.snapTo || 14;
-            updateChartWindow(chartState.chartWindow + increment);
-        });
-    }
+    // Subscribe to chart window change events (from navigation modal)
+    eventBus.subscribe(EVENTS.CHART_WINDOW_CHANGED, (newValue) => {
+        applyChartWindow(newValue);
+    }, true);
 
     // Pan Chart controls - uses Plotly's native panning mechanism
-    const chartDiv = document.getElementById('chart');
     const panDisplay = document.getElementById('chart-pan-position');
     const panIncrement = () => CHART_CONFIG[chartState.chartType]?.snapTo || 14;
 

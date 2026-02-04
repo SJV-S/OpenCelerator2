@@ -15,7 +15,7 @@
 import { chartState } from '../chartState.js';
 import { COLORS } from '../config.js';
 import { createToast, createTextInputDialog, createConfirmToast } from '../ui/toaster.js';
-import { xPositionToDate } from '../util/dates.js';
+import { xPositionToDate, dateToXPosition } from '../util/dates.js';
 import { aimLineMetadata } from './allLines.js';
 import { icons, applySvgCursor, restoreCursor } from '../ui/icons.js';
 import { eventBus, EVENTS } from '../eventBus.js';
@@ -895,6 +895,73 @@ function setAimLineVisibility(visible) {
 }
 
 /**
+ * Redraw all aim lines from chartState.AimLines
+ * Called after chart replot to restore saved lines
+ */
+function redrawAimLines() {
+    const chartDiv = document.getElementById('chart');
+    if (!chartDiv) return;
+
+    // Filter out existing aim shapes/annotations
+    const shapes = (chartDiv.layout.shapes || []).filter(s => !s.name?.startsWith('aim-'));
+    const annotations = (chartDiv.layout.annotations || []).filter(a => !a.name?.startsWith('aim-'));
+
+    const yaxis = chartDiv._fullLayout.yaxis;
+    const isLogY = yaxis.type === 'log';
+
+    // Rebuild shapes and annotations from chartState
+    Object.values(chartState.AimLines).forEach(metadata => {
+        const lineName = `aim-${metadata.id}`;
+        const x1 = dateToXPosition(metadata.date1);
+        const x2 = dateToXPosition(metadata.date2);
+
+        // Aim line shape
+        shapes.push({
+            type: 'line',
+            x0: x1,
+            y0: metadata.y1,
+            x1: x2,
+            y1: metadata.y2,
+            xref: 'x',
+            yref: 'y',
+            name: lineName,
+            line: {
+                color: chartState.lineStyles.aim.color,
+                width: chartState.lineStyles.aim.width
+            }
+        });
+
+        // Annotation (text label at midpoint)
+        const midX = (x1 + x2) / 2;
+        const midY = (metadata.y1 + metadata.y2) / 2;
+        const annotationY = isLogY ? Math.log10(midY) : midY;
+
+        annotations.push({
+            x: midX,
+            y: annotationY,
+            xref: 'x',
+            yref: 'y',
+            text: metadata.text,
+            showarrow: false,
+            name: lineName,
+            font: {
+                color: chartState.lineStyles.aim.color,
+                size: 12,
+                family: 'Arial, sans-serif'
+            },
+            bgcolor: 'rgba(255, 255, 255, 0.8)',
+            bordercolor: chartState.lineStyles.aim.color,
+            borderwidth: 1,
+            borderpad: 4,
+            xanchor: 'center',
+            yanchor: 'bottom'
+        });
+    });
+
+    Plotly.relayout(chartDiv, { shapes, annotations });
+}
+
+/**
  * Initialize subscriptions for this module
  * Called by main.js coordinator
  */
@@ -917,6 +984,11 @@ function init() {
             setAimLineVisibility(data.visible);
         }
     }, true);
+
+    // Redraw aim lines after chart replot completes
+    eventBus.subscribe(EVENTS.DATA_CHART_REPLOT_COMPLETE, () => {
+        redrawAimLines();
+    });
 }
 
 // Export functions for ES modules

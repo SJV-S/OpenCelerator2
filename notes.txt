@@ -38,5 +38,7 @@ To-do
 -- Might be because they don't trigger a save event
 ---- Except that they do?
 * Line type is missing from the style settings, and lines and marker settings should have their own grouping
-* Fix the credit lines tooltip over expansion
 * Crosshair doesn't actually have a centered clickpoint
+- There's a distortion when auto resizing
+- credit line font still gets distorted across browsers
+- Check out the usage of config.maxWindow, we might have to get rid of that one. It should use chartState.chartCapacity, I think

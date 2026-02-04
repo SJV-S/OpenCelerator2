@@ -23,7 +23,7 @@ window.chartState = chartState;
 // ============================================================================
 
 const debugLog = [];
-const DEBUG_PREFIXES = ['[CEL DEBUG]', '[STORAGE]'];
+const DEBUG_PREFIXES = ['[CEL DEBUG]', '[STORAGE]', '[LINE SAVE]'];
 
 // Store original console methods
 const originalLog = console.log.bind(console);
