@@ -34,9 +34,15 @@ function refreshChart() {
     // Remove any toast notifications before replotting
     removeAllToasts();
 
+    // Sort data chronologically (prevents zigzag lines when data entered out of order)
+    const order = chartState.series.xValues.map((_, i) => i).sort((a, b) =>
+        chartState.series.xValues[a] - chartState.series.xValues[b]
+    );
+    const sort = (arr) => order.map(i => arr[i]);
+
     // Convert timestamps to x-positions
-    const allX = timestampsToXPositions(chartState.series.xValues);
-    const allFreq = calculateFrequencies();
+    const allX = timestampsToXPositions(sort(chartState.series.xValues));
+    const allFreq = calculateFrequencies(sort);
 
     // Filter out points exceeding chart capacity
     const valid = allX.map(x => x <= chartState.chartCapacity);

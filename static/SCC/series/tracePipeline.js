@@ -227,12 +227,14 @@ function isBelowFloor(freq, timing) {
  * For minute charts: frequency = count / timing
  * For non-minute charts: uses timing of 1 (frequency = count), but floor logic
  * still applies to handle zero counts (placed at 0.75 below floor of 1)
+ *
+ * @param {Function} [sort] - Optional sort function to apply chronological ordering
  */
-function calculateFrequencies() {
+function calculateFrequencies(sort = (arr) => arr) {
     // Non-minute charts use timing of 1 for all points (raw counts, but floor still works for zeros)
     const timingMinutes = chartState.minuteChart
-        ? chartState.series.timing
-        : chartState.series.timing.map(() => 1);
+        ? sort(chartState.series.timing)
+        : sort(chartState.series.timing).map(() => 1);
 
     // Helper: convert zeros to NaN when placeZerosBelowFloor is false
     const handleZero = (freq) => {
@@ -241,8 +243,8 @@ function calculateFrequencies() {
     };
 
     // Calculate raw frequencies for fixed series (convert zeros to NaN if setting is off)
-    const correctsFreqRaw = chartState.series.corrects.map((count, i) => handleZero(count / timingMinutes[i]));
-    const errorsFreqRaw = chartState.series.errors.map((count, i) => handleZero(count / timingMinutes[i]));
+    const correctsFreqRaw = sort(chartState.series.corrects).map((count, i) => handleZero(count / timingMinutes[i]));
+    const errorsFreqRaw = sort(chartState.series.errors).map((count, i) => handleZero(count / timingMinutes[i]));
 
     // Create original frequency arrays (below-floor values set to NaN)
     const correctsFreq = correctsFreqRaw.map((freq, i) =>
@@ -271,7 +273,7 @@ function calculateFrequencies() {
 
     // Calculate frequencies for dynamic misc series (convert zeros to NaN if setting is off)
     Object.entries(chartState.series.misc).forEach(([miscId, data]) => {
-        const miscFreqRaw = data.map((count, i) => handleZero(count / timingMinutes[i]));
+        const miscFreqRaw = sort(data).map((count, i) => handleZero(count / timingMinutes[i]));
 
         result.misc[miscId] = miscFreqRaw.map((freq, i) =>
             isBelowFloor(freq, timingMinutes[i]) ? NaN : freq
