@@ -4,7 +4,10 @@
 // DEVELOPMENT NOTE: Verbose console logging is intentional for debugging.
 // These logs use [SW] prefix for filtering. Remove or reduce logging in production.
 
-const SW_VERSION = '0.2.0';
+// Set to true during development to always fetch fresh (bypasses cache)
+const DEVELOPER_MODE = true;
+
+const SW_VERSION = '0.18.0';
 const CACHE_NAME = `scc-cache-v${SW_VERSION}`;
 
 // HTML pages to precache
@@ -199,9 +202,13 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // Strategy: Static assets - Cache first, network fallback
+    // Strategy: Static assets - Cache first, network fallback (unless developer mode)
     if (isStaticAsset(url)) {
-        event.respondWith(cacheFirstWithNetwork(request));
+        if (DEVELOPER_MODE) {
+            event.respondWith(fetch(request));
+        } else {
+            event.respondWith(cacheFirstWithNetwork(request));
+        }
         return;
     }
 

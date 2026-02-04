@@ -59,6 +59,7 @@ import { showInitialMenuHint } from './ui/tooltip.js';
 import { icons } from './ui/icons.js';
 import { initializeShareTab } from './misc/share.js';
 import { init as crosshairInit } from './ui/crosshair.js';
+import { init as panSliderInit, setupChartListener as panSliderSetupChart } from './ui/panSlider.js';
 import { initStorage } from './storage/chartStorage.js';
 import { initImportUI } from './import/importUI.js';
 import { initServerSync } from '../Server/init.js';
@@ -194,6 +195,9 @@ export function initializeChart() {
     // Trigger chart refresh to render data from chartState.series
     refreshChart();
     renderCustomLegend();
+
+    // Set up pan slider last, after everything is initialized
+    panSliderSetupChart(chartDiv);
 }
 
 /**
@@ -248,6 +252,7 @@ document.addEventListener('DOMContentLoaded', () => {
     crosshairInit();
     celerationFanInit();
     creditInit();
+    panSliderInit();
     console.log('Main.js: Event bus subscriptions initialized');
 
     // Initialize IndexedDB storage
@@ -556,7 +561,7 @@ export function setupEventListeners() {
             emitFanReposition();
             regenerateCredits();
             renderCustomLegend();
-            updatePanDisplay();
+            // Slider updates automatically via plotly_relayout event
         });
     };
 
@@ -564,45 +569,6 @@ export function setupEventListeners() {
     eventBus.subscribe(EVENTS.CHART_WINDOW_CHANGED, (newValue) => {
         applyChartWindow(newValue);
     }, true);
-
-    // Pan Chart controls - uses Plotly's native panning mechanism
-    const panDisplay = document.getElementById('chart-pan-position');
-    const panIncrement = () => CHART_CONFIG[chartState.chartType]?.snapTo || 14;
-
-    const updatePanDisplay = () => {
-        if (panDisplay) {
-            // Show start position (range[0] + margin offset, rounded)
-            panDisplay.textContent = Math.round(chartDiv.layout.xaxis.range[0] + LAYOUT.X_AXIS_MARGIN_OFFSET);
-        }
-    };
-
-    document.querySelector('[data-action="chart-pan-left"]')?.addEventListener('click', () => {
-        const currentRange = chartDiv.layout.xaxis.range;
-        const shift = panIncrement();
-        Plotly.relayout(chartDiv, {
-            'xaxis.range[0]': currentRange[0] - shift,
-            'xaxis.range[1]': currentRange[1] - shift
-        }).then(updatePanDisplay);
-    });
-
-    document.querySelector('[data-action="chart-pan-right"]')?.addEventListener('click', () => {
-        const currentRange = chartDiv.layout.xaxis.range;
-        const shift = panIncrement();
-        Plotly.relayout(chartDiv, {
-            'xaxis.range[0]': currentRange[0] + shift,
-            'xaxis.range[1]': currentRange[1] + shift
-        }).then(updatePanDisplay);
-    });
-
-    // Reset pan position when start date changes
-    eventBus.subscribe(EVENTS.DATA_START_DATE_CHANGED, () => {
-        const currentRange = chartDiv.layout.xaxis.range;
-        const rangeWidth = currentRange[1] - currentRange[0];
-        Plotly.relayout(chartDiv, {
-            'xaxis.range[0]': -LAYOUT.X_AXIS_MARGIN_OFFSET,
-            'xaxis.range[1]': -LAYOUT.X_AXIS_MARGIN_OFFSET + rangeWidth
-        }).then(updatePanDisplay);
-    });
 
     console.log('Event listeners set up');
 }

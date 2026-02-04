@@ -4,7 +4,7 @@
  * Also handles margin expansion for celeration fan
  */
 
-import { MOBILE_BREAKPOINT, CHART_MATH, LAYOUT } from '../config.js';
+import { MOBILE_BREAKPOINT, CHART_MATH, LAYOUT, CHART_TYPE_CONFIG } from '../config.js';
 import { chartState } from '../chartState.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 
@@ -15,16 +15,10 @@ function isMobile() {
     return window.innerWidth < MOBILE_BREAKPOINT;
 }
 
-// Chart-specific configuration
+// Chart-specific configuration (merges core values from config.js with layout-specific values)
 const CHART_CONFIG = {
     Daily: {
-        yMin: 1 * 0.69,
-        yMax: 1000000,
-        unit: 7,
-        snapTo: 14,  // Snap xmax to multiples of 14 (28, 42, 56...)
-        minXmax: 28,
-        maxWindow: 140,
-        capacity: 280,
+        ...CHART_TYPE_CONFIG.Daily,
         creditMarginMultiplier: 0.13,
         topMarginMultiplier: 0,
         fanMarginMinute: 0.10,
@@ -48,13 +42,7 @@ const CHART_CONFIG = {
         }
     },
     Weekly: {
-        yMin: 0.001 * 0.69,
-        yMax: 1000,
-        unit: 5,
-        snapTo: 5,  // Snap to multiples of 5 (5-week months: 5, 10, 15...)
-        minXmax: 10,
-        maxWindow: 100,
-        capacity: 200,
+        ...CHART_TYPE_CONFIG.Weekly,
         creditMarginMultiplier: 0.10,
         topMarginMultiplier: 0,
         fanMarginMinute: 0.10,
@@ -78,13 +66,7 @@ const CHART_CONFIG = {
         }
     },
     Monthly: {
-        yMin: 0.001 * 0.69,
-        yMax: 1000,
-        unit: 6,
-        snapTo: 24,  // Snap to multiples of 24 (24, 48, 72...)
-        minXmax: 24,
-        maxWindow: 120,
-        capacity: 240,
+        ...CHART_TYPE_CONFIG.Monthly,
         creditMarginMultiplier: 0.15,
         topMarginMultiplier: 0,
         fanMarginMinute: 0.15,
@@ -108,13 +90,7 @@ const CHART_CONFIG = {
         }
     },
     Yearly: {
-        yMin: 0.001 * 0.69,
-        yMax: 1000,
-        unit: 5,
-        snapTo: 20,  // Snap to multiples of 20 (20, 40, 60...)
-        minXmax: 20,
-        maxWindow: 100,
-        capacity: 200,
+        ...CHART_TYPE_CONFIG.Yearly,
         creditMarginMultiplier: 0.15,
         topMarginMultiplier: 0,
         fanMarginMinute: 0.10,
@@ -140,13 +116,7 @@ const CHART_CONFIG = {
         }
     },
     FrequencyCollections: {
-        yMin: 0.001 * 0.69,
-        yMax: 1000,
-        unit: 7,
-        snapTo: 7,  // Snap to multiples of 7 (42, 49, 56...)
-        minXmax: 42,
-        maxWindow: 70,
-        capacity: 280,
+        ...CHART_TYPE_CONFIG.FrequencyCollections,
         creditMarginMultiplier: 0.10,
         topMarginMultiplier: 0,
         fanMarginMinute: 0.10,

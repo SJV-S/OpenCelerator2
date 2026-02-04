@@ -1,10 +1,10 @@
 import { eventBus, EVENTS } from '../eventBus.js';
 import { chartState } from '../chartState.js';
+import { COLORS, CHART_TYPE_CONFIG } from '../config.js';
 
 // Dynamic spine configuration
 const LEFT_SPINE_NAME = 'dynamic-left-spine';
 const RIGHT_SPINE_NAME = 'dynamic-right-spine';
-import { COLORS } from '../config.js';
 const SPINE_COLOR = COLORS.PRIMARY;
 const SPINE_WIDTH = 2.5;
 let gridVisible = true;
@@ -13,15 +13,6 @@ let gridVisible = true;
 const CHART_MARGIN = 0.2;
 const CHART_X_MIN = -CHART_MARGIN;
 
-// Chart-type specific configuration
-const CHART_CONFIG = {
-    Daily:    { xMax: 280, snapInterval: 7 },
-    Weekly:   { xMax: 200, snapInterval: 5 },
-    Monthly:  { xMax: 240, snapInterval: 6 },
-    Yearly:   { xMax: 200, snapInterval: 5 },
-    FrequencyCollections: { xMax: 280, snapInterval: 7 },
-};
-
 // Helper function to snap to nearest multiple of interval
 function snapToNearest(value, interval) {
     return Math.round(value / interval) * interval;
@@ -29,9 +20,9 @@ function snapToNearest(value, interval) {
 
 // Constrain panning to x-axis range
 function setupPanConstraints(plotDiv, chartType) {
-    // Get chart-type specific config
-    const config = CHART_CONFIG[chartType] || CHART_CONFIG.Daily;
-    const CHART_X_MAX = config.xMax + CHART_MARGIN;
+    // Get chart-type specific config from centralized config
+    const config = CHART_TYPE_CONFIG[chartType] || CHART_TYPE_CONFIG.Daily;
+    const CHART_X_MAX = config.capacity + CHART_MARGIN;
     const SNAP_INTERVAL = config.snapInterval;
 
     let isProgrammaticUpdate = false;

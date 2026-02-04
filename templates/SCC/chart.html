@@ -106,6 +106,68 @@ body {
 #custom-legend.touched .legend-lines-section {
     display: flex;
 }
+
+/* Chart area needs position for slider */
+#chart-area {
+    position: relative;
+}
+
+/* Pan slider styling - hidden by default, visible on hover */
+#pan-slider-container {
+    position: absolute;
+    top: -5px;
+    left: 50%;
+    transform: translateX(-50%);
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+    padding: 20px 0;
+    z-index: 100;
+}
+
+#pan-slider-container:hover,
+#pan-slider-container.active {
+    opacity: 1;
+}
+
+#pan-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 8px;
+    border-radius: 4px;
+    background: #d1d5db;
+    outline: none;
+}
+
+#pan-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #6ad1e3;
+    cursor: pointer;
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    transition: transform 0.1s;
+}
+
+#pan-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.15);
+}
+
+#pan-slider::-webkit-slider-thumb:active {
+    transform: scale(0.95);
+}
+
+#pan-slider::-moz-range-thumb {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #6ad1e3;
+    cursor: pointer;
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
 {% endblock %}
 
 {% block content %}
@@ -119,6 +181,10 @@ body {
 
     <!-- Chart area wrapper - shifts right on desktop for menu -->
     <div id="chart-area">
+        <!-- Pan slider - horizontally centered above chart, visible on hover -->
+        <div id="pan-slider-container">
+            <input type="range" id="pan-slider" class="w-[600px] h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+        </div>
         <!-- Chart container: holds the chart (credits rendered as Plotly annotations in bottom margin) -->
         <div id="chart-container">
             <div id="chart" style="position: relative;">

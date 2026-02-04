@@ -89,6 +89,70 @@ export const CHART_MATH = Object.freeze({
 });
 
 // ============================================================================
+// CHART TYPE CONFIGURATION
+// ============================================================================
+// Single source of truth for chart-type-specific values.
+// snapTo: pan increment (also used for snapping chartWindow)
+// snapInterval: snapping granularity during drag operations
+// capacity: total x-axis range
+// maxWindow: default visible window size
+// minXmax: minimum allowed window size
+// unit: x-axis units per doubling (for celeration calculation)
+// yMin/yMax: y-axis range
+export const CHART_TYPE_CONFIG = Object.freeze({
+    Daily: {
+        yMin: 1 * 0.69,
+        yMax: 1000000,
+        unit: 7,
+        snapTo: 14,
+        snapInterval: 7,
+        minXmax: 28,
+        maxWindow: 140,
+        capacity: 280,
+    },
+    Weekly: {
+        yMin: 0.001 * 0.69,
+        yMax: 1000,
+        unit: 5,
+        snapTo: 5,
+        snapInterval: 5,
+        minXmax: 10,
+        maxWindow: 100,
+        capacity: 200,
+    },
+    Monthly: {
+        yMin: 0.001 * 0.69,
+        yMax: 1000,
+        unit: 6,
+        snapTo: 12,
+        snapInterval: 6,
+        minXmax: 24,
+        maxWindow: 120,
+        capacity: 240,
+    },
+    Yearly: {
+        yMin: 0.001 * 0.69,
+        yMax: 1000,
+        unit: 5,
+        snapTo: 10,
+        snapInterval: 5,
+        minXmax: 20,
+        maxWindow: 100,
+        capacity: 200,
+    },
+    FrequencyCollections: {
+        yMin: 0.001 * 0.69,
+        yMax: 1000,
+        unit: 7,
+        snapTo: 7,
+        snapInterval: 7,
+        minXmax: 42,
+        maxWindow: 70,
+        capacity: 280,
+    },
+});
+
+// ============================================================================
 // LIMITS & THRESHOLDS
 // ============================================================================
 export const LIMITS = Object.freeze({
