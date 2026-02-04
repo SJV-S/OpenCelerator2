@@ -40,11 +40,9 @@ To-do
 * Line type is missing from the style settings, and lines and marker settings should have their own grouping
 * Crosshair doesn't actually have a centered clickpoint
 - There's a distortion when auto resizing
-- credit line font still gets distorted across browsers
 - Check out the usage of config.maxWindow, we might have to get rid of that one. It should use chartState.chartCapacity, I think
 - changing the chart window doesn't sync automatically, but works on manual refresh
 - "online/offline" status doesn't show up well on smaller windows
-- Line cuts are not persistent against reloads
 - When placing a change line, have the dropdown be vertical (maybe dedicated modal?) and don't show options that are hidden in the legend (check chartState?)
 - edit mode doesn't work reliably: it shuts off when a line cut is removed, and doesn't seem want to start again after it's done
 -- Also, when removing, is it also removing the associated text?
