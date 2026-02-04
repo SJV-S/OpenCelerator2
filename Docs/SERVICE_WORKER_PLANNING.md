@@ -16,17 +16,42 @@ A comprehensive analysis of the SCC application for implementing offline-first P
 - `static/SCC/icons/icon-192.png` - App icon (192x192)
 - `static/SCC/icons/icon-512.png` - App icon (512x512)
 - `static/SCC/icons/celeration.svg` - Source SVG with #05c3de fill
-- `app.py` - Added `/service-worker.js` route with `Cache-Control: max-age=0`
-- `templates/SCC/base.html` - Added manifest link, theme-color meta, SW registration script
+- `app.py` - Added `/service-worker.js` route using `send_from_directory(app.root_path, ...)`
+- `templates/SCC/base.html` - Refactored as generic base template with manifest link, theme-color meta, SW registration
+- `templates/SCC/menu_page.html` - Refactored to extend base.html, added install button
+- `templates/SCC/new_chart.html` - Refactored to extend base.html
+- `templates/SCC/chart.html` - Updated to include chart-specific scripts via blocks
+- `static/SCC/pwaInstall.js` - Install button handler (beforeinstallprompt)
+
+---
+
+### Phase 2: Offline Caching (COMPLETE)
+
+**Status**: Done
+
+**DEVELOPMENT NOTE**: Verbose console logging (`[SW]` prefix) is intentional for debugging during development. These logs should be reduced or removed before production deployment.
+
+**Files modified**:
+- `service-worker.js` - Added caching with two strategies:
+  - **Network-first** for HTML pages (3s timeout, cache fallback)
+  - **Cache-first** for static assets and CDN resources
+- `static/SCC/debug.js` - Added `[SW]` to DEBUG_PREFIXES for log capture
+
+**Caching strategy**:
+- Precaches: `/`, `/new`, manifest, icons
+- CDN caching: Tailwind, Plotly.js, Google Fonts (cached on first fetch)
+- Static assets: All `/static/*` files (cached on first fetch)
+- Chart pages: Cached per-URL, with fallback to `/` if uncached
 
 **Testing**:
-1. Run `python app.py`
-2. Open Chrome DevTools > Application tab
-3. Check "Service Workers" section shows registration
-4. Check "Manifest" section shows app info and icons
-5. Look for install button in address bar (desktop) or "Add to Home Screen" prompt (mobile)
+1. Load the app and navigate to a chart
+2. Open DevTools > Application > Cache Storage to verify assets cached
+3. Check DevTools Console for `[SW 2.0.0]` logs showing cache hits/misses
+4. Enable "Offline" in DevTools > Network tab
+5. Refresh - app should load from cache
+6. Navigate between pages - should work offline
 
-**Next Phase**: Phase 2 - Basic caching for offline viewing
+**Next Phase**: Phase 3 - manifest.json enhancements, offline fallback page (optional)
 
 ---
 

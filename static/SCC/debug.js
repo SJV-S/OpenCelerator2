@@ -23,7 +23,10 @@ window.chartState = chartState;
 // ============================================================================
 
 const debugLog = [];
-const DEBUG_PREFIXES = ['[CEL DEBUG]', '[STORAGE]', '[LINE SAVE]'];
+// DEVELOPMENT NOTE: [SW] prefix added for service worker debugging.
+// Service worker logs appear in DevTools console (separate context from page).
+// Page-side SW-related logs (e.g., registration) will be captured here.
+const DEBUG_PREFIXES = ['[CEL DEBUG]', '[STORAGE]', '[LINE SAVE]', '[SW]'];
 
 // Store original console methods
 const originalLog = console.log.bind(console);
