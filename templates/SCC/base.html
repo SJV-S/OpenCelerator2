@@ -35,5 +35,10 @@
                 .catch(err => console.error('[SW] Registration failed:', err));
         }
     </script>
+    <script type="module">
+        // Online/Offline status indicator
+        import { initOnlineStatus } from '/static/Server/onlineStatus.js';
+        initOnlineStatus();
+    </script>
 </body>
 </html>

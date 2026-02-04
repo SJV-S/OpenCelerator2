@@ -6,6 +6,7 @@ import { createToast } from '../ui/toaster.js';
 import { icons } from '../ui/icons.js';
 import { createViewLink, createEditLink, isInitialized } from '../../Server/syncClient.js';
 import { getFirstConfig } from '../series/traceStyles.js';
+import { isOnline } from '../../Server/onlineStatus.js';
 
 /**
  * Takes a screenshot of the Plotly chart and downloads it as PNG
@@ -203,6 +204,11 @@ async function handleShareLinkClick(type) {
 
     if (!isInitialized()) {
         createToast({ message: 'Sync not enabled', duration: 2000, position: 'top-right' });
+        return;
+    }
+
+    if (!isOnline()) {
+        createToast({ message: 'No internet connection', duration: 2000, position: 'top-right' });
         return;
     }
 
