@@ -353,6 +353,9 @@ function cutLine(xValue) {
         date: dateUpper
     };
 
+    // Emit save event to trigger auto-save
+    eventBus.emit(EVENTS.LINE_CUT_SAVED, { id: lineId });
+
     // Emit event to refresh chart instead of calling directly
     eventBus.emit(EVENTS.DATA_CHART_REFRESH);
 }

@@ -250,7 +250,7 @@ export async function syncChart(chartId) {
 export function startSyncPolling(chartId) {
     stopSyncPolling();
     syncChart(chartId);
-    syncInterval = setInterval(() => syncChart(chartId), 10000);
+    syncInterval = setInterval(() => syncChart(chartId), 5000);
 }
 
 export function stopSyncPolling() {

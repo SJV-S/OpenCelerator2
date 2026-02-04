@@ -4,7 +4,7 @@
 // DEVELOPMENT NOTE: Verbose console logging is intentional for debugging.
 // These logs use [SW] prefix for filtering. Remove or reduce logging in production.
 
-const SW_VERSION = '2.3.0';
+const SW_VERSION = '0.1.0';
 const CACHE_NAME = `scc-cache-v${SW_VERSION}`;
 
 // HTML pages to precache

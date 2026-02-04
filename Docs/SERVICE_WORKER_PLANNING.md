@@ -11,16 +11,16 @@ A comprehensive analysis of the SCC application for implementing offline-first P
 **Status**: Done
 
 **Files created/modified**:
-- `service-worker.js` - Minimal SW (no caching, just install/activate) - in project root
-- `static/manifest.json` - PWA manifest with app name, icons, theme
-- `static/SCC/icons/icon-192.png` - App icon (192x192)
-- `static/SCC/icons/icon-512.png` - App icon (512x512)
+- `service-worker.js` - In project root, served via Flask route
+- `static/manifest.json` - PWA manifest ("Standard Change Chart", icons, theme)
+- `static/SCC/icons/icon-192.png` - App icon (192x192, transparent background)
+- `static/SCC/icons/icon-512.png` - App icon (512x512, transparent background)
 - `static/SCC/icons/celeration.svg` - Source SVG with #05c3de fill
-- `app.py` - Added `/service-worker.js` route using `send_from_directory(app.root_path, ...)`
-- `templates/SCC/base.html` - Refactored as generic base template with manifest link, theme-color meta, SW registration
-- `templates/SCC/menu_page.html` - Refactored to extend base.html, added install button
-- `templates/SCC/new_chart.html` - Refactored to extend base.html
-- `templates/SCC/chart.html` - Updated to include chart-specific scripts via blocks
+- `app.py` - `/service-worker.js` route with `Cache-Control: no-cache` headers
+- `templates/SCC/base.html` - Generic base template (manifest, theme-color, SW registration, online status)
+- `templates/SCC/menu_page.html` - Extends base.html, includes "Install App" button
+- `templates/SCC/new_chart.html` - Extends base.html
+- `templates/SCC/chart.html` - Extends base.html with chart-specific scripts
 - `static/SCC/pwaInstall.js` - Install button handler (beforeinstallprompt)
 
 ---
@@ -29,29 +29,47 @@ A comprehensive analysis of the SCC application for implementing offline-first P
 
 **Status**: Done
 
-**DEVELOPMENT NOTE**: Verbose console logging (`[SW]` prefix) is intentional for debugging during development. These logs should be reduced or removed before production deployment.
-
 **Files modified**:
-- `service-worker.js` - Added caching with two strategies:
+- `service-worker.js` (v2.3.0) - Full precaching and caching strategies:
+  - **Precaches on install**: All 66+ static assets, HTML pages, CDN resources
   - **Network-first** for HTML pages (3s timeout, cache fallback)
   - **Cache-first** for static assets and CDN resources
-- `static/SCC/debug.js` - Added `[SW]` to DEBUG_PREFIXES for log capture
+- `static/SCC/debug.js` - Added `[SW]` to DEBUG_PREFIXES
 
-**Caching strategy**:
-- Precaches: `/`, `/new`, manifest, icons
-- CDN caching: Tailwind, Plotly.js, Google Fonts (cached on first fetch)
-- Static assets: All `/static/*` files (cached on first fetch)
-- Chart pages: Cached per-URL, with fallback to `/` if uncached
+**Caching includes**:
+- All JS modules (~66 files)
+- CSS, SVG icons
+- CDN: Tailwind, Plotly.js, Google Fonts
+- HTML pages: `/`, `/new`, chart pages (cached on visit)
 
-**Testing**:
-1. Load the app and navigate to a chart
-2. Open DevTools > Application > Cache Storage to verify assets cached
-3. Check DevTools Console for `[SW 2.0.0]` logs showing cache hits/misses
-4. Enable "Offline" in DevTools > Network tab
-5. Refresh - app should load from cache
-6. Navigate between pages - should work offline
+---
 
-**Next Phase**: Phase 3 - manifest.json enhancements, offline fallback page (optional)
+### Phase 3: Online/Offline Status & UX (COMPLETE)
+
+**Status**: Done
+
+**Files created/modified**:
+- `static/Server/onlineStatus.js` - Online/offline indicator (top-right corner)
+- `static/SCC/misc/share.js` - Shows "No internet connection" when sharing offline
+- `templates/SCC/base.html` - Imports and initializes onlineStatus on all pages
+
+**Behavior**:
+- Status indicator always visible: "online" (green) / "offline" (red)
+- Share link attempts show "No internet connection" toast when offline
+- Uses native `navigator.onLine` API (reliable for common scenarios)
+
+---
+
+### Remaining Work (Optional)
+
+| Item | Priority | Notes |
+|------|----------|-------|
+| Offline fallback page | Low | Create `offline.html` with retry button for edge cases |
+| Lazy-load xlsx.js | Low | Save 952KB initial cache; load on first import use |
+| Self-host Plotly | Low | Avoid CDN dependency; or use basic bundle (976KB vs 3.5MB) |
+| Build Tailwind statically | Low | CDN works but not recommended for production |
+
+---
 
 ---
 
