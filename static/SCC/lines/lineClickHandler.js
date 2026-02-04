@@ -13,12 +13,16 @@ import { eventBus, EVENTS } from '../eventBus.js';
 import { createToast } from '../ui/toaster.js';
 import { removeLine } from './allLines.js';
 
+// Module-level state
+let clickHandlerAttached = false;
+let lineClickHandled = false;
+
 /**
  * Initialize click event listener on the chart
  * Call this after chart is rendered with Plotly.newPlot()
  */
 function setupClickHandler() {
-    if (window._clickHandlerAttached) return;
+    if (clickHandlerAttached) return;
 
     const chartDiv = document.getElementById('chart');
 
@@ -46,6 +50,7 @@ function setupClickHandler() {
                     const dist = Math.sqrt((pixelX - markerPixelX) ** 2 + (pixelY - markerPixelY) ** 2);
                     if (dist <= clickThreshold) {
                         console.log(`Line clicked: ${trace.meta.lineName}`);
+                        lineClickHandled = true;
                         handleLineClick(trace.meta.lineName);
                         e.stopImmediatePropagation();
                         return;
@@ -62,6 +67,12 @@ function setupClickHandler() {
 
     // Keep plotly_click as fallback for non-overlapping cases
     chartDiv.on('plotly_click', function(eventData) {
+        // Skip if native handler already processed this click
+        if (lineClickHandled) {
+            lineClickHandled = false;
+            return;
+        }
+
         const points = eventData.points;
         if (points.length === 0) return;
 
@@ -75,7 +86,7 @@ function setupClickHandler() {
         }
     });
 
-    window._clickHandlerAttached = true;
+    clickHandlerAttached = true;
     console.log('Click handler initialized');
 }
 

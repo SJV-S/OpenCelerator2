@@ -2,7 +2,7 @@
 // Renders credit lines in the chart's bottom margin and handles editing
 
 import { chartState } from '../chartState.js';
-import { MOBILE_BREAKPOINT, COLORS } from '../config.js';
+import { MOBILE_BREAKPOINT, COLORS, FONTS } from '../config.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 
 const CREDIT_COLOR = COLORS.FAN; // Using same color as fan
@@ -50,7 +50,7 @@ function generateCreditAnnotations(layout) {
             text: text || ' ',
             showarrow: false,
             font: {
-                family: 'Tahoma, DejaVu Sans, Verdana, sans-serif',
+                family: FONTS.PRIMARY,
                 size: fontSize,
                 color: CREDIT_COLOR,
                 weight: 'bold'

@@ -42,3 +42,5 @@ To-do
 - There's a distortion when auto resizing
 - credit line font still gets distorted across browsers
 - Check out the usage of config.maxWindow, we might have to get rid of that one. It should use chartState.chartCapacity, I think
+- changing the chart window doesn't sync automatically, but works on manual refresh
+- We may have some .window object pollution
