@@ -30,7 +30,7 @@ const CHART_CONFIG = {
         fanMarginMinute: 0.10,
         fanMarginCount: 0.07,
         fanXMultiplier: 1.04,
-        fanXMultiplierMinute: -0.11,
+        fanXMultiplierMinute: -0.22,
         fanYPosition: 1000,
         fanYPositionMinute: 0.01,
         fanLineLengthMultiplier: 0.13,

@@ -22,31 +22,56 @@ function setupClickHandler() {
 
     const chartDiv = document.getElementById('chart');
 
-    // Handler for clicks on data points/traces
+    // Handler for clicks - check clickable lines FIRST before Plotly processes
+    chartDiv.addEventListener('click', function(e) {
+        const xaxis = chartDiv._fullLayout?.xaxis;
+        const yaxis = chartDiv._fullLayout?.yaxis;
+        if (!xaxis || !yaxis) return;
+
+        const rect = chartDiv.getBoundingClientRect();
+        const pixelX = e.clientX - rect.left;
+        const pixelY = e.clientY - rect.top;
+
+        // Convert click to data coordinates
+        const xData = xaxis.p2d(pixelX - xaxis._offset);
+        const yData = yaxis.p2d(pixelY - yaxis._offset);
+
+        // Check if click is near any clickable line marker (prioritize these)
+        const clickThreshold = 15; // pixels
+        for (const trace of chartDiv.data) {
+            if (trace.meta?.type === 'clickableLine' && trace.x && trace.y) {
+                for (let i = 0; i < trace.x.length; i++) {
+                    const markerPixelX = xaxis.d2p(trace.x[i]) + xaxis._offset;
+                    const markerPixelY = yaxis.d2p(trace.y[i]) + yaxis._offset;
+                    const dist = Math.sqrt((pixelX - markerPixelX) ** 2 + (pixelY - markerPixelY) ** 2);
+                    if (dist <= clickThreshold) {
+                        console.log(`Line clicked: ${trace.meta.lineName}`);
+                        handleLineClick(trace.meta.lineName);
+                        e.stopImmediatePropagation();
+                        return;
+                    }
+                }
+            }
+        }
+
+        // Only emit CHART_CLICKED if within visible x-range
+        if (xData >= xaxis.range[0] && xData <= xaxis.range[1]) {
+            eventBus.emit(EVENTS.CHART_CLICKED, { x: xData });
+        }
+    }, true); // Use capture phase to run before Plotly
+
+    // Keep plotly_click as fallback for non-overlapping cases
     chartDiv.on('plotly_click', function(eventData) {
         const points = eventData.points;
         if (points.length === 0) return;
 
-        const point = points[0];
-        const meta = point.data.meta;
-
-        if (meta && meta.type === 'clickableLine') {
-            console.log(`Line clicked: ${meta.lineName}`);
-            handleLineClick(meta.lineName);
-        }
-    });
-
-    // Handler for clicks anywhere on chart area (for date selection)
-    chartDiv.addEventListener('click', function(e) {
-        const xaxis = chartDiv._fullLayout?.xaxis;
-        if (!xaxis) return;
-
-        const rect = chartDiv.getBoundingClientRect();
-        const xData = xaxis.p2d(e.clientX - rect.left - xaxis._offset);
-
-        // Only emit if within visible x-range
-        if (xData >= xaxis.range[0] && xData <= xaxis.range[1]) {
-            eventBus.emit(EVENTS.CHART_CLICKED, { x: xData });
+        for (const point of points) {
+            const meta = point.data.meta;
+            if (meta && meta.type === 'clickableLine') {
+                console.log(`Line clicked: ${meta.lineName}`);
+                handleLineClick(meta.lineName);
+                return;
+            }
         }
     });
 
@@ -69,8 +94,8 @@ function handleLineClick(lineName) {
 
     // Map category to chartState property and display info
     const lineTypeMap = {
-        'phase': { stateKey: 'PhaseLines', label: 'Count marker' },
-        'aim': { stateKey: 'AimLines', label: 'Event marker' },
+        'phase': { stateKey: 'PhaseLines', label: 'Event marker' },
+        'aim': { stateKey: 'AimLines', label: 'Count marker' },
         'cel': { stateKey: 'CelLines', label: null }, // Dynamic label from metadata
         'cut': { stateKey: 'LineCuts', label: 'Cut line' }
     };
@@ -145,9 +170,16 @@ function makeLineClickable(lineData) {
 function removeLineClickable(lineName) {
     const chartDiv = document.getElementById('chart');
     const indices = [];
+    const allClickable = [];
     chartDiv.data.forEach((trace, i) => {
-        if (trace.meta?.type === 'clickableLine' && trace.meta?.lineName === lineName) indices.push(i);
+        if (trace.meta?.type === 'clickableLine') {
+            allClickable.push({ i, lineName: trace.meta.lineName });
+            if (trace.meta.lineName === lineName) indices.push(i);
+        }
     });
+    console.log(`removeLineClickable: looking for "${lineName}"`);
+    console.log(`All clickable traces:`, allClickable);
+    console.log(`Found ${indices.length} traces to remove`);
     if (indices.length > 0) {
         Plotly.deleteTraces(chartDiv, indices.sort((a, b) => b - a));
     }
