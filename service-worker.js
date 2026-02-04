@@ -190,6 +190,11 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
+    // Developer mode: bypass all caching, always fetch fresh
+    if (DEVELOPER_MODE) {
+        return;
+    }
+
     // Strategy: Navigation requests (HTML pages) - Network first, cache fallback
     if (isNavigationRequest(request)) {
         event.respondWith(networkFirstWithCache(request));
@@ -202,13 +207,9 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // Strategy: Static assets - Cache first, network fallback (unless developer mode)
+    // Strategy: Static assets - Cache first, network fallback
     if (isStaticAsset(url)) {
-        if (DEVELOPER_MODE) {
-            event.respondWith(fetch(request));
-        } else {
-            event.respondWith(cacheFirstWithNetwork(request));
-        }
+        event.respondWith(cacheFirstWithNetwork(request));
         return;
     }
 
