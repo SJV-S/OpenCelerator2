@@ -49,11 +49,26 @@
 
     </div>
 
-    <!-- Edit Mode Toggle -->
-    <div class="mt-auto pt-4 flex justify-center">
-        <label class="flex items-center gap-2 cursor-pointer">
-            <span class="text-sm text-gray-600">Edit lines</span>
-            <input type="checkbox" id="line-edit-toggle" class="w-5 h-5 accent-blue-600">
-        </label>
+    <!-- Per-Category Edit Toggles -->
+    <div class="mt-auto pt-4 border-t border-gray-200">
+        <p class="text-xs text-gray-500 text-center mb-2">Edit mode</p>
+        <div class="grid grid-cols-2 gap-2 px-2">
+            <label class="flex items-center gap-1.5 cursor-pointer">
+                <input type="checkbox" data-edit-category="phase" class="w-4 h-4 accent-blue-600">
+                <span class="text-xs text-gray-600">Event</span>
+            </label>
+            <label class="flex items-center gap-1.5 cursor-pointer">
+                <input type="checkbox" data-edit-category="aim" class="w-4 h-4 accent-blue-600">
+                <span class="text-xs text-gray-600">Count</span>
+            </label>
+            <label class="flex items-center gap-1.5 cursor-pointer">
+                <input type="checkbox" data-edit-category="cut" class="w-4 h-4 accent-blue-600">
+                <span class="text-xs text-gray-600">Cut</span>
+            </label>
+            <label class="flex items-center gap-1.5 cursor-pointer">
+                <input type="checkbox" data-edit-category="cel" class="w-4 h-4 accent-blue-600">
+                <span class="text-xs text-gray-600">Change</span>
+            </label>
+        </div>
     </div>
 </div>

@@ -37,8 +37,8 @@ import {
     aimHorizontal,
     otherScissors,
     otherCeleration,
-    toggleLineClickability,
-    isLineEditingEnabled,
+    toggleLineCategoryEdit,
+    isLineCategoryEditEnabled,
     initGestureNavigation,
     initFormKeyboardShortcuts,
     init as navigationInit
@@ -327,25 +327,26 @@ export function setupEventListeners() {
         }
     });
 
-    // Line edit toggle
-    const lineEditToggle = document.getElementById('line-edit-toggle');
-    if (lineEditToggle) {
-        // Initialize checkbox state
-        lineEditToggle.checked = isLineEditingEnabled();
+    // Per-category line edit toggles
+    document.querySelectorAll('[data-edit-category]').forEach(checkbox => {
+        const category = checkbox.dataset.editCategory;
 
-        lineEditToggle.addEventListener('change', (e) => {
-            // Only toggle if the state differs from checkbox
-            if (e.target.checked !== isLineEditingEnabled()) {
-                toggleLineClickability();
-            }
+        // Initialize checkbox state
+        checkbox.checked = isLineCategoryEditEnabled(category);
+
+        checkbox.addEventListener('change', (e) => {
+            toggleLineCategoryEdit(category, e.target.checked);
             e.target.blur();
         });
+    });
 
-        // Keep toggle in sync when edit mode changes programmatically
-        eventBus.subscribe(EVENTS.NAV_LINE_CLICKABILITY_TOGGLE, ({ enabled }) => {
-            lineEditToggle.checked = enabled;
-        }, true);
-    }
+    // Keep toggles in sync when edit mode changes programmatically
+    eventBus.subscribe(EVENTS.NAV_LINE_CLICKABILITY_TOGGLE, ({ category, enabled }) => {
+        const checkbox = document.querySelector(`[data-edit-category="${category}"]`);
+        if (checkbox) {
+            checkbox.checked = enabled;
+        }
+    }, true);
 
     // Data entry
     const submitEntryBtn = document.querySelector('[data-action="submit-entry"]');

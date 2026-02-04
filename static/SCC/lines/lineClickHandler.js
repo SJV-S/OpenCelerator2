@@ -16,6 +16,17 @@ import { removeLine } from './allLines.js';
 // Module-level state
 let clickHandlerAttached = false;
 
+// Per-category edit state
+const categoryEditState = {
+    phase: false,
+    aim: false,
+    cut: false,
+    cel: false
+};
+
+// Delay between drawing individual line edit traces (ms)
+const TRACE_DRAW_DELAY = 16; // ~1 frame at 60fps
+
 /**
  * Initialize click event listener on the chart
  * Call this after chart is rendered with Plotly.newPlot()
@@ -201,15 +212,26 @@ function interpolateLinePoints(x1, y1, x2, y2, isLogY = false) {
 }
 
 /**
- * Sets clickability for all lines in chartState
+ * Helper to add a delay between operations
+ * @param {number} ms - Milliseconds to delay
+ */
+function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Sets clickability for a specific category of lines
+ * @param {string} category - 'phase', 'aim', 'cut', or 'cel'
  * @param {boolean} makeClickable - If true, make lines clickable; if false, remove
  */
-function setLineClickability(makeClickable) {
+function setLineCategoryClickability(category, makeClickable) {
     const chartDiv = document.getElementById('chart');
     if (!chartDiv || !chartDiv._fullLayout) {
         console.warn('Chart not initialized');
         return;
     }
+
+    categoryEditState[category] = makeClickable;
 
     const yaxis = chartDiv._fullLayout.yaxis;
     const isLogY = yaxis.type === 'log';
@@ -228,77 +250,79 @@ function setLineClickability(makeClickable) {
     if (makeClickable) {
         let clickablePromise = Promise.resolve();
 
-        // Phase lines
-        if (chartState.PhaseLines) {
+        if (category === 'phase' && chartState.PhaseLines) {
             Object.values(chartState.PhaseLines).forEach(phaseLine => {
-                clickablePromise = clickablePromise.then(() => {
-                    const verticalTimestamp = Math.floor(phaseLine.verticalLineDate.getTime() / 1000);
-                    const horizontalEndTimestamp = Math.floor(phaseLine.horizontalEndDate.getTime() / 1000);
-                    const verticalX = timestampsToXPositions([verticalTimestamp])[0];
-                    const horizontalEndX = timestampsToXPositions([horizontalEndTimestamp])[0];
+                clickablePromise = clickablePromise
+                    .then(() => delay(TRACE_DRAW_DELAY))
+                    .then(() => {
+                        const verticalTimestamp = Math.floor(phaseLine.verticalLineDate.getTime() / 1000);
+                        const horizontalEndTimestamp = Math.floor(phaseLine.horizontalEndDate.getTime() / 1000);
+                        const verticalX = timestampsToXPositions([verticalTimestamp])[0];
+                        const horizontalEndX = timestampsToXPositions([horizontalEndTimestamp])[0];
 
-                    const points = [];
-                    let verticalPoints;
-                    if (phaseLine.direction === 'top') {
-                        verticalPoints = interpolateLinePoints(verticalX, yBottom, verticalX, phaseLine.verticalLineY, isLogY);
-                    } else {
-                        verticalPoints = interpolateLinePoints(verticalX, yTop, verticalX, phaseLine.verticalLineY, isLogY);
-                    }
-                    points.push(verticalPoints);
+                        const points = [];
+                        let verticalPoints;
+                        if (phaseLine.direction === 'top') {
+                            verticalPoints = interpolateLinePoints(verticalX, yBottom, verticalX, phaseLine.verticalLineY, isLogY);
+                        } else {
+                            verticalPoints = interpolateLinePoints(verticalX, yTop, verticalX, phaseLine.verticalLineY, isLogY);
+                        }
+                        points.push(verticalPoints);
 
-                    const horizontalPoints = interpolateLinePoints(verticalX, phaseLine.verticalLineY, horizontalEndX, phaseLine.verticalLineY, isLogY);
-                    points.push(horizontalPoints);
+                        const horizontalPoints = interpolateLinePoints(verticalX, phaseLine.verticalLineY, horizontalEndX, phaseLine.verticalLineY, isLogY);
+                        points.push(horizontalPoints);
 
-                    return makeLineClickable({
-                        lineName: `phase-${phaseLine.id}`,
-                        points: points
+                        return makeLineClickable({
+                            lineName: `phase-${phaseLine.id}`,
+                            points: points
+                        });
                     });
-                });
             });
         }
 
-        // Aim lines
-        if (chartState.AimLines) {
+        if (category === 'aim' && chartState.AimLines) {
             Object.values(chartState.AimLines).forEach(aimLine => {
-                clickablePromise = clickablePromise.then(() => {
-                    const timestamp1 = Math.floor(aimLine.date1.getTime() / 1000);
-                    const timestamp2 = Math.floor(aimLine.date2.getTime() / 1000);
-                    const x1 = timestampsToXPositions([timestamp1])[0];
-                    const x2 = timestampsToXPositions([timestamp2])[0];
+                clickablePromise = clickablePromise
+                    .then(() => delay(TRACE_DRAW_DELAY))
+                    .then(() => {
+                        const timestamp1 = Math.floor(aimLine.date1.getTime() / 1000);
+                        const timestamp2 = Math.floor(aimLine.date2.getTime() / 1000);
+                        const x1 = timestampsToXPositions([timestamp1])[0];
+                        const x2 = timestampsToXPositions([timestamp2])[0];
 
-                    const points = [interpolateLinePoints(x1, aimLine.y1, x2, aimLine.y2, isLogY)];
+                        const points = [interpolateLinePoints(x1, aimLine.y1, x2, aimLine.y2, isLogY)];
 
-                    return makeLineClickable({
-                        lineName: `aim-${aimLine.id}`,
-                        points: points
+                        return makeLineClickable({
+                            lineName: `aim-${aimLine.id}`,
+                            points: points
+                        });
                     });
-                });
             });
         }
 
-        // Cel lines (change/trend lines)
-        if (chartState.CelLines) {
+        if (category === 'cel' && chartState.CelLines) {
             Object.values(chartState.CelLines).forEach(celLine => {
                 // Skip the settings object (it doesn't have an id property)
                 if (!celLine.id) return;
 
-                clickablePromise = clickablePromise.then(() => {
-                    // Cel lines store dates as YYYY-MM-DD strings
-                    const x1 = dateToXPosition(celLine.date1);
-                    const x2 = dateToXPosition(celLine.date2);
+                clickablePromise = clickablePromise
+                    .then(() => delay(TRACE_DRAW_DELAY))
+                    .then(() => {
+                        // Cel lines store dates as YYYY-MM-DD strings
+                        const x1 = dateToXPosition(celLine.date1);
+                        const x2 = dateToXPosition(celLine.date2);
 
-                    const points = [interpolateLinePoints(x1, celLine.y1, x2, celLine.y2, isLogY)];
+                        const points = [interpolateLinePoints(x1, celLine.y1, x2, celLine.y2, isLogY)];
 
-                    return makeLineClickable({
-                        lineName: `cel-${celLine.id}`,
-                        points: points
+                        return makeLineClickable({
+                            lineName: `cel-${celLine.id}`,
+                            points: points
+                        });
                     });
-                });
             });
         }
 
-        // Cut lines
-        if (chartState.LineCuts && Object.keys(chartState.LineCuts).length > 0) {
+        if (category === 'cut' && chartState.LineCuts && Object.keys(chartState.LineCuts).length > 0) {
             clickablePromise = clickablePromise.then(() => {
                 const cutLineShapes = drawCutLineMarkers();
 
@@ -312,16 +336,18 @@ function setLineClickability(makeClickable) {
                     }).then(() => {
                         let cutPromise = Promise.resolve();
                         Object.values(chartState.LineCuts).forEach(cut => {
-                            cutPromise = cutPromise.then(() => {
-                                const timestamp = Math.floor(cut.date.getTime() / 1000);
-                                const xPos = timestampsToXPositions([timestamp])[0] - 0.5;
-                                const points = [interpolateLinePoints(xPos, yBottom, xPos, yTop, isLogY)];
+                            cutPromise = cutPromise
+                                .then(() => delay(TRACE_DRAW_DELAY))
+                                .then(() => {
+                                    const timestamp = Math.floor(cut.date.getTime() / 1000);
+                                    const xPos = timestampsToXPositions([timestamp])[0] - 0.5;
+                                    const points = [interpolateLinePoints(xPos, yBottom, xPos, yTop, isLogY)];
 
-                                return makeLineClickable({
-                                    lineName: `cut-${cut.id}`,
-                                    points: points
+                                    return makeLineClickable({
+                                        lineName: `cut-${cut.id}`,
+                                        points: points
+                                    });
                                 });
-                            });
                         });
                         return cutPromise;
                     });
@@ -339,21 +365,29 @@ function setLineClickability(makeClickable) {
                 return Plotly.moveTraces(chartDiv, clickableIndices, clickableIndices.map(() => -1));
             }
         }).then(() => {
-            console.log('All lines made clickable');
+            console.log(`${category} lines made clickable`);
         });
 
     } else {
+        // Remove only traces for this category
+        const categoryPrefix = `${category}-`;
         const indices = [];
         chartDiv.data.forEach((trace, i) => {
-            if (trace.meta?.type === 'clickableLine') indices.push(i);
+            if (trace.meta?.type === 'clickableLine' && trace.meta.lineName.startsWith(categoryPrefix)) {
+                indices.push(i);
+            }
         });
         if (indices.length > 0) {
             Plotly.deleteTraces(chartDiv, indices.sort((a, b) => b - a));
         }
-        const shapes = chartDiv.layout.shapes || [];
-        const filtered = shapes.filter(s => !s.name?.startsWith('cut-'));
-        if (filtered.length !== shapes.length) {
-            Plotly.relayout(chartDiv, { shapes: filtered });
+
+        // For cut lines, also remove the marker shapes
+        if (category === 'cut') {
+            const shapes = chartDiv.layout.shapes || [];
+            const filtered = shapes.filter(s => !s.name?.startsWith('cut-'));
+            if (filtered.length !== shapes.length) {
+                Plotly.relayout(chartDiv, { shapes: filtered });
+            }
         }
     }
 }
@@ -413,7 +447,7 @@ function drawCutLineMarkers() {
  */
 function init() {
     eventBus.subscribe(EVENTS.NAV_LINE_CLICKABILITY_TOGGLE, (data) => {
-        setLineClickability(data.enabled);
+        setLineCategoryClickability(data.category, data.enabled);
     }, true);
 
     eventBus.subscribe(EVENTS.LINE_REMOVE_CLICKABLE, (data) => {
@@ -423,7 +457,7 @@ function init() {
 
 export {
     makeLineClickable,
-    setLineClickability,
+    setLineCategoryClickability,
     setupClickHandler,
     drawCutLineMarkers,
     init

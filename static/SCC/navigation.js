@@ -19,10 +19,8 @@ function showCounter() {
         // Clear all toast notifications when menu opens
         removeAllToasts();
 
-        // Auto-disable line editing when menu opens (without showing toast)
-        if (lineClickabilityEnabled) {
-            toggleLineClickability(false);
-        }
+        // Auto-disable all line category editing when menu opens (without showing toast)
+        disableAllLineEditing();
 
         // Update the date input to reflect current startDate
         const otherDateInput = document.getElementById('other-date');
@@ -157,35 +155,67 @@ function otherCeleration() {
     eventBus.emit(EVENTS.MODE_CEL_ACTIVATE);
 }
 
-let lineClickabilityEnabled = false;
+// Per-category edit state
+const lineEditState = {
+    phase: false,
+    aim: false,
+    cut: false,
+    cel: false
+};
 
 /**
- * Toggle line clickability on/off
+ * Toggle line clickability for a specific category
+ * @param {string} category - 'phase', 'aim', 'cut', or 'cel'
+ * @param {boolean} enabled - Whether to enable or disable
  * @param {boolean} showToast - Whether to show the toast notification (default: true)
  */
-function toggleLineClickability(showToast = true) {
-    lineClickabilityEnabled = !lineClickabilityEnabled;
+function toggleLineCategoryEdit(category, enabled, showToast = true) {
+    if (!lineEditState.hasOwnProperty(category)) {
+        console.warn(`Unknown line category: ${category}`);
+        return;
+    }
 
-    // Emit event to toggle line clickability
-    eventBus.emit(EVENTS.NAV_LINE_CLICKABILITY_TOGGLE, { enabled: lineClickabilityEnabled });
-    console.log(`Line clickability ${lineClickabilityEnabled ? 'enabled' : 'disabled'}`);
+    lineEditState[category] = enabled;
+
+    // Emit event with category and enabled state
+    eventBus.emit(EVENTS.NAV_LINE_CLICKABILITY_TOGGLE, { category, enabled });
+    console.log(`${category} line editing ${enabled ? 'enabled' : 'disabled'}`);
 
     // Show feedback to user
     if (showToast) {
+        const categoryLabels = {
+            phase: 'Event marker',
+            aim: 'Count marker',
+            cut: 'Cut line',
+            cel: 'Change line'
+        };
         createToast({
-            message: `Line editing ${lineClickabilityEnabled ? 'enabled' : 'disabled'}`,
-            duration: lineClickabilityEnabled ? undefined : 3000,  // No time limit when ON, 3s when OFF
+            message: `${categoryLabels[category]} editing ${enabled ? 'enabled' : 'disabled'}`,
+            duration: 2000,
             position: 'top-right'
         });
     }
 }
 
 /**
- * Get current line clickability state
- * @returns {boolean} Whether line editing is enabled
+ * Get current line edit state for a category
+ * @param {string} category - 'phase', 'aim', 'cut', or 'cel'
+ * @returns {boolean} Whether editing is enabled for that category
  */
-function isLineEditingEnabled() {
-    return lineClickabilityEnabled;
+function isLineCategoryEditEnabled(category) {
+    return lineEditState[category] || false;
+}
+
+/**
+ * Disable all line category editing (called when menu opens)
+ */
+function disableAllLineEditing() {
+    for (const category of Object.keys(lineEditState)) {
+        if (lineEditState[category]) {
+            lineEditState[category] = false;
+            eventBus.emit(EVENTS.NAV_LINE_CLICKABILITY_TOGGLE, { category, enabled: false });
+        }
+    }
 }
 
 /**
@@ -299,4 +329,4 @@ function init() {
 }
 
 // Export functions for use in main.js
-export { showCounter, hideCounter, switchTab, switchDataSubtab, phaseTextTop, phaseTextBottom, aimDiagonal, aimHorizontal, otherScissors, otherCeleration, toggleLineClickability, isLineEditingEnabled, initGestureNavigation, initFormKeyboardShortcuts, init };
+export { showCounter, hideCounter, switchTab, switchDataSubtab, phaseTextTop, phaseTextBottom, aimDiagonal, aimHorizontal, otherScissors, otherCeleration, toggleLineCategoryEdit, isLineCategoryEditEnabled, disableAllLineEditing, initGestureNavigation, initFormKeyboardShortcuts, init };
