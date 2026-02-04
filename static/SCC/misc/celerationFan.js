@@ -228,13 +228,15 @@ export function generateFanElements(layout, isMinuteChart, chartType, position =
     const p0 = toPaper(xMid, yMid, xMin, xMax, yMinLog, yMaxLog);
     const pEnd = toPaper(xMid + lineLength * 1.3, yMid, xMin, xMax, yMinLog, yMaxLog); // Extended for labels
     const hitPad = 0.03; // Extra padding
+    const headerTextPad = 0.05; // Extra padding for header text (renders above anchor due to yanchor: 'bottom')
+    const periodTextPad = 0.04; // Extra padding for period text (renders below anchor due to yanchor: 'top')
     shapes.push({
         type: 'rect',
         name: 'fan-hitarea',
         x0: p0.x - hitPad,
-        y0: pPeriod.y - hitPad,
+        y0: pPeriod.y - hitPad - periodTextPad,
         x1: pEnd.x + hitPad,
-        y1: pHeader.y + hitPad,
+        y1: pHeader.y + hitPad + headerTextPad,
         xref: 'paper', yref: 'paper',
         fillcolor: 'rgba(0,0,0,0)',
         line: { width: 0 }
@@ -564,6 +566,7 @@ function handleMouseDown(e) {
 
         chartDiv.style.cursor = 'grabbing';
         updateFanTooltip(false);  // Hide tooltip while dragging
+        updateFanHighlight(chartDiv, false);  // Hide highlight rectangle while dragging
 
         // Prevent Plotly's pan from intercepting
         e.preventDefault();

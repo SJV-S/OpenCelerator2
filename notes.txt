@@ -34,3 +34,9 @@ To-do
 * Show the interactivity recentangle (should be slightly longer) BEFORE clicking, but not when dragging.
 * Phase line feedback shouldn't have double notifications when adding phase lines
 * Chart dimensions changes across browswers, at least with fonts, but maybe mo
+* Phase lines don't sync across charts
+-- Might be because they don't trigger a save event
+---- Except that they do?
+* Line type is missing from the style settings, and lines and marker settings should have their own grouping
+* Fix the credit lines tooltip over expansion
+* Crosshair doesn't actually have a centered clickpoint

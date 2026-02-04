@@ -114,41 +114,31 @@ export function regenerateCredits() {
 }
 
 /**
- * Convert pixel coordinates to paper coordinates
- */
-function pixelToPaper(chartDiv, pixelX, pixelY) {
-    const layout = chartDiv.layout;
-    const bbox = chartDiv.getBoundingClientRect();
-
-    const plotLeft = bbox.left + layout.margin.l;
-    const plotRight = bbox.right - layout.margin.r;
-    const plotTop = bbox.top + layout.margin.t;
-    const plotBottom = bbox.bottom - layout.margin.b;
-
-    const plotWidth = plotRight - plotLeft;
-    const plotHeight = plotBottom - plotTop;
-
-    return {
-        x: (pixelX - plotLeft) / plotWidth,
-        y: 1 - (pixelY - plotTop) / plotHeight
-    };
-}
-
-/**
  * Check if click is on a credit line, return index or -1
+ * Uses actual DOM bounding box of the annotation text elements
  */
-function getCreditAtPoint(chartDiv, paperY) {
-    const layout = chartDiv.layout;
-    const plotHeight = layout.height - layout.margin.t - layout.margin.b;
-    const marginEdge = -layout.margin.b / plotHeight;
+function getCreditAtPoint(chartDiv, pixelX, pixelY) {
+    const annotations = chartDiv.layout.annotations || [];
 
-    // Credit positions (same calculation as generateCreditAnnotations)
-    const credit0Y = marginEdge * 0.80;
-    const credit1Y = marginEdge * 0.65;
-    const hitRadius = Math.abs(marginEdge) * 0.15;
+    for (let i = 0; i < annotations.length; i++) {
+        const ann = annotations[i];
+        if (ann.name === 'credit-line-0' || ann.name === 'credit-line-1') {
+            // Find the DOM element for this annotation by its data-index
+            const annotationGroup = chartDiv.querySelector(`.annotation[data-index="${i}"]`);
+            if (!annotationGroup) continue;
 
-    if (paperY >= credit0Y - hitRadius && paperY <= credit0Y + hitRadius) return 0;
-    if (paperY >= credit1Y - hitRadius && paperY <= credit1Y + hitRadius) return 1;
+            const bbox = annotationGroup.getBoundingClientRect();
+            // Add small padding for easier clicking
+            const padding = 5;
+
+            if (pixelX >= bbox.left - padding &&
+                pixelX <= bbox.right + padding &&
+                pixelY >= bbox.top - padding &&
+                pixelY <= bbox.bottom + padding) {
+                return ann.name === 'credit-line-0' ? 0 : 1;
+            }
+        }
+    }
     return -1;
 }
 
@@ -224,8 +214,7 @@ function handleChartClick(e) {
     const chartDiv = document.getElementById('chart');
     if (!chartDiv?.layout) return;
 
-    const paper = pixelToPaper(chartDiv, e.clientX, e.clientY);
-    const creditIndex = getCreditAtPoint(chartDiv, paper.y);
+    const creditIndex = getCreditAtPoint(chartDiv, e.clientX, e.clientY);
 
     if (creditIndex >= 0) {
         openCreditEditDialog();
@@ -264,8 +253,7 @@ function handleChartMouseMove(e) {
     const chartDiv = document.getElementById('chart');
     if (!chartDiv?.layout) return;
 
-    const paper = pixelToPaper(chartDiv, e.clientX, e.clientY);
-    const creditIndex = getCreditAtPoint(chartDiv, paper.y);
+    const creditIndex = getCreditAtPoint(chartDiv, e.clientX, e.clientY);
 
     if (creditIndex >= 0) {
         chartDiv.style.cursor = 'pointer';
