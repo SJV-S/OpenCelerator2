@@ -161,7 +161,6 @@ let lineClickabilityEnabled = false;
 
 /**
  * Toggle line clickability on/off
- * Triggered by long press (touch) or long mouse hold
  * @param {boolean} showToast - Whether to show the toast notification (default: true)
  */
 function toggleLineClickability(showToast = true) {
@@ -179,6 +178,14 @@ function toggleLineClickability(showToast = true) {
             position: 'top-right'
         });
     }
+}
+
+/**
+ * Get current line clickability state
+ * @returns {boolean} Whether line editing is enabled
+ */
+function isLineEditingEnabled() {
+    return lineClickabilityEnabled;
 }
 
 /**
@@ -202,13 +209,8 @@ function initGestureNavigation() {
     let touchStartY = null;
     let touchStartX = null;
 
-    let touchTimer = null;
-    let mouseTimer = null;
-    let touchMoved = false;
-
     // Touch start
     document.addEventListener('touchstart', function(e) {
-        touchMoved = false;
         const counterOverlay = document.getElementById('counter-overlay');
         const counterVisible = counterOverlay && counterOverlay.style.display === 'flex';
 
@@ -226,41 +228,11 @@ function initGestureNavigation() {
         if (e.touches.length === 1) {
             touchStartY = e.touches[0].clientY;
             touchStartX = e.touches[0].clientX;
-
-            // Start long press timer
-            touchTimer = setTimeout(() => {
-                if (!touchMoved) {
-                    toggleLineClickability();
-                }
-            }, TIMING_MS.LONG_PRESS_DURATION);
         }
     }, { passive: true });
 
-    // Touch move - cancel long press if significant movement
-    document.addEventListener('touchmove', function(e) {
-        if (touchStartY !== null && touchStartX !== null && e.touches.length === 1) {
-            const deltaY = Math.abs(e.touches[0].clientY - touchStartY);
-            const deltaX = Math.abs(e.touches[0].clientX - touchStartX);
-
-            // If moved more than threshold, consider it a move (not a long press)
-            if (deltaY > TIMING_MS.LONG_PRESS_MOVEMENT_THRESHOLD || deltaX > TIMING_MS.LONG_PRESS_MOVEMENT_THRESHOLD) {
-                touchMoved = true;
-                if (touchTimer) {
-                    clearTimeout(touchTimer);
-                    touchTimer = null;
-                }
-            }
-        }
-    }, { passive: true });
-
-    // Touch end - detect swipe and clear long press timer
+    // Touch end - detect swipe
     document.addEventListener('touchend', function(e) {
-        // Clear long press timer
-        if (touchTimer) {
-            clearTimeout(touchTimer);
-            touchTimer = null;
-        }
-
         if (touchStartY === null || touchStartX === null) {
             return;
         }
@@ -292,7 +264,6 @@ function initGestureNavigation() {
 
         touchStartY = null;
         touchStartX = null;
-        touchMoved = false;
     }, { passive: true });
 
     // Spacebar to toggle counter
@@ -314,66 +285,6 @@ function initGestureNavigation() {
             }
         }
     });
-
-    // ========================================================================
-    // MOUSE LONG PRESS (Desktop)
-    // ========================================================================
-
-    let mouseStartX = null;
-    let mouseStartY = null;
-    let mouseMoved = false;
-
-    // Mouse down - start long press timer
-    document.addEventListener('mousedown', function(e) {
-        // Ignore right-click and middle-click
-        if (e.button !== 0) return;
-
-        // Ignore clicks on UI elements
-        if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' ||
-            e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') {
-            return;
-        }
-
-        mouseMoved = false;
-        mouseStartX = e.clientX;
-        mouseStartY = e.clientY;
-
-        // Start long press timer
-        mouseTimer = setTimeout(() => {
-            if (!mouseMoved) {
-                toggleLineClickability();
-            }
-        }, TIMING_MS.LONG_PRESS_DURATION);
-    });
-
-    // Mouse move - cancel long press if significant movement
-    document.addEventListener('mousemove', function(e) {
-        if (mouseStartX !== null && mouseStartY !== null) {
-            const deltaX = Math.abs(e.clientX - mouseStartX);
-            const deltaY = Math.abs(e.clientY - mouseStartY);
-
-            // If moved more than threshold, consider it a drag (not a long press)
-            if (deltaX > TIMING_MS.LONG_PRESS_MOVEMENT_THRESHOLD || deltaY > TIMING_MS.LONG_PRESS_MOVEMENT_THRESHOLD) {
-                mouseMoved = true;
-                if (mouseTimer) {
-                    clearTimeout(mouseTimer);
-                    mouseTimer = null;
-                }
-            }
-        }
-    });
-
-    // Mouse up - clear long press timer
-    document.addEventListener('mouseup', function(e) {
-        if (mouseTimer) {
-            clearTimeout(mouseTimer);
-            mouseTimer = null;
-        }
-
-        mouseStartX = null;
-        mouseStartY = null;
-        mouseMoved = false;
-    });
 }
 
 /**
@@ -388,4 +299,4 @@ function init() {
 }
 
 // Export functions for use in main.js
-export { showCounter, hideCounter, switchTab, switchDataSubtab, phaseTextTop, phaseTextBottom, aimDiagonal, aimHorizontal, otherScissors, otherCeleration, toggleLineClickability, initGestureNavigation, initFormKeyboardShortcuts, init };
+export { showCounter, hideCounter, switchTab, switchDataSubtab, phaseTextTop, phaseTextBottom, aimDiagonal, aimHorizontal, otherScissors, otherCeleration, toggleLineClickability, isLineEditingEnabled, initGestureNavigation, initFormKeyboardShortcuts, init };

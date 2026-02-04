@@ -26,6 +26,9 @@ let indicatorTimer = null;
 // Initialized in init() based on DOM state
 let dataTabActive = false;
 
+// Track whether line edit mode is active (disables click-to-set-date)
+let lineEditModeActive = false;
+
 /**
  * Generate input fields for all active misc series
  */
@@ -307,9 +310,14 @@ function init() {
         updateEntryDateIndicator(data.date);
     }, true);
 
+    // Track line edit mode to disable click-to-set-date
+    eventBus.subscribe(EVENTS.NAV_LINE_CLICKABILITY_TOGGLE, (data) => {
+        lineEditModeActive = data.enabled;
+    }, true);
+
     // Handle chart clicks - update entry date when Data tab is active
     eventBus.subscribe(EVENTS.CHART_CLICKED, (data) => {
-        if (!dataTabActive || !chartState.startDate) return;
+        if (!dataTabActive || !chartState.startDate || lineEditModeActive) return;
 
         // Convert x-position to date
         const clickedDate = xPositionToDate(Math.round(data.x));

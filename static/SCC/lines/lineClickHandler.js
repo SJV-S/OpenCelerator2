@@ -15,7 +15,6 @@ import { removeLine } from './allLines.js';
 
 // Module-level state
 let clickHandlerAttached = false;
-let lineClickHandled = false;
 
 /**
  * Initialize click event listener on the chart
@@ -26,7 +25,7 @@ function setupClickHandler() {
 
     const chartDiv = document.getElementById('chart');
 
-    // Handler for clicks - check clickable lines FIRST before Plotly processes
+    // Handle CHART_CLICKED for non-line clicks
     chartDiv.addEventListener('click', function(e) {
         const xaxis = chartDiv._fullLayout?.xaxis;
         const yaxis = chartDiv._fullLayout?.yaxis;
@@ -34,45 +33,16 @@ function setupClickHandler() {
 
         const rect = chartDiv.getBoundingClientRect();
         const pixelX = e.clientX - rect.left;
-        const pixelY = e.clientY - rect.top;
-
-        // Convert click to data coordinates
         const xData = xaxis.p2d(pixelX - xaxis._offset);
-        const yData = yaxis.p2d(pixelY - yaxis._offset);
-
-        // Check if click is near any clickable line marker (prioritize these)
-        const clickThreshold = 15; // pixels
-        for (const trace of chartDiv.data) {
-            if (trace.meta?.type === 'clickableLine' && trace.x && trace.y) {
-                for (let i = 0; i < trace.x.length; i++) {
-                    const markerPixelX = xaxis.d2p(trace.x[i]) + xaxis._offset;
-                    const markerPixelY = yaxis.d2p(trace.y[i]) + yaxis._offset;
-                    const dist = Math.sqrt((pixelX - markerPixelX) ** 2 + (pixelY - markerPixelY) ** 2);
-                    if (dist <= clickThreshold) {
-                        console.log(`Line clicked: ${trace.meta.lineName}`);
-                        lineClickHandled = true;
-                        handleLineClick(trace.meta.lineName);
-                        e.stopImmediatePropagation();
-                        return;
-                    }
-                }
-            }
-        }
 
         // Only emit CHART_CLICKED if within visible x-range
         if (xData >= xaxis.range[0] && xData <= xaxis.range[1]) {
             eventBus.emit(EVENTS.CHART_CLICKED, { x: xData });
         }
-    }, true); // Use capture phase to run before Plotly
+    });
 
-    // Keep plotly_click as fallback for non-overlapping cases
+    // Handle clickable line clicks via Plotly's trace detection
     chartDiv.on('plotly_click', function(eventData) {
-        // Skip if native handler already processed this click
-        if (lineClickHandled) {
-            lineClickHandled = false;
-            return;
-        }
-
         const points = eventData.points;
         if (points.length === 0) return;
 

@@ -45,4 +45,4 @@ To-do
 - changing the chart window doesn't sync automatically, but works on manual refresh
 - We may have some .window object pollution
 - aim lines are not being redrawn faithylly to how they were placed
--
+- 

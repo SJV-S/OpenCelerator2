@@ -38,6 +38,7 @@ import {
     otherScissors,
     otherCeleration,
     toggleLineClickability,
+    isLineEditingEnabled,
     initGestureNavigation,
     initFormKeyboardShortcuts,
     init as navigationInit
@@ -321,6 +322,25 @@ export function setupEventListeners() {
         }
     });
 
+    // Line edit toggle
+    const lineEditToggle = document.getElementById('line-edit-toggle');
+    if (lineEditToggle) {
+        // Initialize checkbox state
+        lineEditToggle.checked = isLineEditingEnabled();
+
+        lineEditToggle.addEventListener('change', (e) => {
+            // Only toggle if the state differs from checkbox
+            if (e.target.checked !== isLineEditingEnabled()) {
+                toggleLineClickability();
+            }
+            e.target.blur();
+        });
+
+        // Keep toggle in sync when edit mode changes programmatically
+        eventBus.subscribe(EVENTS.NAV_LINE_CLICKABILITY_TOGGLE, ({ enabled }) => {
+            lineEditToggle.checked = enabled;
+        }, true);
+    }
 
     // Data entry
     const submitEntryBtn = document.querySelector('[data-action="submit-entry"]');

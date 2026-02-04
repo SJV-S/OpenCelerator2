@@ -96,6 +96,7 @@ function removeLine(lineType, lineId) {
         delete chartState[lineType][lineId];
         // Trigger chart refresh to recalculate aggregations
         eventBus.emit(EVENTS.DATA_CHART_REFRESH);
+        eventBus.emit(EVENTS.LINE_REMOVED, { lineType, lineId });
         return true;
     }
 
@@ -105,6 +106,7 @@ function removeLine(lineType, lineId) {
 
     Plotly.relayout(chartDiv, { shapes, annotations });
     delete chartState[lineType][lineId];
+    eventBus.emit(EVENTS.LINE_REMOVED, { lineType, lineId });
     return true;
 }
 
