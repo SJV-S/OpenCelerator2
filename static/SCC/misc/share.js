@@ -236,17 +236,32 @@ async function handleShareLinkClick(type) {
 }
 
 /**
+ * Custom JSON replacer to preserve NaN and Date values
+ * Matches the format used by chartStorage.js serialization
+ */
+function jsonReplacer(key, value) {
+    if (typeof value === 'number' && Number.isNaN(value)) {
+        return '__NaN__';
+    }
+    if (value instanceof Date) {
+        return { __date__: value.toISOString() };
+    }
+    return value;
+}
+
+/**
  * Exports the entire chartState as a JSON file download
  *
  * Data flow:
- * - Serializes chartState object to JSON
+ * - Serializes chartState object to JSON (preserving NaN and Date values)
  * - Creates a downloadable JSON file via blob
  * - Triggers browser download with filename based on chartName or 'chart-data.json'
  */
 function exportChartStateToJSON() {
     try {
         // Serialize chartState to JSON with pretty formatting
-        const jsonContent = JSON.stringify(chartState, null, 2);
+        // Use custom replacer to preserve NaN as '__NaN__' and Date as { __date__: ... }
+        const jsonContent = JSON.stringify(chartState, jsonReplacer, 2);
 
         // Create a blob from the JSON content
         const blob = new Blob([jsonContent], { type: 'application/json;charset=utf-8;' });

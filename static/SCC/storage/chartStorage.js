@@ -402,17 +402,8 @@ export async function importChart(chartData) {
     }
 
     try {
-        // Assign new ID and timestamp
         const chartId = uuid();
-        const now = Date.now();
-
-        // Build the storage object
-        const data = {
-            ...chartData,
-            id: chartId,
-            lastModified: now,
-            _createdAt: chartData._createdAt || now
-        };
+        const data = serializeChart(chartId, chartData);
 
         await db.put(STORE_NAME, data);
         console.log(`[Storage] Imported chart: ${chartId} (${data.chartName || 'Unnamed'})`);
