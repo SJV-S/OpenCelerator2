@@ -48,6 +48,7 @@ import { init as phaseLinesInit } from './lines/phaseLines.js';
 import { init as aimLinesInit } from './lines/aimLines.js';
 import { init as cutLinesInit } from './lines/cutLines.js';
 import { init as celLineInit } from './lines/celLine.js';
+import { init as lineHoverInit } from './lines/lineHover.js';
 import { initGridToggle, toggleDateLines, toggleCountLines, toggleMinorGrid } from './misc/grid.js';
 import { injectCelerationFan, initFanDrag, toggleCelerationFan, init as celerationFanInit } from './misc/celerationFan.js';
 import { injectCredits, initCreditClick, regenerateCredits, init as creditInit } from './misc/credit.js';
@@ -95,6 +96,7 @@ export function initializeChart() {
     plotData = injectCredits(plotData);
 
     plotData.layout.xaxis.fixedrange = true;
+    plotData.layout.hovermode = 'closest';
 
     Plotly.newPlot(chartDiv, plotData.data, plotData.layout, {
         displayModeBar: false,
@@ -248,6 +250,7 @@ document.addEventListener('DOMContentLoaded', () => {
     aimLinesInit();
     cutLinesInit();
     celLineInit();
+    lineHoverInit();
     customLegendInit();
     crosshairInit();
     celerationFanInit();

@@ -40,8 +40,7 @@ function correctsTrace(xValues, yValues, config) {
         },
         name: config.seriesName,
         connectgaps: true,
-        hoverinfo: 'none',
-        hovertemplate: '%{y}'
+        hoverinfo: 'none'
     };
 }
 
@@ -62,8 +61,7 @@ function errorTrace(xValues, yValues, config) {
         },
         name: config.seriesName,
         connectgaps: true,
-        hoverinfo: 'none',
-        hovertemplate: '%{y}'
+        hoverinfo: 'none'
     };
 }
 
@@ -84,8 +82,7 @@ function timingFloorTrace(xValues, yValues, config) {
         },
         name: config.seriesName,
         connectgaps: true,
-        hoverinfo: 'none',
-        hovertemplate: '%{y}'
+        hoverinfo: 'none'
     };
 }
 
@@ -109,8 +106,7 @@ function miscTrace(xValues, yValues, config) {
         },
         name: config.seriesName,
         connectgaps: false,
-        hoverinfo: 'none',
-        hovertemplate: '%{y}'
+        hoverinfo: 'none'
     };
 }
 
