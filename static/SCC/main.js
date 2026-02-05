@@ -393,6 +393,7 @@ export function setupEventListeners() {
 
         legendToggle.addEventListener('change', (e) => {
             toggleLegend(e.target.checked);
+            eventBus.emit(EVENTS.UI_LEGEND_RENDER);
             // Blur the checkbox so spacebar can be used for navigation
             e.target.blur();
         });

@@ -318,57 +318,28 @@ function showAddSeriesModal() {
     document.getElementById('add-series-modal')?.remove();
 
     const eligibleSeries = getSeriesWithUnusedAggs();
-    const showAggSection = eligibleSeries.length > 0;
+    const hasAggOption = eligibleSeries.length > 0;
 
     const overlay = document.createElement('div');
     overlay.id = 'add-series-modal';
     overlay.className = 'fixed inset-0 bg-black/50 flex justify-center items-center z-[10000]';
 
-    // Build series options HTML
-    const seriesOptionsHtml = eligibleSeries.map(s =>
-        `<option value="${s}">${getSeriesDisplayName(s)}</option>`
-    ).join('');
-
-    // Build initial agg options for first eligible series
-    const initialAggHtml = showAggSection
-        ? getUnusedAggs(eligibleSeries[0]).map(a =>
-            `<option value="${a}">${a.charAt(0).toUpperCase() + a.slice(1)}</option>`
-        ).join('')
-        : '';
-
+    // Step 1: two choices only
     overlay.innerHTML = `
-        <div class="bg-white p-5 rounded-lg shadow-xl w-[320px] max-w-[90vw]">
+        <div class="bg-white p-5 rounded-lg shadow-xl w-[280px] max-w-[90vw]">
             <h3 class="m-0 mb-4 text-sm font-bold text-gray-800">Add to Chart</h3>
-
-            <button id="modal-new-series-btn"
-                class="w-full py-2 px-3 bg-[#6ad1e3] hover:bg-[#5bc1d3] rounded text-white font-medium text-sm transition-colors cursor-pointer">
-                New Series
-            </button>
-
-            ${showAggSection ? `
-            <div class="flex items-center gap-2 my-3">
-                <hr class="flex-1 border-gray-300">
-                <span class="text-xs text-gray-400">or</span>
-                <hr class="flex-1 border-gray-300">
-            </div>
-
             <div class="flex flex-col gap-2">
-                <label class="text-xs font-medium text-gray-600">Add Aggregation</label>
-                <select id="modal-series-select"
-                    class="w-full p-1.5 text-xs border border-gray-300 rounded">
-                    ${seriesOptionsHtml}
-                </select>
-                <select id="modal-agg-select"
-                    class="w-full p-1.5 text-xs border border-gray-300 rounded">
-                    ${initialAggHtml}
-                </select>
+                <button id="modal-new-series-btn"
+                    class="w-full py-2 px-3 bg-[#6ad1e3] hover:bg-[#5bc1d3] rounded text-white font-medium text-sm transition-colors cursor-pointer">
+                    New Series
+                </button>
+                ${hasAggOption ? `
                 <button id="modal-add-agg-btn"
                     class="w-full py-2 px-3 bg-gray-700 hover:bg-gray-800 rounded text-white font-medium text-sm transition-colors cursor-pointer">
-                    Add
+                    Add Aggregation
                 </button>
+                ` : ''}
             </div>
-            ` : ''}
-
             <button id="modal-cancel-btn"
                 class="w-full mt-3 py-1.5 bg-gray-200 hover:bg-gray-300 rounded text-gray-700 text-xs font-medium transition-colors cursor-pointer">
                 Cancel
@@ -378,15 +349,12 @@ function showAddSeriesModal() {
 
     document.body.appendChild(overlay);
 
-    // --- Event handlers ---
     const closeModal = () => overlay.remove();
 
-    // Close on click outside
     overlay.addEventListener('click', (e) => {
         if (e.target === overlay) closeModal();
     });
 
-    // Close on Escape
     const onKeydown = (e) => {
         if (e.key === 'Escape') {
             closeModal();
@@ -395,7 +363,6 @@ function showAddSeriesModal() {
     };
     document.addEventListener('keydown', onKeydown);
 
-    // Clean up keydown listener when modal is removed
     const observer = new MutationObserver(() => {
         if (!document.getElementById('add-series-modal')) {
             document.removeEventListener('keydown', onKeydown);
@@ -404,10 +371,9 @@ function showAddSeriesModal() {
     });
     observer.observe(document.body, { childList: true });
 
-    // Cancel button
     document.getElementById('modal-cancel-btn').addEventListener('click', closeModal);
 
-    // New Series button
+    // New Series — immediate action
     document.getElementById('modal-new-series-btn').addEventListener('click', () => {
         import('./miscSeries.js').then(({ addMiscSeries, canAddMiscSeries }) => {
             if (!canAddMiscSeries()) {
@@ -419,25 +385,65 @@ function showAddSeriesModal() {
         });
     });
 
-    // Aggregation section handlers
-    if (showAggSection) {
-        const seriesSelect = document.getElementById('modal-series-select');
-        const aggSelect = document.getElementById('modal-agg-select');
-
-        // Update agg dropdown when series changes
-        seriesSelect.addEventListener('change', () => {
-            const unused = getUnusedAggs(seriesSelect.value);
-            aggSelect.innerHTML = unused.map(a =>
-                `<option value="${a}">${a.charAt(0).toUpperCase() + a.slice(1)}</option>`
-            ).join('');
-        });
-
-        // Add aggregation button
+    // Add Aggregation — transition to step 2
+    if (hasAggOption) {
         document.getElementById('modal-add-agg-btn').addEventListener('click', () => {
-            addAggregationOfType(seriesSelect.value, aggSelect.value);
-            closeModal();
+            showAggregationStep(overlay, eligibleSeries, closeModal);
         });
     }
+}
+
+function showAggregationStep(overlay, eligibleSeries, closeModal) {
+    const seriesOptionsHtml = eligibleSeries.map(s =>
+        `<option value="${s}">${getSeriesDisplayName(s)}</option>`
+    ).join('');
+
+    const initialAggHtml = getUnusedAggs(eligibleSeries[0]).map(a =>
+        `<option value="${a}">${a.charAt(0).toUpperCase() + a.slice(1)}</option>`
+    ).join('');
+
+    const card = overlay.querySelector('div');
+    card.innerHTML = `
+        <h3 class="m-0 mb-4 text-sm font-bold text-gray-800">Add Aggregation</h3>
+        <div class="flex flex-col gap-2">
+            <select id="modal-series-select"
+                class="w-full p-1.5 text-xs border border-gray-300 rounded">
+                ${seriesOptionsHtml}
+            </select>
+            <select id="modal-agg-select"
+                class="w-full p-1.5 text-xs border border-gray-300 rounded">
+                ${initialAggHtml}
+            </select>
+            <button id="modal-confirm-agg-btn"
+                class="w-full py-2 px-3 bg-gray-700 hover:bg-gray-800 rounded text-white font-medium text-sm transition-colors cursor-pointer">
+                Add
+            </button>
+        </div>
+        <button id="modal-back-btn"
+            class="w-full mt-3 py-1.5 bg-gray-200 hover:bg-gray-300 rounded text-gray-700 text-xs font-medium transition-colors cursor-pointer">
+            Back
+        </button>
+    `;
+
+    const seriesSelect = document.getElementById('modal-series-select');
+    const aggSelect = document.getElementById('modal-agg-select');
+
+    seriesSelect.addEventListener('change', () => {
+        const unused = getUnusedAggs(seriesSelect.value);
+        aggSelect.innerHTML = unused.map(a =>
+            `<option value="${a}">${a.charAt(0).toUpperCase() + a.slice(1)}</option>`
+        ).join('');
+    });
+
+    document.getElementById('modal-confirm-agg-btn').addEventListener('click', () => {
+        addAggregationOfType(seriesSelect.value, aggSelect.value);
+        closeModal();
+    });
+
+    document.getElementById('modal-back-btn').addEventListener('click', () => {
+        closeModal();
+        showAddSeriesModal();
+    });
 }
 
 function addAggregationOfType(seriesName, aggType) {
