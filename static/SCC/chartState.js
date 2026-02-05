@@ -18,6 +18,7 @@ import { CORRECTS, ERRORS, TIMING, COLORS, LINE_DEFAULTS, LIMITS, FONT_SIZES } f
 export const defaultCorrectTraceConfig = Object.freeze({
     seriesName: 'correct',
     showLine: true,
+    lineDash: 'solid',
     lineWidth: LINE_DEFAULTS.TRACE_LINE_WIDTH,
     lineColor: 'black',
     markerSize: 8,
@@ -29,6 +30,7 @@ export const defaultCorrectTraceConfig = Object.freeze({
 export const defaultErrorTraceConfig = Object.freeze({
     seriesName: 'incorrect',
     showLine: true,
+    lineDash: 'solid',
     lineWidth: LINE_DEFAULTS.TRACE_LINE_WIDTH,
     lineColor: 'black',
     markerSize: 20,
@@ -40,6 +42,7 @@ export const defaultErrorTraceConfig = Object.freeze({
 export const defaultTimingTraceConfig = Object.freeze({
     seriesName: 'Timing',
     showLine: false,
+    lineDash: 'solid',
     lineWidth: LINE_DEFAULTS.TRACE_LINE_WIDTH,
     lineColor: 'black',
     markerSize: 30,
@@ -90,6 +93,7 @@ export function createMiscTraceConfig(index) {
     return {
         seriesName: `Misc ${index + 1}`,
         showLine: true,
+        lineDash: 'solid',
         lineWidth: LINE_DEFAULTS.TRACE_LINE_WIDTH,
         lineColor: 'black',
         markerSize: 8,

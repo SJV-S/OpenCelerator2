@@ -199,3 +199,93 @@ window.clearCelLines = function() {
 
     console.log('Cleared all cel lines and triggered save');
 };
+
+/**
+ * Debug custom legend - prints all relevant state to console
+ */
+window.debugLegend = function() {
+    const chartDiv = document.getElementById('chart');
+    const container = document.getElementById('custom-legend');
+
+    console.log('=== LEGEND DEBUG ===');
+
+    // chartState.legend config
+    console.log('chartState.legend:', JSON.parse(JSON.stringify(chartState.legend)));
+
+    // Container DOM state
+    if (container) {
+        console.log('Container found:', true);
+        console.log('Container display:', container.style.display);
+        console.log('Container parent:', container.parentElement?.id || container.parentElement?.tagName);
+        console.log('Container children:', container.children.length);
+        console.log('Container offsetWidth x offsetHeight:', container.offsetWidth, 'x', container.offsetHeight);
+        console.log('Container computed visibility:', getComputedStyle(container).visibility);
+        console.log('Container computed opacity:', getComputedStyle(container).opacity);
+    } else {
+        console.log('Container found:', false);
+    }
+
+    // Series data availability
+    const seriesInfo = {};
+    ['corrects', 'errors', 'timing'].forEach(key => {
+        const arr = chartState.series[key];
+        seriesInfo[key] = {
+            exists: !!arr,
+            length: arr?.length || 0,
+            hasFiniteData: arr ? arr.some(v => Number.isFinite(v)) : false
+        };
+    });
+    // Misc series
+    Object.entries(chartState.series.misc || {}).forEach(([id, arr]) => {
+        seriesInfo[`misc.${id}`] = {
+            exists: !!arr,
+            length: arr?.length || 0,
+            hasIntegerData: arr ? arr.some(v => Number.isInteger(v)) : false
+        };
+    });
+    console.log('Series data:', JSON.parse(JSON.stringify(seriesInfo)));
+
+    // traceStyles keys
+    const styleKeys = {};
+    ['corrects', 'errors', 'timing'].forEach(key => {
+        styleKeys[key] = chartState.traceStyles[key] ? Object.keys(chartState.traceStyles[key]) : null;
+    });
+    styleKeys.misc = {};
+    Object.entries(chartState.traceStyles.misc || {}).forEach(([id, cfg]) => {
+        styleKeys.misc[id] = Object.keys(cfg);
+    });
+    console.log('traceStyles keys:', JSON.parse(JSON.stringify(styleKeys)));
+
+    // minuteChart flag (timing only shows on minute charts)
+    console.log('minuteChart:', chartState.minuteChart);
+
+    // lineVisibility
+    console.log('lineVisibility:', JSON.parse(JSON.stringify(chartState.lineVisibility)));
+
+    // Plotly trace meta (seriesName + aggType)
+    if (chartDiv?.data) {
+        const traceMeta = chartDiv.data.map((t, i) => ({
+            index: i,
+            name: t.name,
+            visible: t.visible,
+            seriesName: t.meta?.seriesName,
+            aggType: t.meta?.aggType
+        }));
+        console.log('Plotly traces:', JSON.parse(JSON.stringify(traceMeta)));
+    } else {
+        console.log('Plotly traces: no chart data');
+    }
+
+    // Legend DOM items
+    if (container) {
+        const items = container.querySelectorAll('.legend-item');
+        const domItems = Array.from(items).map(el => ({
+            seriesKey: el.dataset.seriesKey || el.dataset.lineType || '?',
+            hidden: el.classList.contains('legend-item-hidden'),
+            text: el.textContent.trim()
+        }));
+        console.log('Legend DOM items:', JSON.parse(JSON.stringify(domItems)));
+    }
+
+    console.log('=== END LEGEND DEBUG ===');
+};

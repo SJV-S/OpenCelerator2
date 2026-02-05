@@ -27,7 +27,8 @@ function correctsTrace(xValues, yValues, config) {
         mode: config.showLine ? 'lines+markers' : 'markers',
         line: {
             color: config.lineColor,
-            width: config.lineWidth
+            width: config.lineWidth,
+            dash: config.lineDash || 'solid'
         },
         marker: {
             symbol: config.markerSymbol,
@@ -51,7 +52,8 @@ function errorTrace(xValues, yValues, config) {
         mode: config.showLine ? 'lines+text' : 'text',
         line: {
             color: config.lineColor,
-            width: config.lineWidth
+            width: config.lineWidth,
+            dash: config.lineDash || 'solid'
         },
         text: Array(xValues.length).fill('x'),
         textposition: 'middle center',
@@ -72,7 +74,8 @@ function timingFloorTrace(xValues, yValues, config) {
         mode: config.showLine ? 'lines+text' : 'text',
         line: {
             color: config.lineColor,
-            width: config.lineWidth
+            width: config.lineWidth,
+            dash: config.lineDash || 'solid'
         },
         text: Array(xValues.length).fill('-'),
         textposition: 'middle center',
@@ -93,7 +96,8 @@ function miscTrace(xValues, yValues, config) {
         mode: config.showLine ? 'lines+markers' : 'markers',
         line: {
             color: config.lineColor,
-            width: config.lineWidth
+            width: config.lineWidth,
+            dash: config.lineDash || 'solid'
         },
         marker: {
             symbol: config.markerSymbol,

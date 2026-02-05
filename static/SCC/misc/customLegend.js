@@ -62,7 +62,7 @@ function getLegendItems() {
     Object.entries(chartState.traceStyles.misc).forEach(([miscId, aggConfigs]) => {
         // Skip if no integer data
         const dataArray = chartState.series.misc[miscId];
-        const hasIntegerData = dataArray && dataArray.some(val => Number.isInteger(val));
+        const hasIntegerData = dataArray && dataArray.some(val => Number.isFinite(val));
         if (!hasIntegerData) return;
 
         Object.entries(aggConfigs).forEach(([aggType, config]) => {

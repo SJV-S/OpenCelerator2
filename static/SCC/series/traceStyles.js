@@ -213,6 +213,7 @@ function loadConfigPanel(seriesName, aggType) {
     document.getElementById('config-marker-color').value = config.markerColor || '#000000';
     document.getElementById('config-marker-edge-color').value = config.markerEdgeColor || '#000000';
     document.getElementById('config-marker-symbol').value = config.markerSymbol || 'circle';
+    document.getElementById('config-line-dash').value = config.lineDash || 'solid';
 
     // Update sum option visibility
     updateSumOptionVisibility();
@@ -226,6 +227,7 @@ function applyConfig() {
     const config = {
         seriesName: document.getElementById('config-series-name').value || seriesName,
         showLine: document.getElementById('config-show-line').checked,
+        lineDash: document.getElementById('config-line-dash').value || 'solid',
         lineWidth: parseFloat(document.getElementById('config-line-width').value) || LINE_DEFAULTS.TRACE_LINE_WIDTH,
         lineColor: document.getElementById('config-line-color').value || '#000000',
         markerSize: parseInt(document.getElementById('config-marker-size').value) || 8,

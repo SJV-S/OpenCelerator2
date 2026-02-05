@@ -51,3 +51,13 @@ To-do
 - If the user deletes a shared chart, we need to make sure no errors or resurrections occur
 - Panning STILL doesn't reset after a start-date/capcity change
 - legend position changes does not trigger a save event
+- importing a chart json should generate a new UUID, and chart key?
+- OpenCelerator json import doesn't seem to understand last updated: "Updated Jan 21, 1970"
+- Legend doesn't appear in debt chart
+- and, yet again, auto save is triggered without me doing anything when loading the chart
+- What key in chartSTate is this? "_autoAggNotified": {}
+- The idea of saving 1s in count chart is a waste of space. Just auto generate it.
+- xValues look a bit short. Are they full timestamps?
+- Is there protection against a user find out someoeone else's UUID for a chart and attempting to overwrite it on the server?
+- csv data export is completely broken – misc series are not included!
+-
