@@ -2,7 +2,7 @@
  * Trace Styles Configuration
  *
  * This module handles:
- * - Hierarchical series navigation (series -> aggregations)
+ * - Flat series navigation (one row per series+aggregation combo)
  * - Single aggregation config panel
  * - Adding/removing aggregation methods per series
  */
@@ -102,202 +102,80 @@ function getAggTypes(seriesName) {
 // ============================================================================
 
 function renderSeriesNav() {
+    const flatList = document.getElementById('series-flat-list');
+    if (!flatList) return;
+
+    flatList.innerHTML = '';
+
     const fixedSeries = [CORRECTS, ERRORS, TIMING];
     const miscIds = getMiscSeriesIds();
+    const allSeries = [...fixedSeries, ...miscIds];
 
-    // Render fixed series
-    fixedSeries.forEach(seriesName => {
-        renderSeriesItem(seriesName);
+    allSeries.forEach(seriesName => {
+        const aggTypes = getAggTypes(seriesName);
+        const isMisc = isMiscSeries(seriesName);
+        const config = getFirstConfig(seriesName, isMisc);
+        const displayName = config?.seriesName || seriesName;
+
+        aggTypes.forEach(aggType => {
+            const label = aggType === 'raw'
+                ? displayName
+                : `${displayName} (${aggType.charAt(0).toUpperCase() + aggType.slice(1)})`;
+
+            const btn = document.createElement('button');
+            btn.className = 'series-row';
+            btn.dataset.series = seriesName;
+            btn.dataset.agg = aggType;
+
+            // Hide timing rows when not a minute chart
+            if (seriesName === TIMING) {
+                btn.dataset.seriesType = 'timing';
+                btn.style.display = chartState.minuteChart ? '' : 'none';
+            }
+
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'series-name';
+            nameSpan.textContent = truncateTabName(label);
+            btn.appendChild(nameSpan);
+
+            // Add minus button for deletable (misc) series
+            if (isMisc) {
+                const minusBtn = document.createElement('span');
+                minusBtn.className = 'series-delete-btn';
+                minusBtn.textContent = '−';
+                minusBtn.title = 'Delete series';
+                minusBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    deleteMiscSeriesByName(seriesName);
+                });
+                btn.appendChild(minusBtn);
+            }
+
+            if (seriesName === currentSeries && aggType === currentAggType) {
+                btn.classList.add('active');
+            }
+
+            btn.addEventListener('click', () => selectAggregation(seriesName, aggType));
+            flatList.appendChild(btn);
+        });
     });
-
-    // Render misc series
-    const miscContainer = document.getElementById('misc-series-container');
-    if (miscContainer) {
-        miscContainer.innerHTML = '';
-        miscIds.forEach(id => {
-            const item = createMiscSeriesItem(id);
-            miscContainer.appendChild(item);
-        });
-    }
-
-    // Update timing visibility
-    updateTimingSeriesVisibility();
-}
-
-function renderSeriesItem(seriesName) {
-    const item = document.querySelector(`.series-item[data-series="${seriesName}"]`);
-    if (!item) return;
-
-    const aggCount = getAggCount(seriesName);
-    const aggTypes = getAggTypes(seriesName);
-    const config = getFirstConfig(seriesName, isMiscSeries(seriesName));
-
-    // Update series name display
-    const nameSpan = item.querySelector('.series-name');
-    if (nameSpan && config?.seriesName) {
-        nameSpan.textContent = truncateTabName(config.seriesName);
-    }
-
-    // Update icon visibility based on aggregation count
-    item.classList.remove('single-agg', 'multi-agg');
-    if (aggCount > 1) {
-        item.classList.add('multi-agg');
-    } else {
-        item.classList.add('single-agg');
-    }
-
-    // Render aggregation list
-    renderAggList(item, seriesName, aggTypes);
-}
-
-function renderAggList(item, seriesName, aggTypes) {
-    const listContainer = item.querySelector('.series-agg-list');
-    if (!listContainer) return;
-
-    listContainer.innerHTML = '';
-    const canRemove = aggTypes.length > 1;
-
-    // Add aggregation items
-    aggTypes.forEach(aggType => {
-        const aggRow = document.createElement('div');
-        aggRow.className = 'agg-item-row';
-
-        const aggBtn = document.createElement('button');
-        aggBtn.className = 'agg-item';
-        aggBtn.dataset.series = seriesName;
-        aggBtn.dataset.agg = aggType;
-        aggBtn.textContent = aggType.charAt(0).toUpperCase() + aggType.slice(1);
-
-        if (seriesName === currentSeries && aggType === currentAggType) {
-            aggBtn.classList.add('active');
-        }
-
-        aggBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            selectAggregation(seriesName, aggType);
-        });
-
-        aggRow.appendChild(aggBtn);
-
-        // Add minus button if removable
-        if (canRemove) {
-            const removeBtn = document.createElement('button');
-            removeBtn.className = 'agg-remove-btn';
-            removeBtn.innerHTML = '−';
-            removeBtn.title = 'Remove aggregation';
-            removeBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                removeAggregationByType(seriesName, aggType);
-            });
-            aggRow.appendChild(removeBtn);
-        }
-
-        listContainer.appendChild(aggRow);
-    });
-
-    // Add "+" button if more aggregation types available
-    const usedAggs = aggTypes;
-    const availableAggs = getAvailableAggTypes();
-    const unusedAggs = availableAggs.filter(a => !usedAggs.includes(a));
-
-    if (unusedAggs.length > 0) {
-        const addBtn = document.createElement('button');
-        addBtn.className = 'add-agg-btn';
-        addBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> Add`;
-        addBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            showAddAggregationDialog(seriesName);
-        });
-        listContainer.appendChild(addBtn);
-    }
-}
-
-function createMiscSeriesItem(id) {
-    const template = document.getElementById('misc-series-item-template');
-    const item = template.content.firstElementChild.cloneNode(true);
-
-    item.dataset.series = id;
-    const row = item.querySelector('.series-row');
-    row.dataset.seriesTab = id;
-
-    const config = getFirstConfig(id, true);
-    const nameSpan = item.querySelector('.series-name');
-    nameSpan.textContent = truncateTabName(config?.seriesName || id);
-
-    const aggCount = getAggCount(id);
-    const aggTypes = getAggTypes(id);
-
-    item.classList.add(aggCount > 1 ? 'multi-agg' : 'single-agg');
-
-    // Set up click handler
-    row.addEventListener('click', () => handleSeriesClick(id));
-
-    // Render aggregation list
-    renderAggList(item, id, aggTypes);
-
-    return item;
 }
 
 // ============================================================================
 // INTERACTION HANDLERS
 // ============================================================================
 
-function handleSeriesClick(seriesName) {
-    const item = document.querySelector(`.series-item[data-series="${seriesName}"]`);
-    if (!item) return;
-
-    const aggCount = getAggCount(seriesName);
-
-    if (aggCount === 1) {
-        // Single aggregation - select it directly
-        const aggTypes = getAggTypes(seriesName);
-        selectAggregation(seriesName, aggTypes[0]);
-    } else {
-        // Multiple aggregations - toggle expansion
-        toggleExpand(seriesName);
-    }
-}
-
-function toggleExpand(seriesName) {
-    const item = document.querySelector(`.series-item[data-series="${seriesName}"]`);
-    if (!item) return;
-
-    const wasExpanded = item.classList.contains('expanded');
-
-    // Collapse all other expanded items
-    document.querySelectorAll('.series-item.expanded').forEach(i => {
-        i.classList.remove('expanded');
-    });
-
-    // Toggle this item
-    if (!wasExpanded) {
-        item.classList.add('expanded');
-    }
-}
-
 function selectAggregation(seriesName, aggType) {
     currentSeries = seriesName;
     currentAggType = aggType;
 
-    // Update active states in nav
-    document.querySelectorAll('.series-row').forEach(row => {
+    // Update active state - highlight only the matching flat row
+    document.querySelectorAll('#series-flat-list .series-row').forEach(row => {
         row.classList.remove('active');
+        if (row.dataset.series === seriesName && row.dataset.agg === aggType) {
+            row.classList.add('active');
+        }
     });
-    document.querySelectorAll('.agg-item').forEach(item => {
-        item.classList.remove('active');
-    });
-
-    const aggCount = getAggCount(seriesName);
-
-    if (aggCount === 1) {
-        // Highlight the series row
-        const row = document.querySelector(`.series-item[data-series="${seriesName}"] .series-row`);
-        if (row) row.classList.add('active');
-    } else {
-        // Highlight the aggregation item
-        const aggItem = document.querySelector(`.agg-item[data-series="${seriesName}"][data-agg="${aggType}"]`);
-        if (aggItem) aggItem.classList.add('active');
-    }
 
     // Load config into panel
     loadConfigPanel(seriesName, aggType);
@@ -323,20 +201,6 @@ function loadConfigPanel(seriesName, aggType) {
     const edgeColorRow = document.getElementById('marker-edge-color-row');
     if (edgeColorRow) {
         edgeColorRow.style.display = (seriesName === CORRECTS || isMisc) ? '' : 'none';
-    }
-
-    // Show/hide panel header for misc series
-    const panelHeader = document.getElementById('panel-header');
-    const deleteBtn = document.getElementById('delete-series-btn');
-    if (panelHeader && deleteBtn) {
-        if (isMisc) {
-            panelHeader.classList.remove('hidden');
-            deleteBtn.classList.remove('hidden');
-            document.getElementById('panel-title').textContent = config.seriesName || seriesName;
-        } else {
-            panelHeader.classList.add('hidden');
-            deleteBtn.classList.add('hidden');
-        }
     }
 
     // Populate form fields
@@ -378,22 +242,8 @@ function applyConfig() {
 
     setConfig(seriesName, newAggType, config);
 
-    // Re-render nav and refresh
-    renderSeriesItem(seriesName);
-    if (isMiscSeries(seriesName)) {
-        // Re-render misc item in container
-        const miscContainer = document.getElementById('misc-series-container');
-        const oldItem = miscContainer.querySelector(`[data-series="${seriesName}"]`);
-        if (oldItem) {
-            const newItem = createMiscSeriesItem(seriesName);
-            oldItem.replaceWith(newItem);
-            // Re-expand if was expanded
-            if (getAggCount(seriesName) > 1) {
-                newItem.classList.add('expanded');
-            }
-        }
-    }
-
+    // Re-render flat nav and refresh
+    renderSeriesNav();
     updateCounterLabels();
     eventBus.emit(EVENTS.DATA_CHART_REFRESH);
     eventBus.emit(EVENTS.UI_LEGEND_RENDER);
@@ -424,17 +274,8 @@ function resetConfig() {
 
     currentAggType = 'raw';
 
-    // Re-render and select
-    renderSeriesItem(seriesName);
-    if (isMisc) {
-        const miscContainer = document.getElementById('misc-series-container');
-        const oldItem = miscContainer.querySelector(`[data-series="${seriesName}"]`);
-        if (oldItem) {
-            const newItem = createMiscSeriesItem(seriesName);
-            oldItem.replaceWith(newItem);
-        }
-    }
-
+    // Re-render flat nav and select
+    renderSeriesNav();
     selectAggregation(seriesName, 'raw');
     updateCounterLabels();
 
@@ -448,25 +289,155 @@ function resetConfig() {
 // AGGREGATION MANAGEMENT
 // ============================================================================
 
-function showAddAggregationDialog(seriesName) {
-    const usedAggs = getAggTypes(seriesName);
+function getSeriesWithUnusedAggs() {
+    const fixedSeries = [CORRECTS, ERRORS];
+    if (chartState.minuteChart) fixedSeries.push(TIMING);
+    const miscIds = getMiscSeriesIds();
+    const allSeries = [...fixedSeries, ...miscIds];
     const availableAggs = getAvailableAggTypes();
-    const unusedAggs = availableAggs.filter(a => !usedAggs.includes(a));
 
-    if (unusedAggs.length === 0) return;
-
-    // Create selection buttons for the toast
-    const buttons = unusedAggs.map(aggType => ({
-        label: aggType.charAt(0).toUpperCase() + aggType.slice(1),
-        onClick: () => addAggregationOfType(seriesName, aggType),
-        type: 'secondary'
-    }));
-
-    createToast({
-        message: 'Select aggregation type:',
-        buttons: buttons,
-        layout: 'vertical'
+    return allSeries.filter(seriesName => {
+        const usedAggs = getAggTypes(seriesName);
+        return availableAggs.some(a => !usedAggs.includes(a));
     });
+}
+
+function getUnusedAggs(seriesName) {
+    const usedAggs = getAggTypes(seriesName);
+    return getAvailableAggTypes().filter(a => !usedAggs.includes(a));
+}
+
+function getSeriesDisplayName(seriesName) {
+    const isMisc = isMiscSeries(seriesName);
+    const config = getFirstConfig(seriesName, isMisc);
+    return config?.seriesName || seriesName;
+}
+
+function showAddSeriesModal() {
+    // Remove any existing modal
+    document.getElementById('add-series-modal')?.remove();
+
+    const eligibleSeries = getSeriesWithUnusedAggs();
+    const showAggSection = eligibleSeries.length > 0;
+
+    const overlay = document.createElement('div');
+    overlay.id = 'add-series-modal';
+    overlay.className = 'fixed inset-0 bg-black/50 flex justify-center items-center z-[10000]';
+
+    // Build series options HTML
+    const seriesOptionsHtml = eligibleSeries.map(s =>
+        `<option value="${s}">${getSeriesDisplayName(s)}</option>`
+    ).join('');
+
+    // Build initial agg options for first eligible series
+    const initialAggHtml = showAggSection
+        ? getUnusedAggs(eligibleSeries[0]).map(a =>
+            `<option value="${a}">${a.charAt(0).toUpperCase() + a.slice(1)}</option>`
+        ).join('')
+        : '';
+
+    overlay.innerHTML = `
+        <div class="bg-white p-5 rounded-lg shadow-xl w-[320px] max-w-[90vw]">
+            <h3 class="m-0 mb-4 text-sm font-bold text-gray-800">Add to Chart</h3>
+
+            <button id="modal-new-series-btn"
+                class="w-full py-2 px-3 bg-[#6ad1e3] hover:bg-[#5bc1d3] rounded text-white font-medium text-sm transition-colors cursor-pointer">
+                New Series
+            </button>
+
+            ${showAggSection ? `
+            <div class="flex items-center gap-2 my-3">
+                <hr class="flex-1 border-gray-300">
+                <span class="text-xs text-gray-400">or</span>
+                <hr class="flex-1 border-gray-300">
+            </div>
+
+            <div class="flex flex-col gap-2">
+                <label class="text-xs font-medium text-gray-600">Add Aggregation</label>
+                <select id="modal-series-select"
+                    class="w-full p-1.5 text-xs border border-gray-300 rounded">
+                    ${seriesOptionsHtml}
+                </select>
+                <select id="modal-agg-select"
+                    class="w-full p-1.5 text-xs border border-gray-300 rounded">
+                    ${initialAggHtml}
+                </select>
+                <button id="modal-add-agg-btn"
+                    class="w-full py-2 px-3 bg-gray-700 hover:bg-gray-800 rounded text-white font-medium text-sm transition-colors cursor-pointer">
+                    Add
+                </button>
+            </div>
+            ` : ''}
+
+            <button id="modal-cancel-btn"
+                class="w-full mt-3 py-1.5 bg-gray-200 hover:bg-gray-300 rounded text-gray-700 text-xs font-medium transition-colors cursor-pointer">
+                Cancel
+            </button>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    // --- Event handlers ---
+    const closeModal = () => overlay.remove();
+
+    // Close on click outside
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) closeModal();
+    });
+
+    // Close on Escape
+    const onKeydown = (e) => {
+        if (e.key === 'Escape') {
+            closeModal();
+            document.removeEventListener('keydown', onKeydown);
+        }
+    };
+    document.addEventListener('keydown', onKeydown);
+
+    // Clean up keydown listener when modal is removed
+    const observer = new MutationObserver(() => {
+        if (!document.getElementById('add-series-modal')) {
+            document.removeEventListener('keydown', onKeydown);
+            observer.disconnect();
+        }
+    });
+    observer.observe(document.body, { childList: true });
+
+    // Cancel button
+    document.getElementById('modal-cancel-btn').addEventListener('click', closeModal);
+
+    // New Series button
+    document.getElementById('modal-new-series-btn').addEventListener('click', () => {
+        import('./miscSeries.js').then(({ addMiscSeries, canAddMiscSeries }) => {
+            if (!canAddMiscSeries()) {
+                createToast({ message: 'Maximum of 10 misc series reached.', duration: 3000 });
+            } else {
+                addMiscSeries();
+            }
+            closeModal();
+        });
+    });
+
+    // Aggregation section handlers
+    if (showAggSection) {
+        const seriesSelect = document.getElementById('modal-series-select');
+        const aggSelect = document.getElementById('modal-agg-select');
+
+        // Update agg dropdown when series changes
+        seriesSelect.addEventListener('change', () => {
+            const unused = getUnusedAggs(seriesSelect.value);
+            aggSelect.innerHTML = unused.map(a =>
+                `<option value="${a}">${a.charAt(0).toUpperCase() + a.slice(1)}</option>`
+            ).join('');
+        });
+
+        // Add aggregation button
+        document.getElementById('modal-add-agg-btn').addEventListener('click', () => {
+            addAggregationOfType(seriesSelect.value, aggSelect.value);
+            closeModal();
+        });
+    }
 }
 
 function addAggregationOfType(seriesName, aggType) {
@@ -476,22 +447,8 @@ function addAggregationOfType(seriesName, aggType) {
 
     setConfig(seriesName, aggType, newConfig);
 
-    // Re-render and select the new aggregation
-    renderSeriesItem(seriesName);
-    if (isMiscSeries(seriesName)) {
-        const miscContainer = document.getElementById('misc-series-container');
-        const oldItem = miscContainer.querySelector(`[data-series="${seriesName}"]`);
-        if (oldItem) {
-            const newItem = createMiscSeriesItem(seriesName);
-            newItem.classList.add('expanded');
-            oldItem.replaceWith(newItem);
-        }
-    } else {
-        // Ensure expanded
-        const item = document.querySelector(`.series-item[data-series="${seriesName}"]`);
-        if (item) item.classList.add('expanded');
-    }
-
+    // Re-render flat nav and select the new aggregation
+    renderSeriesNav();
     selectAggregation(seriesName, aggType);
 
     eventBus.emit(EVENTS.DATA_CHART_REFRESH);
@@ -508,19 +465,8 @@ function removeAggregationByType(seriesName, aggType) {
     const remainingAggs = getAggTypes(seriesName);
     const newAggType = remainingAggs[0];
 
-    // Re-render
-    renderSeriesItem(seriesName);
-    if (isMiscSeries(seriesName)) {
-        const miscContainer = document.getElementById('misc-series-container');
-        const oldItem = miscContainer.querySelector(`[data-series="${seriesName}"]`);
-        if (oldItem) {
-            const newItem = createMiscSeriesItem(seriesName);
-            if (remainingAggs.length > 1) {
-                newItem.classList.add('expanded');
-            }
-            oldItem.replaceWith(newItem);
-        }
-    }
+    // Re-render flat nav
+    renderSeriesNav();
 
     // If removed the currently selected agg, select another
     if (currentSeries === seriesName && currentAggType === aggType) {
@@ -536,8 +482,7 @@ function removeAggregationByType(seriesName, aggType) {
 // MISC SERIES MANAGEMENT
 // ============================================================================
 
-function deleteMiscSeries() {
-    const seriesName = currentSeries;
+function deleteMiscSeriesByName(seriesName) {
     if (!isMiscSeries(seriesName)) return;
 
     const config = getFirstConfig(seriesName, true);
@@ -570,11 +515,11 @@ function updateSumOptionVisibility() {
 
 function updateTimingSeriesVisibility() {
     const shouldShow = chartState.minuteChart;
-    const timingItem = document.querySelector('.series-item[data-series="timing"]');
 
-    if (timingItem) {
-        timingItem.style.display = shouldShow ? '' : 'none';
-    }
+    // Hide/show all timing rows in the flat list
+    document.querySelectorAll('#series-flat-list .series-row[data-series-type="timing"]').forEach(row => {
+        row.style.display = shouldShow ? '' : 'none';
+    });
 
     // If timing was selected and now hidden, switch to corrects
     if (!shouldShow && currentSeries === TIMING) {
@@ -610,39 +555,15 @@ function updateCounterLabels() {
 // ============================================================================
 
 function initializeSeriesNav() {
-    // Set up click handlers for fixed series rows
-    document.querySelectorAll('.series-item[data-series] .series-row').forEach(row => {
-        const seriesName = row.closest('.series-item').dataset.series;
-        row.addEventListener('click', () => handleSeriesClick(seriesName));
-    });
-
-    // Set up add misc series button
+    // Set up add series button → opens modal with New Series / Add Aggregation options
     const addSeriesBtn = document.querySelector('[data-action="add-misc-series"]');
     if (addSeriesBtn) {
-        addSeriesBtn.addEventListener('click', () => {
-            import('./miscSeries.js').then(({ addMiscSeries, canAddMiscSeries }) => {
-                if (!canAddMiscSeries()) {
-                    createToast({ message: 'Maximum of 10 misc series reached.', duration: 3000 });
-                    return;
-                }
-                addMiscSeries();
-            });
-        });
+        addSeriesBtn.addEventListener('click', () => showAddSeriesModal());
     }
 
     // Set up config panel buttons
     document.getElementById('apply-config-btn')?.addEventListener('click', applyConfig);
     document.getElementById('reset-config-btn')?.addEventListener('click', resetConfig);
-    document.getElementById('delete-series-btn')?.addEventListener('click', deleteMiscSeries);
-
-    // Set up plus icon click for single-agg series (adds new aggregation)
-    document.querySelectorAll('.series-item .plus-icon').forEach(icon => {
-        icon.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const seriesName = e.target.closest('.series-item').dataset.series;
-            showAddAggregationDialog(seriesName);
-        });
-    });
 
     // Initial render
     renderSeriesNav();

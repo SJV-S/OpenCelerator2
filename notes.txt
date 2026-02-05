@@ -49,5 +49,5 @@ To-do
 - There's no line handling for stacking data points at the moment
 - There's no Ux for unsharing at the moment, although I think the infrastructure should be there...
 - If the user deletes a shared chart, we need to make sure no errors or resurrections occur
-- Import should be in the chart explorer
--
+- Panning STILL doesn't reset after a start-date/capcity change
+- legend position changes does not trigger a save event

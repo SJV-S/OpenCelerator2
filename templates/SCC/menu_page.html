@@ -200,7 +200,7 @@ html, body {
 <script type="module">
     import { initStorage, listCharts, deleteChart, updateChartTags, importChart } from '/static/SCC/storage/chartStorage.js';
     import { isNativeFormat } from '/static/SCC/import/nativeImport.js';
-    import { isOpenCeleratorFormat, convertOpenCeleratorToTC2 } from '/static/SCC/import/openCeleratorImport.js';
+    import { isOpenCeleratorFormat, buildChartFromOpenCelerator } from '/static/SCC/import/openCeleratorImport.js';
 
     let charts = [];
     let chartToDelete = null;
@@ -662,49 +662,23 @@ html, body {
 
             // Detect format and import
             if (isNativeFormat(json)) {
-                // Native TC2 format - save directly to storage with new ID
                 await importChart(json);
                 await loadCharts();
                 alert(`Imported "${json.chartName || 'Unnamed'}"`);
 
             } else if (isOpenCeleratorFormat(json)) {
-                // OpenCelerator format - convert then save
-                const conversion = convertOpenCeleratorToTC2(json);
-                if (!conversion.success) {
-                    alert(`Import failed: ${conversion.error}`);
+                const result = buildChartFromOpenCelerator(json, file.name);
+                if (!result.success) {
+                    alert(`Import failed: ${result.error}`);
                     return;
                 }
 
-                // Build a minimal chartState-like object for storage
-                const chartData = {
-                    chartKey: null,
-                    shared: false,
-                    series: conversion.data.series,
-                    chartType: 'Daily',
-                    minuteChart: true,
-                    chartName: file.name.replace(/\.json$/i, ''),
-                    tags: [],
-                    hasTimestamps: true,
-                    startDate: null,
-                    credits: conversion.data.credits || {},
-                    traceStyles: {},
-                    lineStyles: {},
-                    PhaseLines: {},
-                    AimLines: {},
-                    CelLines: { settings: {} },
-                    LineCuts: {},
-                    legend: { show: true, position: 'top-right' },
-                    lineVisibility: { phase: true, aim: true, change: true, grid: true },
-                    fanVisible: true,
-                    placeZerosBelowFloor: conversion.data.placeZerosBelowFloor ?? true
-                };
-
-                await importChart(chartData);
+                await importChart(result.chartData);
                 await loadCharts();
 
-                let message = `Imported "${chartData.chartName}"`;
-                if (conversion.warnings.length > 0) {
-                    message += ` (${conversion.warnings.length} feature(s) not supported)`;
+                let message = `Imported "${result.chartData.chartName}"`;
+                if (result.warnings.length > 0) {
+                    message += ` (${result.warnings.length} feature(s) not supported)`;
                 }
                 alert(message);
 

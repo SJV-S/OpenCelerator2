@@ -1,44 +1,8 @@
 <div class="series-tab-layout">
-    <!-- Vertical Sub-Tab Menu with expandable aggregation lists -->
+    <!-- Flat series nav - one row per series+aggregation combo -->
     <div class="series-subtabs" id="series-tab-container">
-        <!-- Corrects series item -->
-        <div class="series-item" data-series="corrects">
-            <button class="series-row" data-series-tab="corrects">
-                <span class="series-name">Correct</span>
-                <span class="series-icon">
-                    <svg class="chevron-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
-                    <svg class="plus-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                </span>
-            </button>
-            <div class="series-agg-list"></div>
-        </div>
-
-        <!-- Errors series item -->
-        <div class="series-item" data-series="errors">
-            <button class="series-row" data-series-tab="errors">
-                <span class="series-name">Incorrect</span>
-                <span class="series-icon">
-                    <svg class="chevron-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
-                    <svg class="plus-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                </span>
-            </button>
-            <div class="series-agg-list"></div>
-        </div>
-
-        <!-- Timing series item -->
-        <div class="series-item" data-series="timing">
-            <button class="series-row" data-series-tab="timing">
-                <span class="series-name">Timing</span>
-                <span class="series-icon">
-                    <svg class="chevron-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
-                    <svg class="plus-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                </span>
-            </button>
-            <div class="series-agg-list"></div>
-        </div>
-
-        <!-- Dynamic misc series items will be inserted here -->
-        <div id="misc-series-container"></div>
+        <!-- Flat rows are rendered dynamically by traceStyles.js -->
+        <div id="series-flat-list"></div>
 
         <!-- Add new data series button -->
         <button class="series-row add-series-btn" data-action="add-misc-series" title="Add new data series">
@@ -52,12 +16,6 @@
     <!-- Series Content Area - shows single aggregation config -->
     <div class="series-content">
         <div id="series-config-panel" class="series-config-panel">
-            <!-- Panel header with delete button for misc series -->
-            <div id="panel-header" class="hidden mb-4 flex justify-between items-center">
-                <h3 id="panel-title" class="text-lg font-semibold text-gray-700"></h3>
-                <button id="delete-series-btn" class="hidden px-3 py-1 bg-red-500 text-white text-sm font-semibold rounded hover:bg-red-600">Delete Series</button>
-            </div>
-
             <!-- Single aggregation config block -->
             <div id="agg-config-form" class="space-y-3">
                 <div>
@@ -130,16 +88,3 @@
     </div>
 </div>
 
-<!-- Template for misc series item in left panel -->
-<template id="misc-series-item-template">
-    <div class="series-item" data-series="">
-        <button class="series-row" data-series-tab="">
-            <span class="series-name"></span>
-            <span class="series-icon">
-                <svg class="chevron-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
-                <svg class="plus-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-            </span>
-        </button>
-        <div class="series-agg-list"></div>
-    </div>
-</template>

@@ -404,13 +404,16 @@ export async function importChart(chartData) {
     try {
         const chartId = uuid();
 
-        // Data is already in serialized format (exported with jsonReplacer)
-        // Just assign new ID and timestamps
+        // Serialize the data to handle NaN → '__NaN__' and Date → { __date__: ... }
+        // Safe for native imports (already serialized values pass through unchanged)
+        // Required for OpenCelerator imports (raw JS values need conversion)
+        const serialized = serializeValue(chartData);
+
         const data = {
-            ...chartData,
+            ...serialized,
             id: chartId,
             lastModified: Math.floor(Date.now() / 1000),
-            _createdAt: chartData._createdAt || Math.floor(Date.now() / 1000)
+            _createdAt: serialized._createdAt || Math.floor(Date.now() / 1000)
         };
 
         await db.put(STORE_NAME, data);

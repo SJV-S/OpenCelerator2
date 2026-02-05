@@ -1,29 +1,32 @@
 /**
  * OpenCelerator Import Module
  *
- * Converts OpenCelerator JSON export files to TC2 chartState format.
+ * Converts OpenCelerator JSON export files to complete TC2 chart objects
+ * ready for storage. Single entry point: buildChartFromOpenCelerator()
  *
  * What IS converted:
  *   - Raw data (dates, corrects, incorrects, timing/minutes, misc/other columns)
- *   - Series names from column_map
- *   - Data point styles (universal "none, none" styles)
+ *   - Series names and styles from column_map / data_point_styles
  *   - Credit lines
- *   - Start date
+ *   - Start date (Monday before earliest data)
  *
- * Limitations (features that don't translate):
- *   - Phase lines: Different structure, not imported
- *   - Aim lines: Different structure, not imported
- *   - Trend/celeration lines: Different parameters, not imported
- *   - Slice-specific styling (date ranges): Only universal styles imported
+ * Limitations (warnings issued):
+ *   - Phase lines, aim lines, trend/celeration lines: not imported
+ *   - Slice-specific styling (date ranges): only universal styles imported
  */
 
 import {
-    chartState,
     createMiscTraceConfig,
-    MISC_COLORS
+    MISC_COLORS,
+    defaultCorrectTraceConfig,
+    defaultErrorTraceConfig,
+    defaultTimingTraceConfig,
+    DEFAULT_PHASE_LINE_COLOR,
+    DEFAULT_PHASE_LINE_WIDTH,
+    DEFAULT_AIM_LINE_COLOR,
+    DEFAULT_AIM_LINE_WIDTH
 } from '../chartState.js';
-import { CORRECTS, ERRORS } from '../config.js';
-import { eventBus, EVENTS } from '../eventBus.js';
+import { CORRECTS, ERRORS, TIMING, COLORS, LINE_DEFAULTS } from '../config.js';
 
 // ============================================================================
 // Marker Symbol Mapping (matplotlib -> Plotly)
@@ -145,7 +148,7 @@ function extractUniversalStyles(dataPointStyles, userColName) {
  * @param {object} json - OpenCelerator JSON object
  * @returns {{success: boolean, data: object|null, warnings: string[], error: string|null}}
  */
-export function convertOpenCeleratorToTC2(json) {
+function convertOpenCeleratorToTC2(json) {
     const warnings = [];
 
     try {
@@ -317,157 +320,130 @@ export function convertOpenCeleratorToTC2(json) {
     }
 }
 
+// ============================================================================
+// Chart Type Detection
+// ============================================================================
+
 /**
- * Apply converted data to chartState
- * Imports data, series names, styles, and credits
- * Does NOT change chart name, type, or other unrelated settings
+ * Detect TC2 chart type from OpenCelerator's type string
+ * @param {string} ocType - OpenCelerator type field (e.g., "daily", "Weekly", etc.)
+ * @returns {string} TC2 chart type
  */
-export function applyToChartState(convertedData, options = { replace: true }) {
-    if (!convertedData || !convertedData.series) {
-        eventBus.emit(EVENTS.DATA_IMPORT_FAILED, {
-            error: 'No data to import',
-            stage: 'import'
-        });
-        return { success: false, count: 0, message: 'No data to import' };
+function detectChartType(ocType) {
+    if (!ocType || typeof ocType !== 'string') return 'Daily';
+
+    const lower = ocType.toLowerCase();
+    if (lower.includes('weekly')) return 'Weekly';
+    if (lower.includes('monthly')) return 'Monthly';
+    if (lower.includes('yearly')) return 'Yearly';
+    return 'Daily';
+}
+
+// ============================================================================
+// Build Complete Chart Object
+// ============================================================================
+
+/**
+ * Convert OpenCelerator JSON to a complete chart object ready for storage.
+ * Single entry point — handles conversion, style mapping, and startDate.
+ *
+ * @param {object} json - Parsed OpenCelerator JSON
+ * @param {string} fileName - Original filename (used for chart name)
+ * @returns {{success: boolean, chartData: object|null, warnings: string[], error: string|null}}
+ */
+export function buildChartFromOpenCelerator(json, fileName) {
+    const conversion = convertOpenCeleratorToTC2(json);
+    if (!conversion.success) {
+        return { success: false, chartData: null, warnings: conversion.warnings, error: conversion.error };
     }
 
-    try {
-        const { series, credits, columnNames, columnStyles, hasCorrects, hasErrors, placeZerosBelowFloor } = convertedData;
+    const { series, credits, columnNames, columnStyles, hasCorrects, hasErrors, placeZerosBelowFloor } = conversion.data;
 
-        if (options.replace) {
-            // Remove existing misc series UI first (emit REMOVED for each)
-            const existingMiscIds = Object.keys(chartState.series.misc || {});
-            for (const id of existingMiscIds) {
-                eventBus.emit(EVENTS.MISC_SERIES_REMOVED, { id });
-            }
+    // Build traceStyles with defaults + imported overrides
+    const correctsRaw = { ...defaultCorrectTraceConfig };
+    if (hasCorrects && columnNames.corrects) {
+        correctsRaw.seriesName = columnNames.corrects;
+        Object.assign(correctsRaw, columnStyles.corrects);
+    }
 
-            // Clear existing data
-            chartState.series.xValues = [];
-            chartState.series.corrects = [];
-            chartState.series.errors = [];
-            chartState.series.timing = [];
-            chartState.series.misc = {};
+    const errorsRaw = { ...defaultErrorTraceConfig };
+    if (hasErrors && columnNames.errors) {
+        errorsRaw.seriesName = columnNames.errors;
+        Object.assign(errorsRaw, columnStyles.errors);
+    }
 
-            // Clear misc traceStyles and lineStyles
-            chartState.traceStyles.misc = {};
-            chartState.lineStyles.trend.misc = {};
+    const traceStyles = {
+        [CORRECTS]: { raw: correctsRaw },
+        [ERRORS]:   { raw: errorsRaw },
+        [TIMING]:   { raw: { ...defaultTimingTraceConfig } },
+        misc: {}
+    };
 
-            // Apply placeZerosBelowFloor setting from OpenCelerator
-            chartState.placeZerosBelowFloor = placeZerosBelowFloor;
-            // Update the UI toggle if it exists
-            const toggle = document.getElementById('place-zeros-below-floor-toggle');
-            if (toggle) toggle.checked = placeZerosBelowFloor;
-
-            // Update credits
-            if (credits && (credits[0] || credits[1])) {
-                chartState.credits = credits;
-                eventBus.emit(EVENTS.CREDITS_UPDATED);
-            }
+    const lineStyles = {
+        phase: { color: DEFAULT_PHASE_LINE_COLOR, width: DEFAULT_PHASE_LINE_WIDTH },
+        aim:   { color: DEFAULT_AIM_LINE_COLOR, width: DEFAULT_AIM_LINE_WIDTH },
+        trend: {
+            [CORRECTS]: { color: COLORS.TREND_CORRECTS, width: LINE_DEFAULTS.TREND_WIDTH },
+            [ERRORS]:   { color: COLORS.TREND_ERRORS, width: LINE_DEFAULTS.TREND_WIDTH },
+            [TIMING]:   { color: COLORS.TREND_TIMING, width: LINE_DEFAULTS.TREND_WIDTH },
+            misc: {}
         }
+    };
 
-        // Apply series names and styles for corrects (only if there's actual data)
-        if (hasCorrects && columnNames.corrects && chartState.traceStyles[CORRECTS]?.raw) {
-            chartState.traceStyles[CORRECTS].raw.seriesName = columnNames.corrects;
-            if (columnStyles.corrects) {
-                Object.assign(chartState.traceStyles[CORRECTS].raw, columnStyles.corrects);
-            }
-        } else if (!hasCorrects && options.replace) {
-            // Reset corrects series name to default when no corrects data
-            if (chartState.traceStyles[CORRECTS]?.raw) {
-                chartState.traceStyles[CORRECTS].raw.seriesName = 'correct';
-            }
-        }
+    // Build misc series configs
+    for (const miscId of Object.keys(series.misc)) {
+        const index = parseInt(miscId.slice(4)) - 1;
+        const miscRaw = createMiscTraceConfig(index);
 
-        // Apply series names and styles for errors (only if there's actual data)
-        if (hasErrors && columnNames.errors && chartState.traceStyles[ERRORS]?.raw) {
-            chartState.traceStyles[ERRORS].raw.seriesName = columnNames.errors;
-            if (columnStyles.errors) {
-                Object.assign(chartState.traceStyles[ERRORS].raw, columnStyles.errors);
-            }
-        } else if (!hasErrors && options.replace) {
-            // Reset errors series name to default when no errors data
-            if (chartState.traceStyles[ERRORS]?.raw) {
-                chartState.traceStyles[ERRORS].raw.seriesName = 'incorrect';
-            }
-        }
+        if (columnNames.misc[miscId]) miscRaw.seriesName = columnNames.misc[miscId];
+        if (columnStyles.misc[miscId]) Object.assign(miscRaw, columnStyles.misc[miscId]);
 
-        // Initialize misc arrays with names and styles
-        for (const miscId of Object.keys(series.misc)) {
-            if (!chartState.series.misc[miscId]) {
-                chartState.series.misc[miscId] = [];
-            }
-
-            const num = parseInt(miscId.slice(4));
-            const index = num - 1;
-
-            // Create traceStyles config
-            if (!chartState.traceStyles.misc[miscId]) {
-                chartState.traceStyles.misc[miscId] = {
-                    raw: createMiscTraceConfig(index)
-                };
-            }
-
-            // Apply series name from column_map
-            if (columnNames.misc[miscId]) {
-                chartState.traceStyles.misc[miscId].raw.seriesName = columnNames.misc[miscId];
-            }
-
-            // Apply styles from data_point_styles
-            if (columnStyles.misc[miscId]) {
-                Object.assign(chartState.traceStyles.misc[miscId].raw, columnStyles.misc[miscId]);
-            }
-
-            // Create lineStyles config
-            if (!chartState.lineStyles.trend.misc[miscId]) {
-                chartState.lineStyles.trend.misc[miscId] = {
-                    color: MISC_COLORS[index % MISC_COLORS.length],
-                    width: 2
-                };
-            }
-        }
-        // Note: UI sync happens via DATA_IMPORT_COMPLETED -> syncMiscSeriesUI()
-
-        // Push data
-        for (let i = 0; i < series.xValues.length; i++) {
-            chartState.series.xValues.push(series.xValues[i]);
-            chartState.series.corrects.push(series.corrects[i]);
-            chartState.series.errors.push(series.errors[i]);
-            chartState.series.timing.push(series.timing[i]);
-
-            for (const miscId of Object.keys(series.misc)) {
-                chartState.series.misc[miscId].push(series.misc[miscId][i]);
-            }
-        }
-
-        // Update startDate to Monday before earliest data point
-        if (chartState.series.xValues.length > 0) {
-            const earliestTimestamp = Math.min(...chartState.series.xValues);
-            chartState.startDate = calculateMondayBefore(earliestTimestamp);
-        }
-
-        // Emit success event (triggers UI sync via DATA_IMPORT_COMPLETED subscriber)
-        eventBus.emit(EVENTS.DATA_IMPORT_COMPLETED, {
-            count: series.xValues.length,
-            replaced: options.replace,
-            source: 'OpenCelerator'
-        });
-
-        // Trigger chart refresh
-        eventBus.emit(EVENTS.DATA_CHART_REFRESH);
-
-        return {
-            success: true,
-            count: series.xValues.length,
-            message: `Imported ${series.xValues.length} entries from OpenCelerator`
+        traceStyles.misc[miscId] = { raw: miscRaw };
+        lineStyles.trend.misc[miscId] = {
+            color: MISC_COLORS[index % MISC_COLORS.length],
+            width: LINE_DEFAULTS.TREND_WIDTH
         };
-
-    } catch (err) {
-        eventBus.emit(EVENTS.DATA_IMPORT_FAILED, {
-            error: err.message,
-            stage: 'import'
-        });
-        return { success: false, count: 0, message: err.message };
     }
+
+    // Detect chart type from OpenCelerator's type field
+    const detectedType = detectChartType(json.type);
+
+    // Detect minute vs count from the type string — OC includes "minute" in the name
+    const minuteChart = json.type.toLowerCase().includes('minute');
+
+    // Calculate startDate
+    let startDate = null;
+    if (series.xValues.length > 0) {
+        startDate = calculateMondayBefore(Math.min(...series.xValues));
+    }
+
+    return {
+        success: true,
+        chartData: {
+            chartKey: null,
+            shared: false,
+            series,
+            chartType: detectedType,
+            minuteChart,
+            chartName: fileName.replace(/\.json$/i, ''),
+            tags: [],
+            hasTimestamps: true,
+            startDate,
+            credits: credits || {},
+            traceStyles,
+            lineStyles,
+            PhaseLines: {},
+            AimLines: {},
+            CelLines: { settings: {} },
+            LineCuts: {},
+            legend: { show: true, position: 'top-right' },
+            lineVisibility: { phase: true, aim: true, change: true, grid: true },
+            fanVisible: true,
+            placeZerosBelowFloor: placeZerosBelowFloor ?? true
+        },
+        warnings: conversion.warnings,
+        error: null
+    };
 }
 
 // ============================================================================
@@ -536,63 +512,3 @@ function parseCredits(creditArray) {
     return { 0: line0, 1: line1 };
 }
 
-// ============================================================================
-// Full Import Pipeline
-// ============================================================================
-
-/**
- * Full import pipeline for OpenCelerator JSON
- */
-export async function importOpenCeleratorFile(file) {
-    try {
-        const text = await file.text();
-
-        let json;
-        try {
-            json = JSON.parse(text);
-        } catch (parseErr) {
-            return {
-                success: false,
-                count: 0,
-                message: `Invalid JSON: ${parseErr.message}`,
-                warnings: []
-            };
-        }
-
-        if (!isOpenCeleratorFormat(json)) {
-            return {
-                success: false,
-                count: 0,
-                message: 'Not a valid OpenCelerator export file',
-                warnings: []
-            };
-        }
-
-        const conversion = convertOpenCeleratorToTC2(json);
-        if (!conversion.success) {
-            return {
-                success: false,
-                count: 0,
-                message: conversion.error,
-                warnings: conversion.warnings
-            };
-        }
-
-        const result = applyToChartState(conversion.data, { replace: true });
-
-        return {
-            success: result.success,
-            count: result.count,
-            message: result.message,
-            warnings: conversion.warnings
-        };
-
-    } catch (err) {
-        return {
-            success: false,
-            count: 0,
-            message: `Import error: ${err.message}`,
-            warnings: []
-        };
-    }
-}
