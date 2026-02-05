@@ -384,6 +384,47 @@ export async function createChart(name, chartType, minuteChart) {
     }
 }
 
+/**
+ * Import a chart from a raw chart object (for JSON imports)
+ * Assigns a new ID and saves directly to IndexedDB without affecting chartState
+ * @param {object} chartData - Full chart data object
+ * @returns {Promise<string|null>} The chart ID or null on failure
+ */
+export async function importChart(chartData) {
+    if (!db) {
+        console.warn('[Storage] Database not initialized');
+        return null;
+    }
+
+    if (!chartData || typeof chartData !== 'object') {
+        console.warn('[Storage] Invalid chart data');
+        return null;
+    }
+
+    try {
+        // Assign new ID and timestamp
+        const chartId = uuid();
+        const now = Date.now();
+
+        // Build the storage object
+        const data = {
+            ...chartData,
+            id: chartId,
+            lastModified: now,
+            _createdAt: chartData._createdAt || now
+        };
+
+        await db.put(STORE_NAME, data);
+        console.log(`[Storage] Imported chart: ${chartId} (${data.chartName || 'Unnamed'})`);
+        eventBus.emit(EVENTS.STORAGE_CHART_SAVED, { id: chartId, name: data.chartName });
+        return chartId;
+    } catch (error) {
+        console.error('[Storage] Import failed:', error);
+        eventBus.emit(EVENTS.STORAGE_ERROR, { operation: 'import', error });
+        return null;
+    }
+}
+
 // ============================================================================
 // Auto-save via Event Subscriptions
 // ============================================================================

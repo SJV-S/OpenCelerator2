@@ -48,4 +48,6 @@ To-do
 -- Also, when removing, is it also removing the associated text?
 - There's no line handling for stacking data points at the moment
 - There's no Ux for unsharing at the moment, although I think the infrastructure should be there...
+- If the user deletes a shared chart, we need to make sure no errors or resurrections occur
+- Import should be in the chart explorer
 -

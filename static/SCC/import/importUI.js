@@ -1,8 +1,11 @@
 /**
  * Import UI Module
  *
- * Handles the Import tab UI: drop zone, column mapping, and import actions.
- * Wires up the import_tab.html template to the dataImport.js infrastructure.
+ * Handles the Import tab UI for DATA imports: CSV, Excel files.
+ * Provides drop zone, column mapping, and import actions.
+ *
+ * Note: JSON chart imports (TC2 native, OpenCelerator) are handled
+ * in Chart Explorer via the "Import Chart" button.
  */
 
 import { chartState } from '../chartState.js';
@@ -13,14 +16,6 @@ import {
     importToChartState
 } from './dataImport.js';
 import { createToast } from '../ui/toaster.js';
-import {
-    isOpenCeleratorFormat,
-    importOpenCeleratorFile
-} from './openCeleratorImport.js';
-import {
-    isNativeFormat,
-    importNativeFile
-} from './nativeImport.js';
 
 // ============================================================================
 // State
@@ -160,22 +155,16 @@ function updateReplaceOptionVisibility() {
 // ============================================================================
 
 async function handleFile(file) {
-    // Validate file type
-    const validExtensions = ['.csv', '.xlsx', '.xls', '.ods', '.json'];
+    // Validate file type (data imports only - JSON chart imports are in Chart Explorer)
+    const validExtensions = ['.csv', '.xlsx', '.xls', '.ods'];
     const ext = '.' + file.name.split('.').pop().toLowerCase();
 
     if (!validExtensions.includes(ext)) {
         createToast({
-            message: 'Invalid file type',
+            message: 'Invalid file type. Use CSV or Excel files for data import.',
             duration: 3000,
             position: 'top-right'
         });
-        return;
-    }
-
-    // Handle JSON files - detect format and route appropriately
-    if (ext === '.json') {
-        await handleJsonFile(file);
         return;
     }
 
@@ -203,109 +192,6 @@ async function handleFile(file) {
         showState('dropzone');
         createToast({
             message: `Failed to read file: ${err.message}`,
-            duration: 4000,
-            position: 'top-right'
-        });
-    }
-}
-
-/**
- * Handle JSON file import - detects format and routes appropriately
- * Supports: Native TC2 exports, OpenCelerator exports
- */
-async function handleJsonFile(file) {
-    try {
-        showState('progress');
-
-        // Read and parse JSON to detect format
-        const text = await file.text();
-        let json;
-        try {
-            json = JSON.parse(text);
-        } catch (parseErr) {
-            throw new Error(`Invalid JSON: ${parseErr.message}`);
-        }
-
-        // Check for native TC2 format first (has id, chartKey, shared keys)
-        if (isNativeFormat(json)) {
-            const result = await importNativeFile(file);
-            if (result.success) {
-                createToast({
-                    message: result.message,
-                    duration: 4000,
-                    position: 'top-right'
-                });
-                resetImportUI();
-            } else {
-                throw new Error(result.message || 'Native import failed');
-            }
-            return;
-        }
-
-        // Fall back to OpenCelerator format
-        if (isOpenCeleratorFormat(json)) {
-            await handleOpenCeleratorFile(file);
-            return;
-        }
-
-        // Unknown JSON format
-        throw new Error('Unrecognized JSON format');
-
-    } catch (err) {
-        console.error('JSON import error:', err);
-        showState('dropzone');
-        createToast({
-            message: `Failed to import: ${err.message}`,
-            duration: 4000,
-            position: 'top-right'
-        });
-    }
-}
-
-/**
- * Handle OpenCelerator JSON file import
- * Bypasses column mapping since OpenCelerator has a known format
- */
-async function handleOpenCeleratorFile(file) {
-    try {
-        showState('progress');
-
-        const result = await importOpenCeleratorFile(file);
-
-        if (result.success) {
-            // Show success message
-            let message = `Imported ${result.count} entries from OpenCelerator`;
-
-            // Show warnings if any
-            if (result.warnings.length > 0) {
-                console.log('[ImportUI] OpenCelerator import warnings:', result.warnings);
-                // Show first warning in toast if there are important ones
-                const importantWarnings = result.warnings.filter(w =>
-                    w.includes('not imported') || w.includes('not supported')
-                );
-                if (importantWarnings.length > 0) {
-                    message += ` (${importantWarnings.length} feature(s) skipped)`;
-                }
-            }
-
-            createToast({
-                message,
-                duration: 4000,
-                position: 'top-right'
-            });
-
-            // Reset UI back to dropzone
-            resetImportUI();
-
-        } else {
-            throw new Error(result.message || 'OpenCelerator import failed');
-        }
-
-    } catch (err) {
-        console.error('OpenCelerator import error:', err);
-        showState('dropzone');
-        createToast({
-            message: `Failed to import: ${err.message}`,
             duration: 4000,
             position: 'top-right'
         });

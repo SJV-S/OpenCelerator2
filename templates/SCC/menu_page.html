@@ -60,6 +60,13 @@ html, body {
                 </svg>
                 Install App
             </button>
+            <button id="import-chart-btn" class="px-5 py-2 rounded-lg border-2 border-[#6ad1e3] text-[#05c3de] font-medium text-sm flex items-center gap-2 hover:bg-[#6ad1e3] hover:text-white transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                </svg>
+                Import Chart
+            </button>
+            <input type="file" id="import-chart-input" accept=".json" class="hidden">
             <a href="/new" class="new-chart-btn px-5 py-2 rounded-lg text-white font-medium text-sm flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
@@ -191,7 +198,9 @@ html, body {
 
 {% block scripts %}
 <script type="module">
-    import { initStorage, listCharts, deleteChart, updateChartTags } from '/static/SCC/storage/chartStorage.js';
+    import { initStorage, listCharts, deleteChart, updateChartTags, importChart } from '/static/SCC/storage/chartStorage.js';
+    import { isNativeFormat } from '/static/SCC/import/nativeImport.js';
+    import { isOpenCeleratorFormat, convertOpenCeleratorToTC2 } from '/static/SCC/import/openCeleratorImport.js';
 
     let charts = [];
     let chartToDelete = null;
@@ -627,6 +636,86 @@ html, body {
     document.getElementById('next-page').addEventListener('click', () => {
         currentPage++;
         renderCharts();
+    });
+
+    // Import chart button
+    document.getElementById('import-chart-btn').addEventListener('click', () => {
+        document.getElementById('import-chart-input').click();
+    });
+
+    document.getElementById('import-chart-input').addEventListener('change', async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Reset input so same file can be selected again
+        e.target.value = '';
+
+        try {
+            const text = await file.text();
+            let json;
+            try {
+                json = JSON.parse(text);
+            } catch (parseErr) {
+                alert(`Invalid JSON file: ${parseErr.message}`);
+                return;
+            }
+
+            // Detect format and import
+            if (isNativeFormat(json)) {
+                // Native TC2 format - save directly to storage with new ID
+                await importChart(json);
+                await loadCharts();
+                alert(`Imported "${json.chartName || 'Unnamed'}"`);
+
+            } else if (isOpenCeleratorFormat(json)) {
+                // OpenCelerator format - convert then save
+                const conversion = convertOpenCeleratorToTC2(json);
+                if (!conversion.success) {
+                    alert(`Import failed: ${conversion.error}`);
+                    return;
+                }
+
+                // Build a minimal chartState-like object for storage
+                const chartData = {
+                    chartKey: null,
+                    shared: false,
+                    series: conversion.data.series,
+                    chartType: 'Daily',
+                    minuteChart: true,
+                    chartName: file.name.replace(/\.json$/i, ''),
+                    tags: [],
+                    hasTimestamps: true,
+                    startDate: null,
+                    credits: conversion.data.credits || {},
+                    traceStyles: {},
+                    lineStyles: {},
+                    PhaseLines: {},
+                    AimLines: {},
+                    CelLines: { settings: {} },
+                    LineCuts: {},
+                    legend: { show: true, position: 'top-right' },
+                    lineVisibility: { phase: true, aim: true, change: true, grid: true },
+                    fanVisible: true,
+                    placeZerosBelowFloor: conversion.data.placeZerosBelowFloor ?? true
+                };
+
+                await importChart(chartData);
+                await loadCharts();
+
+                let message = `Imported "${chartData.chartName}"`;
+                if (conversion.warnings.length > 0) {
+                    message += ` (${conversion.warnings.length} feature(s) not supported)`;
+                }
+                alert(message);
+
+            } else {
+                alert('Unrecognized JSON format. Expected TC2 or OpenCelerator export.');
+            }
+
+        } catch (err) {
+            console.error('Import error:', err);
+            alert(`Import failed: ${err.message}`);
+        }
     });
 
     // Load on page show (handles back button)
