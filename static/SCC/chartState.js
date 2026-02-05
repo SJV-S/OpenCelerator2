@@ -155,7 +155,6 @@ export const chartState = {
     hasTimestamps: true, // If true, xValues are timestamps that need conversion; if false, xValues are direct x-positions
     startDate: null, // The Monday before/at earliest data point (set on import or first data entry)
 
-    // Chart dimensions (NOT CURRENTLY IN USE - placeholder for future implementation)
     chartCapacity: 280, // Max X positions the chart can hold (Daily: 280, Weekly: 200, Monthly: 240, Yearly: 200)
     chartWindow: 140,   // Currently visible X range, selected based on screen size (always <= chartCapacity)
 

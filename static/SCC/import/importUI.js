@@ -17,6 +17,10 @@ import {
     isOpenCeleratorFormat,
     importOpenCeleratorFile
 } from './openCeleratorImport.js';
+import {
+    isNativeFormat,
+    importNativeFile
+} from './nativeImport.js';
 
 // ============================================================================
 // State
@@ -169,9 +173,9 @@ async function handleFile(file) {
         return;
     }
 
-    // Handle JSON files (assumed to be OpenCelerator exports)
+    // Handle JSON files - detect format and route appropriately
     if (ext === '.json') {
-        await handleOpenCeleratorFile(file);
+        await handleJsonFile(file);
         return;
     }
 
@@ -199,6 +203,59 @@ async function handleFile(file) {
         showState('dropzone');
         createToast({
             message: `Failed to read file: ${err.message}`,
+            duration: 4000,
+            position: 'top-right'
+        });
+    }
+}
+
+/**
+ * Handle JSON file import - detects format and routes appropriately
+ * Supports: Native TC2 exports, OpenCelerator exports
+ */
+async function handleJsonFile(file) {
+    try {
+        showState('progress');
+
+        // Read and parse JSON to detect format
+        const text = await file.text();
+        let json;
+        try {
+            json = JSON.parse(text);
+        } catch (parseErr) {
+            throw new Error(`Invalid JSON: ${parseErr.message}`);
+        }
+
+        // Check for native TC2 format first (has id, chartKey, shared keys)
+        if (isNativeFormat(json)) {
+            const result = await importNativeFile(file);
+            if (result.success) {
+                createToast({
+                    message: result.message,
+                    duration: 4000,
+                    position: 'top-right'
+                });
+                resetImportUI();
+            } else {
+                throw new Error(result.message || 'Native import failed');
+            }
+            return;
+        }
+
+        // Fall back to OpenCelerator format
+        if (isOpenCeleratorFormat(json)) {
+            await handleOpenCeleratorFile(file);
+            return;
+        }
+
+        // Unknown JSON format
+        throw new Error('Unrecognized JSON format');
+
+    } catch (err) {
+        console.error('JSON import error:', err);
+        showState('dropzone');
+        createToast({
+            message: `Failed to import: ${err.message}`,
             duration: 4000,
             position: 'top-right'
         });

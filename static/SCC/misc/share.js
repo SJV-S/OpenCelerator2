@@ -236,6 +236,56 @@ async function handleShareLinkClick(type) {
 }
 
 /**
+ * Exports the entire chartState as a JSON file download
+ *
+ * Data flow:
+ * - Serializes chartState object to JSON
+ * - Creates a downloadable JSON file via blob
+ * - Triggers browser download with filename based on chartName or 'chart-data.json'
+ */
+function exportChartStateToJSON() {
+    try {
+        // Serialize chartState to JSON with pretty formatting
+        const jsonContent = JSON.stringify(chartState, null, 2);
+
+        // Create a blob from the JSON content
+        const blob = new Blob([jsonContent], { type: 'application/json;charset=utf-8;' });
+
+        // Create a download link and trigger download
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+
+        // Use chartName from metadata if available, otherwise default to 'chart-data'
+        const fileName = chartState.chartName ? `${chartState.chartName}.json` : 'chart-data.json';
+
+        link.setAttribute('href', url);
+        link.setAttribute('download', fileName);
+        link.style.visibility = 'hidden';
+
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        // Clean up the URL object
+        URL.revokeObjectURL(url);
+
+        createToast({
+            message: 'Chart exported successfully',
+            duration: 2000,
+            position: 'top-right'
+        });
+
+    } catch (error) {
+        console.error('Error exporting chart state:', error);
+        createToast({
+            message: 'Export failed',
+            duration: 2000,
+            position: 'top-right'
+        });
+    }
+}
+
+/**
  * Initializes the share tab functionality
  *
  * Data flow:
@@ -292,6 +342,17 @@ function initializeShareTab() {
     const csvExportBtn = document.getElementById('csv-export-btn');
     if (csvExportBtn) {
         csvExportBtn.addEventListener('click', exportDataToCSV);
+    }
+
+    // Inject JSON export icon
+    const jsonIconElement = document.getElementById('json-icon');
+    if (jsonIconElement) {
+        jsonIconElement.innerHTML = icons.jsonExport();
+    }
+
+    const jsonExportBtn = document.getElementById('json-export-btn');
+    if (jsonExportBtn) {
+        jsonExportBtn.addEventListener('click', exportChartStateToJSON);
     }
 
     console.log('Share tab initialized');
