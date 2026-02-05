@@ -403,10 +403,18 @@ export async function importChart(chartData) {
 
     try {
         const chartId = uuid();
-        const data = serializeChart(chartId, chartData);
+
+        // Data is already in serialized format (exported with jsonReplacer)
+        // Just assign new ID and timestamps
+        const data = {
+            ...chartData,
+            id: chartId,
+            lastModified: Math.floor(Date.now() / 1000),
+            _createdAt: chartData._createdAt || Math.floor(Date.now() / 1000)
+        };
 
         await db.put(STORE_NAME, data);
-        console.log(`[Storage] Imported chart: ${chartId} (${data.chartName || 'Unnamed'})`);
+        console.log(`[STORAGE] Imported chart: ${chartId} (${data.chartName || 'Unnamed'})`);
         eventBus.emit(EVENTS.STORAGE_CHART_SAVED, { id: chartId, name: data.chartName });
         return chartId;
     } catch (error) {

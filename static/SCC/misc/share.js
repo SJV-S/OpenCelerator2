@@ -236,15 +236,25 @@ async function handleShareLinkClick(type) {
 }
 
 /**
- * Custom JSON replacer to preserve NaN and Date values
- * Matches the format used by chartStorage.js serialization
+ * Recursively serialize a value, handling Date and NaN
+ * Must match the format in chartStorage.js serializeValue
  */
-function jsonReplacer(key, value) {
+function serializeValue(value) {
+    if (value instanceof Date) {
+        return { __date__: value.toISOString() };
+    }
     if (typeof value === 'number' && Number.isNaN(value)) {
         return '__NaN__';
     }
-    if (value instanceof Date) {
-        return { __date__: value.toISOString() };
+    if (Array.isArray(value)) {
+        return value.map(serializeValue);
+    }
+    if (typeof value === 'object' && value !== null) {
+        const result = {};
+        for (const [k, v] of Object.entries(value)) {
+            result[k] = serializeValue(v);
+        }
+        return result;
     }
     return value;
 }
@@ -259,9 +269,10 @@ function jsonReplacer(key, value) {
  */
 function exportChartStateToJSON() {
     try {
-        // Serialize chartState to JSON with pretty formatting
-        // Use custom replacer to preserve NaN as '__NaN__' and Date as { __date__: ... }
-        const jsonContent = JSON.stringify(chartState, jsonReplacer, 2);
+        // Serialize chartState using same format as chartStorage.js
+        // This converts NaN to '__NaN__' and Date to { __date__: ... } BEFORE JSON.stringify
+        const serialized = serializeValue(chartState);
+        const jsonContent = JSON.stringify(serialized, null, 2);
 
         // Create a blob from the JSON content
         const blob = new Blob([jsonContent], { type: 'application/json;charset=utf-8;' });
