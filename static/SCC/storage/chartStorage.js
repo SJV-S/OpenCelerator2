@@ -248,7 +248,8 @@ export async function listCharts() {
             updatedAt: chart.lastModified,
             createdAt: chart._createdAt,
             credits: chart.credits || {},
-            tags: chart.tags || []
+            tags: chart.tags || [],
+            shared: chart.shared || false
         })).sort((a, b) => b.updatedAt - a.updatedAt);
     } catch (error) {
         console.error('[Storage] List failed:', error);

@@ -99,6 +99,11 @@ html, body {
                     <input type="radio" name="search-mode" value="tags" class="accent-[#6ad1e3]">
                     <span>Tags</span>
                 </label>
+                <span class="border-l border-gray-300 h-4 mx-2"></span>
+                <label class="flex items-center gap-1.5 cursor-pointer">
+                    <input type="checkbox" id="filter-shared" class="accent-[#6ad1e3]">
+                    <span>Filter shared charts</span>
+                </label>
             </div>
         </div>
     </div>
@@ -194,6 +199,7 @@ html, body {
     let editingTags = [];
     let searchQuery = '';
     let searchMode = localStorage.getItem('scc-search-mode') || 'name';
+    let filterShared = false;
     let searchDebounceTimer = null;
     let currentPage = 1;
     const CHARTS_PER_PAGE = 20;
@@ -267,8 +273,12 @@ html, body {
                     </button>
                 </div>
             </td>
-            <td class="py-3">
-                <span class="text-gray-400 text-sm">-</span>
+            <td class="py-3 text-center">
+                ${chart.shared
+                    ? `<svg class="w-5 h-5 text-green-500 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                       </svg>`
+                    : `<span class="text-gray-400 text-sm">-</span>`}
             </td>
             <td class="py-3 pr-2 text-right">
                 <button class="delete-btn text-gray-400 hover:text-red-500 p-1" data-id="${chart.id}" data-name="${escapeHtml(chart.chartName || 'Unnamed')}">
@@ -318,7 +328,11 @@ html, body {
     }
 
     function filterCharts(charts) {
-        return searchCharts(charts);
+        let filtered = searchCharts(charts);
+        if (filterShared) {
+            filtered = filtered.filter(chart => chart.shared);
+        }
+        return filtered;
     }
 
     function renderCharts(resetPage = false) {
@@ -594,6 +608,12 @@ html, body {
                 renderCharts(true);
             }
         });
+    });
+
+    // Filter shared toggle
+    document.getElementById('filter-shared').addEventListener('change', (e) => {
+        filterShared = e.target.checked;
+        renderCharts(true);
     });
 
     // Pagination

@@ -47,4 +47,5 @@ To-do
 - edit mode doesn't work reliably: it shuts off when a line cut is removed, and doesn't seem want to start again after it's done
 -- Also, when removing, is it also removing the associated text?
 - There's no line handling for stacking data points at the moment
--
+- There's no Ux for unsharing at the moment, although I think the infrastructure should be there...
+- 
