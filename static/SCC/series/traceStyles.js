@@ -9,7 +9,7 @@
 
 import { chartState, defaultCorrectTraceConfig, defaultErrorTraceConfig, defaultTimingTraceConfig, createMiscTraceConfig } from '../chartState.js';
 import { CORRECTS, ERRORS, TIMING, LIMITS, LINE_DEFAULTS } from '../config.js';
-import { getMiscSeriesIds, addMiscSeries, canAddMiscSeries } from './miscSeries.js';
+import { getMiscSeriesIds, addMiscSeries, canAddMiscSeries, removeMiscSeries } from './miscSeries.js';
 import { createToast, createConfirmToast } from '../ui/toaster.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 
@@ -243,6 +243,12 @@ function loadAddAggPanel(seriesName) {
         if (select) select.style.display = '';
         if (addBtn) addBtn.style.display = '';
         if (emptyMsg) emptyMsg.style.display = 'none';
+    }
+
+    // Show delete button only for misc series
+    const deleteBtn = document.getElementById('delete-series-btn');
+    if (deleteBtn) {
+        deleteBtn.style.display = isMiscSeries(seriesName) ? '' : 'none';
     }
 }
 
@@ -510,9 +516,7 @@ function removeCurrentSelection() {
         message,
         onYes: () => {
             if (isFullMiscDelete) {
-                import('./miscSeries.js').then(({ removeMiscSeries }) => {
-                    removeMiscSeries(seriesName);
-                });
+                removeMiscSeries(seriesName);
             } else {
                 removeAggregationByType(seriesName, aggType);
             }
@@ -593,6 +597,22 @@ function initializeSeriesNav() {
         if (currentSeries && aggType) {
             addAggregationOfType(currentSeries, aggType);
         }
+    });
+
+    // Set up delete series button (only functional for misc series)
+    document.getElementById('delete-series-btn')?.addEventListener('click', () => {
+        if (!currentSeries || !isMiscSeries(currentSeries)) return;
+        const displayName = getSeriesDisplayName(currentSeries);
+        createConfirmToast({
+            message: `Delete "${displayName}" series and all its aggregations?`,
+            onYes: () => {
+                removeMiscSeries(currentSeries);
+            },
+            onNo: () => {},
+            yesLabel: 'Delete',
+            noLabel: 'Cancel',
+            primaryColor: '#ef4444'
+        });
     });
 
     // Initial render
