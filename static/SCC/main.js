@@ -11,7 +11,7 @@
 
 // Import state and functions from modules
 import { chartState } from './chartState.js';
-import { CORRECTS, ERRORS, TIMING, MOBILE_BREAKPOINT, MIN_DESKTOP_WIDTH, MIN_DESKTOP_HEIGHT, TIMING_MS, CHART_MATH, LAYOUT } from './config.js';
+import { CORRECTS, ERRORS, TIMING, TIMING_MS, CHART_MATH, LAYOUT } from './config.js';
 import './debug.js';
 import { eventBus, EVENTS } from './eventBus.js';
 import {
@@ -124,55 +124,6 @@ export function initializeChart() {
 
     // Initialize credit click handler
     initCreditClick();
-
-    // Observe container for resize (fullscreen, viewport changes)
-    if (chartContainer) {
-        let resizeTimeout;
-        const resizeObserver = new ResizeObserver((entries) => {
-            clearTimeout(resizeTimeout);
-            resizeTimeout = setTimeout(() => {
-                const viewportWidth = window.innerWidth;
-                const viewportHeight = window.innerHeight;
-
-                // On non-mobile screens, hide chart if viewport too small
-                if (viewportWidth >= MOBILE_BREAKPOINT) {
-                    if (viewportWidth < MIN_DESKTOP_WIDTH || viewportHeight < MIN_DESKTOP_HEIGHT) {
-                        chartDiv.style.visibility = 'hidden';
-                        return;
-                    }
-                }
-                chartDiv.style.visibility = 'visible';
-
-                const newHeight = entries[0].contentRect.height * LAYOUT.CHART_HEIGHT_MULTIPLIER;
-                const config = CHART_CONFIG[chartState.chartType];
-                // Use the current chart margins (already expanded for fan/credits)
-                const margin = chartDiv.layout.margin;
-                // Use chartState.chartWindow - the authoritative window width
-                const xmax = chartState.chartWindow;
-                const deg = CHART_MATH.ANGLE_DEGREES;
-                const yaxis_px = newHeight - (margin.t + margin.b);
-                const y_axis = Math.log10(config.yMax) - Math.log10(config.yMin);
-                const delta_y = Math.log10(2 ** (xmax / config.unit));
-                const delta_y_px = (delta_y / y_axis) * yaxis_px;
-                const xaxis_px = delta_y_px / Math.tan((deg * Math.PI) / 180);
-                const newWidth = xaxis_px + (margin.l + margin.r);
-
-                // Preserve the current x-axis range to prevent stretching after pan
-                const currentRange = chartDiv.layout.xaxis.range;
-
-                Plotly.relayout(chartDiv, {
-                    height: newHeight,
-                    width: newWidth,
-                    'xaxis.range': [currentRange[0], currentRange[1]]
-                }).then(() => {
-                    emitFanReposition();
-                    regenerateCredits();
-                    renderCustomLegend();
-                });
-            }, TIMING_MS.RESIZE_DEBOUNCE);
-        });
-        resizeObserver.observe(chartContainer);
-    }
 
     // Initialize startDate using chart-type-specific alignment
     if (!chartState.startDate) {

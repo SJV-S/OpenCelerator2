@@ -117,17 +117,27 @@ function renderSeriesNav() {
         const config = getFirstConfig(seriesName, isMisc);
         const displayName = config?.seriesName || seriesName;
 
+        // Non-clickable heading for the series group
+        const heading = document.createElement('div');
+        heading.className = 'series-heading';
+        heading.textContent = truncateTabName(displayName);
+        if (seriesName === TIMING) {
+            heading.dataset.seriesType = 'timing';
+            heading.style.display = chartState.minuteChart ? '' : 'none';
+        }
+        flatList.appendChild(heading);
+
+        // Indented clickable rows for each aggregation
         aggTypes.forEach(aggType => {
             const label = aggType === 'raw'
-                ? displayName
+                ? `${displayName} (Raw)`
                 : `${displayName} (${aggType.charAt(0).toUpperCase() + aggType.slice(1)})`;
 
             const btn = document.createElement('button');
-            btn.className = 'series-row';
+            btn.className = 'series-row series-agg-row';
             btn.dataset.series = seriesName;
             btn.dataset.agg = aggType;
 
-            // Hide timing rows when not a minute chart
             if (seriesName === TIMING) {
                 btn.dataset.seriesType = 'timing';
                 btn.style.display = chartState.minuteChart ? '' : 'none';
@@ -137,19 +147,6 @@ function renderSeriesNav() {
             nameSpan.className = 'series-name';
             nameSpan.textContent = truncateTabName(label);
             btn.appendChild(nameSpan);
-
-            // Add minus button for deletable (misc) series
-            if (isMisc) {
-                const minusBtn = document.createElement('span');
-                minusBtn.className = 'series-delete-btn';
-                minusBtn.textContent = '−';
-                minusBtn.title = 'Delete series';
-                minusBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    deleteMiscSeriesByName(seriesName);
-                });
-                btn.appendChild(minusBtn);
-            }
 
             if (seriesName === currentSeries && aggType === currentAggType) {
                 btn.classList.add('active');
@@ -201,6 +198,13 @@ function loadConfigPanel(seriesName, aggType) {
     const edgeColorRow = document.getElementById('marker-edge-color-row');
     if (edgeColorRow) {
         edgeColorRow.style.display = (seriesName === CORRECTS || isMisc) ? '' : 'none';
+    }
+
+    // Show/hide Remove button
+    const removeBtn = document.getElementById('remove-series-btn');
+    if (removeBtn) {
+        const isDefaultRaw = !isMisc && aggType === 'raw';
+        removeBtn.style.display = isDefaultRaw ? 'none' : '';
     }
 
     // Populate form fields
@@ -476,24 +480,40 @@ function removeAggregationByType(seriesName, aggType) {
 }
 
 // ============================================================================
-// MISC SERIES MANAGEMENT
+// REMOVE CURRENT SELECTION
 // ============================================================================
 
-function deleteMiscSeriesByName(seriesName) {
-    if (!isMiscSeries(seriesName)) return;
-
-    const config = getFirstConfig(seriesName, true);
+function removeCurrentSelection() {
+    const seriesName = currentSeries;
+    const aggType = currentAggType;
+    const isMisc = isMiscSeries(seriesName);
+    const config = getFirstConfig(seriesName, isMisc);
     const displayName = config?.seriesName || seriesName;
+    const aggCount = getAggCount(seriesName);
+    const isLastAgg = aggCount <= 1;
+
+    // Determine if this is the last agg of a misc series (full deletion)
+    const isFullMiscDelete = isMisc && isLastAgg;
+
+    const message = isFullMiscDelete
+        ? `Delete "${displayName}" series?`
+        : `Remove ${displayName} (${aggType.charAt(0).toUpperCase() + aggType.slice(1)})?`;
+
+    const yesLabel = isFullMiscDelete ? 'Delete' : 'Remove';
 
     createConfirmToast({
-        message: `Delete "${displayName}" series?`,
+        message,
         onYes: () => {
-            import('./miscSeries.js').then(({ removeMiscSeries }) => {
-                removeMiscSeries(seriesName);
-            });
+            if (isFullMiscDelete) {
+                import('./miscSeries.js').then(({ removeMiscSeries }) => {
+                    removeMiscSeries(seriesName);
+                });
+            } else {
+                removeAggregationByType(seriesName, aggType);
+            }
         },
         onNo: () => {},
-        yesLabel: 'Delete',
+        yesLabel,
         noLabel: 'Cancel',
         primaryColor: '#ef4444'
     });
@@ -506,9 +526,9 @@ function deleteMiscSeriesByName(seriesName) {
 function updateTimingSeriesVisibility() {
     const shouldShow = chartState.minuteChart;
 
-    // Hide/show all timing rows in the flat list
-    document.querySelectorAll('#series-flat-list .series-row[data-series-type="timing"]').forEach(row => {
-        row.style.display = shouldShow ? '' : 'none';
+    // Hide/show all timing headings and rows in the flat list
+    document.querySelectorAll('#series-flat-list [data-series-type="timing"]').forEach(el => {
+        el.style.display = shouldShow ? '' : 'none';
     });
 
     // If timing was selected and now hidden, switch to corrects
@@ -554,6 +574,7 @@ function initializeSeriesNav() {
     // Set up config panel buttons
     document.getElementById('apply-config-btn')?.addEventListener('click', applyConfig);
     document.getElementById('reset-config-btn')?.addEventListener('click', resetConfig);
+    document.getElementById('remove-series-btn')?.addEventListener('click', removeCurrentSelection);
 
     // Initial render
     renderSeriesNav();

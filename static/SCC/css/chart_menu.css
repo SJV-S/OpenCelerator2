@@ -572,19 +572,29 @@
     text-overflow: ellipsis;
 }
 
-/* Minus button for deletable series in flat nav */
-.series-delete-btn {
-    flex-shrink: 0;
-    font-size: 1rem;
-    font-weight: bold;
-    color: #9ca3af;
-    line-height: 1;
-    padding: 0 0.25rem;
-    transition: color 0.15s ease;
+/* Non-clickable series group heading */
+.series-heading {
+    padding: 0.375rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    user-select: none;
 }
 
-.series-delete-btn:hover {
-    color: #ef4444;
+/* Indented aggregation row under a heading */
+.series-agg-row {
+    padding-left: 1.25rem;
+    font-size: 0.8125rem;
+}
+
+/* Remove Series button */
+#remove-series-btn {
+    background-color: #ef4444;
 }
 
 /* Icon container (used only by Add Series button) */
@@ -624,4 +634,16 @@
 .series-config-panel {
     display: flex;
     flex-direction: column;
+}
+
+/* Override chart-menu-content block styling for inline config rows */
+.series-config-panel label {
+    display: inline-flex;
+    margin-bottom: 0;
+}
+
+.series-config-panel input,
+.series-config-panel select {
+    width: auto;
+    max-width: none;
 }

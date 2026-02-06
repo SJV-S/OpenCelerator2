@@ -36,10 +36,9 @@ const state = {
     // Handler references for cleanup
     mouseMoveHandler: null,
     beforeHoverHandler: null,
-    resizeHandler: null,
     relayoutHandler: null,
 
-    // Cached geometry (rebuilt on activate/resize/relayout)
+    // Cached geometry (rebuilt on activate/relayout)
     cache: null,
 
     // DOM references (created once, reused)
@@ -371,20 +370,6 @@ function activateCrosshair() {
     state.mouseMoveHandler = handleMouseMove;
     state.elements.eventOverlay.addEventListener('mousemove', state.mouseMoveHandler);
 
-    // Attach resize handler (debounced)
-    let resizeTimeout;
-    state.resizeHandler = () => {
-        clearTimeout(resizeTimeout);
-        resizeTimeout = setTimeout(() => {
-            rebuildCache();
-            // Redraw with current position after resize
-            if (state.currentXPixel !== null) {
-                drawCanvas();
-            }
-        }, 150);
-    };
-    window.addEventListener('resize', state.resizeHandler);
-
     // Attach relayout handler
     state.relayoutHandler = () => {
         rebuildCache();
@@ -454,12 +439,6 @@ function deactivateCrosshair() {
     if (chartDiv && state.relayoutHandler) {
         chartDiv.removeListener('plotly_relayout', state.relayoutHandler);
         state.relayoutHandler = null;
-    }
-
-    // Remove resize handler
-    if (state.resizeHandler) {
-        window.removeEventListener('resize', state.resizeHandler);
-        state.resizeHandler = null;
     }
 
     // Disable event capture
