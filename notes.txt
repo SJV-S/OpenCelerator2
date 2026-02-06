@@ -68,4 +68,6 @@ To-do
 -- Keep the Ux very clean and the same style as elswhere, white and same kind of blue-is. Greet the user with title: Standard Change Chart, and then ask below in smaller text above three buttons:
 -- What will you be using the app for? Three options: Teaching, Business, and Both. Once the user has selected, we'll do two things, 1) add that in localStorage, and 2) generate the passphrase that we use as their identity (the infrastructure of that already exists)
 -  I need a robust mechanism to update the users apps
--
+- if I use cut series line, it resets the visiblity options for other things like the data series it seems
+- grid settings changs does not trigger a save event, check for the other visiblity settings as well (in the case of the grid, the legend seems to remember that the grid is off, state of the grid is not being applied)
+-- In the case of the visiblity of a series, not even the legend seems to remember

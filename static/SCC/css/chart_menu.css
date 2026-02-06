@@ -572,7 +572,7 @@
     text-overflow: ellipsis;
 }
 
-/* Non-clickable series group heading */
+/* Clickable series group heading */
 .series-heading {
     padding: 0.375rem 0.5rem;
     font-size: 0.75rem;
@@ -584,6 +584,16 @@
     overflow: hidden;
     text-overflow: ellipsis;
     user-select: none;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.series-heading:hover {
+    background-color: #e5e7eb;
+}
+
+.series-heading.active {
+    background-color: #d1d5db;
 }
 
 /* Indented aggregation row under a heading */

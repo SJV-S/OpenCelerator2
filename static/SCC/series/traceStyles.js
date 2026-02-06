@@ -9,7 +9,7 @@
 
 import { chartState, defaultCorrectTraceConfig, defaultErrorTraceConfig, defaultTimingTraceConfig, createMiscTraceConfig } from '../chartState.js';
 import { CORRECTS, ERRORS, TIMING, LIMITS, LINE_DEFAULTS } from '../config.js';
-import { getMiscSeriesIds } from './miscSeries.js';
+import { getMiscSeriesIds, addMiscSeries, canAddMiscSeries } from './miscSeries.js';
 import { createToast, createConfirmToast } from '../ui/toaster.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 
@@ -117,14 +117,19 @@ function renderSeriesNav() {
         const config = getFirstConfig(seriesName, isMisc);
         const displayName = config?.seriesName || seriesName;
 
-        // Non-clickable heading for the series group
+        // Clickable heading for the series group
         const heading = document.createElement('div');
         heading.className = 'series-heading';
+        heading.dataset.series = seriesName;
         heading.textContent = truncateTabName(displayName);
         if (seriesName === TIMING) {
             heading.dataset.seriesType = 'timing';
             heading.style.display = chartState.minuteChart ? '' : 'none';
         }
+        if (seriesName === currentSeries && currentAggType === null) {
+            heading.classList.add('active');
+        }
+        heading.addEventListener('click', () => selectSeriesHeading(seriesName));
         flatList.appendChild(heading);
 
         // Indented clickable rows for each aggregation
@@ -166,7 +171,10 @@ function selectAggregation(seriesName, aggType) {
     currentSeries = seriesName;
     currentAggType = aggType;
 
-    // Update active state - highlight only the matching flat row
+    // Clear active from all headings and agg rows
+    document.querySelectorAll('#series-flat-list .series-heading').forEach(h => {
+        h.classList.remove('active');
+    });
     document.querySelectorAll('#series-flat-list .series-row').forEach(row => {
         row.classList.remove('active');
         if (row.dataset.series === seriesName && row.dataset.agg === aggType) {
@@ -174,8 +182,68 @@ function selectAggregation(seriesName, aggType) {
         }
     });
 
+    // Switch to config panel, hide add-agg panel
+    const addAggPanel = document.getElementById('add-agg-panel');
+    const configPanel = document.getElementById('series-config-panel');
+    if (addAggPanel) addAggPanel.style.display = 'none';
+    if (configPanel) configPanel.style.display = '';
+
     // Load config into panel
     loadConfigPanel(seriesName, aggType);
+}
+
+function selectSeriesHeading(seriesName) {
+    currentSeries = seriesName;
+    currentAggType = null;
+
+    // Clear active from all agg rows, set active on clicked heading
+    document.querySelectorAll('#series-flat-list .series-row').forEach(row => {
+        row.classList.remove('active');
+    });
+    document.querySelectorAll('#series-flat-list .series-heading').forEach(h => {
+        h.classList.remove('active');
+        if (h.dataset.series === seriesName) {
+            h.classList.add('active');
+        }
+    });
+
+    loadAddAggPanel(seriesName);
+}
+
+function loadAddAggPanel(seriesName) {
+    const addAggPanel = document.getElementById('add-agg-panel');
+    const configPanel = document.getElementById('series-config-panel');
+    if (!addAggPanel || !configPanel) return;
+
+    // Show add-agg panel, hide config panel
+    configPanel.style.display = 'none';
+    addAggPanel.style.display = '';
+
+    // Set series name heading
+    const nameEl = document.getElementById('add-agg-series-name');
+    if (nameEl) nameEl.textContent = getSeriesDisplayName(seriesName);
+
+    // Populate unused agg types
+    const unused = getUnusedAggs(seriesName);
+    const select = document.getElementById('agg-type-select');
+    const addBtn = document.getElementById('confirm-add-agg-btn');
+    const emptyMsg = document.getElementById('add-agg-empty-msg');
+
+    if (select) {
+        select.innerHTML = unused.map(a =>
+            `<option value="${a}">${a.charAt(0).toUpperCase() + a.slice(1)}</option>`
+        ).join('');
+    }
+
+    if (unused.length === 0) {
+        if (select) select.style.display = 'none';
+        if (addBtn) addBtn.style.display = 'none';
+        if (emptyMsg) emptyMsg.style.display = '';
+    } else {
+        if (select) select.style.display = '';
+        if (addBtn) addBtn.style.display = '';
+        if (emptyMsg) emptyMsg.style.display = 'none';
+    }
 }
 
 // ============================================================================
@@ -284,19 +352,6 @@ function resetConfig() {
 // AGGREGATION MANAGEMENT
 // ============================================================================
 
-function getSeriesWithUnusedAggs() {
-    const fixedSeries = [CORRECTS, ERRORS];
-    if (chartState.minuteChart) fixedSeries.push(TIMING);
-    const miscIds = getMiscSeriesIds();
-    const allSeries = [...fixedSeries, ...miscIds];
-    const availableAggs = getAvailableAggTypes();
-
-    return allSeries.filter(seriesName => {
-        const usedAggs = getAggTypes(seriesName);
-        return availableAggs.some(a => !usedAggs.includes(a));
-    });
-}
-
 function getUnusedAggs(seriesName) {
     const usedAggs = getAggTypes(seriesName);
     return getAvailableAggTypes().filter(a => !usedAggs.includes(a));
@@ -306,139 +361,6 @@ function getSeriesDisplayName(seriesName) {
     const isMisc = isMiscSeries(seriesName);
     const config = getFirstConfig(seriesName, isMisc);
     return config?.seriesName || seriesName;
-}
-
-function showAddSeriesModal() {
-    // Remove any existing modal
-    document.getElementById('add-series-modal')?.remove();
-
-    const eligibleSeries = getSeriesWithUnusedAggs();
-    const hasAggOption = eligibleSeries.length > 0;
-
-    const overlay = document.createElement('div');
-    overlay.id = 'add-series-modal';
-    overlay.className = 'fixed inset-0 bg-black/50 flex justify-center items-center z-[10000]';
-
-    // Step 1: two choices only
-    overlay.innerHTML = `
-        <div class="bg-white p-5 rounded-lg shadow-xl w-[280px] max-w-[90vw]">
-            <h3 class="m-0 mb-4 text-sm font-bold text-gray-800">Add to Chart</h3>
-            <div class="flex flex-col gap-2">
-                <button id="modal-new-series-btn"
-                    class="w-full py-2 px-3 bg-[#6ad1e3] hover:bg-[#5bc1d3] rounded text-white font-medium text-sm transition-colors cursor-pointer">
-                    New Series
-                </button>
-                ${hasAggOption ? `
-                <button id="modal-add-agg-btn"
-                    class="w-full py-2 px-3 bg-gray-700 hover:bg-gray-800 rounded text-white font-medium text-sm transition-colors cursor-pointer">
-                    Add Aggregation
-                </button>
-                ` : ''}
-            </div>
-            <button id="modal-cancel-btn"
-                class="w-full mt-3 py-1.5 bg-gray-200 hover:bg-gray-300 rounded text-gray-700 text-xs font-medium transition-colors cursor-pointer">
-                Cancel
-            </button>
-        </div>
-    `;
-
-    document.body.appendChild(overlay);
-
-    const closeModal = () => overlay.remove();
-
-    overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) closeModal();
-    });
-
-    const onKeydown = (e) => {
-        if (e.key === 'Escape') {
-            closeModal();
-            document.removeEventListener('keydown', onKeydown);
-        }
-    };
-    document.addEventListener('keydown', onKeydown);
-
-    const observer = new MutationObserver(() => {
-        if (!document.getElementById('add-series-modal')) {
-            document.removeEventListener('keydown', onKeydown);
-            observer.disconnect();
-        }
-    });
-    observer.observe(document.body, { childList: true });
-
-    document.getElementById('modal-cancel-btn').addEventListener('click', closeModal);
-
-    // New Series — immediate action
-    document.getElementById('modal-new-series-btn').addEventListener('click', () => {
-        import('./miscSeries.js').then(({ addMiscSeries, canAddMiscSeries }) => {
-            if (!canAddMiscSeries()) {
-                createToast({ message: 'Maximum of 10 misc series reached.', duration: 3000 });
-            } else {
-                addMiscSeries();
-            }
-            closeModal();
-        });
-    });
-
-    // Add Aggregation — transition to step 2
-    if (hasAggOption) {
-        document.getElementById('modal-add-agg-btn').addEventListener('click', () => {
-            showAggregationStep(overlay, eligibleSeries, closeModal);
-        });
-    }
-}
-
-function showAggregationStep(overlay, eligibleSeries, closeModal) {
-    const seriesOptionsHtml = eligibleSeries.map(s =>
-        `<option value="${s}">${getSeriesDisplayName(s)}</option>`
-    ).join('');
-
-    const initialAggHtml = getUnusedAggs(eligibleSeries[0]).map(a =>
-        `<option value="${a}">${a.charAt(0).toUpperCase() + a.slice(1)}</option>`
-    ).join('');
-
-    const card = overlay.querySelector('div');
-    card.innerHTML = `
-        <h3 class="m-0 mb-4 text-sm font-bold text-gray-800">Add Aggregation</h3>
-        <div class="flex flex-col gap-2">
-            <select id="modal-series-select"
-                class="w-full p-1.5 text-xs border border-gray-300 rounded">
-                ${seriesOptionsHtml}
-            </select>
-            <select id="modal-agg-select"
-                class="w-full p-1.5 text-xs border border-gray-300 rounded">
-                ${initialAggHtml}
-            </select>
-            <button id="modal-confirm-agg-btn"
-                class="w-full py-2 px-3 bg-gray-700 hover:bg-gray-800 rounded text-white font-medium text-sm transition-colors cursor-pointer">
-                Add
-            </button>
-        </div>
-        <button id="modal-back-btn"
-            class="w-full mt-3 py-1.5 bg-gray-200 hover:bg-gray-300 rounded text-gray-700 text-xs font-medium transition-colors cursor-pointer">
-            Back
-        </button>
-    `;
-
-    const seriesSelect = document.getElementById('modal-series-select');
-    const aggSelect = document.getElementById('modal-agg-select');
-
-    seriesSelect.addEventListener('change', () => {
-        const unused = getUnusedAggs(seriesSelect.value);
-        aggSelect.innerHTML = unused.map(a =>
-            `<option value="${a}">${a.charAt(0).toUpperCase() + a.slice(1)}</option>`
-        ).join('');
-    });
-
-    document.getElementById('modal-confirm-agg-btn').addEventListener('click', () => {
-        addAggregationOfType(seriesSelect.value, aggSelect.value);
-        closeModal();
-    });
-
-    document.getElementById('modal-back-btn').addEventListener('click', () => {
-        closeModal();
-        showAddSeriesModal();
-    });
 }
 
 function addAggregationOfType(seriesName, aggType) {
@@ -565,16 +487,30 @@ function updateCounterLabels() {
 // ============================================================================
 
 function initializeSeriesNav() {
-    // Set up add series button → opens modal with New Series / Add Aggregation options
+    // Set up add series button → directly creates a new misc series
     const addSeriesBtn = document.querySelector('[data-action="add-misc-series"]');
     if (addSeriesBtn) {
-        addSeriesBtn.addEventListener('click', () => showAddSeriesModal());
+        addSeriesBtn.addEventListener('click', () => {
+            if (!canAddMiscSeries()) {
+                createToast({ message: 'Maximum of 10 misc series reached.', duration: 3000 });
+            } else {
+                addMiscSeries();
+            }
+        });
     }
 
     // Set up config panel buttons
     document.getElementById('apply-config-btn')?.addEventListener('click', applyConfig);
     document.getElementById('reset-config-btn')?.addEventListener('click', resetConfig);
     document.getElementById('remove-series-btn')?.addEventListener('click', removeCurrentSelection);
+
+    // Set up add-agg panel confirm button
+    document.getElementById('confirm-add-agg-btn')?.addEventListener('click', () => {
+        const aggType = document.getElementById('agg-type-select')?.value;
+        if (currentSeries && aggType) {
+            addAggregationOfType(currentSeries, aggType);
+        }
+    });
 
     // Initial render
     renderSeriesNav();
