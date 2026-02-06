@@ -117,6 +117,7 @@ export function initGridToggle() {
     eventBus.subscribe(EVENTS.DATA_CHART_REPLOT_COMPLETE, () => {
         if (!chartState.lineVisibility.grid) {
             toggleGrid(false);
+            eventBus.emit(EVENTS.CHART_GRID_VISIBILITY_CHANGED, { visible: false });
         }
     });
 }
