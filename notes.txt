@@ -57,7 +57,6 @@ To-do
 - xValues look a bit short. Are they full timestamps?
 - Is there protection against a user find out someoeone else's UUID for a chart and attempting to overwrite it on the server?
 - Default chart capacity doesn't seem to respect, or at least not for monthly (and the chart generated was not aligned with what was showing for chart capacity)
-- What is the relationship between loadChart and initializeChart and their respective roles? Do a survey and drop report as .md in Docs.
 - The "Navigation" button needs renaming.
 - - just cut the auto-reziing on page change for now, require manual refresh for the time being,
 - Fix the auto aggregation notificaiton issue
