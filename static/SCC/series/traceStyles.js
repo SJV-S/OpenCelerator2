@@ -363,6 +363,89 @@ function getSeriesDisplayName(seriesName) {
     return config?.seriesName || seriesName;
 }
 
+function showNameSeriesModal() {
+    document.getElementById('name-series-modal')?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'name-series-modal';
+    overlay.className = 'fixed inset-0 bg-black/50 flex justify-center items-center z-[10000]';
+
+    overlay.innerHTML = `
+        <div class="bg-white p-5 rounded-lg shadow-xl w-[280px] max-w-[90vw]">
+            <h3 class="m-0 mb-4 text-sm font-bold text-gray-800">New Series</h3>
+            <div class="flex flex-col gap-2">
+                <label class="text-sm font-semibold text-gray-600">Name</label>
+                <input id="modal-series-name-input" type="text" placeholder="e.g. Prompts"
+                    class="w-full px-3 py-2 border-2 border-gray-300 rounded text-sm focus:outline-none focus:border-[#6ad1e3]">
+            </div>
+            <div class="flex gap-2 mt-4">
+                <button id="modal-name-cancel-btn"
+                    class="flex-1 py-2 bg-gray-200 hover:bg-gray-300 rounded text-gray-700 text-sm font-medium transition-colors cursor-pointer">
+                    Cancel
+                </button>
+                <button id="modal-name-confirm-btn"
+                    class="flex-1 py-2 bg-[#6ad1e3] hover:bg-[#5bc1d3] rounded text-white text-sm font-medium transition-colors cursor-pointer">
+                    Create
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const nameInput = document.getElementById('modal-series-name-input');
+    const closeModal = () => overlay.remove();
+
+    const confirmCreate = () => {
+        const name = nameInput.value.trim();
+        if (!name) {
+            nameInput.focus();
+            return;
+        }
+        const id = addMiscSeries();
+        if (id) {
+            // Overwrite the default display name with the user's choice
+            const configs = chartState.traceStyles.misc[id];
+            if (configs) {
+                Object.values(configs).forEach(cfg => { cfg.seriesName = name; });
+            }
+            // Re-render so the name shows immediately
+            renderSeriesNav();
+            selectAggregation(id, 'raw');
+            updateCounterLabels();
+        }
+        closeModal();
+    };
+
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) closeModal();
+    });
+
+    const onKeydown = (e) => {
+        if (e.key === 'Escape') {
+            closeModal();
+            document.removeEventListener('keydown', onKeydown);
+        } else if (e.key === 'Enter') {
+            confirmCreate();
+            document.removeEventListener('keydown', onKeydown);
+        }
+    };
+    document.addEventListener('keydown', onKeydown);
+
+    const observer = new MutationObserver(() => {
+        if (!document.getElementById('name-series-modal')) {
+            document.removeEventListener('keydown', onKeydown);
+            observer.disconnect();
+        }
+    });
+    observer.observe(document.body, { childList: true });
+
+    document.getElementById('modal-name-cancel-btn').addEventListener('click', closeModal);
+    document.getElementById('modal-name-confirm-btn').addEventListener('click', confirmCreate);
+
+    nameInput.focus();
+}
+
 function addAggregationOfType(seriesName, aggType) {
     // Get base config from first aggregation
     const firstConfig = getFirstConfig(seriesName, isMiscSeries(seriesName));
@@ -487,14 +570,14 @@ function updateCounterLabels() {
 // ============================================================================
 
 function initializeSeriesNav() {
-    // Set up add series button → directly creates a new misc series
+    // Set up add series button → shows name modal then creates misc series
     const addSeriesBtn = document.querySelector('[data-action="add-misc-series"]');
     if (addSeriesBtn) {
         addSeriesBtn.addEventListener('click', () => {
             if (!canAddMiscSeries()) {
                 createToast({ message: 'Maximum of 10 misc series reached.', duration: 3000 });
             } else {
-                addMiscSeries();
+                showNameSeriesModal();
             }
         });
     }

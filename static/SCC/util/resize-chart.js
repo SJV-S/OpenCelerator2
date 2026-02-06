@@ -71,8 +71,8 @@ const CHART_CONFIG = {
         topMarginMultiplier: 0,
         fanMarginMinute: 0.15,
         fanMarginCount: 0.07,
-        fanXMultiplier: 1.04,
-        fanXMultiplierMinute: -0.12,
+        fanXOffsetPx: 30,
+        fanXOffsetPxMinute: 30,
         fanYPosition: 1000,
         fanYPositionMinute: 0.01,
         fanLineLengthMultiplier: 0.13,
@@ -95,8 +95,8 @@ const CHART_CONFIG = {
         topMarginMultiplier: 0,
         fanMarginMinute: 0.10,
         fanMarginCount: 0.07,
-        fanXMultiplier: 1.04,
-        fanXMultiplierMinute: -0.12,
+        fanXOffsetPx: 30,
+        fanXOffsetPxMinute: 30,
         fanYPosition: 1000,
         fanYPositionMinute: 0.01,
         fanLineLengthMultiplier: 0.13,
@@ -121,8 +121,8 @@ const CHART_CONFIG = {
         topMarginMultiplier: 0,
         fanMarginMinute: 0.10,
         fanMarginCount: 0.07,
-        fanXMultiplier: 1.04,
-        fanXMultiplierMinute: -0.12,
+        fanXOffsetPx: 30,
+        fanXOffsetPxMinute: 30,
         fanYPosition: 1000,
         fanYPositionMinute: 0.01,
         fanLineLengthMultiplier: 0.13,
@@ -386,29 +386,11 @@ function resizeChartByHeight(chartJson, containerWidth, containerHeight, chartTy
 }
 
 /**
- * Calculate fan position and emit event to reposition the fan
- * Called after resize or chart window change
+ * Emit event to reposition the fan after resize or chart window change.
+ * Position calculation is handled by generateFanElements() using layout dimensions.
  */
 function emitFanReposition() {
-    const chartType = chartState.chartType;
-    const isMinuteChart = chartState.minuteChart;
-    const chartWindow = chartState.chartWindow;
-    const config = CHART_CONFIG[chartType] || CHART_CONFIG.Daily;
-
-    const xMid = isMinuteChart
-        ? chartWindow * config.fanXMultiplierMinute
-        : chartWindow * config.fanXMultiplier;
-
-    const yMid = isMinuteChart
-        ? config.fanYPositionMinute
-        : config.fanYPosition;
-
-    eventBus.emit(EVENTS.FAN_REPOSITION, {
-        xMid,
-        yMid,
-        chartType,
-        isMinuteChart
-    });
+    eventBus.emit(EVENTS.FAN_REPOSITION);
 }
 
 export { resizeChartByHeight, CHART_CONFIG, emitFanReposition };

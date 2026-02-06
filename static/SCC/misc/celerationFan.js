@@ -110,7 +110,7 @@ function toPaper(x, y, xMin, xMax, yMinLog, yMaxLog) {
     };
 }
 
-export function generateFanElements(layout, isMinuteChart, chartType, position = null) {
+export function generateFanElements(layout, isMinuteChart, chartType) {
     const xMin = layout.xaxis.range[0];
     const xMax = layout.xaxis.range[1];
     const yMinLog = layout.yaxis.range[0]; // Already log10
@@ -124,9 +124,14 @@ export function generateFanElements(layout, isMinuteChart, chartType, position =
     const plotWidth = layout.width - layout.margin.l - layout.margin.r;
     const plotHeight = layout.height - layout.margin.t - layout.margin.b;
 
-    // Fan center in DATA coordinates - use provided position or fall back to config
-    const xMid = position?.xMid ?? (isMinuteChart ? config.capacity * config.fanXMultiplierMinute : config.capacity * config.fanXMultiplier);
-    const yMid = position?.yMid ?? (isMinuteChart ? config.fanYPositionMinute : config.fanYPosition);
+    // Fan center: fixed px distance from chart edge, converted to data coordinates.
+    // Count charts: offset right of xMax. Minute charts: offset left of xMin.
+    const pxPerDataUnit = plotWidth / (xMax - xMin);
+    const fanOffsetPx = isMinuteChart ? config.fanXOffsetPxMinute : config.fanXOffsetPx;
+    const xMid = isMinuteChart
+        ? xMin - fanOffsetPx / pxPerDataUnit
+        : xMax + fanOffsetPx / pxPerDataUnit;
+    const yMid = isMinuteChart ? config.fanYPositionMinute : config.fanYPosition;
 
     // Line length based on chart height (constant visual size)
     const lineLengthPx = plotHeight * config.fanLineLengthMultiplier;
@@ -342,9 +347,9 @@ export function regenerateFan() {
 
 /**
  * Handle fan reposition event from resize-chart.js
- * @param {Object} data - Event data with xMid, yMid, chartType, isMinuteChart
+ * Position is calculated by generateFanElements() from layout dimensions.
  */
-function handleFanReposition(data) {
+function handleFanReposition() {
     // On mobile, remove fan if it exists
     if (isMobile()) {
         if (chartState.fanVisible) {
@@ -362,12 +367,11 @@ function handleFanReposition(data) {
     const existingShapes = (chartDiv.layout.shapes || []).filter(s => !s.name?.startsWith('fan-'));
     const existingAnnotations = (chartDiv.layout.annotations || []).filter(a => !a.name?.startsWith('fan-'));
 
-    // Generate new fan with position from resize-chart.js
+    // Generate new fan — position derived from current layout
     const { shapes, annotations } = generateFanElements(
         chartDiv.layout,
-        data.isMinuteChart,
-        data.chartType,
-        { xMid: data.xMid, yMid: data.yMid }
+        chartState.minuteChart,
+        chartState.chartType
     );
 
     // Update in single relayout call
