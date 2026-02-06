@@ -191,6 +191,9 @@ export const chartState = {
         grid: true
     },
 
+    // Series visibility (by unique key, e.g. "corrects_raw": true/false)
+    seriesVisibility: {},
+
     // Celeration fan visibility
     fanVisible: true,
 

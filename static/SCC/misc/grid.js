@@ -1,3 +1,5 @@
+import { chartState } from '../chartState.js';
+
 // Track grid visibility state
 let gridVisible = true;
 let dateLinesVisible = true;
@@ -106,7 +108,14 @@ export function initGridToggle() {
     const chartDiv = document.getElementById('chart');
     if (chartDiv && chartDiv.data) {
         const gridIndices = getGridTraceIndices(chartDiv);
-        gridVisible = true;
-        console.log(`Grid toggle initialized (${gridIndices.length} grid traces)`);
+        const savedVisible = chartState.lineVisibility.grid;
+        gridVisible = savedVisible;
+
+        // If grid was saved as hidden, hide it now
+        if (!savedVisible && gridIndices.length > 0) {
+            Plotly.restyle(chartDiv, { visible: false }, gridIndices);
+        }
+
+        console.log(`Grid toggle initialized (${gridIndices.length} grid traces, visible: ${savedVisible})`);
     }
 }

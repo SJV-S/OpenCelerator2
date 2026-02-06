@@ -1025,8 +1025,15 @@ function redrawAimLines() {
     const annotations = (chartDiv.layout.annotations || []).filter(a => !a.name?.startsWith('aim-'));
 
     // Rebuild shapes and annotations from chartState using the builder
+    const isVisible = chartState.lineVisibility.aim;
     Object.values(chartState.AimLines).forEach(metadata => {
         const elements = buildAimLineElements(metadata, chartDiv);
+
+        // Apply saved visibility state to rebuilt elements
+        if (!isVisible) {
+            elements.shape.visible = false;
+            if (elements.annotation) elements.annotation.visible = false;
+        }
 
         // Add shape
         shapes.push(elements.shape);

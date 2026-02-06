@@ -14,11 +14,7 @@ import { icons } from '../ui/icons.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 import { toggleGrid } from './grid.js';
 
-// Visibility state tracked independently from Plotly
-// Each unique series_aggType combination has its own visibility state
-const visibilityState = {};
-
-// Line visibility now stored in chartState.lineVisibility
+// Series visibility is stored in chartState.seriesVisibility (persisted via IndexedDB)
 
 /**
  * Generate legend items from chartState.traceStyles
@@ -43,14 +39,14 @@ function getLegendItems() {
         Object.entries(aggConfigs).forEach(([aggType, config]) => {
             const uniqueKey = `${seriesKey}_${aggType}`;
 
-            if (visibilityState[uniqueKey] === undefined) {
-                visibilityState[uniqueKey] = true;
+            if (chartState.seriesVisibility[uniqueKey] === undefined) {
+                chartState.seriesVisibility[uniqueKey] = true;
             }
 
             items.push({
                 seriesKey: uniqueKey,
                 displayName: config.seriesName,
-                visible: visibilityState[uniqueKey],
+                visible: chartState.seriesVisibility[uniqueKey],
                 config: config,
                 baseSeriesKey: seriesKey,
                 aggType: aggType
@@ -68,14 +64,14 @@ function getLegendItems() {
         Object.entries(aggConfigs).forEach(([aggType, config]) => {
             const uniqueKey = `${miscId}_${aggType}`;
 
-            if (visibilityState[uniqueKey] === undefined) {
-                visibilityState[uniqueKey] = true;
+            if (chartState.seriesVisibility[uniqueKey] === undefined) {
+                chartState.seriesVisibility[uniqueKey] = true;
             }
 
             items.push({
                 seriesKey: uniqueKey,
                 displayName: config.seriesName,
-                visible: visibilityState[uniqueKey],
+                visible: chartState.seriesVisibility[uniqueKey],
                 config: config,
                 baseSeriesKey: miscId,
                 aggType: aggType
@@ -339,6 +335,13 @@ function renderCustomLegend() {
 
     // Apply visibility based on chartState.legend.show
     container.style.display = chartState.legend.show ? 'flex' : 'none';
+
+    // Re-apply hidden series after render (survives replot)
+    Object.entries(chartState.seriesVisibility).forEach(([key, visible]) => {
+        if (!visible) {
+            updatePlotlyTraceVisibility(key, false);
+        }
+    });
 }
 
 /**
@@ -347,12 +350,12 @@ function renderCustomLegend() {
  */
 function toggleSeriesVisibility(seriesKey) {
     // Toggle visibility state for THIS specific series_aggType combination
-    visibilityState[seriesKey] = !visibilityState[seriesKey];
+    chartState.seriesVisibility[seriesKey] = !chartState.seriesVisibility[seriesKey];
 
     // Update legend item styling for this specific item only
     const legendItem = document.querySelector(`.legend-item[data-series-key="${seriesKey}"]`);
     if (legendItem) {
-        if (visibilityState[seriesKey]) {
+        if (chartState.seriesVisibility[seriesKey]) {
             legendItem.classList.remove('legend-item-hidden');
         } else {
             legendItem.classList.add('legend-item-hidden');
@@ -360,7 +363,10 @@ function toggleSeriesVisibility(seriesKey) {
     }
 
     // Tell Plotly to hide/show traces for this specific series_aggType
-    updatePlotlyTraceVisibility(seriesKey, visibilityState[seriesKey]);
+    updatePlotlyTraceVisibility(seriesKey, chartState.seriesVisibility[seriesKey]);
+
+    // Emit event so state is persisted
+    eventBus.emit(EVENTS.SERIES_VISIBILITY_CHANGED, { seriesKey, visible: chartState.seriesVisibility[seriesKey] });
 }
 
 /**
@@ -443,4 +449,4 @@ function init() {
     });
 }
 
-export { renderCustomLegend, visibilityState, toggleLegend, init };
+export { renderCustomLegend, toggleLegend, init };

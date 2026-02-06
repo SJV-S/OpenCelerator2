@@ -33,7 +33,7 @@ const CHART_CONFIG = {
         annotations: {
             'date-text': { offsetMultiplier: 4, useGeneral: true },
             'week-count': { offsetMultiplier: 2.0833, useGeneral: true },
-            'top_x_title': { offsetMultiplier: 5.2, useTitle: true, yDirection: 'above' },
+            'top_x_title': { offsetMultiplier: 4.5, useTitle: true, yDirection: 'above' },
             'bottom_x_title': { offsetMultiplier: 4.1666, useTitle: true, yDirection: 'below' }
         },
         shapes: {

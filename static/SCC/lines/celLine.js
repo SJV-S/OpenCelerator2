@@ -1063,6 +1063,7 @@ function redrawCelLines() {
     const celAnnotations = [];
 
     // Rebuild shapes and annotations from chartState using the builder
+    const isVisible = chartState.lineVisibility.change;
     Object.values(chartState.CelLines).forEach(entry => {
         // Skip the settings object
         if (entry === chartState.CelLines.settings) return;
@@ -1073,6 +1074,12 @@ function redrawCelLines() {
         console.log('[CEL DEBUG] REDRAW: "' + displayName + '" date1=' + metadata.date1);
 
         const elements = buildCelLineElements(metadata, chartDiv);
+
+        // Apply saved visibility state to rebuilt elements
+        if (!isVisible) {
+            elements.shapes.forEach(s => s.visible = false);
+            elements.annotation.visible = false;
+        }
 
         // Add shapes
         celShapes.push(...elements.shapes);

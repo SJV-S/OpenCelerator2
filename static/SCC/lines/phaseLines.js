@@ -1016,8 +1016,15 @@ function redrawPhaseLines() {
     const annotations = (chartDiv.layout.annotations || []).filter(a => !a.name?.startsWith('phase-'));
 
     // Rebuild shapes and annotations from chartState using the builder
+    const isVisible = chartState.lineVisibility.phase;
     Object.values(chartState.PhaseLines).forEach(metadata => {
         const elements = buildPhaseLineElements(metadata, chartDiv);
+
+        // Apply saved visibility state to rebuilt elements
+        if (!isVisible) {
+            elements.shapes.forEach(s => s.visible = false);
+            elements.annotation.visible = false;
+        }
 
         // Add shapes
         shapes.push(...elements.shapes);
