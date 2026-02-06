@@ -24,7 +24,7 @@ const CHART_CONFIG = {
         fanMarginMinute: 0.10,
         fanMarginCount: 0.07,
         fanXOffsetPx: 30,
-        fanXOffsetPxMinute: 30,
+        fanXOffsetPxMinute: 180,
         fanYPosition: 1000,
         fanYPositionMinute: 0.01,
         fanLineLengthMultiplier: 0.13,
