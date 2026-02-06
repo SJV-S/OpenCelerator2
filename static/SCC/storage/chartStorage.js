@@ -404,6 +404,10 @@ export async function importChart(chartData) {
     try {
         const chartId = uuid();
 
+        // Generate a fresh encryption key for the imported chart
+        const cryptoKey = await generateChartKey();
+        const chartKey = await exportKeyToHex(cryptoKey);
+
         // Serialize the data to handle NaN → '__NaN__' and Date → { __date__: ... }
         // Safe for native imports (already serialized values pass through unchanged)
         // Required for OpenCelerator imports (raw JS values need conversion)
@@ -412,6 +416,8 @@ export async function importChart(chartData) {
         const data = {
             ...serialized,
             id: chartId,
+            chartKey,
+            shared: false,
             lastModified: Math.floor(Date.now() / 1000),
             _createdAt: serialized._createdAt || Math.floor(Date.now() / 1000)
         };

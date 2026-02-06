@@ -62,12 +62,8 @@ function refreshChart() {
 
     // Update chartState.traceStyles only for series that were auto-aggregated
     if (autoAggregatedSeries.size > 0) {
-        if (!chartState._autoAggNotified) chartState._autoAggNotified = new Set();
-
         const displayNames = [];
         autoAggregatedSeries.forEach(seriesName => {
-            if (chartState._autoAggNotified.has(seriesName)) return;
-
             const isMisc = seriesName.startsWith('misc');
             const styles = isMisc
                 ? chartState.traceStyles.misc[seriesName]
@@ -76,7 +72,6 @@ function refreshChart() {
                 displayNames.push(styles.raw.seriesName);
                 styles.median = styles.raw;
                 delete styles.raw;
-                chartState._autoAggNotified.add(seriesName);
             }
         });
 

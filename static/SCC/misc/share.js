@@ -90,23 +90,11 @@ function exportDataToCSV() {
     }
 
     try {
-        // Find misc series that have integer data
-        const miscSeriesWithData = Object.entries(chartState.series.misc)
-            .filter(([id, data]) => data && data.some(val => Number.isInteger(val)))
+        // Find misc series that have numeric data
+        const miscSeriesWithData = Object.entries(chartState.series.misc || {})
+            .filter(([id, data]) => data && data.some(val => Number.isFinite(val)))
             .map(([id]) => id)
             .sort((a, b) => parseInt(a.slice(4)) - parseInt(b.slice(4)));
-
-        // Prepare CSV data
-        let csvContent = '';
-
-        // Add header row based on which series have data
-        csvContent += 'Date,Corrects,Errors,Minutes';
-        miscSeriesWithData.forEach(miscId => {
-            const config = getFirstConfig(miscId, true);
-            const name = config?.seriesName || miscId;
-            csvContent += `,${name}`;
-        });
-        csvContent += '\n';
 
         // Get the length of timestamps array
         const dataLength = chartState.series.xValues.length;
@@ -119,6 +107,24 @@ function exportDataToCSV() {
             });
             return;
         }
+
+        // Determine which fixed columns have data
+        const hasData = (arr) => arr && arr.some(val => Number.isFinite(val));
+        const includeCorrects = hasData(chartState.series.corrects);
+        const includeErrors = hasData(chartState.series.errors);
+        const includeMinutes = chartState.minuteChart && hasData(chartState.series.timing);
+
+        // Build header row — Date is always included
+        let csvContent = 'Date';
+        if (includeCorrects) csvContent += ',Corrects';
+        if (includeErrors) csvContent += ',Errors';
+        if (includeMinutes) csvContent += ',Minutes';
+        miscSeriesWithData.forEach(miscId => {
+            const config = getFirstConfig(miscId, true);
+            const name = config?.seriesName || miscId;
+            csvContent += `,${name}`;
+        });
+        csvContent += '\n';
 
         // Helper function to format value (convert NaN to empty string)
         const formatValue = (val) => {
@@ -136,11 +142,10 @@ function exportDataToCSV() {
                 dateStr = date.toISOString().replace('T', ' ').substring(0, 19);
             }
 
-            const correct = formatValue(chartState.series.corrects[i]);
-            const error = formatValue(chartState.series.errors[i]);
-            const timing = formatValue(chartState.series.timing[i]);
-
-            let row = `${dateStr},${correct},${error},${timing}`;
+            let row = dateStr;
+            if (includeCorrects) row += `,${formatValue(chartState.series.corrects[i])}`;
+            if (includeErrors) row += `,${formatValue(chartState.series.errors[i])}`;
+            if (includeMinutes) row += `,${formatValue(chartState.series.timing[i])}`;
 
             miscSeriesWithData.forEach(miscId => {
                 const val = formatValue(chartState.series.misc[miscId][i]);

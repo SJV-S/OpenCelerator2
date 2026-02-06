@@ -240,7 +240,7 @@ window.debugLegend = function() {
         seriesInfo[`misc.${id}`] = {
             exists: !!arr,
             length: arr?.length || 0,
-            hasIntegerData: arr ? arr.some(v => Number.isInteger(v)) : false
+            hasFiniteData: arr ? arr.some(v => Number.isFinite(v)) : false
         };
     });
     console.log('Series data:', JSON.parse(JSON.stringify(seriesInfo)));

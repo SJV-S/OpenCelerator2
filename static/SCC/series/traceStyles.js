@@ -205,7 +205,6 @@ function loadConfigPanel(seriesName, aggType) {
 
     // Populate form fields
     document.getElementById('config-series-name').value = config.seriesName || '';
-    document.getElementById('config-agg-type').value = aggType;
     document.getElementById('config-marker-size').value = config.markerSize || 8;
     document.getElementById('config-line-width').value = config.lineWidth || 0.7;
     document.getElementById('config-show-line').checked = config.showLine ?? true;
@@ -214,15 +213,11 @@ function loadConfigPanel(seriesName, aggType) {
     document.getElementById('config-marker-edge-color').value = config.markerEdgeColor || '#000000';
     document.getElementById('config-marker-symbol').value = config.markerSymbol || 'circle';
     document.getElementById('config-line-dash').value = config.lineDash || 'solid';
-
-    // Update sum option visibility
-    updateSumOptionVisibility();
 }
 
 function applyConfig() {
     const seriesName = currentSeries;
-    const oldAggType = currentAggType;
-    const newAggType = document.getElementById('config-agg-type').value;
+    const aggType = currentAggType;
 
     const config = {
         seriesName: document.getElementById('config-series-name').value || seriesName,
@@ -236,13 +231,7 @@ function applyConfig() {
         markerSymbol: document.getElementById('config-marker-symbol').value || 'circle'
     };
 
-    // If aggregation type changed, delete old and create new
-    if (oldAggType !== newAggType) {
-        deleteConfig(seriesName, oldAggType);
-        currentAggType = newAggType;
-    }
-
-    setConfig(seriesName, newAggType, config);
+    setConfig(seriesName, aggType, config);
 
     // Re-render flat nav and refresh
     renderSeriesNav();
@@ -253,7 +242,7 @@ function applyConfig() {
     createToast({ message: `${config.seriesName} updated.`, duration: 2000 });
 
     // Re-select to update active states
-    selectAggregation(seriesName, newAggType);
+    selectAggregation(seriesName, aggType);
 }
 
 function resetConfig() {
@@ -514,13 +503,6 @@ function deleteMiscSeriesByName(seriesName) {
 // VISIBILITY FUNCTIONS
 // ============================================================================
 
-function updateSumOptionVisibility() {
-    const sumOption = document.querySelector('#config-agg-type .sum-option');
-    if (sumOption) {
-        sumOption.style.display = chartState.minuteChart ? 'none' : '';
-    }
-}
-
 function updateTimingSeriesVisibility() {
     const shouldShow = chartState.minuteChart;
 
@@ -582,7 +564,6 @@ function initializeSeriesNav() {
 
 function initializeAllSeriesInputs() {
     renderSeriesNav();
-    updateSumOptionVisibility();
 
     // Re-select current if valid, otherwise default to corrects/raw
     const configs = getSeriesConfigs(currentSeries);
@@ -629,7 +610,6 @@ export {
     initializeSeriesNav,
     initializeAllSeriesInputs,
     getAvailableAggTypes,
-    updateSumOptionVisibility,
     updateTimingSeriesVisibility,
     getFirstConfig
 };
