@@ -274,11 +274,10 @@ function loadConfigPanel(seriesName, aggType) {
         edgeColorRow.style.display = (seriesName === CORRECTS || isMisc) ? '' : 'none';
     }
 
-    // Show/hide Remove button
+    // Always show Remove button (series-level protection is handled at the heading panel)
     const removeBtn = document.getElementById('remove-series-btn');
     if (removeBtn) {
-        const isDefaultRaw = !isMisc && aggType === 'raw';
-        removeBtn.style.display = isDefaultRaw ? 'none' : '';
+        removeBtn.style.display = '';
     }
 
     // Populate form fields
@@ -468,21 +467,20 @@ function addAggregationOfType(seriesName, aggType) {
 }
 
 function removeAggregationByType(seriesName, aggType) {
-    const aggCount = getAggCount(seriesName);
-    if (aggCount <= 1) return;
-
     deleteConfig(seriesName, aggType);
 
-    // Select first remaining aggregation
     const remainingAggs = getAggTypes(seriesName);
-    const newAggType = remainingAggs[0];
 
     // Re-render flat nav
     renderSeriesNav();
 
-    // If removed the currently selected agg, select another
+    // If removed the currently selected agg, select another or fall back to heading
     if (currentSeries === seriesName && currentAggType === aggType) {
-        selectAggregation(seriesName, newAggType);
+        if (remainingAggs.length > 0) {
+            selectAggregation(seriesName, remainingAggs[0]);
+        } else {
+            selectSeriesHeading(seriesName);
+        }
     }
 
     eventBus.emit(EVENTS.DATA_CHART_REFRESH);
@@ -503,12 +501,13 @@ function removeCurrentSelection() {
     const aggCount = getAggCount(seriesName);
     const isLastAgg = aggCount <= 1;
 
-    // Determine if this is the last agg of a misc series (full deletion)
+    // Last agg of a misc series → delete entire series; otherwise just remove the agg
     const isFullMiscDelete = isMisc && isLastAgg;
 
+    const aggLabel = aggType.charAt(0).toUpperCase() + aggType.slice(1);
     const message = isFullMiscDelete
         ? `Delete "${displayName}" series?`
-        : `Remove ${displayName} (${aggType.charAt(0).toUpperCase() + aggType.slice(1)})?`;
+        : `Remove ${displayName} (${aggLabel})?`;
 
     const yesLabel = isFullMiscDelete ? 'Delete' : 'Remove';
 
