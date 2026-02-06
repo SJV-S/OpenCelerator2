@@ -77,6 +77,7 @@ function refreshChart() {
 
         if (displayNames.length > 0) {
             initializeAllSeriesInputs();
+            eventBus.emit(EVENTS.UI_TRACE_STYLE_CHANGED);
             createToast({
                 message: `Auto-aggregated to median: ${displayNames.join(', ')} (>${AUTO_AGG_THRESHOLD} points/position)`,
                 duration: 4000

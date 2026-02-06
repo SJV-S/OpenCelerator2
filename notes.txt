@@ -50,16 +50,22 @@ To-do
 - There's no Ux for unsharing at the moment, although I think the infrastructure should be there...
 - If the user deletes a shared chart, we need to make sure no errors or resurrections occur
 - Panning STILL doesn't reset after a start-date/capcity change
-- legend position changes does not trigger a save event
 - importing a chart json should generate a new UUID, and chart key?
 - OpenCelerator json import doesn't seem to understand last updated: "Updated Jan 21, 1970"
-- Legend doesn't appear in debt chart
 - and, yet again, auto save is triggered without me doing anything when loading the chart
-- What key in chartSTate is this? "_autoAggNotified": {}
 - The idea of saving 1s in count chart is a waste of space. Just auto generate it.
 - xValues look a bit short. Are they full timestamps?
 - Is there protection against a user find out someoeone else's UUID for a chart and attempting to overwrite it on the server?
-- csv data export is completely broken – misc series are not included!
-- Default chart capacity doesn't seem to be respect, or at least not for monthly (and the chart generated was not aligned with what was showing for chart capacity)
+- Default chart capacity doesn't seem to respect, or at least not for monthly (and the chart generated was not aligned with what was showing for chart capacity)
 - Can't write capital letters for data series because shift crosshair panel intercepts
--
+- What is the relationship between loadChart and initializeChart?
+- The "Navigation" button needs renaming.
+- Series handling of aggregation need to be more clear
+- - Use indentation to group, and use (raw) when there's no aggregation type, find out where the removal minus button went (maybe just but it under Apply and Reset?), since we now using headings for "line" and "marker" we don't need to repeat that under each option, and the text could be on the same row
+- - just cut the auto-reziing on page change for now, require manual refresh for the time being,
+- Fix the auto aggregation notificaiton issue
+- - Is it deferring the save event until at the END of the chart drawing and stuff? It should set a bool and check it at the end.
+- We need to get rid of the double notification when placing lines
+- The celeration fan's x value position (tested on minute chart) doesn't move in good proportion to the width of the chart.
+- We need the welcome screen: 1) Check local storage if an SCC user exists. If not, direct to a welcome screen where we guide the user through some simple options and set values in localStorage
+-- Keep the U
