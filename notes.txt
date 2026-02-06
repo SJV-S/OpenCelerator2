@@ -57,15 +57,15 @@ To-do
 - xValues look a bit short. Are they full timestamps?
 - Is there protection against a user find out someoeone else's UUID for a chart and attempting to overwrite it on the server?
 - Default chart capacity doesn't seem to respect, or at least not for monthly (and the chart generated was not aligned with what was showing for chart capacity)
-- Can't write capital letters for data series because shift crosshair panel intercepts
 - What is the relationship between loadChart and initializeChart?
 - The "Navigation" button needs renaming.
-- Series handling of aggregation need to be more clear
-- - Use indentation to group, and use (raw) when there's no aggregation type, find out where the removal minus button went (maybe just but it under Apply and Reset?), since we now using headings for "line" and "marker" we don't need to repeat that under each option, and the text could be on the same row
 - - just cut the auto-reziing on page change for now, require manual refresh for the time being,
 - Fix the auto aggregation notificaiton issue
 - - Is it deferring the save event until at the END of the chart drawing and stuff? It should set a bool and check it at the end.
 - We need to get rid of the double notification when placing lines
 - The celeration fan's x value position (tested on minute chart) doesn't move in good proportion to the width of the chart.
 - We need the welcome screen: 1) Check local storage if an SCC user exists. If not, direct to a welcome screen where we guide the user through some simple options and set values in localStorage
--- Keep the U
+-- Keep the Ux very clean and the same style as elswhere, white and same kind of blue-is. Greet the user with title: Standard Change Chart, and then ask below in smaller text above three buttons:
+-- What will you be using the app for? Three options: Teaching, Business, and Both. Once the user has selected, we'll do two things, 1) add that in localStorage, and 2) generate the passphrase that we use as their identity (the infrastructure of that already exists)
+-  I need a robust mechanism to update the users apps
+-

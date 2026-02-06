@@ -1,0 +1,607 @@
+/**
+ * Date Utilities - All date handling and conversion functions
+ *
+ * This module handles:
+ * - Finding nearest Monday
+ * - Calculating start dates
+ * - Converting timestamps to x-positions
+ * - Converting x-positions back to dates
+ * - Date formatting and display
+ * - Updating chart date labels
+ * - Date change UI handling
+ *
+ * Emits events instead of calling peer modules directly.
+ *
+ * =============================================================================
+ * DATE BOUNDARY POLICY
+ * =============================================================================
+ * All dates must snap to the FIRST of their respective period:
+ *
+ * - Daily:   The day itself (no snapping)
+ * - Weekly:  Monday (first day of week per ISO 8601)
+ * - Monthly: 1st of month
+ * - Yearly:  January 1st
+ *
+ * This policy is enforced by snapToChartBoundary() which MUST be used:
+ * - When initializing date inputs
+ * - When adjusting dates via arrow buttons
+ * - When user selects a date from calendar picker
+ * - Anywhere else a date is set for chart purposes
+ *
+ * =============================================================================
+ * DATA AGGREGATION / BINNING
+ * =============================================================================
+ * Data points are grouped into bins based on chart type. All entries within
+ * the same period share the same X-position, enabling aggregation.
+ *
+ * Chart Type | Bin Size   | X-Position Calculation        | startDate Alignment
+ * -----------|------------|-------------------------------|---------------------
+ * Daily      | 1 day      | daysDiff from startDate       | Previous Monday
+ * Weekly     | 7 days     | floor(daysDiff / 7)           | Monday <= 1st of prev month
+ * Monthly    | 1 month    | monthsDiff from startDate     | Jan 1 of previous year
+ * Yearly     | 1 year     | yearsDiff from startDate      | Jan 1 of decade start
+ *
+ * CRITICAL: The startDate alignment ensures binning intervals align with the
+ * date boundary policy. For Weekly charts, startDate is a Monday so that
+ * 7-day bins correspond to actual calendar weeks (Mon-Sun, ISO 8601).
+ *
+ * Functions:
+ * - parseLocalDate(): ALWAYS use this to parse dates from strings or clone Date objects
+ * - alignStartDate(): Sets chart's anchor point (startDate) per chart type
+ * - timestampsToXPositions(): Converts timestamps to X-positions with binning
+ * - xPositionToDate(): Reverse conversion (X-position back to date)
+ * - snapToChartBoundary(): Snaps user-selected dates to valid boundaries
+ * - formatDateInputValue(): ALWAYS use this to format dates for input fields
+ *
+ * IMPORTANT: Never use `new Date(string)` directly - it causes timezone issues.
+ * Always use parseLocalDate() for parsing and formatDateInputValue() for output.
+ * =============================================================================
+ */
+
+import { chartState } from '../chartState.js';
+import { eventBus, EVENTS } from '../eventBus.js';
+import { createToast } from '../ui/toaster.js';
+
+/**
+ * Find the nearest Monday before (or at) a given date.
+ * @param {Date} date - Single Date object
+ * @returns {Date} The Monday at or before the given date
+ */
+function findNearestMonday(date) {
+    const d = parseLocalDate(date);
+    const dayOfWeek = d.getDay();
+    // getDay(): 0=Sun, 1=Mon, ..., 6=Sat
+    // Days to subtract: Mon(1)->0, Tue(2)->1, ..., Sun(0)->6
+    const daysToSubtract = (dayOfWeek === 0) ? 6 : dayOfWeek - 1;
+
+    if (daysToSubtract > 0) {
+        d.setDate(d.getDate() - daysToSubtract);
+    }
+
+    return d;
+}
+
+/**
+ * @deprecated Use findNearestMonday instead
+ */
+function findNearestSunday(date) {
+    return findNearestMonday(date);
+}
+
+/**
+ * Align a date to the appropriate start boundary based on chart type.
+ * - Daily: Previous Monday
+ * - Weekly: Monday at or before 1st of previous month (ensures week binning aligns with calendar weeks)
+ * - Monthly: January 1st of previous year
+ * - Yearly: January 1st of decade start (year rounded down to nearest 10)
+ *
+ * @param {Date} date - Date to align
+ * @param {string} chartType - Chart type (Daily, Weekly, Monthly, Yearly)
+ * @returns {Date} Aligned date
+ */
+function alignStartDate(date, chartType) {
+    const d = parseLocalDate(date);
+
+    switch ((chartType || 'Daily').toLowerCase()) {
+        case 'weekly':
+            // First go to 1st of previous month
+            d.setDate(1);
+            d.setMonth(d.getMonth() - 1);
+            // Then find Monday at or before that date (ISO 8601)
+            const weekday = d.getDay();
+            const daysToSubtract = (weekday === 0) ? 6 : weekday - 1;
+            if (daysToSubtract > 0) {
+                d.setDate(d.getDate() - daysToSubtract);
+            }
+            return d;
+
+        case 'monthly':
+            // January 1st of previous year
+            d.setFullYear(d.getFullYear() - 1);
+            d.setMonth(0);
+            d.setDate(1);
+            return d;
+
+        case 'yearly':
+            // January 1st of decade start
+            const decadeStart = d.getFullYear() - (d.getFullYear() % 10);
+            d.setFullYear(decadeStart);
+            d.setMonth(0);
+            d.setDate(1);
+            return d;
+
+        case 'daily':
+        default:
+            // Previous Monday (ISO 8601)
+            const dayOfWeekDaily = d.getDay();
+            const daysToMonday = (dayOfWeekDaily === 0) ? 6 : dayOfWeekDaily - 1;
+            d.setDate(d.getDate() - daysToMonday);
+            return d;
+    }
+}
+
+/**
+ * Format a date as month-year (e.g., "Jan 2025")
+ * @param {Date} date - Date to format
+ * @returns {string} Formatted month-year string
+ */
+function formatMonthYear(date) {
+    console.log('ran')
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const year = date.getFullYear().toString().slice(-2);
+    return `${months[date.getMonth()]}<br>${year}`;
+}
+
+/**
+ * Parse a date safely as local date, handling both Date objects and strings.
+ * Avoids timezone issues by using local date components.
+ *
+ * @param {Date|string} date - Date object or YYYY-MM-DD string
+ * @returns {Date} Local date at midnight
+ */
+function parseLocalDate(date) {
+    if (date instanceof Date) {
+        return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    }
+    if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        const [year, month, day] = date.split('-').map(Number);
+        return new Date(year, month - 1, day);
+    }
+    // Fallback - parse and normalize to local midnight
+    // BUG INVESTIGATION: ISO strings with time component can shift dates across timezone boundaries
+    const d = new Date(date);
+    const result = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    if (typeof date === 'string' && date.includes('T')) {
+        console.log('[CEL DEBUG] parseLocalDate ISO fallback: input="' + date + '" -> parsed=' + d.toISOString() + ' -> result=' + result.toISOString());
+    }
+    return result;
+}
+
+/**
+ * Snap a date to the appropriate boundary based on chart type.
+ * POLICY: Always use FIRST of the period.
+ * - Daily: the day itself (no change)
+ * - Weekly: Monday (first day of week per ISO 8601)
+ * - Monthly: 1st of month
+ * - Yearly: January 1st
+ *
+ * @param {Date|string} date - Date object or YYYY-MM-DD string
+ * @returns {Date} Snapped date
+ */
+function snapToChartBoundary(date) {
+    const d = parseLocalDate(date);
+    const chartType = (chartState.chartType || 'Daily').toLowerCase();
+
+    switch (chartType) {
+        case 'weekly':
+            // First day of week = Monday (ISO 8601)
+            // getDay() returns 0=Sun, 1=Mon, ..., 6=Sat
+            // We want to go back to Monday: if Mon(1)->0, Tue(2)->1, ..., Sun(0)->6
+            const dayOfWeek = d.getDay();
+            const daysToSubtract = (dayOfWeek === 0) ? 6 : dayOfWeek - 1;
+            if (daysToSubtract > 0) {
+                d.setDate(d.getDate() - daysToSubtract);
+            }
+            break;
+        case 'monthly':
+            // First day of month
+            d.setDate(1);
+            break;
+        case 'yearly':
+            // First day of year = January 1st
+            d.setMonth(0);
+            d.setDate(1);
+            break;
+        case 'daily':
+        default:
+            // No change needed
+            break;
+    }
+
+    return d;
+}
+
+/**
+ * Calculate and set the start date based on the earliest date in the provided array.
+ * Uses chart-type-specific alignment via alignStartDate().
+ * @param {Array<Date>} dates - Array of Date objects
+ */
+function calculateStartDate(dates) {
+    const earliestDate = new Date(Math.min(...dates));
+    const chartType = chartState.chartType || 'Daily';
+    chartState.startDate = alignStartDate(earliestDate, chartType);
+    return chartState.startDate;
+}
+
+/**
+ * Convert x-values to x-position coordinates for chart rendering.
+ * - If chartState.hasTimestamps is true: converts timestamps to positions based on chart type
+ * - If chartState.hasTimestamps is false: returns x-positions as-is
+ *
+ * BINNING BEHAVIOR:
+ * This function also handles binning by chart type. Multiple data entries that fall
+ * within the same time unit will have the same X position, enabling proper aggregation.
+ * - Daily: X = day offset from startDate (no binning, each day unique)
+ * - Weekly: X = week offset (days / 7, floored) - entries in same week share X
+ * - Monthly: X = month offset from startDate - entries in same month share X
+ * - Yearly: X = year offset from startDate - entries in same year share X
+ *
+ * @param {Array<number>} xValues - Array of Unix timestamps (seconds) or direct x-positions
+ * @returns {Array<number>} Array of x-position coordinates
+ */
+function timestampsToXPositions(xValues) {
+    if (!xValues || xValues.length === 0) {
+        return [];
+    }
+
+    // If not using timestamps, return x-positions as-is
+    if (!chartState.hasTimestamps) {
+        return [...xValues];
+    }
+
+    // Convert timestamps to dates
+    const dates = xValues.map(timestamp => {
+        const dt = new Date(timestamp * 1000);
+        return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+    });
+
+    if (!chartState.startDate) {
+        calculateStartDate(dates);
+    }
+
+    const chartType = (chartState.chartType || 'Daily').toLowerCase();
+
+    const xPositions = dates.map(date => {
+        const daysDiff = Math.floor((date - chartState.startDate) / (1000 * 60 * 60 * 24));
+
+        switch (chartType) {
+            case 'weekly':
+                return Math.floor(daysDiff / 7);
+            case 'monthly':
+                // Calculate month difference from startDate
+                const startYear = chartState.startDate.getFullYear();
+                const startMonth = chartState.startDate.getMonth();
+                const dateYear = date.getFullYear();
+                const dateMonth = date.getMonth();
+                return (dateYear - startYear) * 12 + (dateMonth - startMonth);
+            case 'yearly':
+                return date.getFullYear() - chartState.startDate.getFullYear();
+            case 'daily':
+            default:
+                return daysDiff;
+        }
+    });
+
+    return xPositions;
+}
+
+/**
+ * Convert a single x-position coordinate back to a date.
+ * Reverses the binning done by timestampsToXPositions.
+ * - Daily: X = day offset, returns that day
+ * - Weekly: X = week offset, returns first day of that week
+ * - Monthly: X = month offset, returns first day of that month
+ * - Yearly: X = year offset, returns first day of that year
+ *
+ * @param {number} xPosition - X-position coordinate
+ * @returns {Date} Date object corresponding to the x-position
+ */
+function xPositionToDate(xPosition) {
+    const chartType = (chartState.chartType || 'Daily').toLowerCase();
+    // Use parseLocalDate to get a clean local date without timezone issues
+    const startDate = parseLocalDate(chartState.startDate);
+
+    switch (chartType) {
+        case 'weekly': {
+            const resultDate = new Date(startDate);
+            resultDate.setDate(startDate.getDate() + (xPosition * 7));
+            return resultDate;
+        }
+        case 'monthly': {
+            // Use first of month to avoid timezone boundary issues
+            const resultDate = new Date(startDate.getFullYear(), startDate.getMonth() + xPosition, 1);
+            return resultDate;
+        }
+        case 'yearly': {
+            // Use January 1 to avoid timezone boundary issues (Dec 31 23:00 UTC becomes Jan 1 in UTC+1)
+            const resultDate = new Date(startDate.getFullYear() + xPosition, 0, 1);
+            return resultDate;
+        }
+        case 'daily':
+        default: {
+            const resultDate = new Date(startDate);
+            resultDate.setDate(startDate.getDate() + xPosition);
+            return resultDate;
+        }
+    }
+}
+
+/**
+ * Convert a Date object to an x-position on the chart (inverse of xPositionToDate).
+ * Uses chart-type-specific calculations matching timestampsToXPositions:
+ * - Daily: X = day offset from startDate
+ * - Weekly: X = floor(daysDiff / 7)
+ * - Monthly: X = month offset from startDate
+ * - Yearly: X = year offset from startDate
+ *
+ * @param {Date|string} date - Date object or ISO string to convert
+ * @returns {number} X-position for the chart
+ */
+function dateToXPosition(date) {
+    if (!chartState.startDate) return 0;
+
+    const chartType = (chartState.chartType || 'Daily').toLowerCase();
+    const inputDate = parseLocalDate(date);
+    const startDate = parseLocalDate(chartState.startDate);
+
+    // Calculate days difference (used by daily and weekly)
+    const daysDiff = Math.floor((inputDate - startDate) / (1000 * 60 * 60 * 24));
+
+    switch (chartType) {
+        case 'yearly':
+            return inputDate.getFullYear() - startDate.getFullYear();
+        case 'monthly':
+            return (inputDate.getFullYear() - startDate.getFullYear()) * 12 +
+                   (inputDate.getMonth() - startDate.getMonth());
+        case 'weekly':
+            return Math.floor(daysDiff / 7);
+        case 'daily':
+        default:
+            return daysDiff;
+    }
+}
+
+/**
+ * Update date annotations in chart with formatted dates based on startDate.
+ * Handles different annotation types for different chart types:
+ * - Daily: date-text-* annotations, 28-day intervals
+ * - Weekly: month-label-* annotations, monthly intervals
+ * - Monthly: year-label-* annotations, yearly intervals
+ * - Yearly: year-label-* annotations, decade intervals
+ *
+ * @param {HTMLElement} chartElement - Plotly chart element
+ * @param {Date} startDate - The start date to use for formatting
+ */
+function updateChartDateLabels(chartElement, startDate) {
+    if (!chartElement?.layout?.annotations) {
+        return;
+    }
+
+    const chartType = (chartState.chartType || 'Daily').toLowerCase();
+
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    function formatDate(date) {
+        const day = date.getDate();
+        const month = months[date.getMonth()];
+        const year = date.getFullYear();
+        return `${day}-${month}-${year}`;
+    }
+
+    chartElement.layout.annotations.forEach(annotation => {
+        if (!annotation.name) return;
+
+        let idx, currentDate, formattedDate;
+
+        if (annotation.name.startsWith('date-text-')) {
+            // Daily: 28-day (4-week) intervals
+            idx = parseInt(annotation.name.replace('date-text-', ''));
+            currentDate = new Date(startDate);
+            currentDate.setDate(startDate.getDate() + (idx * 28));
+            formattedDate = formatDate(currentDate);
+            annotation.text = `<u>${formattedDate}</u>`;
+
+        } else if (annotation.name.startsWith('month-label-')) {
+            // Weekly: monthly intervals
+            idx = parseInt(annotation.name.replace('month-label-', ''));
+            currentDate = new Date(startDate);
+            currentDate.setMonth(startDate.getMonth() + idx);
+            formattedDate = formatMonthYear(currentDate);
+            annotation.text = formattedDate;
+
+        } else if (annotation.name.startsWith('year-label-')) {
+            idx = parseInt(annotation.name.replace('year-label-', ''));
+            currentDate = new Date(startDate);
+
+            if (chartType === 'yearly') {
+                // Yearly: decade (10-year) intervals
+                currentDate.setFullYear(startDate.getFullYear() + (idx * 10));
+            } else {
+                // Monthly: yearly intervals
+                currentDate.setFullYear(startDate.getFullYear() + idx);
+            }
+            formattedDate = currentDate.getFullYear().toString();
+            annotation.text = formattedDate;
+        }
+    });
+
+    Plotly.relayout(chartElement, {
+        'annotations': chartElement.layout.annotations
+    });
+}
+
+/**
+ * Format a date as day-month(name)-year
+ * @param {Date} date - Date to format
+ * @returns {string} Formatted date string (e.g., "15-Nov-2024")
+ */
+function formatDateDisplay(date) {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const day = date.getDate();
+    const month = months[date.getMonth()];
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`;
+}
+
+/**
+ * Update the visible date display element
+ * @param {Date} date - Date to display
+ */
+function updateDateDisplay(date) {
+    const displayElement = document.getElementById('other-date-display');
+    if (displayElement) {
+        displayElement.textContent = formatDateDisplay(date);
+    }
+}
+
+/**
+ * Handle date change in other tab - align to appropriate boundary based on chart type
+ * Emits: DATA_START_DATE_CHANGED
+ */
+function handleOtherDateChange() {
+    const otherDateInput = document.getElementById('other-date');
+    const selectedDate = parseLocalDate(otherDateInput.value);
+    const chartType = chartState.chartType || 'Daily';
+    const alignedDate = alignStartDate(selectedDate, chartType);
+
+    // Update input to show aligned date
+    otherDateInput.value = formatDateInputValue(alignedDate);
+    updateDateDisplay(alignedDate);
+
+    // Emit event instead of calling setStartDate directly
+    eventBus.emit(EVENTS.DATA_START_DATE_CHANGED, { date: alignedDate });
+
+    // Show appropriate toast based on chart type
+    const alignmentMessages = {
+        daily: 'Adjusted to nearest Monday',
+        weekly: 'Adjusted to first of previous month',
+        monthly: 'Adjusted to January 1 of previous year',
+        yearly: 'Adjusted to start of decade'
+    };
+
+    createToast({
+        message: alignmentMessages[chartType.toLowerCase()] || 'Start date updated',
+        duration: 2000,
+        position: 'top-right'
+    });
+
+}
+
+/**
+ * Adjust a date input field by the appropriate interval based on chart type.
+ * Snaps to chart boundary first, then adjusts, then snaps result.
+ * - Daily: adjusts by days
+ * - Weekly: adjusts by weeks (7 days)
+ * - Monthly: adjusts by months
+ * - Yearly: adjusts by years
+ *
+ * @param {string} inputId - ID of the date input element
+ * @param {number} offset - Number of units to adjust (positive or negative)
+ */
+function adjustDateInput(inputId, offset) {
+    const dateInput = document.getElementById(inputId);
+    if (!dateInput) return;
+
+    // Snap to boundary first to ensure valid starting point
+    const currentDate = snapToChartBoundary(dateInput.value);
+    const chartType = (chartState.chartType || 'Daily').toLowerCase();
+
+    switch (chartType) {
+        case 'weekly':
+            currentDate.setDate(currentDate.getDate() + (offset * 7));
+            break;
+        case 'monthly':
+            currentDate.setMonth(currentDate.getMonth() + offset);
+            break;
+        case 'yearly':
+            currentDate.setFullYear(currentDate.getFullYear() + offset);
+            break;
+        case 'daily':
+        default:
+            currentDate.setDate(currentDate.getDate() + offset);
+            break;
+    }
+
+    dateInput.value = formatDateInputValue(currentDate);
+}
+
+/**
+ * Format a Date object as YYYY-MM-DD string for input fields.
+ * Uses local date components to avoid timezone issues.
+ * @param {Date} date - Date to format
+ * @returns {string} Date string in YYYY-MM-DD format
+ */
+function formatDateInputValue(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+/**
+ * Initialize a date input field to today's date, snapped to chart boundary.
+ * @param {string} inputId - ID of the date input element
+ */
+function initializeDateInput(inputId) {
+    const dateInput = document.getElementById(inputId);
+    if (!dateInput) return;
+
+    const today = snapToChartBoundary(new Date());
+    dateInput.value = formatDateInputValue(today);
+}
+
+/**
+ * Update the "Plot Date" label text based on chart type.
+ * - Daily: "Plot Date"
+ * - Weekly: "Plot Week"
+ * - Monthly: "Plot Month"
+ * - Yearly: "Plot Year"
+ */
+function updatePlotDateLabel() {
+    const label = document.querySelector('label[for="entry-date"]');
+    if (!label) return;
+
+    const chartType = (chartState.chartType || 'Daily').toLowerCase();
+    const labelText = {
+        daily: 'Plot Date',
+        weekly: 'Plot Week',
+        monthly: 'Plot Month',
+        yearly: 'Plot Year'
+    };
+
+    label.textContent = labelText[chartType] || 'Plot Date';
+}
+
+export {
+    findNearestMonday,
+    findNearestSunday, // deprecated, use findNearestMonday
+    alignStartDate,
+    calculateStartDate,
+    parseLocalDate,
+    snapToChartBoundary,
+    timestampsToXPositions,
+    xPositionToDate,
+    dateToXPosition,
+    updateChartDateLabels,
+    formatDateDisplay,
+    formatDateInputValue,
+    formatMonthYear,
+    updateDateDisplay,
+    handleOtherDateChange,
+    adjustDateInput,
+    initializeDateInput,
+    updatePlotDateLabel
+};

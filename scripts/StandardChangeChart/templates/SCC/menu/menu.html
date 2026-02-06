@@ -1,0 +1,45 @@
+<!-- Menu overlay -->
+<div id="counter-overlay" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: white; z-index: 1000; flex-direction: row;">
+    <!-- Tabs -->
+    <div class="chart-menu-tabs">
+        <button class="chart-menu-tab-btn active" data-tab="data">Data</button>
+        <button class="chart-menu-tab-btn" data-tab="credit">Credit</button>
+        <button class="chart-menu-tab-btn" data-tab="lines">Lines</button>
+        <button class="chart-menu-tab-btn" data-tab="series">Series</button>
+        <button class="chart-menu-tab-btn" data-tab="chart">Settings</button>
+        <button class="chart-menu-tab-btn" data-tab="share">Share</button>
+        <button class="chart-menu-tab-btn" data-tab="import">Import</button>
+    </div>
+
+    <!-- Tab Content -->
+    <div id="chart-menu-content" class="chart-menu-content menu-loading">
+        <div id="data-content" class="chart-menu-tab-pane active">
+            {% include 'SCC/menu/data_tab.html' %}
+        </div>
+        <div id="credit-content" class="chart-menu-tab-pane">
+            {% include 'SCC/menu/credit_tab.html' %}
+        </div>
+        <div id="lines-content" class="chart-menu-tab-pane">
+            {% include 'SCC/menu/lines_tab.html' %}
+        </div>
+        <div id="series-content" class="chart-menu-tab-pane">
+            {% include 'SCC/menu/series_tab.html' %}
+        </div>
+        <div id="chart-content" class="chart-menu-tab-pane">
+            {% include 'SCC/menu/chart_tab.html' %}
+        </div>
+        <div id="share-content" class="chart-menu-tab-pane">
+            {% include 'SCC/menu/share_tab.html' %}
+        </div>
+        <div id="import-content" class="chart-menu-tab-pane">
+            {% include 'SCC/menu/import_tab.html' %}
+        </div>
+        <!-- Crosshair info panel (shown when Shift+hover) -->
+        <div id="crosshair-content" class="chart-menu-tab-pane">
+            <div class="crosshair-panel">
+                <h2 class="crosshair-title">Crosshair Info</h2>
+                <div id="crosshair-info" class="crosshair-info"></div>
+            </div>
+        </div>
+    </div>
+</div>

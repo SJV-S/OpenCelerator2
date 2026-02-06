@@ -1,0 +1,132 @@
+<div class="chart-menu-tab-inner">
+    <!-- Chart Name Section -->
+    <div class="mb-8 lg:mb-4">
+        <label class="block text-sm font-semibold text-gray-600 mb-2 lg:mb-1 text-center" for="chart-name">Chart Name</label>
+        <div class="flex items-center gap-2 max-w-md lg:max-w-full mx-auto">
+            <input type="text" id="chart-name" placeholder="Unnamed" class="flex-1 px-4 py-3 lg:px-2 lg:py-2 text-lg lg:text-base border-2 border-gray-300 rounded focus:outline-none focus:border-[#6ad1e3] transition-colors text-center">
+        </div>
+    </div>
+
+    <!-- Navigation Group -->
+    <div class="mb-4 lg:mb-3 border-t border-gray-300 pt-4 lg:pt-3">
+        <label class="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-3 lg:mb-2 text-center">Navigation</label>
+
+        <!-- Navigation Settings Button -->
+        <div class="mb-4 lg:mb-3">
+            <button type="button" id="start-date-btn" class="w-full py-3 lg:py-2 px-4 bg-white border-2 border-gray-300 rounded hover:bg-gray-50 active:bg-gray-100 transition-colors text-sm font-semibold text-gray-600">
+                Navigation
+            </button>
+        </div>
+
+    </div>
+
+    <!-- Other Group -->
+    <div class="mb-4 lg:mb-3 border-t border-gray-300 pt-4 lg:pt-3">
+        <label class="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-3 lg:mb-2 text-center">Other</label>
+
+        <!-- Celeration Fan Toggle (hidden on mobile - screen too small for fan) -->
+        <div class="mb-4 lg:mb-3 hidden md:block">
+            <label class="block text-sm font-semibold text-gray-600 mb-3 lg:mb-2 text-center">Celeration Fan</label>
+            <div class="flex items-center justify-center">
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="fan-toggle" class="sr-only peer" checked>
+                    <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#6ad1e3]"></div>
+                </label>
+            </div>
+        </div>
+
+        <!-- Place Zeros Below Floor Toggle -->
+        <div>
+            <label class="block text-sm font-semibold text-gray-600 mb-3 lg:mb-2 text-center">Place Zeros Below Floor</label>
+            <div class="flex items-center justify-center">
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="place-zeros-below-floor-toggle" class="sr-only peer" checked>
+                    <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#6ad1e3]"></div>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Legend Toggle -->
+    <div class="mb-4 lg:mb-3 border-t border-gray-300 pt-4 lg:pt-3">
+        <label class="block text-sm font-semibold text-gray-600 mb-3 lg:mb-2 text-center">Legend</label>
+        <div class="flex items-center justify-center gap-4 lg:gap-3">
+            <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="legend-toggle" class="sr-only peer" checked>
+                <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#6ad1e3]"></div>
+            </label>
+            <select id="legend-position" class="px-3 py-2 lg:px-2 lg:py-1 text-sm border-2 border-gray-300 rounded focus:outline-none focus:border-[#6ad1e3] transition-colors bg-white disabled:bg-gray-100 disabled:text-gray-400 disabled:bg-gray-200 disabled:cursor-not-allowed">
+                <option value="top-right">Top Right</option>
+                <option value="top-left">Top Left</option>
+                <option value="bottom-right">Bottom Right</option>
+                <option value="bottom-left">Bottom Left</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Grid Settings -->
+    <div class="mb-4 lg:mb-3 border-t border-gray-300 pt-4 lg:pt-3">
+        <label class="block text-sm font-semibold text-gray-600 mb-3 lg:mb-2 text-center">Grid</label>
+        <!-- Date Lines (thick vertical) -->
+        <div class="flex items-center justify-between mb-3">
+            <label class="text-sm text-gray-500">Date Lines</label>
+            <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="grid-date-lines-toggle" class="sr-only peer" checked>
+                <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#6ad1e3]"></div>
+            </label>
+        </div>
+        <!-- Count Lines (thick horizontal) -->
+        <div class="flex items-center justify-between mb-3">
+            <label class="text-sm text-gray-500">Count Lines</label>
+            <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="grid-count-lines-toggle" class="sr-only peer" checked>
+                <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#6ad1e3]"></div>
+            </label>
+        </div>
+        <!-- Minor Grid (thin lines) -->
+        <div class="flex items-center justify-between">
+            <label class="text-sm text-gray-500">Minor Grid</label>
+            <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="grid-minor-toggle" class="sr-only peer" checked>
+                <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#6ad1e3]"></div>
+            </label>
+        </div>
+    </div>
+
+    <!-- Trend Fit Settings -->
+    <div class="mb-4 lg:mb-3 border-t border-gray-300 pt-4 lg:pt-3">
+        <label class="block text-sm font-semibold text-gray-600 mb-3 lg:mb-2 text-center">Trend Fit Settings</label>
+        <!-- Fit Method -->
+        <div class="flex items-center justify-between mb-3">
+            <label class="text-sm text-gray-500" for="fit-method">Fit Method</label>
+            <select id="fit-method" data-action="fit-method-change" class="px-3 py-2 lg:px-2 lg:py-1 text-sm border-2 border-gray-300 rounded focus:outline-none focus:border-[#6ad1e3] transition-colors bg-white">
+                <option value="Theil-Sen" selected>Theil-Sen</option>
+                <option value="Least-squares">Least-squares</option>
+                <option value="Quarter-intersect">Quarter-intersect</option>
+                <option value="Split-middle-line">Split-middle-line</option>
+                <option value="Mean">Mean</option>
+                <option value="Median">Median</option>
+            </select>
+        </div>
+        <!-- Bounce Envelope -->
+        <div class="flex items-center justify-between mb-3">
+            <label class="text-sm text-gray-500" for="bounce-envelope">Bounce Envelope</label>
+            <select id="bounce-envelope" data-action="bounce-envelope-change" class="px-3 py-2 lg:px-2 lg:py-1 text-sm border-2 border-gray-300 rounded focus:outline-none focus:border-[#6ad1e3] transition-colors bg-white">
+                <option value="None" selected>None</option>
+                <option value="5-95 percentile">5-95 percentile</option>
+                <option value="Interquartile range">Interquartile range</option>
+                <option value="Standard deviation">Standard deviation</option>
+                <option value="90% confidence interval">90% confidence interval</option>
+            </select>
+        </div>
+        <!-- Forecast -->
+        <div class="flex items-center justify-between">
+            <label class="text-sm text-gray-500" for="trend-forecast">Forecast</label>
+            <div class="flex items-center gap-2">
+                <input type="number" id="trend-forecast" min="0" max="100" value="0" class="w-16 px-2 py-2 lg:py-1 text-sm text-center border-2 border-gray-300 rounded focus:outline-none focus:border-[#6ad1e3] transition-colors">
+                <span class="text-sm text-gray-500">days</span>
+            </div>
+        </div>
+    </div>
+
+</div>

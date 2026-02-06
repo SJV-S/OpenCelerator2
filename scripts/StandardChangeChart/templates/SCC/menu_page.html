@@ -1,0 +1,699 @@
+{% extends "SCC/base.html" %}
+
+{% block title %}Chart Explorer{% endblock %}
+
+{% block base_style %}
+html, body {
+    height: 100%;
+}
+.expand-btn.expanded {
+    transform: rotate(90deg);
+}
+.credits-row {
+    display: none;
+}
+.credits-row.expanded {
+    display: table-row;
+}
+.table-row:hover {
+    background: #f8fafc;
+    cursor: pointer;
+}
+.new-chart-btn {
+    background: #6ad1e3;
+    transition: all 0.15s ease;
+}
+.new-chart-btn:hover {
+    background: #5bc4d6;
+}
+.chart-link:hover {
+    color: #6ad1e3;
+}
+.delete-btn {
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+.table-row:hover .delete-btn,
+.table-row:hover .edit-tags-btn {
+    opacity: 1;
+}
+.edit-tags-btn {
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+.tag {
+    pointer-events: none;
+}
+{% endblock %}
+
+{% block body_class %}bg-white min-h-screen{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<header class="border-b border-gray-200 bg-white sticky top-0 z-10">
+    <div class="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+        <h1 class="text-xl font-semibold text-gray-800">Chart Explorer</h1>
+        <div class="flex items-center gap-3">
+            <button id="install-btn" class="hidden px-5 py-2 rounded-lg border-2 border-[#6ad1e3] text-[#05c3de] font-medium text-sm flex items-center gap-2 hover:bg-[#6ad1e3] hover:text-white transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                </svg>
+                Install App
+            </button>
+            <button id="import-chart-btn" class="px-5 py-2 rounded-lg border-2 border-[#6ad1e3] text-[#05c3de] font-medium text-sm flex items-center gap-2 hover:bg-[#6ad1e3] hover:text-white transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                </svg>
+                Import Chart
+            </button>
+            <input type="file" id="import-chart-input" accept=".json" class="hidden">
+            <a href="/new" class="new-chart-btn px-5 py-2 rounded-lg text-white font-medium text-sm flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+                New Chart
+            </a>
+        </div>
+    </div>
+</header>
+
+<main class="max-w-5xl mx-auto px-6 py-8">
+    <!-- Search Bar -->
+    <div class="mb-6">
+        <div class="flex items-center gap-4">
+            <div class="relative flex-1 max-w-md">
+                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+                <input
+                    type="text"
+                    id="search-input"
+                    placeholder="Search charts..."
+                    class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm"
+                    autocomplete="off"
+                >
+            </div>
+            <div class="flex items-center gap-4 text-sm text-gray-600">
+                <label class="flex items-center gap-1.5 cursor-pointer">
+                    <input type="radio" name="search-mode" value="name" checked class="accent-[#6ad1e3]">
+                    <span>Name</span>
+                </label>
+                <label class="flex items-center gap-1.5 cursor-pointer">
+                    <input type="radio" name="search-mode" value="credits" class="accent-[#6ad1e3]">
+                    <span>Credits</span>
+                </label>
+                <label class="flex items-center gap-1.5 cursor-pointer">
+                    <input type="radio" name="search-mode" value="tags" class="accent-[#6ad1e3]">
+                    <span>Tags</span>
+                </label>
+                <span class="border-l border-gray-300 h-4 mx-2"></span>
+                <label class="flex items-center gap-1.5 cursor-pointer">
+                    <input type="checkbox" id="filter-shared" class="accent-[#6ad1e3]">
+                    <span>Filter shared charts</span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Empty State -->
+    <div id="empty-state" class="hidden text-center py-16">
+        <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
+            <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+            </svg>
+        </div>
+        <h2 class="text-lg font-medium text-gray-800 mb-2">No charts yet</h2>
+        <p class="text-gray-500 mb-6">Create your first chart to get started</p>
+        <a href="/new" class="new-chart-btn inline-flex items-center gap-2 px-5 py-2 rounded-lg text-white font-medium text-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            New Chart
+        </a>
+    </div>
+
+    <!-- No Results State -->
+    <div id="no-results" class="hidden text-center py-16">
+        <p class="text-gray-500">No charts found</p>
+    </div>
+
+    <!-- Charts Table -->
+    <div id="charts-container" class="hidden">
+        <table class="w-full">
+            <thead>
+                <tr class="border-b border-gray-200">
+                    <th class="w-8 py-3"></th>
+                    <th class="py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                    <th class="py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-40">Type</th>
+                    <th class="py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tags</th>
+                    <th class="py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">Shared</th>
+                    <th class="py-3 w-20"></th>
+                </tr>
+            </thead>
+            <tbody id="charts-table" class="divide-y divide-gray-100">
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    <div id="pagination" class="hidden flex items-center justify-between mt-6 pt-4 border-t border-gray-200">
+        <span id="page-info" class="text-sm text-gray-500"></span>
+        <div class="flex gap-2">
+            <button id="prev-page" class="px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">Previous</button>
+            <button id="next-page" class="px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">Next</button>
+        </div>
+    </div>
+</main>
+
+<!-- Delete Confirmation Modal -->
+<div id="delete-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-lg shadow-xl max-w-sm w-full mx-4 p-6">
+        <h3 class="text-lg font-semibold text-gray-800 mb-2">Delete Chart</h3>
+        <p class="text-gray-600 mb-6">Are you sure you want to delete "<span id="delete-chart-name" class="font-medium"></span>"? This cannot be undone.</p>
+        <div class="flex gap-3 justify-end">
+            <button id="cancel-delete" class="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium">Cancel</button>
+            <button id="confirm-delete" class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 font-medium">Delete</button>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Tags Modal -->
+<div id="tags-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Edit Tags</h3>
+        <input
+            type="text"
+            id="tags-input"
+            class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg text-sm mb-3"
+            autocomplete="off"
+        >
+        <div id="current-tags" class="flex flex-wrap gap-2 mb-4 min-h-[32px]"></div>
+        <div class="flex gap-3 justify-end">
+            <button id="cancel-tags" class="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium">Cancel</button>
+            <button id="save-tags" class="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 font-medium">Save</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script type="module">
+    import { initStorage, listCharts, deleteChart, updateChartTags, importChart } from '/static/SCC/storage/chartStorage.js';
+    import { isNativeFormat } from '/static/SCC/import/nativeImport.js';
+    import { isOpenCeleratorFormat, buildChartFromOpenCelerator } from '/static/SCC/import/openCeleratorImport.js';
+
+    let charts = [];
+    let chartToDelete = null;
+    let chartToEditTags = null;
+    let editingTags = [];
+    let searchQuery = '';
+    let searchMode = localStorage.getItem('scc-search-mode') || 'name';
+    let filterShared = false;
+    let searchDebounceTimer = null;
+    let currentPage = 1;
+    const CHARTS_PER_PAGE = 20;
+
+    function formatDate(timestamp) {
+        if (!timestamp) return '-';
+        const date = new Date(timestamp);
+        return date.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+        });
+    }
+
+    function formatChartType(chartType, minuteChart) {
+        const typeLabel = chartType === 'FrequencyCollections' ? 'Freq. Collections' : chartType;
+        const variant = minuteChart ? 'Minute' : 'Count';
+        return `${typeLabel} (${variant})`;
+    }
+
+    function parseCredits(credits) {
+        if (!credits || typeof credits !== 'object') return [];
+        const lines = [];
+        if (credits[0]) lines.push(credits[0]);
+        if (credits[1]) lines.push(credits[1]);
+        return lines;
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function createTagHtml(tag) {
+        const escaped = escapeHtml(tag);
+        return `<span class="tag inline-flex items-center px-2 py-0.5 rounded text-xs border border-gray-300 text-gray-600">${escaped}</span>`;
+    }
+
+    function createChartRow(chart) {
+        const credits = parseCredits(chart.credits);
+        const hasCredits = credits.length > 0 && credits.some(c => c && c.trim());
+        const tags = chart.tags || [];
+
+        const row = document.createElement('tr');
+        row.className = 'table-row';
+        row.dataset.id = chart.id;
+        row.dataset.tags = JSON.stringify(tags);
+        row.innerHTML = `
+            <td class="py-3 pl-2">
+                ${hasCredits ? `
+                    <button class="expand-btn text-gray-400 hover:text-gray-600 p-1" data-id="${chart.id}">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                        </svg>
+                    </button>
+                ` : '<span class="w-6 inline-block"></span>'}
+            </td>
+            <td class="py-3">
+                <a href="/chart/${chart.id}" class="chart-link text-gray-800 font-medium hover:underline">${escapeHtml(chart.chartName || 'Unnamed')}</a>
+                <div class="text-xs text-gray-400 mt-0.5">Updated ${formatDate(chart.updatedAt)}</div>
+            </td>
+            <td class="py-3 text-gray-600 text-sm">${formatChartType(chart.chartType, chart.minuteChart)}</td>
+            <td class="py-3">
+                <div class="flex items-center gap-1 flex-wrap">
+                    ${tags.map(t => createTagHtml(t)).join('')}
+                    <button class="edit-tags-btn text-gray-400 hover:text-gray-600 p-1" data-id="${chart.id}">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        </svg>
+                    </button>
+                </div>
+            </td>
+            <td class="py-3 text-center">
+                ${chart.shared
+                    ? `<svg class="w-5 h-5 text-green-500 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                       </svg>`
+                    : `<span class="text-gray-400 text-sm">-</span>`}
+            </td>
+            <td class="py-3 pr-2 text-right">
+                <button class="delete-btn text-gray-400 hover:text-red-500 p-1" data-id="${chart.id}" data-name="${escapeHtml(chart.chartName || 'Unnamed')}">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                </button>
+            </td>
+        `;
+
+        // Create credits expansion row
+        const creditsRow = document.createElement('tr');
+        creditsRow.className = 'credits-row';
+        creditsRow.id = `credits-${chart.id}`;
+        creditsRow.innerHTML = `
+            <td></td>
+            <td colspan="5" class="pb-4 pt-1">
+                <div class="bg-gray-50 rounded-lg p-4 text-xs text-gray-600 font-mono leading-relaxed">
+                    ${credits.map(line => `<div class="mb-1 last:mb-0">${escapeHtml(line || '')}</div>`).join('')}
+                </div>
+            </td>
+        `;
+
+        return { row, creditsRow };
+    }
+
+
+    function searchCharts(charts) {
+        if (!searchQuery.trim()) return charts;
+
+        const query = searchQuery.toLowerCase().trim();
+
+        return charts.filter(chart => {
+            switch (searchMode) {
+                case 'name':
+                    return (chart.chartName || '').toLowerCase().includes(query);
+                case 'credits':
+                    const credits = chart.credits || {};
+                    const creditText = [credits[0] || '', credits[1] || ''].join(' ').toLowerCase();
+                    return creditText.includes(query);
+                case 'tags':
+                    return (chart.tags || []).some(t => t.toLowerCase().includes(query));
+                default:
+                    return true;
+            }
+        });
+    }
+
+    function filterCharts(charts) {
+        let filtered = searchCharts(charts);
+        if (filterShared) {
+            filtered = filtered.filter(chart => chart.shared);
+        }
+        return filtered;
+    }
+
+    function renderCharts(resetPage = false) {
+        if (resetPage) currentPage = 1;
+
+        const emptyState = document.getElementById('empty-state');
+        const noResults = document.getElementById('no-results');
+        const chartsContainer = document.getElementById('charts-container');
+        const tableBody = document.getElementById('charts-table');
+        const pagination = document.getElementById('pagination');
+
+        if (charts.length === 0) {
+            emptyState.classList.remove('hidden');
+            noResults.classList.add('hidden');
+            chartsContainer.classList.add('hidden');
+            pagination.classList.add('hidden');
+            return;
+        }
+
+        const filteredCharts = filterCharts(charts);
+
+        if (filteredCharts.length === 0) {
+            emptyState.classList.add('hidden');
+            noResults.classList.remove('hidden');
+            chartsContainer.classList.add('hidden');
+            pagination.classList.add('hidden');
+            return;
+        }
+
+        // Sort by most recently modified
+        filteredCharts.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+
+        // Pagination
+        const totalPages = Math.ceil(filteredCharts.length / CHARTS_PER_PAGE);
+        if (currentPage > totalPages) currentPage = totalPages;
+        const startIndex = (currentPage - 1) * CHARTS_PER_PAGE;
+        const pageCharts = filteredCharts.slice(startIndex, startIndex + CHARTS_PER_PAGE);
+
+        emptyState.classList.add('hidden');
+        noResults.classList.add('hidden');
+        chartsContainer.classList.remove('hidden');
+        tableBody.innerHTML = '';
+
+        for (const chart of pageCharts) {
+            const { row, creditsRow } = createChartRow(chart);
+            tableBody.appendChild(row);
+            tableBody.appendChild(creditsRow);
+        }
+
+        attachRowListeners();
+        updatePagination(filteredCharts.length, totalPages);
+    }
+
+    function updatePagination(totalCharts, totalPages) {
+        const pagination = document.getElementById('pagination');
+        const pageInfo = document.getElementById('page-info');
+        const prevBtn = document.getElementById('prev-page');
+        const nextBtn = document.getElementById('next-page');
+
+        if (totalPages <= 1) {
+            pagination.classList.add('hidden');
+            return;
+        }
+
+        pagination.classList.remove('hidden');
+        const start = (currentPage - 1) * CHARTS_PER_PAGE + 1;
+        const end = Math.min(currentPage * CHARTS_PER_PAGE, totalCharts);
+        pageInfo.textContent = `${start}-${end} of ${totalCharts}`;
+
+        prevBtn.disabled = currentPage === 1;
+        nextBtn.disabled = currentPage === totalPages;
+    }
+
+    function attachRowListeners() {
+        // Single-click row to toggle credits, double-click to open chart
+        document.querySelectorAll('.table-row').forEach(row => {
+            row.addEventListener('click', (e) => {
+                // Don't toggle if clicking on interactive elements
+                if (e.target.closest('a, button')) return;
+
+                const chartId = row.dataset.id;
+                const expandBtn = row.querySelector('.expand-btn');
+                const creditsRow = document.getElementById(`credits-${chartId}`);
+
+                // Only toggle if this chart has credits (has expand button)
+                if (expandBtn && creditsRow) {
+                    expandBtn.classList.toggle('expanded');
+                    creditsRow.classList.toggle('expanded');
+                }
+            });
+
+            row.addEventListener('dblclick', () => {
+                const chartId = row.dataset.id;
+                if (chartId) {
+                    window.location.href = `/chart/${chartId}`;
+                }
+            });
+        });
+
+        // Expand buttons (still functional for direct clicks)
+        document.querySelectorAll('.expand-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent row click from also firing
+                const id = btn.dataset.id;
+                const creditsRow = document.getElementById(`credits-${id}`);
+                btn.classList.toggle('expanded');
+                creditsRow.classList.toggle('expanded');
+            });
+        });
+
+        // Delete buttons
+        document.querySelectorAll('.delete-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                chartToDelete = btn.dataset.id;
+                document.getElementById('delete-chart-name').textContent = btn.dataset.name;
+                document.getElementById('delete-modal').classList.remove('hidden');
+                document.getElementById('delete-modal').classList.add('flex');
+            });
+        });
+
+        // Edit tags buttons
+        document.querySelectorAll('.edit-tags-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const chartId = btn.dataset.id;
+                const chart = charts.find(c => c.id === chartId);
+                chartToEditTags = chartId;
+                editingTags = chart ? [...(chart.tags || [])] : [];
+                openTagsModal();
+            });
+        });
+    }
+
+    // Tags modal functions
+    function openTagsModal() {
+        document.getElementById('tags-input').value = '';
+        renderCurrentTags();
+        document.getElementById('tags-modal').classList.remove('hidden');
+        document.getElementById('tags-modal').classList.add('flex');
+        document.getElementById('tags-input').focus();
+    }
+
+    function closeTagsModal() {
+        chartToEditTags = null;
+        editingTags = [];
+        document.getElementById('tags-modal').classList.add('hidden');
+        document.getElementById('tags-modal').classList.remove('flex');
+    }
+
+    function renderCurrentTags() {
+        const container = document.getElementById('current-tags');
+        const input = document.getElementById('tags-input');
+
+        container.innerHTML = editingTags.map(tag => `
+            <span class="inline-flex items-center gap-1 px-2 py-1 rounded text-xs bg-gray-100 text-gray-700">
+                ${escapeHtml(tag)}
+                <button class="remove-tag hover:text-red-500" data-tag="${escapeHtml(tag)}">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </span>
+        `).join('');
+
+        // Disable input when max tags reached
+        input.disabled = editingTags.length >= MAX_TAGS;
+
+        container.querySelectorAll('.remove-tag').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tagToRemove = btn.dataset.tag.toLowerCase();
+                editingTags = editingTags.filter(t => t.toLowerCase() !== tagToRemove);
+                renderCurrentTags();
+            });
+        });
+    }
+
+    const MAX_TAGS = 5;
+
+    function addTagsFromInput() {
+        const input = document.getElementById('tags-input');
+        const newTags = input.value
+            .split(',')
+            .map(t => t.trim().toLowerCase())
+            .filter(t => t.length > 0);
+
+        for (const tag of newTags) {
+            if (editingTags.length >= MAX_TAGS) break;
+            if (!editingTags.some(t => t.toLowerCase() === tag)) {
+                editingTags.push(tag);
+            }
+        }
+
+        input.value = '';
+        renderCurrentTags();
+    }
+
+    async function loadCharts() {
+        await initStorage();
+        charts = await listCharts();
+        renderCharts();
+    }
+
+    // Delete modal handlers
+    document.getElementById('cancel-delete').addEventListener('click', () => {
+        chartToDelete = null;
+        document.getElementById('delete-modal').classList.add('hidden');
+        document.getElementById('delete-modal').classList.remove('flex');
+    });
+
+    document.getElementById('confirm-delete').addEventListener('click', async () => {
+        if (chartToDelete) {
+            await deleteChart(chartToDelete);
+            chartToDelete = null;
+            document.getElementById('delete-modal').classList.add('hidden');
+            document.getElementById('delete-modal').classList.remove('flex');
+            await loadCharts();
+        }
+    });
+
+    document.getElementById('delete-modal').addEventListener('click', (e) => {
+        if (e.target.id === 'delete-modal') {
+            chartToDelete = null;
+            document.getElementById('delete-modal').classList.add('hidden');
+            document.getElementById('delete-modal').classList.remove('flex');
+        }
+    });
+
+    // Tags modal handlers
+    document.getElementById('cancel-tags').addEventListener('click', closeTagsModal);
+
+    document.getElementById('save-tags').addEventListener('click', async () => {
+        if (chartToEditTags) {
+            // Add any remaining input
+            addTagsFromInput();
+            await updateChartTags(chartToEditTags, editingTags);
+            closeTagsModal();
+            await loadCharts();
+        }
+    });
+
+    document.getElementById('tags-modal').addEventListener('click', (e) => {
+        if (e.target.id === 'tags-modal') {
+            closeTagsModal();
+        }
+    });
+
+    document.getElementById('tags-input').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            addTagsFromInput();
+        }
+    });
+
+    // Search input with debounce
+    document.getElementById('search-input').addEventListener('input', (e) => {
+        clearTimeout(searchDebounceTimer);
+        searchDebounceTimer = setTimeout(() => {
+            searchQuery = e.target.value;
+            renderCharts(true);
+        }, 200);
+    });
+
+    // Search mode radio buttons
+    document.querySelectorAll('input[name="search-mode"]').forEach(radio => {
+        // Set initial state from localStorage
+        radio.checked = radio.value === searchMode;
+
+        radio.addEventListener('change', (e) => {
+            searchMode = e.target.value;
+            localStorage.setItem('scc-search-mode', searchMode);
+            if (searchQuery.trim()) {
+                renderCharts(true);
+            }
+        });
+    });
+
+    // Filter shared toggle
+    document.getElementById('filter-shared').addEventListener('change', (e) => {
+        filterShared = e.target.checked;
+        renderCharts(true);
+    });
+
+    // Pagination
+    document.getElementById('prev-page').addEventListener('click', () => {
+        if (currentPage > 1) {
+            currentPage--;
+            renderCharts();
+        }
+    });
+
+    document.getElementById('next-page').addEventListener('click', () => {
+        currentPage++;
+        renderCharts();
+    });
+
+    // Import chart button
+    document.getElementById('import-chart-btn').addEventListener('click', () => {
+        document.getElementById('import-chart-input').click();
+    });
+
+    document.getElementById('import-chart-input').addEventListener('change', async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Reset input so same file can be selected again
+        e.target.value = '';
+
+        try {
+            const text = await file.text();
+            let json;
+            try {
+                json = JSON.parse(text);
+            } catch (parseErr) {
+                alert(`Invalid JSON file: ${parseErr.message}`);
+                return;
+            }
+
+            // Detect format and import
+            if (isNativeFormat(json)) {
+                await importChart(json);
+                await loadCharts();
+                alert(`Imported "${json.chartName || 'Unnamed'}"`);
+
+            } else if (isOpenCeleratorFormat(json)) {
+                const result = buildChartFromOpenCelerator(json, file.name);
+                if (!result.success) {
+                    alert(`Import failed: ${result.error}`);
+                    return;
+                }
+
+                await importChart(result.chartData);
+                await loadCharts();
+
+                let message = `Imported "${result.chartData.chartName}"`;
+                if (result.warnings.length > 0) {
+                    message += ` (${result.warnings.length} feature(s) not supported)`;
+                }
+                alert(message);
+
+            } else {
+                alert('Unrecognized JSON format. Expected TC2 or OpenCelerator export.');
+            }
+
+        } catch (err) {
+            console.error('Import error:', err);
+            alert(`Import failed: ${err.message}`);
+        }
+    });
+
+    // Load on page show (handles back button)
+    window.addEventListener('pageshow', loadCharts);
+</script>
+<script src="/static/SCC/pwaInstall.js"></script>
+{% endblock %}

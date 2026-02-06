@@ -35,12 +35,6 @@ def service_worker():
     response.headers['Expires'] = '0'
     return response
 
-# @app.route('/service-worker.js')
-# def service_worker():
-#     response = make_response(send_from_directory(app.root_path, 'service-worker.js'))
-#     # Check for SW updates every 2 hours
-#     response.headers['Cache-Control'] = 'max-age=7200'
-#     return response
 
 # =============================================================================
 # HTML Routes (existing)

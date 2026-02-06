@@ -1,0 +1,78 @@
+<div class="chart-menu-tab-inner flex flex-col h-full">
+    <!-- Vertical Stack of Categories -->
+    <div class="chart-menu-icon-group">
+
+        <!-- Phase Category -->
+        <div class="chart-menu-icon-category">
+            <h2>Event markers</h2>
+            <div class="chart-menu-icon-group-row">
+                <!-- Phase Text Top Button -->
+                <button class="chart-menu-icon-btn" data-action="phase-text-top" data-icon="phaseTextTop">
+                </button>
+
+                <!-- Phase Text Bottom Button -->
+                <button class="chart-menu-icon-btn" data-action="phase-text-bottom" data-icon="phaseTextBottom">
+                </button>
+            </div>
+        </div>
+
+        <!-- Aim Category -->
+        <div class="chart-menu-icon-category">
+            <h2>Count markers</h2>
+            <div class="chart-menu-icon-group-row">
+                <!-- Diagonal Line Button -->
+                <button class="chart-menu-icon-btn" data-action="aim-diagonal" data-icon="aimDiagonal">
+                </button>
+
+                <!-- Horizontal Line Button -->
+                <button class="chart-menu-icon-btn" data-action="aim-horizontal" data-icon="aimHorizontal">
+                </button>
+            </div>
+        </div>
+
+        <!-- Lines Section -->
+        <div class="chart-menu-icon-group-row">
+            <!-- Cut Series Line -->
+            <div class="chart-menu-icon-category">
+                <h2>Cut series line</h2>
+                <button class="chart-menu-icon-btn" data-action="other-scissors" data-icon="otherScissors">
+                </button>
+            </div>
+
+            <!-- Add Change Line -->
+            <div class="chart-menu-icon-category">
+                <h2>Add change line</h2>
+                <button class="chart-menu-icon-btn" data-action="other-celeration" data-icon="scatterLine">
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Per-Category Edit Toggles -->
+    <div class="mt-auto pt-4 border-t border-gray-200">
+        <p class="text-xs text-gray-500 text-center mb-2">Edit mode</p>
+        <div class="grid grid-cols-2 gap-x-4 gap-y-2 px-3">
+            <label class="inline-flex items-center justify-between cursor-pointer">
+                <span class="text-xs text-gray-600">Event</span>
+                <input type="checkbox" data-edit-category="phase" class="sr-only peer">
+                <div class="relative w-8 h-4 bg-gray-300 rounded-full peer peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-4"></div>
+            </label>
+            <label class="inline-flex items-center justify-between cursor-pointer">
+                <span class="text-xs text-gray-600">Count</span>
+                <input type="checkbox" data-edit-category="aim" class="sr-only peer">
+                <div class="relative w-8 h-4 bg-gray-300 rounded-full peer peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-4"></div>
+            </label>
+            <label class="inline-flex items-center justify-between cursor-pointer">
+                <span class="text-xs text-gray-600">Cut</span>
+                <input type="checkbox" data-edit-category="cut" class="sr-only peer">
+                <div class="relative w-8 h-4 bg-gray-300 rounded-full peer peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-4"></div>
+            </label>
+            <label class="inline-flex items-center justify-between cursor-pointer">
+                <span class="text-xs text-gray-600">Change</span>
+                <input type="checkbox" data-edit-category="cel" class="sr-only peer">
+                <div class="relative w-8 h-4 bg-gray-300 rounded-full peer peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-4"></div>
+            </label>
+        </div>
+    </div>
+</div>

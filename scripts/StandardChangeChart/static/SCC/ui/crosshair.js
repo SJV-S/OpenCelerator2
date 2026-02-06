@@ -835,16 +835,10 @@ function formatSeriesName(seriesId) {
 // =============================================================================
 
 function init() {
-    // Keydown - mark Shift held (activation deferred until mouse moves)
+    // Keydown - activate on Shift (guard against repeat)
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Shift' && !state.shiftHeld) {
             state.shiftHeld = true;
-        }
-    });
-
-    // Mousemove - activate crosshair if Shift is held and not yet active
-    document.addEventListener('mousemove', () => {
-        if (state.shiftHeld && !state.active) {
             activateCrosshair();
         }
     });
