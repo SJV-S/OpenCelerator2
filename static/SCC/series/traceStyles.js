@@ -130,8 +130,8 @@ function renderSeriesNav() {
         // Indented clickable rows for each aggregation
         aggTypes.forEach(aggType => {
             const label = aggType === 'raw'
-                ? `${displayName} (Raw)`
-                : `${displayName} (${aggType.charAt(0).toUpperCase() + aggType.slice(1)})`;
+                ? 'Raw'
+                : aggType.charAt(0).toUpperCase() + aggType.slice(1);
 
             const btn = document.createElement('button');
             btn.className = 'series-row series-agg-row';

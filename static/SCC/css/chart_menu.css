@@ -588,7 +588,7 @@
 
 /* Indented aggregation row under a heading */
 .series-agg-row {
-    padding-left: 1.25rem;
+    padding-left: 2.5rem;
     font-size: 0.8125rem;
 }
 
@@ -636,14 +636,3 @@
     flex-direction: column;
 }
 
-/* Override chart-menu-content block styling for inline config rows */
-.series-config-panel label {
-    display: inline-flex;
-    margin-bottom: 0;
-}
-
-.series-config-panel input,
-.series-config-panel select {
-    width: auto;
-    max-width: none;
-}
