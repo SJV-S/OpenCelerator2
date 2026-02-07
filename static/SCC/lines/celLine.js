@@ -1089,7 +1089,7 @@ function redrawCelLines() {
     const celAnnotations = [];
 
     // Rebuild shapes and annotations from chartState using the builder
-    const isVisible = chartState.lineVisibility.change;
+    const globalVisible = chartState.lineVisibility.change;
     Object.values(chartState.CelLines).forEach(entry => {
         // Skip the settings object
         if (entry === chartState.CelLines.settings) return;
@@ -1101,8 +1101,9 @@ function redrawCelLines() {
 
         const elements = buildCelLineElements(metadata, chartDiv);
 
-        // Apply saved visibility state to rebuilt elements
-        if (!isVisible) {
+        // Visible only if global change visibility AND this series are both on
+        const lineVisible = globalVisible && isSeriesVisible(metadata.seriesKey);
+        if (!lineVisible) {
             elements.shapes.forEach(s => s.visible = false);
             elements.annotation.visible = false;
         }
@@ -1121,8 +1122,9 @@ function redrawCelLines() {
 }
 
 /**
- * Toggle visibility of all cel (celeration/change) lines
- * @param {boolean} visible - Whether cel lines should be visible
+ * Toggle visibility of all cel (celeration/change) lines.
+ * When showing, each line also requires its series to be visible.
+ * @param {boolean} visible - Whether cel lines should be globally visible
  */
 function setCelLineVisibility(visible) {
     const chartDiv = document.getElementById('chart');
@@ -1132,11 +1134,22 @@ function setCelLineVisibility(visible) {
     const annotations = chartDiv.layout.annotations || [];
     let updated = false;
 
+    // Build a set of line IDs whose series is currently visible
+    const seriesVisibleById = new Map();
+    if (visible) {
+        for (const [id, entry] of Object.entries(chartState.CelLines)) {
+            if (entry === chartState.CelLines.settings) continue;
+            seriesVisibleById.set(String(id), isSeriesVisible(entry.seriesKey));
+        }
+    }
+
     // Update shapes with names starting with 'cel-'
     const updatedShapes = shapes.map(s => {
         if (s.name && s.name.startsWith('cel-')) {
             updated = true;
-            return { ...s, visible };
+            const lineId = s.name.replace('cel-', '').split('-')[0];
+            const show = visible && (seriesVisibleById.get(lineId) !== false);
+            return { ...s, visible: show };
         }
         return s;
     });
@@ -1145,7 +1158,59 @@ function setCelLineVisibility(visible) {
     const updatedAnnotations = annotations.map(a => {
         if (a.name && a.name.startsWith('cel-')) {
             updated = true;
-            return { ...a, visible };
+            const lineId = a.name.replace('cel-', '').split('-')[0];
+            const show = visible && (seriesVisibleById.get(lineId) !== false);
+            return { ...a, visible: show };
+        }
+        return a;
+    });
+
+    if (updated) {
+        Plotly.relayout(chartDiv, { shapes: updatedShapes, annotations: updatedAnnotations });
+    }
+}
+
+/**
+ * Update visibility of cel lines for a specific series.
+ * @param {string} seriesKey - The series key that changed
+ * @param {boolean} seriesVisible - Whether that series is now visible
+ */
+function updateCelLineSeriesVisibility(seriesKey, seriesVisible) {
+    if (!chartState.lineVisibility.change) return; // global is off, nothing to toggle
+
+    const chartDiv = document.getElementById('chart');
+    if (!chartDiv) return;
+
+    // Find cel line IDs that belong to this series
+    const affectedIds = [];
+    for (const [id, entry] of Object.entries(chartState.CelLines)) {
+        if (entry === chartState.CelLines.settings) continue;
+        if (entry.seriesKey === seriesKey) affectedIds.push(String(id));
+    }
+    if (affectedIds.length === 0) return;
+
+    const shapes = chartDiv.layout.shapes || [];
+    const annotations = chartDiv.layout.annotations || [];
+    let updated = false;
+
+    const updatedShapes = shapes.map(s => {
+        if (s.name && s.name.startsWith('cel-')) {
+            const lineId = s.name.replace('cel-', '').split('-')[0];
+            if (affectedIds.includes(lineId)) {
+                updated = true;
+                return { ...s, visible: seriesVisible };
+            }
+        }
+        return s;
+    });
+
+    const updatedAnnotations = annotations.map(a => {
+        if (a.name && a.name.startsWith('cel-')) {
+            const lineId = a.name.replace('cel-', '').split('-')[0];
+            if (affectedIds.includes(lineId)) {
+                updated = true;
+                return { ...a, visible: seriesVisible };
+            }
         }
         return a;
     });
@@ -1180,6 +1245,13 @@ function init() {
         if (data.lineType === 'change') {
             setCelLineVisibility(data.visible);
         }
+    }, true);
+
+    // Subscribe to series visibility changes - show/hide cel lines per series
+    // Emitted seriesKey is like "corrects_raw"; extract base to match cel metadata
+    eventBus.subscribe(EVENTS.SERIES_VISIBILITY_CHANGED, (data) => {
+        const baseKey = data.seriesKey.substring(0, data.seriesKey.lastIndexOf('_'));
+        updateCelLineSeriesVisibility(baseKey, isSeriesVisible(baseKey));
     }, true);
 }
 
