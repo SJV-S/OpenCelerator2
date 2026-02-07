@@ -769,7 +769,10 @@ function updateInfoPanel(xRounded, yLogValue, traceData) {
                 continue;
             }
 
-            const displayName = formatSeriesName(seriesName);
+            let displayName = formatSeriesName(seriesName);
+            if (displayName.length > 30) {
+                displayName = displayName.slice(0, 30) + '...';
+            }
             rowRefs.labelSpan.textContent = `${displayName}:`;
 
             // Format value - timing shows reciprocal

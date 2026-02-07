@@ -223,7 +223,7 @@ function activateCelLineMode() {
     celLineState.seriesSelectionToast = createToast({
         message: 'Select series:',
         buttons: seriesButtons,
-        layout: 'horizontal'
+        layout: 'vertical'
     });
 
 }
@@ -246,13 +246,31 @@ function getFirstConfig(seriesId) {
 }
 
 /**
+ * Check if a series has any visible aggregation type.
+ * Returns false if ALL visibility entries for this series are explicitly false.
+ * @param {string} seriesKey - Base series key (corrects, errors, timing, misc1, etc.)
+ * @returns {boolean} True if at least one aggregation type is visible
+ */
+function isSeriesVisible(seriesKey) {
+    const visibility = chartState.seriesVisibility;
+    const prefix = seriesKey + '_';
+    const entries = Object.entries(visibility).filter(([key]) => key.startsWith(prefix));
+
+    // If no visibility entries exist yet, treat as visible
+    if (entries.length === 0) return true;
+
+    // Visible if any aggregation type is not explicitly false
+    return entries.some(([, visible]) => visible !== false);
+}
+
+/**
  * Get buttons for available data series
  */
 function getAvailableSeriesButtons() {
     const buttons = [];
 
     // Check fixed series
-    if (chartState.series.corrects && chartState.series.corrects.some(v => v !== null)) {
+    if (chartState.series.corrects && chartState.series.corrects.some(v => v !== null) && isSeriesVisible(CORRECTS)) {
         const config = getFirstConfig(CORRECTS);
         buttons.push({
             label: config?.seriesName || 'Corrects',
@@ -261,7 +279,7 @@ function getAvailableSeriesButtons() {
         });
     }
 
-    if (chartState.series.errors && chartState.series.errors.some(v => v !== null)) {
+    if (chartState.series.errors && chartState.series.errors.some(v => v !== null) && isSeriesVisible(ERRORS)) {
         const config = getFirstConfig(ERRORS);
         buttons.push({
             label: config?.seriesName || 'Errors',
@@ -270,7 +288,7 @@ function getAvailableSeriesButtons() {
         });
     }
 
-    if (chartState.series.timing && chartState.series.timing.some(v => v !== null)) {
+    if (chartState.series.timing && chartState.series.timing.some(v => v !== null) && isSeriesVisible(TIMING)) {
         const config = getFirstConfig(TIMING);
         buttons.push({
             label: config?.seriesName || 'Timing',
@@ -281,7 +299,7 @@ function getAvailableSeriesButtons() {
 
     // Check misc series
     Object.entries(chartState.series.misc).forEach(([miscId, data]) => {
-        if (data && data.some(v => v !== null)) {
+        if (data && data.some(v => v !== null) && isSeriesVisible(miscId)) {
             const config = getFirstConfig(miscId);
             buttons.push({
                 label: config?.seriesName || miscId,
@@ -613,7 +631,11 @@ function getPlotCoordinatesForCelLine(event, chartDiv) {
     const xValue = xRange[0] + xFraction * (xRange[1] - xRange[0]);
     const xRounded = Math.round(xValue);
 
-    return { x: xRounded, xPixel: xPixel, yPixel: yPixel };
+    // Snap pixel to integer x using Plotly's axis mapping (matches crosshair behavior)
+    const xaxis = chartDiv._fullLayout.xaxis;
+    const xSnappedPixel = xaxis._offset + xaxis.l2p(xRounded);
+
+    return { x: xRounded, xPixel: xSnappedPixel, yPixel: yPixel };
 }
 
 function getPlotCoordinatesForCelLineTouch(touch, chartDiv) {
@@ -640,7 +662,11 @@ function getPlotCoordinatesForCelLineTouch(touch, chartDiv) {
     const xValue = xRange[0] + xFraction * (xRange[1] - xRange[0]);
     const xRounded = Math.round(xValue);
 
-    return { x: xRounded, xPixel: xPixel, yPixel: yPixel };
+    // Snap pixel to integer x using Plotly's axis mapping (matches crosshair behavior)
+    const xaxis = chartDiv._fullLayout.xaxis;
+    const xSnappedPixel = xaxis._offset + xaxis.l2p(xRounded);
+
+    return { x: xRounded, xPixel: xSnappedPixel, yPixel: yPixel };
 }
 
 // ============================================

@@ -16,7 +16,7 @@
  */
 
 import { chartState } from '../chartState.js';
-import { COLORS } from '../config.js';
+import { COLORS, CHART_TYPE_CONFIG } from '../config.js';
 import { createToast, createTextInputDialog, createNumberInputDialog, createConfirmToast, createArrowControls } from '../ui/toaster.js';
 import { xPositionToDate, timestampsToXPositions, dateToXPosition } from '../util/dates.js';
 import { icons, applySvgCursor, restoreCursor } from '../ui/icons.js';
@@ -235,8 +235,9 @@ function adjustVerticalLineX(chartDiv, direction) {
     }
     // Phase 3: Adjust horizontal line length
     else if (phaseLineState.currentPhase === 3) {
-        // Update horizontal endpoint by +7 or -7 (to maintain rounding to multiples of 7)
-        const newEndX = phaseLineState.horizontalEndX + (direction * 7);
+        // Update horizontal endpoint by +unit or -unit (to maintain rounding to multiples of unit)
+        const unit = CHART_TYPE_CONFIG[chartState.chartType].unit;
+        const newEndX = phaseLineState.horizontalEndX + (direction * unit);
 
         // Ensure it doesn't go past the vertical line
         if (newEndX <= phaseLineState.verticalLineX) {
@@ -457,22 +458,24 @@ function roundYValue(yValue) {
 }
 
 /**
- * Rounds x2 value to nearest multiple of 7
- * If result equals x1, forces x2 = x1 + 7 for minimum line length
+ * Rounds x2 value to nearest multiple of the chart's unit (doubling value)
+ * If result equals x1, forces x2 = x1 + unit for minimum line length
  * @param {number} x2Raw - Raw x2 value from click
  * @param {number} x1 - The x1 value from first click
  * @returns {number} Rounded x2 value
  */
 function roundHorizontalX(x2Raw, x1) {
+    const unit = CHART_TYPE_CONFIG[chartState.chartType].unit;
+
     // First round to integer
     const x2Int = Math.round(x2Raw);
 
-    // Find nearest multiple of 7
-    let x2Rounded = Math.round(x2Int / 7) * 7;
+    // Find nearest multiple of unit
+    let x2Rounded = Math.round(x2Int / unit) * unit;
 
-    // If x2 equals x1, force x2 = x1 + 7
+    // If x2 equals x1, force x2 = x1 + unit
     if (x2Rounded === x1) {
-        x2Rounded = x1 + 7;
+        x2Rounded = x1 + unit;
     }
 
     return x2Rounded;

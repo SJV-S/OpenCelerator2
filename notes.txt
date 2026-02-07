@@ -68,4 +68,6 @@ To-do
 - Hit area for the flag is not right when placing horziontal lines. Or is it x value rounding that does it? It might be configured for Daily chart only
 - Chart can't currently be manually resized
 - Fine grained grid control does not trigger save event?
+- Would be nice if the hovering over the mouse on a trend line also showed the fit type, and if one howevers on a bounce line, it would show how the bounce was calculated
+- if change lines, aim lines, phase lines, etc are placed when their global visiblity is set to off, turn it on for that type, and provide a notification
 -
