@@ -659,6 +659,10 @@ function findTraceDataAtX(xRounded) {
         const { seriesName, aggType } = trace.meta;
         if (!seriesName || seriesName.includes('FloorShadow')) continue;
 
+        // Skip series the user has hidden via the legend
+        const visKey = `${seriesName}_${aggType}`;
+        if (chartState.seriesVisibility[visKey] === false) continue;
+
         const xArray = trace.x;
         const yArray = trace.y;
         if (!xArray || !yArray || xArray.length === 0) continue;

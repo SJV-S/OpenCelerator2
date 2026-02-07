@@ -188,7 +188,7 @@ export const chartState = {
         phase: true,
         aim: true,
         change: true,
-        grid: true
+        grid: false
     },
 
     // Series visibility (by unique key, e.g. "corrects_raw": true/false)
