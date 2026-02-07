@@ -223,6 +223,10 @@ function loadAddAggPanel(seriesName) {
     const nameEl = document.getElementById('add-agg-series-name');
     if (nameEl) nameEl.textContent = getSeriesDisplayName(seriesName);
 
+    // Populate display name input
+    const nameInput = document.getElementById('heading-series-name');
+    if (nameInput) nameInput.value = getSeriesDisplayName(seriesName);
+
     // Populate unused agg types
     const unused = getUnusedAggs(seriesName);
     const select = document.getElementById('agg-type-select');
@@ -281,7 +285,6 @@ function loadConfigPanel(seriesName, aggType) {
     }
 
     // Populate form fields
-    document.getElementById('config-series-name').value = config.seriesName || '';
     document.getElementById('config-marker-size').value = config.markerSize || 8;
     document.getElementById('config-line-width').value = config.lineWidth || 0.7;
     document.getElementById('config-show-line').checked = config.showLine ?? true;
@@ -296,8 +299,9 @@ function applyConfig() {
     const seriesName = currentSeries;
     const aggType = currentAggType;
 
+    const existingConfig = getConfig(seriesName, aggType);
     const config = {
-        seriesName: document.getElementById('config-series-name').value || seriesName,
+        seriesName: existingConfig?.seriesName || seriesName,
         showLine: document.getElementById('config-show-line').checked,
         lineDash: document.getElementById('config-line-dash').value || 'solid',
         lineWidth: parseFloat(document.getElementById('config-line-width').value) || LINE_DEFAULTS.TRACE_LINE_WIDTH,
@@ -351,6 +355,35 @@ function resetConfig() {
     eventBus.emit(EVENTS.UI_LEGEND_RENDER);
     eventBus.emit(EVENTS.UI_TRACE_STYLE_CHANGED);
     createToast({ message: `Reset to defaults.`, duration: 2000 });
+}
+
+function applyHeadingName() {
+    const seriesName = currentSeries;
+    if (!seriesName) return;
+
+    const nameInput = document.getElementById('heading-series-name');
+    const newName = nameInput?.value.trim();
+    if (!newName) return;
+
+    // Update seriesName on ALL aggregation configs for this series
+    const configs = getSeriesConfigs(seriesName);
+    if (configs) {
+        Object.values(configs).forEach(cfg => { cfg.seriesName = newName; });
+    }
+
+    // Update the heading text in the panel
+    const nameEl = document.getElementById('add-agg-series-name');
+    if (nameEl) nameEl.textContent = newName;
+
+    renderSeriesNav();
+    updateCounterLabels();
+    eventBus.emit(EVENTS.DATA_CHART_REFRESH);
+    eventBus.emit(EVENTS.UI_LEGEND_RENDER);
+    eventBus.emit(EVENTS.UI_TRACE_STYLE_CHANGED);
+    createToast({ message: `Renamed to "${newName}".`, duration: 2000 });
+
+    // Re-select heading to keep it active
+    selectSeriesHeading(seriesName);
 }
 
 // ============================================================================
@@ -595,6 +628,19 @@ function initializeSeriesNav() {
         const aggType = document.getElementById('agg-type-select')?.value;
         if (currentSeries && aggType) {
             addAggregationOfType(currentSeries, aggType);
+        }
+    });
+
+    // Set up heading name apply button
+    document.getElementById('apply-heading-name-btn')?.addEventListener('click', () => {
+        applyHeadingName();
+    });
+
+    // Also apply on Enter key in heading name input
+    document.getElementById('heading-series-name')?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            applyHeadingName();
         }
     });
 
