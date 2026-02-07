@@ -31,7 +31,7 @@ const CHART_CONFIG = {
         yAxisTitlePosition: 0.5,
         yAxisTitlePositionMinute: 0.7,
         annotations: {
-            'date-text': { offsetMultiplier: 4, useGeneral: true },
+            'date-text': { offsetMultiplier: 3.6, useGeneral: true, prefix: true },
             'week-count': { offsetMultiplier: 2.0833, useGeneral: true },
             'top_x_title': { offsetMultiplier: 4.5, useTitle: true, yDirection: 'above' },
             'bottom_x_title': { offsetMultiplier: 4.1666, useTitle: true, yDirection: 'below' }

@@ -72,6 +72,8 @@ To-do
 - We need to make change lines smarter, to only show if the associated series they are placed on has it's visiblity set to true. So two conditions for displaying a specific change line: 1) is global visiblity on? 2) Is the visibility for the specific data series that it is placed on on? If yes to BOTH, show change line
 - Aim lines need the same cleaning up as phase lines had in terms of notifications
 - When editing lines, turn of edit mode automatically after 1 minute?
+- bounce lines are not cleaned up when deleting a change line, a page refresh is currently necessary
+-
 
 
 - Survey prompts
