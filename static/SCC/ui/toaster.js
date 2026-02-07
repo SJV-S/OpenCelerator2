@@ -162,6 +162,7 @@ function createToast(options) {
     `;
 
     // Layout-specific styles
+    const isVerticalButtons = layout === 'vertical-buttons';
     const layoutStyles = layout === 'horizontal'
         ? 'align-items: center; gap: 12px;'
         : 'flex-direction: column; gap: 12px; min-width: 200px;';
@@ -169,7 +170,7 @@ function createToast(options) {
     toast.style.cssText = baseStyles + layoutStyles;
 
     // Create message element
-    const messageElement = document.createElement(layout === 'horizontal' ? 'span' : 'div');
+    const messageElement = document.createElement((layout === 'horizontal' && !isVerticalButtons) ? 'span' : 'div');
     messageElement.textContent = message;
     messageElement.style.cssText = `
         color: ${COLORS.TEXT};
@@ -184,15 +185,14 @@ function createToast(options) {
 
     // Create buttons
     if (buttons.length > 0) {
-        const buttonContainer = layout === 'horizontal'
+        const buttonContainer = (layout === 'horizontal')
             ? toast // For horizontal, append directly to toast
-            : document.createElement('div'); // For vertical, create container
+            : document.createElement('div'); // For vertical/vertical-buttons, create container
 
-        if (layout === 'vertical') {
-            buttonContainer.style.cssText = `
-                display: flex;
-                gap: 10px;
-            `;
+        if (layout === 'vertical' || isVerticalButtons) {
+            buttonContainer.style.cssText = isVerticalButtons
+                ? 'display: flex; flex-direction: column; gap: 10px;'
+                : 'display: flex; gap: 10px;';
         }
 
         buttons.forEach(buttonConfig => {
@@ -208,7 +208,7 @@ function createToast(options) {
             buttonContainer.appendChild(button);
         });
 
-        if (layout === 'vertical') {
+        if (layout === 'vertical' || isVerticalButtons) {
             toast.appendChild(buttonContainer);
         }
     }

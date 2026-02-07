@@ -223,7 +223,7 @@ function activateCelLineMode() {
     celLineState.seriesSelectionToast = createToast({
         message: 'Select series:',
         buttons: seriesButtons,
-        layout: 'vertical'
+        layout: 'vertical-buttons'
     });
 
 }
@@ -269,8 +269,8 @@ function isSeriesVisible(seriesKey) {
 function getAvailableSeriesButtons() {
     const buttons = [];
 
-    // Check fixed series
-    if (chartState.series.corrects && chartState.series.corrects.some(v => v !== null) && isSeriesVisible(CORRECTS)) {
+    // Check fixed series (use Number.isFinite to match customLegend data checks)
+    if (chartState.series.corrects && chartState.series.corrects.some(v => Number.isFinite(v)) && isSeriesVisible(CORRECTS)) {
         const config = getFirstConfig(CORRECTS);
         buttons.push({
             label: config?.seriesName || 'Corrects',
@@ -279,7 +279,7 @@ function getAvailableSeriesButtons() {
         });
     }
 
-    if (chartState.series.errors && chartState.series.errors.some(v => v !== null) && isSeriesVisible(ERRORS)) {
+    if (chartState.series.errors && chartState.series.errors.some(v => Number.isFinite(v)) && isSeriesVisible(ERRORS)) {
         const config = getFirstConfig(ERRORS);
         buttons.push({
             label: config?.seriesName || 'Errors',
@@ -288,7 +288,7 @@ function getAvailableSeriesButtons() {
         });
     }
 
-    if (chartState.series.timing && chartState.series.timing.some(v => v !== null) && isSeriesVisible(TIMING)) {
+    if (chartState.minuteChart && chartState.series.timing && chartState.series.timing.some(v => Number.isFinite(v)) && isSeriesVisible(TIMING)) {
         const config = getFirstConfig(TIMING);
         buttons.push({
             label: config?.seriesName || 'Timing',
@@ -299,7 +299,7 @@ function getAvailableSeriesButtons() {
 
     // Check misc series
     Object.entries(chartState.series.misc).forEach(([miscId, data]) => {
-        if (data && data.some(v => v !== null) && isSeriesVisible(miscId)) {
+        if (data && data.some(v => Number.isFinite(v)) && isSeriesVisible(miscId)) {
             const config = getFirstConfig(miscId);
             buttons.push({
                 label: config?.seriesName || miscId,

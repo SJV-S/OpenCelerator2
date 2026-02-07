@@ -11,6 +11,7 @@
 import { chartState } from '../chartState.js';
 import { CORRECTS, ERRORS, TIMING } from '../config.js';
 import { icons } from '../ui/icons.js';
+import { createToast } from '../ui/toaster.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 import { toggleGrid } from './grid.js';
 
@@ -447,6 +448,28 @@ function init() {
     eventBus.subscribe(EVENTS.UI_LEGEND_RENDER, () => {
         renderCustomLegend();
     });
+
+    // When a line drawing mode activates, ensure that line type is visible
+    const modeToLineType = {
+        [EVENTS.MODE_PHASE_ACTIVATE]: { key: 'phase', label: 'Event markers' },
+        [EVENTS.MODE_AIM_ACTIVATE]:   { key: 'aim',   label: 'Count markers' },
+        [EVENTS.MODE_CEL_ACTIVATE]:   { key: 'change', label: 'Change lines' }
+    };
+
+    for (const [event, { key, label }] of Object.entries(modeToLineType)) {
+        eventBus.subscribe(event, () => {
+            if (chartState.lineVisibility[key]) return;
+
+            chartState.lineVisibility[key] = true;
+
+            const legendItem = document.querySelector(`.legend-line-item[data-line-type="${key}"]`);
+            if (legendItem) legendItem.classList.remove('legend-item-hidden');
+
+            eventBus.emit(EVENTS.LINE_VISIBILITY_CHANGED, { lineType: key, visible: true });
+
+            createToast({ message: `${label} are now visible`, duration: 3000 });
+        });
+    }
 }
 
 export { renderCustomLegend, toggleLegend, init };
