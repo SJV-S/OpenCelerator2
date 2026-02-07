@@ -404,6 +404,14 @@ function parseDate(value) {
         // Standard date parsing
         else {
             date = new Date(str);
+
+            // Fallback: strip time components (e.g. "00:00:00 07-Jan-2026" → "07-Jan-2026")
+            if (!date || isNaN(date.getTime())) {
+                const stripped = str.replace(/\b\d{1,2}:\d{2}(:\d{2})?\b/g, '').trim();
+                if (stripped && stripped !== str) {
+                    date = new Date(stripped);
+                }
+            }
         }
     }
 

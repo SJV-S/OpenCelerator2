@@ -76,7 +76,7 @@ To-do
 - default chart capacity for weekly is weird
 - - Fake spine on weekly is not drawn correctly either. It might be adapted for Daily only right now
 - Import is blocking if I only pick a misc
-
+- There's date code duplication in the dataImport.js
 
 - Survey prompts
 -- Investigate the occurrence of any cross-module imports that should be handled by the event bus system instead
