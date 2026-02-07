@@ -686,8 +686,11 @@ function drawHorizontalLine(chartDiv, coords) {
     // Note: Keep arrow controls visible so user can adjust horizontal line length
     phaseLineState.currentPhase = 3;
 
-    // Update toaster to show phase 3
-    updatePhaseModeToaster(3);
+    // Remove instruction toaster - the text input dialog includes the step info
+    if (phaseLineState.modeToast) {
+        phaseLineState.modeToast.remove();
+        phaseLineState.modeToast = null;
+    }
 
     showTextInput(chartDiv);
     console.log('Phase 3: Enter text label');
@@ -699,7 +702,7 @@ function drawHorizontalLine(chartDiv, coords) {
  */
 function showTextInput(chartDiv) {
     phaseLineState.textInputOverlay = createTextInputDialog({
-        title: 'Enter Count Marker Text',
+        title: 'Enter Event Marker Text',
         placeholder: 'Enter phase label...',
         borderColor: COLORS.PRIMARY,
         onSubmit: (text) => {
@@ -770,8 +773,11 @@ function addPhaseTextLabel(chartDiv, text) {
     // Store annotation index for potential removal
     phaseLineState.tempAnnotationIndex = currentAnnotations.length;
 
-    // Update toaster to show phase 4
-    updatePhaseModeToaster(4);
+    // Remove instruction toaster - the confirm dialog includes the step info
+    if (phaseLineState.modeToast) {
+        phaseLineState.modeToast.remove();
+        phaseLineState.modeToast = null;
+    }
 
     // Show save confirmation toast
     showSaveConfirmationToast(chartDiv);
@@ -919,7 +925,7 @@ function removePhaseShapes(chartDiv) {
 function showPhaseModeToaster(phase) {
     const stepText = getPhaseStepText(phase);
     phaseLineState.modeToast = createToast({
-        message: `Count marker mode - ${stepText}`,
+        message: `Event marker mode - ${stepText}`,
         buttons: [
             {
                 label: 'Cancel',
@@ -957,13 +963,13 @@ function updatePhaseModeToaster(phase) {
  */
 function getPhaseStepText(phase) {
     if (phase === 1) {
-        return 'Step 1 of 4: Place vertical line';
+        return 'Place vertical line';
     } else if (phase === 2) {
-        return 'Step 2 of 4: Place horizontal endpoint';
+        return 'Place horizontal endpoint';
     } else if (phase === 3) {
-        return 'Step 3 of 4: Enter text label';
+        return 'Enter text label';
     } else if (phase === 4) {
-        return 'Step 4 of 4: Save confirmation';
+        return 'Save confirmation';
     }
     return '';
 }

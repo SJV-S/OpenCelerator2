@@ -401,7 +401,7 @@
     }
 
     #chart-container {
-        height: 100%;
+        height: 98%;
         width: 100%;
         display: flex;
         justify-content: center;
@@ -421,7 +421,7 @@
 
     #chart-container {
         width: 100%;
-        height: 100vh;
+        height: calc(100vh - 4px);
         display: flex;
         justify-content: center;
         align-items: center;

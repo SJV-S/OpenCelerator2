@@ -51,7 +51,6 @@ To-do
 - If the user deletes a shared chart, we need to make sure no errors or resurrections occur
 - Panning STILL doesn't reset after a start-date/capcity change
 - importing a chart json should generate a new UUID, and chart key?
-- OpenCelerator json import doesn't seem to understand last updated: "Updated Jan 21, 1970"
 - and, yet again, auto save is triggered without me doing anything when loading the chart
 - The idea of saving 1s in count chart is a waste of space. Just auto generate it.
 - xValues look a bit short. Are they full timestamps?
@@ -66,7 +65,7 @@ To-do
 - We need the welcome screen: 1) Check local storage if an SCC user exists. If not, direct to a welcome screen where we guide the user through some simple options and set values in localStorage
 -- Keep the Ux very clean and the same style as elswhere, white and same kind of blue-is. Greet the user with title: Standard Change Chart, and then ask below in smaller text above three buttons:
 -- What will you be using the app for? Three options: Teaching, Business, and Both. Once the user has selected, we'll do two things, 1) add that in localStorage, and 2) generate the passphrase that we use as their identity (the infrastructure of that already exists)
--  I need a robust mechanism to update the users apps
-- if I use cut series line, it resets the visiblity options for other things like the data series it seems
-- grid settings changs does not trigger a save event, check for the other visiblity settings as well (in the case of the grid, the legend seems to remember that the grid is off, state of the grid is not being applied)
--- In the case of the visiblity of a series, not even the legend seems to remember
+- Hit area for the flag is not right when placing horziontal lines. Or is it x value rounding that does it? It might be configured for Daily chart only
+- Crosshair vertical lines don't respect the integer position
+- Chart can't currently be manually resized
+-
