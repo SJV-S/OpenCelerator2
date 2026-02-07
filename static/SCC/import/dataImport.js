@@ -346,9 +346,10 @@ function cleanRow(row, columnMap) {
         }
     }
 
-    // At least one of corrects or errors should have data
-    if (isNaN(corrects) && isNaN(errors)) {
-        return { data: null, error: 'No count data (corrects or errors)' };
+    // At least one data series should have data (corrects, errors, or any misc)
+    const hasMiscData = Object.values(misc).some(v => !isNaN(v));
+    if (isNaN(corrects) && isNaN(errors) && !hasMiscData) {
+        return { data: null, error: 'No count data (corrects, errors, or misc)' };
     }
 
     return {

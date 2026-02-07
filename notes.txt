@@ -73,7 +73,9 @@ To-do
 - Aim lines need the same cleaning up as phase lines had in terms of notifications
 - When editing lines, turn of edit mode automatically after 1 minute?
 - bounce lines are not cleaned up when deleting a change line, a page refresh is currently necessary
--
+- default chart capacity for weekly is weird
+- - Fake spine on weekly is not drawn correctly either. It might be adapted for Daily only right now
+- Import is blocking if I only pick a misc
 
 
 - Survey prompts

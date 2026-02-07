@@ -445,8 +445,8 @@ function validateMapping() {
     if (!dateCol) {
         valid = false;
     }
-    // At least one of corrects or errors required
-    else if (!correctsCol && !errorsCol) {
+    // At least one data series required (corrects, errors, or misc)
+    else if (!correctsCol && !errorsCol && Object.keys(getMiscColumnMappings()).length === 0) {
         valid = false;
     }
     // Minutes required for minute charts
