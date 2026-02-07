@@ -536,7 +536,7 @@ function processFrame() {
     const xValue = cache.xRange[0] + (xPixel - cache.plotLeft) / cache.xScale;
     const yLogValue = cache.yRange[1] - (yPixel - cache.plotTop) / cache.yScale;
 
-    // --- Tier 2: Only run when x changes ---
+    // --- Tier 2: Only run when x changes (data lookup, date, series) ---
     const xRounded = Math.round(xValue);
     if (xRounded !== state.lastXRounded) {
         state.lastXRounded = xRounded;
@@ -546,6 +546,9 @@ function processFrame() {
 
         updateInfoPanel(xRounded, yLogValue, traceData);
     }
+
+    // --- Tier 1: Cursor y-value updates every frame ---
+    updateCursorY(yLogValue);
 
     // --- Tier 1: Draw crosshair and markers ---
     drawCanvas();
@@ -720,6 +723,16 @@ function binarySearchClosest(arr, target) {
 // =============================================================================
 // Info Panel Updates
 // =============================================================================
+
+/**
+ * Update cursor y-value in info panel (runs every frame)
+ */
+function updateCursorY(yLogValue) {
+    const refs = state.elements?.infoPanelRefs;
+    if (!refs?.yLabel) return;
+    const yValue = Math.pow(10, yLogValue);
+    refs.yLabel.textContent = formatValue(yValue);
+}
 
 /**
  * Update info panel with data at current position
