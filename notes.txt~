@@ -68,4 +68,4 @@ To-do
 - Hit area for the flag is not right when placing horziontal lines. Or is it x value rounding that does it? It might be configured for Daily chart only
 - Chart can't currently be manually resized
 - Fine grained grid control does not trigger save event?
--
+- 

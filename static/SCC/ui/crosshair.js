@@ -573,10 +573,15 @@ function drawCanvas() {
     ctx.lineWidth = 1;
     ctx.setLineDash(DASH_PATTERN);
 
-    // Vertical line
+    // Vertical line - snapped to rounded x position (matches info panel)
+    // Uses Plotly's internal axis mapping for pixel-perfect gridline alignment
+    const xaxis = state.elements.chart._fullLayout.xaxis;
+    const xSnapped = state.lastXRounded !== null
+        ? xaxis._offset + xaxis.l2p(state.lastXRounded)
+        : xPixel;
     ctx.beginPath();
-    ctx.moveTo(xPixel, cache.plotTop);
-    ctx.lineTo(xPixel, cache.plotBottom);
+    ctx.moveTo(xSnapped, cache.plotTop);
+    ctx.lineTo(xSnapped, cache.plotBottom);
     ctx.stroke();
 
     // Horizontal line
