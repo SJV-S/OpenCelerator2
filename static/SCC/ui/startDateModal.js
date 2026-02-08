@@ -641,9 +641,8 @@ function showPreviewRect(containerHeight) {
 
     if (!previewRect) {
         previewRect = document.createElement('div');
-        previewRect.style.cssText = 'position:absolute;top:0;left:50%;transform:translateX(-50%);border:3px dashed #6ad1e3;pointer-events:none;z-index:999;box-sizing:border-box;';
-        chart.parentElement.style.position = 'relative';
-        chart.parentElement.appendChild(previewRect);
+        previewRect.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);border:3px dashed #6ad1e3;pointer-events:none;z-index:999;box-sizing:border-box;';
+        chart.appendChild(previewRect);
     }
 
     previewRect.style.width = `${Math.round(dims.width)}px`;
