@@ -76,8 +76,8 @@ html, body {
         <button class="chart-btn w-full px-6 py-3 border-2 border-gray-300 rounded-lg text-gray-800 bg-white font-medium" data-type="Weekly">Weekly</button>
         <button class="chart-btn w-full px-6 py-3 border-2 border-gray-300 rounded-lg text-gray-800 bg-white font-medium" data-type="Monthly">Monthly</button>
         <button class="chart-btn w-full px-6 py-3 border-2 border-gray-300 rounded-lg text-gray-800 bg-white font-medium" data-type="Yearly">Yearly</button>
-        <button class="chart-btn w-full px-6 py-3 border-2 border-gray-300 rounded-lg text-gray-800 bg-white font-medium" data-type="Timing">Timing</button>
-        <button class="chart-btn w-full px-6 py-3 border-2 border-gray-300 rounded-lg text-gray-800 bg-white font-medium" data-type="FrequencyCollections">Frequency Collections</button>
+        <button class="chart-btn w-full px-6 py-3 border-2 border-gray-300 rounded-lg text-gray-800 bg-white font-medium" data-type="Timing" disabled data-coming-soon>Timing (Coming Soon)</button>
+        <button class="chart-btn w-full px-6 py-3 border-2 border-gray-300 rounded-lg text-gray-800 bg-white font-medium" data-type="FrequencyCollections" disabled data-coming-soon>Frequency Collections (Coming Soon)</button>
     </div>
 </main>
 {% endblock %}
@@ -96,6 +96,7 @@ html, body {
     function updateButtonState() {
         const hasName = nameInput.value.trim().length > 0;
         buttons.forEach(btn => {
+            if (btn.hasAttribute('data-coming-soon')) return;
             btn.disabled = !hasName;
         });
         if (hasName) {

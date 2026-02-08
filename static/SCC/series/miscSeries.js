@@ -8,12 +8,10 @@
  */
 
 import { eventBus, EVENTS } from '../eventBus.js';
-import {
-    chartState,
-    createMiscTraceConfig,
-    MISC_COLORS,
-    MAX_MISC_SERIES
-} from '../chartState.js';
+import { chartState } from '../chartState.js';
+import { createMiscTraceConfig, MISC_COLORS, LIMITS } from '../config.js';
+
+const MAX_MISC_SERIES = LIMITS.MAX_MISC_SERIES;
 
 /**
  * Get the next available misc series ID (fills gaps)

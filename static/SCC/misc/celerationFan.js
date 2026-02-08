@@ -78,9 +78,8 @@
  */
 
 import { chartState } from '../chartState.js';
-import { MOBILE_BREAKPOINT, COLORS, CHART_MATH } from '../config.js';
+import { MOBILE_BREAKPOINT, COLORS, CHART_MATH, CHART_TYPE_CONFIG } from '../config.js';
 import { eventBus, EVENTS } from '../eventBus.js';
-import { CHART_CONFIG } from '../util/resize-chart.js';
 
 const CEL_VALUES = [16, 4, 2, 1.4, 1, 1/1.4, 1/2, 1/4, 1/16];
 const LABELS = ['×16', '×4', '×2', '×1.4', '×1', '÷1.4', '÷2', '÷4', '÷16'];
@@ -116,7 +115,7 @@ export function generateFanElements(layout, isMinuteChart, chartType) {
     const yMinLog = layout.yaxis.range[0]; // Already log10
     const yMaxLog = layout.yaxis.range[1]; // Already log10
 
-    const config = CHART_CONFIG[chartType] || CHART_CONFIG.Daily;
+    const config = CHART_TYPE_CONFIG[chartType] || CHART_TYPE_CONFIG.Daily;
     const unit = config.unit || 7;
     const periodLabel = PERIOD_LABELS[chartType] || 'per week';
 

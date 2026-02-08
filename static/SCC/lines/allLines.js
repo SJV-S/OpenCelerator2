@@ -9,7 +9,7 @@
  *   - chartState.lineStyles.aim.width
  */
 
-import { chartState, DEFAULT_PHASE_LINE_COLOR, DEFAULT_PHASE_LINE_WIDTH, DEFAULT_AIM_LINE_COLOR, DEFAULT_AIM_LINE_WIDTH } from '../chartState.js';
+import { chartState } from '../chartState.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 
 /**

@@ -270,30 +270,7 @@ function timestampsToXPositions(xValues) {
         calculateStartDate(dates);
     }
 
-    const chartType = (chartState.chartType || 'Daily').toLowerCase();
-
-    const xPositions = dates.map(date => {
-        const daysDiff = Math.floor((date - chartState.startDate) / (1000 * 60 * 60 * 24));
-
-        switch (chartType) {
-            case 'weekly':
-                return Math.floor(daysDiff / 7);
-            case 'monthly':
-                // Calculate month difference from startDate
-                const startYear = chartState.startDate.getFullYear();
-                const startMonth = chartState.startDate.getMonth();
-                const dateYear = date.getFullYear();
-                const dateMonth = date.getMonth();
-                return (dateYear - startYear) * 12 + (dateMonth - startMonth);
-            case 'yearly':
-                return date.getFullYear() - chartState.startDate.getFullYear();
-            case 'daily':
-            default:
-                return daysDiff;
-        }
-    });
-
-    return xPositions;
+    return dates.map(date => dateToXPosition(date));
 }
 
 /**
@@ -585,6 +562,148 @@ function updatePlotDateLabel() {
     label.textContent = labelText[chartType] || 'Plot Date';
 }
 
+/**
+ * Get all Mondays in a given month/year.
+ * @param {number} year - Full year (e.g., 2025)
+ * @param {number} month - Month 1-12
+ * @returns {number[]} Array of day numbers that are Mondays (e.g., [6, 13, 20, 27])
+ */
+function getMondaysInMonth(year, month) {
+    const mondays = [];
+    const tempDate = new Date(2000, month, 0);
+    tempDate.setFullYear(year);
+    const lastDay = tempDate.getDate();
+
+    for (let day = 1; day <= lastDay; day++) {
+        const date = new Date(2000, month - 1, day);
+        date.setFullYear(year);
+        if (date.getDay() === 1) {
+            mondays.push(day);
+        }
+    }
+
+    return mondays;
+}
+
+/**
+ * Format year for display with BC/AD suffix.
+ * Internal: 1 = 1 AD, 0 = 1 BC, -1 = 2 BC
+ * @param {number} internalYear - Internal year number
+ * @returns {string} Formatted year string (e.g., "2025 AD", "44 BC")
+ */
+function formatYearDisplay(internalYear) {
+    if (internalYear >= 1) {
+        return `${internalYear} AD`;
+    } else {
+        return `${1 - internalYear} BC`;
+    }
+}
+
+/**
+ * Parse year input that may contain BC/AD.
+ * @param {string|number} input - Year string (e.g., "44 BC", "2025 AD", "2025")
+ * @returns {number|null} Internal year number, or null if invalid
+ */
+function parseYearInput(input) {
+    const str = input.toString().trim().toUpperCase();
+    const bcMatch = str.match(/^(\d+)\s*BC$/);
+    const adMatch = str.match(/^(\d+)\s*AD$/);
+
+    if (bcMatch) {
+        return 1 - parseInt(bcMatch[1]);
+    } else if (adMatch) {
+        return parseInt(adMatch[1]);
+    } else {
+        const num = parseInt(str);
+        return isNaN(num) ? null : num;
+    }
+}
+
+/**
+ * Create a Date object with correct year handling.
+ * JavaScript Date treats years 0-99 as 1900-1999, so we use setFullYear.
+ * @param {number} year - Full year
+ * @param {number} month - Month (0-indexed)
+ * @param {number} day - Day of month
+ * @returns {Date} Date object
+ */
+function createDate(year, month, day) {
+    const date = new Date(2000, month, day);
+    date.setFullYear(year);
+    return date;
+}
+
+/**
+ * Convert internal startDate to user-visible date components.
+ * @param {Date} startDate - The internal start date
+ * @param {string} chartType - Chart type (e.g., "Daily", "Weekly")
+ * @returns {Object} User-visible components (monday, month, year, decade depending on chart type)
+ */
+function internalToUserDate(startDate, chartType) {
+    const type = chartType.toLowerCase();
+
+    if (type === 'daily') {
+        const dayOfWeek = startDate.getDay();
+        const mondayDate = new Date(startDate);
+        const daysToSubtract = (dayOfWeek === 0) ? 6 : dayOfWeek - 1;
+        if (daysToSubtract > 0) {
+            mondayDate.setDate(startDate.getDate() - daysToSubtract);
+        }
+
+        return {
+            monday: mondayDate.getDate(),
+            month: mondayDate.getMonth() + 1,
+            year: mondayDate.getFullYear()
+        };
+    } else if (type === 'weekly') {
+        const targetDate = new Date(startDate);
+        targetDate.setDate(startDate.getDate() + 6);
+        return {
+            month: targetDate.getMonth() + 1,
+            year: targetDate.getFullYear()
+        };
+    } else if (type === 'monthly') {
+        return {
+            year: startDate.getFullYear()
+        };
+    } else if (type === 'yearly') {
+        const year = startDate.getFullYear();
+        return {
+            decade: year - (year % 10)
+        };
+    }
+
+    return {};
+}
+
+/**
+ * Convert user-selected values back to internal date.
+ * @param {Object} values - User values (monday, month, year, decade)
+ * @param {string} chartType - Chart type (e.g., "Daily", "Weekly")
+ * @returns {Date} Internal date
+ */
+function userToInternalDate(values, chartType) {
+    const type = chartType.toLowerCase();
+
+    if (type === 'daily') {
+        return createDate(values.year, values.month - 1, values.monday);
+    } else if (type === 'weekly') {
+        const d = createDate(values.year, values.month - 1, 1);
+        const weekday = d.getDay();
+        const daysToSubtract = (weekday === 0) ? 6 : weekday - 1;
+        if (daysToSubtract > 0) {
+            d.setDate(d.getDate() - daysToSubtract);
+        }
+        return d;
+    } else if (type === 'monthly') {
+        return createDate(values.year, 0, 1);
+    } else if (type === 'yearly') {
+        return createDate(values.decade, 0, 1);
+    }
+
+    return new Date();
+}
+
 export {
     findNearestMonday,
     findNearestSunday, // deprecated, use findNearestMonday
@@ -603,5 +722,11 @@ export {
     handleOtherDateChange,
     adjustDateInput,
     initializeDateInput,
-    updatePlotDateLabel
+    updatePlotDateLabel,
+    getMondaysInMonth,
+    formatYearDisplay,
+    parseYearInput,
+    createDate,
+    internalToUserDate,
+    userToInternalDate
 };

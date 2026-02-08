@@ -9,6 +9,7 @@
  */
 
 import { chartState } from '../chartState.js';
+import { CORRECTS, ERRORS } from '../config.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 import {
     prepareImport,
@@ -481,6 +482,32 @@ function validateMapping() {
 // Import Execution
 // ============================================================================
 
+/**
+ * Update series display names from the CSV column names in the column map.
+ * Sets traceStyles seriesName for each mapped series so the chart legend
+ * and series nav show the original column header instead of generic defaults.
+ */
+function updateSeriesDisplayNames(columnMap) {
+    if (columnMap.corrects) {
+        const configs = chartState.traceStyles[CORRECTS];
+        if (configs) {
+            Object.values(configs).forEach(cfg => { cfg.seriesName = columnMap.corrects; });
+        }
+    }
+    if (columnMap.errors) {
+        const configs = chartState.traceStyles[ERRORS];
+        if (configs) {
+            Object.values(configs).forEach(cfg => { cfg.seriesName = columnMap.errors; });
+        }
+    }
+    for (const [miscId, colName] of Object.entries(columnMap.misc || {})) {
+        const configs = chartState.traceStyles.misc[miscId];
+        if (configs) {
+            Object.values(configs).forEach(cfg => { cfg.seriesName = colName; });
+        }
+    }
+}
+
 async function performImport() {
     if (!currentFileData || !validateMapping()) return;
 
@@ -507,6 +534,9 @@ async function performImport() {
         const result = importToChartState(valid, { replace: shouldReplace });
 
         if (result.success) {
+            // Update display names from CSV column names
+            updateSeriesDisplayNames(columnMap);
+
             // Show success message
             let message = `Imported ${result.count} entries`;
             if (invalid.length > 0) {

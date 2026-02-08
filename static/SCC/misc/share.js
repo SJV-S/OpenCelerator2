@@ -134,6 +134,13 @@ function exportDataToCSV() {
 
         // Iterate through each data point
         for (let i = 0; i < dataLength; i++) {
+            // Skip rows where all data columns are empty/NaN
+            const hasCorrect = includeCorrects && Number.isFinite(chartState.series.corrects[i]);
+            const hasError = includeErrors && Number.isFinite(chartState.series.errors[i]);
+            const hasMinute = includeMinutes && Number.isFinite(chartState.series.timing[i]);
+            const hasMisc = miscSeriesWithData.some(id => Number.isFinite(chartState.series.misc[id][i]));
+            if (!hasCorrect && !hasError && !hasMinute && !hasMisc) continue;
+
             // Convert Unix timestamp to human-readable date/time (ISO format without commas)
             const timestamp = chartState.series.xValues[i];
             let dateStr = '';

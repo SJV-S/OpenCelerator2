@@ -95,7 +95,6 @@ export const CHART_MATH = Object.freeze({
 // snapTo: pan increment (also used for snapping chartWindow)
 // snapInterval: snapping granularity during drag operations
 // capacity: total x-axis range
-// maxWindow: default visible window size
 // minXmax: minimum allowed window size
 // unit: x-axis units per doubling (for celeration calculation)
 // yMin/yMax: y-axis range
@@ -107,8 +106,28 @@ export const CHART_TYPE_CONFIG = Object.freeze({
         snapTo: 14,
         snapInterval: 7,
         minXmax: 28,
-        maxWindow: 140,
         capacity: 280,
+        creditMarginMultiplier: 0.13,
+        topMarginMultiplier: 0,
+        fanMarginMinute: 0.10,
+        fanMarginCount: 0.07,
+        fanXOffsetPx: 30,
+        fanXOffsetPxMinute: 180,
+        fanYPosition: 1000,
+        fanYPositionMinute: 0.01,
+        fanLineLengthMultiplier: 0.13,
+        yAxisTitlePosition: 0.5,
+        yAxisTitlePositionMinute: 0.7,
+        annotations: {
+            'date-text': { offsetMultiplier: 3.6, useGeneral: true, prefix: true },
+            'week-count': { offsetMultiplier: 2.0833, useGeneral: true },
+            'top_x_title': { offsetMultiplier: 4.5, useTitle: true, yDirection: 'above' },
+            'bottom_x_title': { offsetMultiplier: 4.1666, useTitle: true, yDirection: 'below' }
+        },
+        shapes: {
+            hasDateLine: true,
+            dateLineOffsetMultiplier: 2.4305
+        }
     },
     Weekly: {
         yMin: 0.001 * 0.69,
@@ -117,8 +136,28 @@ export const CHART_TYPE_CONFIG = Object.freeze({
         snapTo: 5,
         snapInterval: 5,
         minXmax: 10,
-        maxWindow: 100,
         capacity: 200,
+        creditMarginMultiplier: 0.10,
+        topMarginMultiplier: 0,
+        fanMarginMinute: 0.10,
+        fanMarginCount: 0.07,
+        fanXOffsetPx: 30,
+        fanXOffsetPxMinute: 30,
+        fanYPosition: 1000,
+        fanYPositionMinute: 0.01,
+        fanLineLengthMultiplier: 0.13,
+        yAxisTitlePosition: 0.5,
+        yAxisTitlePositionMinute: 0.7,
+        annotations: {
+            'month-label': { offsetMultiplier: 2.8, useGeneral: true, fontScale: 0.85, prefix: true },
+            'month-count': { offsetMultiplier: 5, useGeneral: true },
+            'top_x_title': { offsetMultiplier: 5.93, useTitle: true, yDirection: 'above' },
+            'bottom_x_title': { offsetMultiplier: 4.44, useTitle: true, yDirection: 'below' }
+        },
+        shapes: {
+            hasTopXTick: true,
+            topXTickMultiplier: 3
+        }
     },
     Monthly: {
         yMin: 0.001 * 0.69,
@@ -127,8 +166,28 @@ export const CHART_TYPE_CONFIG = Object.freeze({
         snapTo: 12,
         snapInterval: 6,
         minXmax: 24,
-        maxWindow: 120,
         capacity: 240,
+        creditMarginMultiplier: 0.15,
+        topMarginMultiplier: 0,
+        fanMarginMinute: 0.15,
+        fanMarginCount: 0.07,
+        fanXOffsetPx: 30,
+        fanXOffsetPxMinute: 30,
+        fanYPosition: 1000,
+        fanYPositionMinute: 0.01,
+        fanLineLengthMultiplier: 0.13,
+        yAxisTitlePosition: 0.5,
+        yAxisTitlePositionMinute: 0.7,
+        annotations: {
+            'year-label': { offsetMultiplier: 3, useGeneral: true, fontScale: 1.5, prefix: true },
+            'year-count': { offsetMultiplier: 5.2, useGeneral: true },
+            'top_x_title': { offsetMultiplier: 5.5, useTitle: true, yDirection: 'above' },
+            'bottom_x_title': { offsetMultiplier: 4.44, useTitle: true, yDirection: 'below' }
+        },
+        shapes: {
+            hasTopXTick: true,
+            topXTickMultiplier: 3.3
+        }
     },
     Yearly: {
         yMin: 0.001 * 0.69,
@@ -137,8 +196,30 @@ export const CHART_TYPE_CONFIG = Object.freeze({
         snapTo: 10,
         snapInterval: 5,
         minXmax: 20,
-        maxWindow: 100,
         capacity: 200,
+        creditMarginMultiplier: 0.15,
+        topMarginMultiplier: 0,
+        fanMarginMinute: 0.10,
+        fanMarginCount: 0.07,
+        fanXOffsetPx: 30,
+        fanXOffsetPxMinute: 30,
+        fanYPosition: 1000,
+        fanYPositionMinute: 0.01,
+        fanLineLengthMultiplier: 0.13,
+        yAxisTitlePosition: 0.5,
+        yAxisTitlePositionMinute: 0.7,
+        annotations: {
+            'year-label': { offsetMultiplier: 3, useGeneral: true, fontScale: 1, prefix: true },
+            'decade-count': { offsetMultiplier: 4.7, useGeneral: true, fontScale: 1 },
+            'top_x_title': { offsetMultiplier: 5, useTitle: true, yDirection: 'above' },
+            'bottom_x_title': { offsetMultiplier: 4.44, useTitle: true, yDirection: 'below' }
+        },
+        shapes: {
+            hasTopXTick: true,
+            topXTickFullMultiplier: 1.4,
+            topXTickHalfMultiplier: 0.8,
+            useDecadeTicks: true
+        }
     },
     FrequencyCollections: {
         yMin: 0.001 * 0.69,
@@ -147,9 +228,40 @@ export const CHART_TYPE_CONFIG = Object.freeze({
         snapTo: 7,
         snapInterval: 7,
         minXmax: 42,
-        maxWindow: 70,
         capacity: 280,
+        creditMarginMultiplier: 0.10,
+        topMarginMultiplier: 0,
+        fanMarginMinute: 0.10,
+        fanMarginCount: 0.07,
+        fanXOffsetPx: 30,
+        fanXOffsetPxMinute: 30,
+        fanYPosition: 1000,
+        fanYPositionMinute: 0.01,
+        fanLineLengthMultiplier: 0.13,
+        yAxisTitlePosition: 0.5,
+        yAxisTitlePositionMinute: 0.7,
+        annotations: {
+            'blank-line': { offsetMultiplier: 3.05, useGeneral: true, fontScale: 0.75, prefix: true, yDirection: 'below' },
+            'counted-label': { offsetMultiplier: 4.79, useGeneral: true, fontScale: 0.75, prefix: true, yDirection: 'below' },
+            'chart_title': { fontScale: 1.2, useTitle: true, skipPosition: true }
+        },
+        shapes: {
+            noRightYTick: true
+        }
     },
+});
+
+// ============================================================================
+// RESIZE SCALING CONSTANTS
+// ============================================================================
+export const RESIZE = Object.freeze({
+    GENERAL_FONT_SCALE: 0.017,
+    TITLE_FONT_SCALE: 0.025,
+    X_TICKS_DOWN: 36,
+    Y_TICK_LENGTH_PX: 6,
+    TICK_FONT_SCALE: 1.5,
+    Y_AXIS_TITLE_OFFSET: 0.6,
+    DATE_LINE_LEN_SCALE: 0.8,
 });
 
 // ============================================================================
@@ -203,4 +315,113 @@ export const TRACE_PROP = Object.freeze({
     MARKER_COLOR: 'markerColor',    // Primary color (fill for markers, color for text)
     MARKER_EDGE_COLOR: 'markerEdgeColor',  // Outline color (markers only)
     MARKER_SYMBOL: 'markerSymbol'   // Shape (markers only)
+});
+
+// ============================================================================
+// DEFAULT TRACE CONFIGURATIONS
+// ============================================================================
+// All configs use standardized property names from TRACE_PROP above
+
+export const defaultCorrectTraceConfig = Object.freeze({
+    seriesName: 'correct',
+    showLine: true,
+    lineDash: 'solid',
+    lineWidth: LINE_DEFAULTS.TRACE_LINE_WIDTH,
+    lineColor: 'black',
+    markerSize: 8,
+    markerSymbol: 'circle',
+    markerColor: 'black',
+    markerEdgeColor: 'black'
+});
+
+export const defaultErrorTraceConfig = Object.freeze({
+    seriesName: 'incorrect',
+    showLine: true,
+    lineDash: 'solid',
+    lineWidth: LINE_DEFAULTS.TRACE_LINE_WIDTH,
+    lineColor: 'black',
+    markerSize: 20,
+    markerSymbol: 'x',
+    markerColor: 'black',
+    markerEdgeColor: 'black'
+});
+
+export const defaultTimingTraceConfig = Object.freeze({
+    seriesName: 'Timing',
+    showLine: false,
+    lineDash: 'solid',
+    lineWidth: LINE_DEFAULTS.TRACE_LINE_WIDTH,
+    lineColor: 'black',
+    markerSize: 30,
+    markerSymbol: '-',
+    markerColor: 'black',
+    markerEdgeColor: 'black'
+});
+
+// ============================================================================
+// MISC SERIES CONFIGURATION
+// ============================================================================
+
+export const MISC_COLORS = Object.freeze([
+    '#FFA500', // orange
+    '#FF0000', // red
+    '#00AA00', // green
+    '#0000FF', // blue
+    '#FF00FF', // magenta
+    '#00CCCC', // cyan
+    '#800080', // purple
+    '#008080', // teal
+    '#FFD700', // gold
+    '#8B4513'  // saddle brown
+]);
+
+export const MISC_SYMBOLS = Object.freeze([
+    'square',
+    'triangle-up',
+    'diamond',
+    'star',
+    'hexagon',
+    'pentagon',
+    'cross',
+    'triangle-down',
+    'hexagon2',
+    'octagon'
+]);
+
+/**
+ * Create a default trace config for a misc series based on its index
+ * @param {number} index - 0-based index for color/symbol cycling
+ * @returns {Object} Trace configuration object
+ */
+export function createMiscTraceConfig(index) {
+    return {
+        seriesName: `Misc ${index + 1}`,
+        showLine: true,
+        lineDash: 'solid',
+        lineWidth: LINE_DEFAULTS.TRACE_LINE_WIDTH,
+        lineColor: 'black',
+        markerSize: 8,
+        markerSymbol: MISC_SYMBOLS[index % MISC_SYMBOLS.length],
+        markerColor: MISC_COLORS[index % MISC_COLORS.length],
+        markerEdgeColor: 'black'
+    };
+}
+
+// ============================================================================
+// DEFAULT LEGEND CONFIGURATION
+// ============================================================================
+
+export const DEFAULT_LEGEND_CONFIG = Object.freeze({
+    x: 1,
+    y: 1,
+    xanchor: 'right',
+    yanchor: 'top',
+    bgcolor: COLORS.LEGEND_BG,
+    bordercolor: COLORS.LEGEND_BORDER,
+    borderwidth: 1,
+    font: {
+        size: FONT_SIZES.LEGEND,
+        family: 'Arial',
+        color: 'black'
+    }
 });

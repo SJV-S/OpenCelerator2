@@ -4,7 +4,7 @@
  * Also handles margin expansion for celeration fan
  */
 
-import { MOBILE_BREAKPOINT, CHART_MATH, LAYOUT, CHART_TYPE_CONFIG } from '../config.js';
+import { MOBILE_BREAKPOINT, CHART_MATH, LAYOUT, CHART_TYPE_CONFIG, RESIZE } from '../config.js';
 import { chartState } from '../chartState.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 
@@ -14,130 +14,6 @@ import { eventBus, EVENTS } from '../eventBus.js';
 function isMobile() {
     return window.innerWidth < MOBILE_BREAKPOINT;
 }
-
-// Chart-specific configuration (merges core values from config.js with layout-specific values)
-const CHART_CONFIG = {
-    Daily: {
-        ...CHART_TYPE_CONFIG.Daily,
-        creditMarginMultiplier: 0.13,
-        topMarginMultiplier: 0,
-        fanMarginMinute: 0.10,
-        fanMarginCount: 0.07,
-        fanXOffsetPx: 30,
-        fanXOffsetPxMinute: 180,
-        fanYPosition: 1000,
-        fanYPositionMinute: 0.01,
-        fanLineLengthMultiplier: 0.13,
-        yAxisTitlePosition: 0.5,
-        yAxisTitlePositionMinute: 0.7,
-        annotations: {
-            'date-text': { offsetMultiplier: 3.6, useGeneral: true, prefix: true },
-            'week-count': { offsetMultiplier: 2.0833, useGeneral: true },
-            'top_x_title': { offsetMultiplier: 4.5, useTitle: true, yDirection: 'above' },
-            'bottom_x_title': { offsetMultiplier: 4.1666, useTitle: true, yDirection: 'below' }
-        },
-        shapes: {
-            hasDateLine: true,
-            dateLineOffsetMultiplier: 2.4305
-        }
-    },
-    Weekly: {
-        ...CHART_TYPE_CONFIG.Weekly,
-        creditMarginMultiplier: 0.10,
-        topMarginMultiplier: 0,
-        fanMarginMinute: 0.10,
-        fanMarginCount: 0.07,
-        fanXOffsetPx: 30,
-        fanXOffsetPxMinute: 30,
-        fanYPosition: 1000,
-        fanYPositionMinute: 0.01,
-        fanLineLengthMultiplier: 0.13,
-        yAxisTitlePosition: 0.5,
-        yAxisTitlePositionMinute: 0.7,
-        annotations: {
-            'month-label': { offsetMultiplier: 2.8, useGeneral: true, fontScale: 0.85, prefix: true },
-            'month-count': { offsetMultiplier: 5, useGeneral: true },
-            'top_x_title': { offsetMultiplier: 5.93, useTitle: true, yDirection: 'above' },
-            'bottom_x_title': { offsetMultiplier: 4.44, useTitle: true, yDirection: 'below' }
-        },
-        shapes: {
-            hasTopXTick: true,
-            topXTickMultiplier: 3
-        }
-    },
-    Monthly: {
-        ...CHART_TYPE_CONFIG.Monthly,
-        creditMarginMultiplier: 0.15,
-        topMarginMultiplier: 0,
-        fanMarginMinute: 0.15,
-        fanMarginCount: 0.07,
-        fanXOffsetPx: 30,
-        fanXOffsetPxMinute: 30,
-        fanYPosition: 1000,
-        fanYPositionMinute: 0.01,
-        fanLineLengthMultiplier: 0.13,
-        yAxisTitlePosition: 0.5,
-        yAxisTitlePositionMinute: 0.7,
-        annotations: {
-            'year-label': { offsetMultiplier: 3, useGeneral: true, fontScale: 1.5, prefix: true },
-            'year-count': { offsetMultiplier: 5.2, useGeneral: true },
-            'top_x_title': { offsetMultiplier: 5.5, useTitle: true, yDirection: 'above' },
-            'bottom_x_title': { offsetMultiplier: 4.44, useTitle: true, yDirection: 'below' }
-        },
-        shapes: {
-            hasTopXTick: true,
-            topXTickMultiplier: 3.3
-        }
-    },
-    Yearly: {
-        ...CHART_TYPE_CONFIG.Yearly,
-        creditMarginMultiplier: 0.15,
-        topMarginMultiplier: 0,
-        fanMarginMinute: 0.10,
-        fanMarginCount: 0.07,
-        fanXOffsetPx: 30,
-        fanXOffsetPxMinute: 30,
-        fanYPosition: 1000,
-        fanYPositionMinute: 0.01,
-        fanLineLengthMultiplier: 0.13,
-        yAxisTitlePosition: 0.5,
-        yAxisTitlePositionMinute: 0.7,
-        annotations: {
-            'year-label': { offsetMultiplier: 3, useGeneral: true, fontScale: 1, prefix: true },
-            'decade-count': { offsetMultiplier: 4.7, useGeneral: true, fontScale: 1 },
-            'top_x_title': { offsetMultiplier: 5, useTitle: true, yDirection: 'above' },
-            'bottom_x_title': { offsetMultiplier: 4.44, useTitle: true, yDirection: 'below' }
-        },
-        shapes: {
-            hasTopXTick: true,
-            topXTickFullMultiplier: 1.4,
-            topXTickHalfMultiplier: 0.8,
-            useDecadeTicks: true
-        }
-    },
-    FrequencyCollections: {
-        ...CHART_TYPE_CONFIG.FrequencyCollections,
-        creditMarginMultiplier: 0.10,
-        topMarginMultiplier: 0,
-        fanMarginMinute: 0.10,
-        fanMarginCount: 0.07,
-        fanXOffsetPx: 30,
-        fanXOffsetPxMinute: 30,
-        fanYPosition: 1000,
-        fanYPositionMinute: 0.01,
-        fanLineLengthMultiplier: 0.13,
-        yAxisTitlePosition: 0.5,
-        yAxisTitlePositionMinute: 0.7,
-        annotations: {
-            'blank-line': { offsetMultiplier: 3.05, useGeneral: true, fontScale: 0.75, prefix: true, yDirection: 'below' },
-            'counted-label': { offsetMultiplier: 4.79, useGeneral: true, fontScale: 0.75, prefix: true, yDirection: 'below' },
-            'chart_title': { fontScale: 1.2, useTitle: true, skipPosition: true }
-        },
-        shapes: {
-            noRightYTick: true
-        }
-    }
-};
 
 /**
  * Resize chart based on container dimensions
@@ -153,7 +29,7 @@ const CHART_CONFIG = {
 function resizeChartByHeight(chartJson, containerWidth, containerHeight, chartType = 'Daily', options = {}) {
     const { fanVisible = false, isMinuteChart = false } = options;
 
-    const config = CHART_CONFIG[chartType];
+    const config = CHART_TYPE_CONFIG[chartType];
     if (!config) {
         console.warn(`Unknown chart type: ${chartType}, defaulting to Daily`);
         return resizeChartByHeight(chartJson, containerWidth, containerHeight, 'Daily', options);
@@ -239,9 +115,9 @@ function resizeChartByHeight(chartJson, containerWidth, containerHeight, chartTy
     chartJson.layout.width = width;
 
     // Scaling factors
-    const generalFontScale = height * 0.017;
-    const titleFontScale = height * 0.025;
-    const xTicksDown = 36;
+    const generalFontScale = height * RESIZE.GENERAL_FONT_SCALE;
+    const titleFontScale = height * RESIZE.TITLE_FONT_SCALE;
+    const xTicksDown = RESIZE.X_TICKS_DOWN;
 
     // Universally scale annotations
     chartJson.layout.annotations.forEach(annotation => {
@@ -262,7 +138,7 @@ function resizeChartByHeight(chartJson, containerWidth, containerHeight, chartTy
             text: titleText,
             xref: 'paper',
             yref: 'paper',
-            x: -(margin.l / width) * 0.6,
+            x: -(margin.l / width) * RESIZE.Y_AXIS_TITLE_OFFSET,
             y: config.yAxisTitlePositionMinute,
             xanchor: 'center',
             yanchor: 'middle',
@@ -276,9 +152,9 @@ function resizeChartByHeight(chartJson, containerWidth, containerHeight, chartTy
             }
         });
     }
-    chartJson.layout.yaxis.tickfont.size = generalFontScale * 1.5;
+    chartJson.layout.yaxis.tickfont.size = generalFontScale * RESIZE.TICK_FONT_SCALE;
     if (chartJson.layout.xaxis?.tickfont?.size) {
-        chartJson.layout.xaxis.tickfont.size = generalFontScale * 1.5;
+        chartJson.layout.xaxis.tickfont.size = generalFontScale * RESIZE.TICK_FONT_SCALE;
     }
     if (chartJson.layout.yaxis2?.tickfont?.size) {
         chartJson.layout.yaxis2.tickfont.size = generalFontScale;
@@ -337,7 +213,7 @@ function resizeChartByHeight(chartJson, containerWidth, containerHeight, chartTy
     });
 
     // Scale shapes
-    const px_y_tick_len = 6;
+    const px_y_tick_len = RESIZE.Y_TICK_LENGTH_PX;
     const paper_y_tick_len = px_y_tick_len / xaxis_px;
 
     chartJson.layout.shapes.forEach(shape => {
@@ -356,7 +232,7 @@ function resizeChartByHeight(chartJson, containerWidth, containerHeight, chartTy
         if (config.shapes.hasDateLine && shape.name === 'date-line') {
             // Daily chart date lines
             const dateLineOffset = generalFontScale * config.shapes.dateLineOffsetMultiplier;
-            const px_date_line_len = dateLineOffset * 0.8;
+            const px_date_line_len = dateLineOffset * RESIZE.DATE_LINE_LEN_SCALE;
             const paper_date_line_len = px_date_line_len / xaxis_px;
 
             shape.y0 = 1 + (dateLineOffset / yaxis_px);
@@ -393,4 +269,4 @@ function emitFanReposition() {
     eventBus.emit(EVENTS.FAN_REPOSITION);
 }
 
-export { resizeChartByHeight, CHART_CONFIG, emitFanReposition };
+export { resizeChartByHeight, emitFanReposition };

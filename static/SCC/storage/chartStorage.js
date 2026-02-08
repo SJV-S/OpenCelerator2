@@ -24,6 +24,7 @@
 import { openDB } from '../lib/idb.js';
 import { eventBus, EVENTS, EVENT_CATEGORIES } from '../eventBus.js';
 import { chartState } from '../chartState.js';
+import { CHART_TYPE_CONFIG } from '../config.js';
 import { findNearestMonday } from '../util/dates.js';
 import { jsonBackwardsCompatibilityCheck } from '../import/jsonBackwardsCompatibility.js';
 import { generateChartKey } from '../../Server/crypto.js';
@@ -367,8 +368,8 @@ export async function createChart(name, chartType, minuteChart) {
         // hasTimestamps: false,  // Commented out for test data - uncomment to disable
         // series: { xValues: [], corrects: [], errors: [], timing: [], misc: {} },
         // startDate,  // Commented out for test data - uncomment to disable
-        chartCapacity: 140,
-        chartWindow: 140,
+        chartCapacity: CHART_TYPE_CONFIG[chartType]?.capacity || 280,
+        chartWindow: (CHART_TYPE_CONFIG[chartType]?.capacity || 280) / 2,
         _createdAt: now
     });
 

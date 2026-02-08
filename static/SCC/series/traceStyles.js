@@ -7,8 +7,8 @@
  * - Adding/removing aggregation methods per series
  */
 
-import { chartState, defaultCorrectTraceConfig, defaultErrorTraceConfig, defaultTimingTraceConfig, createMiscTraceConfig } from '../chartState.js';
-import { CORRECTS, ERRORS, TIMING, LIMITS, LINE_DEFAULTS } from '../config.js';
+import { chartState } from '../chartState.js';
+import { CORRECTS, ERRORS, TIMING, LIMITS, LINE_DEFAULTS, defaultCorrectTraceConfig, defaultErrorTraceConfig, defaultTimingTraceConfig, createMiscTraceConfig } from '../config.js';
 import { getMiscSeriesIds, addMiscSeries, canAddMiscSeries, removeMiscSeries } from './miscSeries.js';
 import { createToast, createConfirmToast } from '../ui/toaster.js';
 import { eventBus, EVENTS } from '../eventBus.js';

@@ -7,126 +7,12 @@
  * Accessible from: Import this module in other scripts
  */
 
-import { CORRECTS, ERRORS, TIMING, COLORS, LINE_DEFAULTS, LIMITS, FONT_SIZES } from './config.js';
-
-// ============================================================================
-// Trace Configurations (Defaults - Read-only)
-// ============================================================================
-
-// Default configurations (frozen to prevent modification)
-// All configs use standardized property names from TRACE_PROP in config.js
-export const defaultCorrectTraceConfig = Object.freeze({
-    seriesName: 'correct',
-    showLine: true,
-    lineDash: 'solid',
-    lineWidth: LINE_DEFAULTS.TRACE_LINE_WIDTH,
-    lineColor: 'black',
-    markerSize: 8,
-    markerSymbol: 'circle',
-    markerColor: 'black',
-    markerEdgeColor: 'black'
-});
-
-export const defaultErrorTraceConfig = Object.freeze({
-    seriesName: 'incorrect',
-    showLine: true,
-    lineDash: 'solid',
-    lineWidth: LINE_DEFAULTS.TRACE_LINE_WIDTH,
-    lineColor: 'black',
-    markerSize: 20,
-    markerSymbol: 'x',
-    markerColor: 'black',
-    markerEdgeColor: 'black'
-});
-
-export const defaultTimingTraceConfig = Object.freeze({
-    seriesName: 'Timing',
-    showLine: false,
-    lineDash: 'solid',
-    lineWidth: LINE_DEFAULTS.TRACE_LINE_WIDTH,
-    lineColor: 'black',
-    markerSize: 30,
-    markerSymbol: '-',
-    markerColor: 'black',
-    markerEdgeColor: 'black'
-});
-
-// ============================================================================
-// Dynamic Misc Series Configuration
-// ============================================================================
-
-export const MAX_MISC_SERIES = LIMITS.MAX_MISC_SERIES;
-
-// Color and symbol arrays for cycling through misc series appearances
-export const MISC_COLORS = Object.freeze([
-    '#FFA500', // orange
-    '#FF0000', // red
-    '#00AA00', // green
-    '#0000FF', // blue
-    '#FF00FF', // magenta
-    '#00CCCC', // cyan
-    '#800080', // purple
-    '#008080', // teal
-    '#FFD700', // gold
-    '#8B4513'  // saddle brown
-]);
-
-export const MISC_SYMBOLS = Object.freeze([
-    'square',
-    'triangle-up',
-    'diamond',
-    'star',
-    'hexagon',
-    'pentagon',
-    'cross',
-    'triangle-down',
-    'hexagon2',
-    'octagon'
-]);
-
-/**
- * Create a default trace config for a misc series based on its index
- * @param {number} index - 0-based index for color/symbol cycling
- * @returns {Object} Trace configuration object
- */
-export function createMiscTraceConfig(index) {
-    return {
-        seriesName: `Misc ${index + 1}`,
-        showLine: true,
-        lineDash: 'solid',
-        lineWidth: LINE_DEFAULTS.TRACE_LINE_WIDTH,
-        lineColor: 'black',
-        markerSize: 8,
-        markerSymbol: MISC_SYMBOLS[index % MISC_SYMBOLS.length],
-        markerColor: MISC_COLORS[index % MISC_COLORS.length],
-        markerEdgeColor: 'black'
-    };
-}
-
-// ============================================================================
-// Line Styling Constants (from config.js)
-// ============================================================================
-
-export const DEFAULT_PHASE_LINE_COLOR = COLORS.PHASE_LINE;
-export const DEFAULT_PHASE_LINE_WIDTH = LINE_DEFAULTS.PHASE_WIDTH;
-export const DEFAULT_AIM_LINE_COLOR = COLORS.AIM_LINE;
-export const DEFAULT_AIM_LINE_WIDTH = LINE_DEFAULTS.AIM_WIDTH;
-
-// Default legend configuration
-export const DEFAULT_LEGEND_CONFIG = Object.freeze({
-    x: 1,
-    y: 1,
-    xanchor: 'right',
-    yanchor: 'top',
-    bgcolor: COLORS.LEGEND_BG,
-    bordercolor: COLORS.LEGEND_BORDER,
-    borderwidth: 1,
-    font: {
-        size: FONT_SIZES.LEGEND,
-        family: 'Arial',
-        color: 'black'
-    }
-});
+import {
+    CORRECTS, ERRORS, TIMING,
+    COLORS, LINE_DEFAULTS,
+    defaultCorrectTraceConfig, defaultErrorTraceConfig, defaultTimingTraceConfig,
+    DEFAULT_LEGEND_CONFIG
+} from './config.js';
 
 // ============================================================================
 // Chart State (Combined Data & Metadata)
@@ -160,7 +46,7 @@ export const chartState = {
     startDate: null, // The Monday before/at earliest data point (set on import or first data entry)
 
     chartCapacity: 280, // Max X positions the chart can hold (Daily: 280, Weekly: 200, Monthly: 240, Yearly: 200)
-    chartWindow: 140,   // Currently visible X range, selected based on screen size (always <= chartCapacity)
+    chartWindow: 140,   // Currently visible X range (always <= chartCapacity, defaults to capacity / 2)
 
     // Legend configuration
     legend: {
@@ -203,12 +89,12 @@ export const chartState = {
     // Line styling
     lineStyles: {
         phase: {
-            color: DEFAULT_PHASE_LINE_COLOR,
-            width: DEFAULT_PHASE_LINE_WIDTH
+            color: COLORS.PHASE_LINE,
+            width: LINE_DEFAULTS.PHASE_WIDTH
         },
         aim: {
-            color: DEFAULT_AIM_LINE_COLOR,
-            width: DEFAULT_AIM_LINE_WIDTH
+            color: COLORS.AIM_LINE,
+            width: LINE_DEFAULTS.AIM_WIDTH
         },
         trend: {
             [CORRECTS]: {
@@ -247,4 +133,3 @@ export const chartState = {
         1: 'ORGANIZATION: ________________     MANAGER: ________________     COUNTER: ________________     CHARTER: ________________     ROOM: ________________'
     }
 };
-

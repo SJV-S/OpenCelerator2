@@ -55,7 +55,6 @@ const PRECACHE_STATIC = [
     // UI
     '/static/SCC/ui/crosshair.js',
     '/static/SCC/ui/icons.js',
-    '/static/SCC/ui/startDateControls.js',
     '/static/SCC/ui/startDateModal.js',
     '/static/SCC/ui/toaster.js',
     '/static/SCC/ui/tooltip.js',

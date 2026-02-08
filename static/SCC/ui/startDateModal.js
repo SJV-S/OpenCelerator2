@@ -9,7 +9,14 @@
 import { chartState } from '../chartState.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 import { createToast } from './toaster.js';
-import { CHART_CONFIG } from '../util/resize-chart.js';
+import { CHART_TYPE_CONFIG } from '../config.js';
+import {
+    getMondaysInMonth,
+    formatYearDisplay,
+    parseYearInput,
+    internalToUserDate,
+    userToInternalDate
+} from '../util/dates.js';
 
 // Current values stored here for easy access
 let currentValues = {
@@ -24,55 +31,6 @@ let currentValues = {
 // Modal elements
 let modalOverlay = null;
 let modalContent = null;
-
-/**
- * Get all Mondays in a given month/year
- */
-function getMondaysInMonth(year, month) {
-    const mondays = [];
-    const tempDate = new Date(2000, month, 0);
-    tempDate.setFullYear(year);
-    const lastDay = tempDate.getDate();
-
-    for (let day = 1; day <= lastDay; day++) {
-        const date = new Date(2000, month - 1, day);
-        date.setFullYear(year);
-        if (date.getDay() === 1) {
-            mondays.push(day);
-        }
-    }
-
-    return mondays;
-}
-
-/**
- * Format year for display with BC/AD
- */
-function formatYearDisplay(internalYear) {
-    if (internalYear >= 1) {
-        return `${internalYear} AD`;
-    } else {
-        return `${1 - internalYear} BC`;
-    }
-}
-
-/**
- * Parse year input that may contain BC/AD
- */
-function parseYearInput(input) {
-    const str = input.toString().trim().toUpperCase();
-    const bcMatch = str.match(/^(\d+)\s*BC$/);
-    const adMatch = str.match(/^(\d+)\s*AD$/);
-
-    if (bcMatch) {
-        return 1 - parseInt(bcMatch[1]);
-    } else if (adMatch) {
-        return parseInt(adMatch[1]);
-    } else {
-        const num = parseInt(str);
-        return isNaN(num) ? null : num;
-    }
-}
 
 /**
  * Update the display for a spinbox element
@@ -186,7 +144,7 @@ function adjustDecade(delta) {
  * Adjust chart window
  */
 function adjustChartWindow(delta) {
-    const config = CHART_CONFIG[chartState.chartType] || CHART_CONFIG.Daily;
+    const config = CHART_TYPE_CONFIG[chartState.chartType] || CHART_TYPE_CONFIG.Daily;
     const increment = config.snapTo || 14;
     const minWindow = config.minXmax || config.snapTo || 14;
 
@@ -200,86 +158,11 @@ function adjustChartWindow(delta) {
 }
 
 /**
- * Convert internal startDate to user-visible date components
- */
-function internalToUserDate() {
-    const internalDate = chartState.startDate;
-    const chartType = chartState.chartType.toLowerCase();
-
-    if (chartType === 'daily') {
-        const dayOfWeek = internalDate.getDay();
-        const mondayDate = new Date(internalDate);
-        const daysToSubtract = (dayOfWeek === 0) ? 6 : dayOfWeek - 1;
-        if (daysToSubtract > 0) {
-            mondayDate.setDate(internalDate.getDate() - daysToSubtract);
-        }
-
-        return {
-            monday: mondayDate.getDate(),
-            month: mondayDate.getMonth() + 1,
-            year: mondayDate.getFullYear()
-        };
-    } else if (chartType === 'weekly') {
-        const targetDate = new Date(internalDate);
-        targetDate.setDate(internalDate.getDate() + 6);
-        return {
-            month: targetDate.getMonth() + 1,
-            year: targetDate.getFullYear()
-        };
-    } else if (chartType === 'monthly') {
-        return {
-            year: internalDate.getFullYear()
-        };
-    } else if (chartType === 'yearly') {
-        const year = internalDate.getFullYear();
-        return {
-            decade: year - (year % 10)
-        };
-    }
-
-    return {};
-}
-
-/**
- * Create a Date object with correct year handling
- */
-function createDate(year, month, day) {
-    const date = new Date(2000, month, day);
-    date.setFullYear(year);
-    return date;
-}
-
-/**
- * Convert user-selected values back to internal date
- */
-function userToInternalDate() {
-    const chartType = chartState.chartType.toLowerCase();
-
-    if (chartType === 'daily') {
-        return createDate(currentValues.year, currentValues.month - 1, currentValues.monday);
-    } else if (chartType === 'weekly') {
-        const d = createDate(currentValues.year, currentValues.month - 1, 1);
-        const weekday = d.getDay();
-        const daysToSubtract = (weekday === 0) ? 6 : weekday - 1;
-        if (daysToSubtract > 0) {
-            d.setDate(d.getDate() - daysToSubtract);
-        }
-        return d;
-    } else if (chartType === 'monthly') {
-        return createDate(currentValues.year, 0, 1);
-    } else if (chartType === 'yearly') {
-        return createDate(currentValues.decade, 0, 1);
-    }
-
-    return new Date();
-}
-
-/**
  * Handle save - emit events for changed values
  */
 function handleSave() {
     // Check if start date changed
-    const newDate = userToInternalDate();
+    const newDate = userToInternalDate(currentValues, chartState.chartType);
     const oldDate = chartState.startDate;
     const startDateChanged = newDate.getTime() !== oldDate.getTime();
 
@@ -344,7 +227,7 @@ function handleDecadeInput(e) {
  * Set values from current chartState
  */
 function setInputValues() {
-    const values = internalToUserDate();
+    const values = internalToUserDate(chartState.startDate, chartState.chartType);
     const chartType = chartState.chartType.toLowerCase();
 
     // Set start date values
@@ -709,7 +592,5 @@ export function refreshStartDateDisplay() {
         setInputValues();
     }
 }
-
-export { getMondaysInMonth };
 
 console.log('startDateModal.js loaded');

@@ -11,7 +11,7 @@
 
 // Import state and functions from modules
 import { chartState } from './chartState.js';
-import { CORRECTS, ERRORS, TIMING, TIMING_MS, CHART_MATH, LAYOUT } from './config.js';
+import { CORRECTS, ERRORS, TIMING, TIMING_MS, CHART_MATH, LAYOUT, CHART_TYPE_CONFIG } from './config.js';
 import './debug.js';
 import { eventBus, EVENTS } from './eventBus.js';
 import {
@@ -54,7 +54,7 @@ import { injectCelerationFan, initFanDrag, toggleCelerationFan, init as celerati
 import { injectCredits, initCreditClick, regenerateCredits, init as creditInit } from './misc/credit.js';
 import { toggleLegend, renderCustomLegend, init as customLegendInit } from './misc/customLegend.js';
 import { setupPanConstraints } from './util/panning_controls.js';
-import { resizeChartByHeight, CHART_CONFIG, emitFanReposition } from './util/resize-chart.js';
+import { resizeChartByHeight, emitFanReposition } from './util/resize-chart.js';
 import { getTemplate } from './util/chartLayouts.js';
 import { showInitialMenuHint } from './ui/tooltip.js';
 import { icons } from './ui/icons.js';
@@ -107,10 +107,10 @@ export function initializeChart() {
     chartDiv.on('plotly_afterplot', syncVisibilityState);
 
     // Initialize chartState capacity from config
-    const chartConfig = CHART_CONFIG[chartState.chartType];
+    const chartConfig = CHART_TYPE_CONFIG[chartState.chartType];
     chartState.chartCapacity = chartConfig?.capacity || 280;
     if (!chartState.id) {
-        chartState.chartWindow = chartConfig?.maxWindow || 140;
+        chartState.chartWindow = chartState.chartCapacity / 2;
     }
 
     // Update display elements (setupEventListeners ran before initializeChart)
@@ -490,7 +490,7 @@ export function setupEventListeners() {
     const chartDiv = document.getElementById('chart');
 
     const applyChartWindow = (newValue) => {
-        const config = CHART_CONFIG[chartState.chartType];
+        const config = CHART_TYPE_CONFIG[chartState.chartType];
         const minWindow = config?.minXmax || config?.snapTo || 14;
 
         // Clamp value between min and capacity

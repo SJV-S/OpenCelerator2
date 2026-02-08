@@ -16,17 +16,10 @@
  */
 
 import {
-    createMiscTraceConfig,
-    MISC_COLORS,
-    defaultCorrectTraceConfig,
-    defaultErrorTraceConfig,
-    defaultTimingTraceConfig,
-    DEFAULT_PHASE_LINE_COLOR,
-    DEFAULT_PHASE_LINE_WIDTH,
-    DEFAULT_AIM_LINE_COLOR,
-    DEFAULT_AIM_LINE_WIDTH
-} from '../chartState.js';
-import { CORRECTS, ERRORS, TIMING, COLORS, LINE_DEFAULTS } from '../config.js';
+    CORRECTS, ERRORS, TIMING, COLORS, LINE_DEFAULTS,
+    createMiscTraceConfig, MISC_COLORS,
+    defaultCorrectTraceConfig, defaultErrorTraceConfig, defaultTimingTraceConfig
+} from '../config.js';
 
 // ============================================================================
 // Marker Symbol Mapping (matplotlib -> Plotly)
@@ -380,8 +373,8 @@ export function buildChartFromOpenCelerator(json, fileName) {
     };
 
     const lineStyles = {
-        phase: { color: DEFAULT_PHASE_LINE_COLOR, width: DEFAULT_PHASE_LINE_WIDTH },
-        aim:   { color: DEFAULT_AIM_LINE_COLOR, width: DEFAULT_AIM_LINE_WIDTH },
+        phase: { color: COLORS.PHASE_LINE, width: LINE_DEFAULTS.PHASE_WIDTH },
+        aim:   { color: COLORS.AIM_LINE, width: LINE_DEFAULTS.AIM_WIDTH },
         trend: {
             [CORRECTS]: { color: COLORS.TREND_CORRECTS, width: LINE_DEFAULTS.TREND_WIDTH },
             [ERRORS]:   { color: COLORS.TREND_ERRORS, width: LINE_DEFAULTS.TREND_WIDTH },

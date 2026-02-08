@@ -17,6 +17,7 @@
  */
 
 import { chartState } from '../chartState.js';
+import { createMiscTraceConfig, MISC_COLORS } from '../config.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 
 // ============================================================================
@@ -489,9 +490,23 @@ export function importToChartState(cleanedRows, options = { replace: true }) {
             chartState.series.timing = [];
             chartState.series.misc = {};
 
-            // Initialize misc arrays
+            // Clear stale misc trace styles and trend line styles
+            chartState.traceStyles.misc = {};
+            chartState.lineStyles.trend.misc = {};
+
+            // Initialize misc arrays and ensure trace/trend styles exist
             for (const miscId of miscIds) {
                 chartState.series.misc[miscId] = [];
+
+                const num = parseInt(miscId.slice(4));
+                const index = num - 1;
+                chartState.traceStyles.misc[miscId] = {
+                    raw: createMiscTraceConfig(index)
+                };
+                chartState.lineStyles.trend.misc[miscId] = {
+                    color: MISC_COLORS[index % MISC_COLORS.length],
+                    width: 2
+                };
             }
         }
 
