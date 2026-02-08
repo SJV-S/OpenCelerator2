@@ -13,6 +13,7 @@ let modalOverlay = null;
 let colorInput = null;
 let widthInput = null;
 let dashSelect = null;
+let textInput = null;
 let fontColorInput = null;
 let fontSizeInput = null;
 let titleEl = null;
@@ -126,6 +127,27 @@ function createModal() {
     fontSectionLabel.className = 'text-sm font-semibold text-gray-600 mb-3 text-center';
     fontSectionLabel.textContent = 'Label';
 
+    // --- Text ---
+    const textRow = document.createElement('div');
+    textRow.className = 'mb-3';
+
+    const textLabel = document.createElement('label');
+    textLabel.className = 'block text-sm text-gray-500 mb-1';
+    textLabel.textContent = 'Text';
+
+    textInput = document.createElement('input');
+    textInput.type = 'text';
+    textInput.className = 'w-full px-3 py-2 lg:px-2 lg:py-1 text-sm border-2 border-gray-300 rounded focus:outline-none focus:border-[#6ad1e3] transition-colors';
+
+    textInput.addEventListener('input', (e) => {
+        if (activeLineId == null) return;
+        const metadata = chartState.PhaseLines[activeLineId];
+        if (metadata) metadata.text = e.target.value;
+    });
+
+    textRow.appendChild(textLabel);
+    textRow.appendChild(textInput);
+
     // --- Font Color ---
     const fontColorRow = document.createElement('div');
     fontColorRow.className = 'mb-3';
@@ -187,6 +209,7 @@ function createModal() {
     content.appendChild(dashRow);
     content.appendChild(divider);
     content.appendChild(fontSectionLabel);
+    content.appendChild(textRow);
     content.appendChild(fontColorRow);
     content.appendChild(fontSizeRow);
     content.appendChild(closeBtn);
@@ -229,6 +252,8 @@ export function showPhaseLineEditor(lineId) {
     if (!metadata) return;
 
     titleEl.textContent = `Edit: ${metadata.text || 'Event Marker'}`;
+
+    textInput.value = metadata.text || '';
 
     const style = metadata.style;
     colorInput.value = style.color;

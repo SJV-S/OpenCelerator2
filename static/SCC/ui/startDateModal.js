@@ -8,7 +8,7 @@
 import { chartState } from '../chartState.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 import { createToast, createConfirmToast } from './toaster.js';
-import { CHART_TYPE_CONFIG } from '../config.js';
+import { CHART_TYPE_CONFIG, CHART_MATH, LAYOUT } from '../config.js';
 import {
     getMondaysInMonth,
     formatYearDisplay,
@@ -585,8 +585,8 @@ export function initChartWindowControl() {
  * Preview: shows a rectangle outline matching proposed container size
  * Apply: confirm toast triggers actual chart re-init
  */
-const HEIGHT_STEP = 50; // px per click
-const MIN_HEIGHT = 300;
+const HEIGHT_STEP = 30; // px per click
+const MIN_HEIGHT = 600;
 
 let chartHeightEl = null;
 let maxHeight = null;       // Flex default captured on init
@@ -600,19 +600,54 @@ function updateChartHeightDisplay(value) {
     }
 }
 
-function showPreviewRect(height) {
-    const container = document.getElementById('chart-container');
-    if (!container) return;
+/**
+ * Predict chart dimensions for a given container height.
+ * Mirrors the core math in resizeChartByHeight without rendering.
+ */
+function predictChartDimensions(containerHeight) {
+    const chartDiv = document.getElementById('chart');
+    if (!chartDiv?.layout) return null;
+
+    const config = CHART_TYPE_CONFIG[chartState.chartType];
+    const currentLayout = chartDiv.layout;
+    const currentHeight = currentLayout.height;
+    const cm = currentLayout.margin;
+
+    // Reverse-engineer base margins by subtracting height-proportional additions
+    const baseB = cm.b - currentHeight * (config.creditMarginMultiplier ?? 0.10);
+    const baseT = cm.t - currentHeight * (config.topMarginMultiplier ?? 0);
+
+    // Predicted values at new height
+    const newHeight = containerHeight * LAYOUT.CHART_HEIGHT_MULTIPLIER;
+    const newMarginB = baseB + newHeight * (config.creditMarginMultiplier ?? 0.10);
+    const newMarginT = baseT + newHeight * (config.topMarginMultiplier ?? 0);
+
+    const yaxis_px = newHeight - (newMarginT + newMarginB);
+    const y_axis = Math.log10(config.yMax) - Math.log10(config.yMin);
+    const delta_y = Math.log10(2 ** (chartState.chartWindow / config.unit));
+    const delta_y_px = (delta_y / y_axis) * yaxis_px;
+    const xaxis_px = delta_y_px / Math.tan((CHART_MATH.ANGLE_DEGREES * Math.PI) / 180);
+    const newWidth = xaxis_px + (cm.l + cm.r);
+
+    return { width: newWidth, height: newHeight };
+}
+
+function showPreviewRect(containerHeight) {
+    const chart = document.getElementById('chart');
+    if (!chart) return;
+
+    const dims = predictChartDimensions(containerHeight);
+    if (!dims) return;
 
     if (!previewRect) {
         previewRect = document.createElement('div');
-        previewRect.style.cssText = 'position:absolute;top:0;left:0;border:3px dashed #6ad1e3;pointer-events:none;z-index:999;box-sizing:border-box;';
-        container.style.position = 'relative';
-        container.appendChild(previewRect);
+        previewRect.style.cssText = 'position:absolute;top:0;left:50%;transform:translateX(-50%);border:3px dashed #6ad1e3;pointer-events:none;z-index:999;box-sizing:border-box;';
+        chart.parentElement.style.position = 'relative';
+        chart.parentElement.appendChild(previewRect);
     }
 
-    previewRect.style.width = `${container.offsetWidth}px`;
-    previewRect.style.height = `${height}px`;
+    previewRect.style.width = `${Math.round(dims.width)}px`;
+    previewRect.style.height = `${Math.round(dims.height)}px`;
 }
 
 function removePreviewRect() {

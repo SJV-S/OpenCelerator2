@@ -442,7 +442,7 @@
         width: 100%;
         display: flex;
         justify-content: center;
-        align-items: flex-end;
+        align-items: center;
     }
 
     /* Credit container hidden on desktop - credits now rendered as Plotly annotations */
