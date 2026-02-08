@@ -124,8 +124,8 @@ function refreshChart() {
         updateChartDateLabels(chartDiv, chartState.startDate);
     }
 
-    // Emit event to render custom legend
-    eventBus.emit(EVENTS.UI_LEGEND_RENDER);
+    // Render legend without triggering auto-save (this fires on every chart open/refresh)
+    eventBus.emit(EVENTS.UI_LEGEND_RENDER, { save: false });
 
     // Notify that chart replot is complete (cel lines subscribe to this)
     eventBus.emit(EVENTS.DATA_CHART_REPLOT_COMPLETE);

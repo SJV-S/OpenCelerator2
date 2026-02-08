@@ -118,15 +118,17 @@ export function generateFanElements(layout, isMinuteChart, chartType) {
     const config = CHART_TYPE_CONFIG[chartType] || CHART_TYPE_CONFIG.Daily;
     const unit = config.unit || 7;
     const periodLabel = PERIOD_LABELS[chartType] || 'per week';
+    const fanLabelSize = layout.height * config.fanLabelSizeMultiplier;
+    const fanHeaderSize = layout.height * config.fanHeaderSizeMultiplier;
 
     // Calculate plot area dimensions for visual angle calculation
     const plotWidth = layout.width - layout.margin.l - layout.margin.r;
     const plotHeight = layout.height - layout.margin.t - layout.margin.b;
 
-    // Fan center: fixed px distance from chart edge, converted to data coordinates.
+    // Fan center: px distance from chart edge (derived from chart height), converted to data coordinates.
     // Count charts: offset right of xMax. Minute charts: offset left of xMin.
     const pxPerDataUnit = plotWidth / (xMax - xMin);
-    const fanOffsetPx = isMinuteChart ? config.fanXOffsetPxMinute : config.fanXOffsetPx;
+    const fanOffsetPx = layout.height * (isMinuteChart ? config.fanXOffsetMultiplierMinute : config.fanXOffsetMultiplier);
     const xMid = isMinuteChart
         ? xMin - fanOffsetPx / pxPerDataUnit
         : xMax + fanOffsetPx / pxPerDataUnit;
@@ -192,7 +194,7 @@ export function generateFanElements(layout, isMinuteChart, chartType) {
             ax: 0,
             ay: 0,
             arrowcolor: 'rgba(0,0,0,0)',
-            font: { size: 10, color: COLORS.FAN, weight: 'bold' },
+            font: { size: fanLabelSize, color: COLORS.FAN, weight: 'bold' },
             textangle: -visualAngleDeg,
             xanchor: 'center',
             yanchor: 'middle'
@@ -209,7 +211,7 @@ export function generateFanElements(layout, isMinuteChart, chartType) {
         xref: 'paper', yref: 'paper',
         text: '<b>Standard<br>change</b>',
         showarrow: false,
-        font: { size: 11, color: COLORS.FAN },
+        font: { size: fanHeaderSize, color: COLORS.FAN },
         xanchor: 'center', yanchor: 'bottom'
     });
 
@@ -223,7 +225,7 @@ export function generateFanElements(layout, isMinuteChart, chartType) {
         xref: 'paper', yref: 'paper',
         text: `<b>${periodLabel}</b>`,
         showarrow: false,
-        font: { size: 11, color: COLORS.FAN },
+        font: { size: fanHeaderSize, color: COLORS.FAN },
         xanchor: 'center', yanchor: 'top'
     });
 

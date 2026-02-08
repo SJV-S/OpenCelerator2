@@ -44,8 +44,6 @@ const STORE_NAME = 'charts';
 let db = null;
 let saveTimeout = null;
 const SAVE_DEBOUNCE_MS = 1000;
-let syncPushTimeout = null;
-const SYNC_PUSH_DEBOUNCE_MS = 60000;
 
 function uuid() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
@@ -454,13 +452,8 @@ function debouncedSaveToIndexedDB() {
         if (chartState.id) {
             await saveChart(chartState.id);
             console.log('[LINE SAVE] 5. saveChart completed for id:', chartState.id);
-            if (chartState.shared && isInitialized()) {
+            if ((chartState.shared || isSyncEnabled()) && isInitialized()) {
                 pushChart(chartState.id).catch(err => console.warn('[Storage] Push failed:', err));
-            } else if (isSyncEnabled() && isInitialized()) {
-                if (syncPushTimeout) clearTimeout(syncPushTimeout);
-                syncPushTimeout = setTimeout(() => {
-                    pushChart(chartState.id).catch(err => console.warn('[Storage] Sync push failed:', err));
-                }, SYNC_PUSH_DEBOUNCE_MS);
             }
         }
     }, SAVE_DEBOUNCE_MS);
@@ -469,8 +462,10 @@ function debouncedSaveToIndexedDB() {
 /**
  * Handle state mutation - auto-save to IndexedDB
  * Chart always has an ID (created before user sees it)
+ * @param {boolean} save - When false, skip persistence (e.g. render-only events during init)
  */
-function onStateMutation() {
+function onStateMutation(save = true) {
+    if (!save) return;
     console.log('[LINE SAVE] 3. onStateMutation triggered, PhaseLines count:', Object.keys(chartState.PhaseLines).length);
     if (!chartState.id) {
         console.warn('[Storage] No chart ID - chart should be created before mutations');
@@ -480,9 +475,29 @@ function onStateMutation() {
 }
 
 /**
+ * Flush pending sync push immediately (e.g. on page hide / navigation)
+ */
+function flushSyncPush() {
+    if (syncPushTimeout && chartState.id && isSyncEnabled() && isInitialized()) {
+        clearTimeout(syncPushTimeout);
+        syncPushTimeout = null;
+        pushChart(chartState.id).catch(err => console.warn('[Storage] Sync push failed:', err));
+    }
+}
+
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+        flushSyncPush();
+    }
+});
+
+/**
  * Subscribe to STATE_MUTATING category for auto-save
  */
 function subscribeToEvents() {
-    eventBus.subscribeToCategory(EVENT_CATEGORIES.STATE_MUTATING, onStateMutation);
+    // data?.save comes from the emit payload — emitters pass { save: false } to suppress persistence
+    eventBus.subscribeToCategory(EVENT_CATEGORIES.STATE_MUTATING, ({ data }) => {
+        onStateMutation(data?.save);
+    }, true);
     console.log('[Storage] Subscribed to STATE_MUTATING category');
 }

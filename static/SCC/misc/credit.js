@@ -2,7 +2,7 @@
 // Renders credit lines in the chart's bottom margin and handles editing
 
 import { chartState } from '../chartState.js';
-import { MOBILE_BREAKPOINT, COLORS, FONTS } from '../config.js';
+import { MOBILE_BREAKPOINT, COLORS, FONTS, RESIZE, CHART_TYPE_CONFIG } from '../config.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 
 const CREDIT_COLOR = COLORS.FAN; // Using same color as fan
@@ -24,17 +24,16 @@ function generateCreditAnnotations(layout) {
     const annotations = [];
     const plotHeight = layout.height - layout.margin.t - layout.margin.b;
 
-    // Scale font based on chart height (matches resize-chart.js generalFontScale)
-    const fontSize = layout.height * 0.014;
+    const config = CHART_TYPE_CONFIG[chartState.chartType] || CHART_TYPE_CONFIG.Daily;
 
-    // Calculate margin edge in paper coords (y=0 is plot bottom, negative goes into margin)
-    // marginEdge is the bottom of the margin in paper coordinates
-    const marginEdge = -layout.margin.b / plotHeight;
+    // Scale font based on chart height
+    const fontSize = layout.height * RESIZE.CREDIT_FONT_SCALE;
 
-    // Position credits as percentage above the margin edge
+    // Position credits as pixel offset from plot bottom, derived from chart height
+    // Convert to paper coords (y=0 is plot bottom, negative goes into margin)
     const creditPositions = [
-        { y: marginEdge * 0.80 },   // Credit line 0
-        { y: marginEdge * 0.65 }    // Credit line 1
+        { y: -(layout.height * config.creditRow0Y) / plotHeight },
+        { y: -(layout.height * (config.creditRow0Y - config.creditRowSpacing)) / plotHeight }
     ];
 
     [0, 1].forEach((index) => {
