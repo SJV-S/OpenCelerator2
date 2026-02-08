@@ -24,8 +24,8 @@ import { initializeSeriesNav } from './series/traceStyles.js';
 import { createToast } from './ui/toaster.js';
 import { refreshChart, init as replotInit } from './series/replot.js';
 import { alignStartDate, updateChartDateLabels, updateDateDisplay, adjustDateInput, initializeDateInput, updatePlotDateLabel } from './util/dates.js';
-import { initStartDateModal } from './ui/startDateModal.js';
-
+import { initStartDateModal, initChartWindowControl } from './ui/startDateModal.js';
+import { initLineSettingsModal } from './ui/lineSettingsModal.js';
 import { loadDataForDate, adjustTimestamp, updateCurrentEntry, deleteCurrentEntry, init as dataUpdateInit } from './series/dataUpdate.js';
 import {
     showCounter,
@@ -55,7 +55,7 @@ import { injectCelerationFan, initFanDrag, toggleCelerationFan, init as celerati
 import { injectCredits, initCreditClick, regenerateCredits, init as creditInit } from './misc/credit.js';
 import { toggleLegend, renderCustomLegend, init as customLegendInit } from './misc/customLegend.js';
 import { setupPanConstraints } from './util/panning_controls.js';
-import { resizeChartByHeight, emitFanReposition } from './util/resize-chart.js';
+import { resizeChartByHeight, emitFanReposition, repositionLabels } from './util/resize-chart.js';
 import { getTemplate } from './util/chartLayouts.js';
 import { showInitialMenuHint } from './ui/tooltip.js';
 import { icons } from './ui/icons.js';
@@ -176,8 +176,9 @@ function initializeDateInputs() {
     // Update the "Plot Date" label based on chart type
     updatePlotDateLabel();
 
-    // Initialize start date modal
+    // Initialize start date modal and chart window control
     initStartDateModal();
+    initChartWindowControl();
 }
 
 /**
@@ -235,6 +236,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initialize form keyboard shortcuts (Enter key to submit)
     initFormKeyboardShortcuts();
+
+    // Initialize line settings modal (gear icons in lines tab)
+    initLineSettingsModal();
 
     // Initialize share tab icons
     initializeShareTab();
@@ -425,56 +429,6 @@ export function setupEventListeners() {
         if (gridMinorToggle) gridMinorToggle.checked = visible;
     }, true);
 
-    // Trend fit method dropdown
-    const fitMethodSelect = document.getElementById('fit-method');
-    if (fitMethodSelect) {
-        // Initialize from chartState
-        const settings = chartState.CelLines.settings || {};
-        fitMethodSelect.value = settings.fitMethod || 'Theil-Sen';
-
-        fitMethodSelect.addEventListener('change', (e) => {
-            if (!chartState.CelLines.settings) {
-                chartState.CelLines.settings = {};
-            }
-            chartState.CelLines.settings.fitMethod = e.target.value;
-            e.target.blur();
-        });
-    }
-
-    // Bounce envelope dropdown
-    const bounceEnvelopeSelect = document.getElementById('bounce-envelope');
-    if (bounceEnvelopeSelect) {
-        // Initialize from chartState
-        const settings = chartState.CelLines.settings || {};
-        bounceEnvelopeSelect.value = settings.bounceEnvelope || 'None';
-
-        bounceEnvelopeSelect.addEventListener('change', (e) => {
-            if (!chartState.CelLines.settings) {
-                chartState.CelLines.settings = {};
-            }
-            chartState.CelLines.settings.bounceEnvelope = e.target.value;
-            e.target.blur();
-        });
-    }
-
-    // Trend forecast input
-    const trendForecastInput = document.getElementById('trend-forecast');
-    if (trendForecastInput) {
-        // Initialize from chartState
-        const settings = chartState.CelLines.settings || {};
-        trendForecastInput.value = settings.forecast || 0;
-
-        trendForecastInput.addEventListener('change', (e) => {
-            if (!chartState.CelLines.settings) {
-                chartState.CelLines.settings = {};
-            }
-            const value = parseInt(e.target.value) || 0;
-            chartState.CelLines.settings.forecast = Math.max(0, value);
-            e.target.value = chartState.CelLines.settings.forecast;
-            e.target.blur();
-        });
-    }
-
     // Chart name input
     const chartNameInput = document.getElementById('chart-name');
     if (chartNameInput) {
@@ -517,6 +471,7 @@ export function setupEventListeners() {
         }).then(() => {
             emitFanReposition();
             regenerateCredits();
+            repositionLabels();
             renderCustomLegend();
             // Slider updates automatically via plotly_relayout event
         });

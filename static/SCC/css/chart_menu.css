@@ -330,18 +330,24 @@
 }
 
 /* ===== GEAR SETTINGS BUTTON (Lines Tab) ===== */
+.chart-menu-icon-category h2 {
+    position: relative;
+    width: fit-content;
+}
+
 .line-settings-gear {
-    width: 1.25rem;
-    height: 1.25rem;
+    position: absolute;
+    left: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    margin-left: -0.15rem;
     padding: 0;
     border: none;
     background: none;
     cursor: pointer;
     opacity: 0.6;
     transition: opacity 0.15s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    display: inline-flex;
 }
 
 .line-settings-gear:hover {
@@ -349,8 +355,15 @@
 }
 
 .line-settings-gear svg {
-    width: 100%;
-    height: 100%;
+    width: 1.5rem;
+    height: 1.5rem;
+}
+
+@media (min-width: 1024px) {
+    .line-settings-gear svg {
+        width: 1.25rem;
+        height: 1.25rem;
+    }
 }
 
 /* ===== DATA TAB SUB-TABS ===== */

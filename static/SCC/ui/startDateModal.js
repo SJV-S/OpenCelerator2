@@ -1,9 +1,8 @@
 /**
- * Navigation Settings Modal - Modal dialog for chart navigation settings
+ * Start Date Modal + Chart Window control
  *
- * Contains:
- * - Start date controls (varies by chart type)
- * - Chart window control
+ * Modal: Start date controls (varies by chart type)
+ * Settings tab: Chart window spinbox (applies immediately)
  */
 
 import { chartState } from '../chartState.js';
@@ -24,8 +23,7 @@ let currentValues = {
     month: 1,
     year: 2025,
     decade: 2020,
-    availableMondays: [],
-    chartWindow: 140
+    availableMondays: []
 };
 
 // Modal elements
@@ -141,23 +139,6 @@ function adjustDecade(delta) {
 }
 
 /**
- * Adjust chart window
- */
-function adjustChartWindow(delta) {
-    const config = CHART_TYPE_CONFIG[chartState.chartType] || CHART_TYPE_CONFIG.Daily;
-    const increment = config.snapTo || 14;
-    const minWindow = config.minXmax || config.snapTo || 14;
-
-    let newWindow = currentValues.chartWindow + (delta * increment);
-
-    if (newWindow < minWindow) newWindow = minWindow;
-    if (newWindow > chartState.chartCapacity) newWindow = chartState.chartCapacity;
-
-    currentValues.chartWindow = newWindow;
-    updateDisplay('modal-chart-window', currentValues.chartWindow);
-}
-
-/**
  * Handle save - emit events for changed values
  */
 function handleSave() {
@@ -166,20 +147,10 @@ function handleSave() {
     const oldDate = chartState.startDate;
     const startDateChanged = newDate.getTime() !== oldDate.getTime();
 
-    // Check if chart window changed
-    const chartWindowChanged = currentValues.chartWindow !== chartState.chartWindow;
-
     if (startDateChanged) {
         eventBus.emit(EVENTS.DATA_START_DATE_CHANGED, { date: newDate });
-    }
-
-    if (chartWindowChanged) {
-        eventBus.emit(EVENTS.CHART_WINDOW_CHANGED, currentValues.chartWindow);
-    }
-
-    if (startDateChanged || chartWindowChanged) {
         createToast({
-            message: 'Settings updated',
+            message: 'Start date updated',
             duration: 2000,
             position: 'top-right'
         });
@@ -253,9 +224,6 @@ function setInputValues() {
         updateDisplay('modal-start-decade', currentValues.decade);
     }
 
-    // Set chart window value
-    currentValues.chartWindow = chartState.chartWindow;
-    updateDisplay('modal-chart-window', currentValues.chartWindow);
 }
 
 /**
@@ -363,7 +331,7 @@ function createModal() {
     // Title
     const title = document.createElement('h2');
     title.className = 'text-lg font-semibold text-gray-700 mb-4 text-center';
-    title.textContent = 'Navigation';
+    title.textContent = 'Start Date';
 
     // Start Date Section
     const startDateLabel = document.createElement('div');
@@ -385,19 +353,6 @@ function createModal() {
     startDateContainer.appendChild(monthRow);
     startDateContainer.appendChild(yearRow);
     startDateContainer.appendChild(decadeRow);
-
-    // Divider
-    const divider = document.createElement('div');
-    divider.className = 'border-t border-gray-200 my-3';
-
-    // Chart Window Section
-    const chartWindowLabel = document.createElement('div');
-    chartWindowLabel.className = 'text-sm font-semibold text-gray-600 mb-2 text-center';
-    chartWindowLabel.textContent = 'Chart Window';
-
-    // Chart window row (always visible)
-    const chartWindowRow = createSpinboxRow('modal-chart-window', 'Days');
-    chartWindowRow.style.display = 'flex'; // Always visible
 
     // Button container
     const buttonContainer = document.createElement('div');
@@ -426,9 +381,6 @@ function createModal() {
     modalContent.appendChild(title);
     modalContent.appendChild(startDateLabel);
     modalContent.appendChild(startDateContainer);
-    modalContent.appendChild(divider);
-    modalContent.appendChild(chartWindowLabel);
-    modalContent.appendChild(chartWindowRow);
     modalContent.appendChild(buttonContainer);
     modalOverlay.appendChild(modalContent);
 
@@ -482,12 +434,6 @@ function setupModalEventListeners() {
                 break;
             case 'modal-start-decade-inc':
                 adjustDecade(1);
-                break;
-            case 'modal-chart-window-dec':
-                adjustChartWindow(-1);
-                break;
-            case 'modal-chart-window-inc':
-                adjustChartWindow(1);
                 break;
         }
     });
@@ -591,6 +537,47 @@ export function refreshStartDateDisplay() {
     if (modalOverlay && modalOverlay.style.display !== 'none') {
         setInputValues();
     }
+}
+
+/**
+ * Chart Window control for settings tab (applies immediately)
+ */
+let chartWindowEl = null;
+
+function updateChartWindowDisplay(value) {
+    if (chartWindowEl) {
+        chartWindowEl.textContent = value ?? chartState.chartWindow;
+    }
+}
+
+function adjustSettingsChartWindow(delta) {
+    const config = CHART_TYPE_CONFIG[chartState.chartType] || CHART_TYPE_CONFIG.Daily;
+    const increment = config.snapTo || 14;
+    const minWindow = config.minXmax || config.snapTo || 14;
+
+    let newWindow = chartState.chartWindow + (delta * increment);
+
+    if (newWindow < minWindow) newWindow = minWindow;
+    if (newWindow > chartState.chartCapacity) newWindow = chartState.chartCapacity;
+
+    if (newWindow !== chartState.chartWindow) {
+        eventBus.emit(EVENTS.CHART_WINDOW_CHANGED, newWindow);
+    }
+}
+
+export function initChartWindowControl() {
+    chartWindowEl = document.getElementById('chart-window-value');
+    const decBtn = document.getElementById('chart-window-dec');
+    const incBtn = document.getElementById('chart-window-inc');
+
+    if (chartWindowEl) updateChartWindowDisplay();
+    if (decBtn) decBtn.addEventListener('click', () => adjustSettingsChartWindow(-1));
+    if (incBtn) incBtn.addEventListener('click', () => adjustSettingsChartWindow(1));
+
+    // Update display when chart window changes from any source
+    eventBus.subscribe(EVENTS.CHART_WINDOW_CHANGED, (newValue) => {
+        updateChartWindowDisplay(newValue);
+    }, true);
 }
 
 console.log('startDateModal.js loaded');

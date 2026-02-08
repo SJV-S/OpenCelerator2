@@ -3,7 +3,11 @@
  *
  * Triggered by gear icons next to "Event markers", "Count markers",
  * and "Add change line" headings in the lines tab.
+ *
+ * The cel category delegates to celSettingsModal.js for real settings.
  */
+
+import { showCelSettingsModal } from './celSettingsModal.js';
 
 let modalOverlay = null;
 let modalTitle = null;
@@ -65,6 +69,12 @@ function createModal() {
  * @param {string} category - 'phase', 'aim', or 'cel'
  */
 function showModal(category) {
+    // Cel has its own dedicated modal with real settings
+    if (category === 'cel') {
+        showCelSettingsModal();
+        return;
+    }
+
     if (!modalOverlay) createModal();
 
     const label = CATEGORY_LABELS[category] || category;

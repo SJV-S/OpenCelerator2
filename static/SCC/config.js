@@ -120,7 +120,8 @@ export const CHART_TYPE_CONFIG = Object.freeze({
         fanLineLengthMultiplier: 0.13,
         fanLabelSizeMultiplier: 0.012,
         fanHeaderSizeMultiplier: 0.013,
-        countingTimesLabelXOffsetPx: 40,
+        countingTimesXOffsetMultiplier: 0.06,
+        yAxisTitleXOffsetMultiplier: 0.105,
         yAxisTitlePosition: 0.5,
         yAxisTitlePositionMinute: 0.7,
         annotations: {
@@ -155,7 +156,8 @@ export const CHART_TYPE_CONFIG = Object.freeze({
         fanLineLengthMultiplier: 0.13,
         fanLabelSizeMultiplier: 0.012,
         fanHeaderSizeMultiplier: 0.013,
-        countingTimesLabelXOffsetPx: 40,
+        countingTimesXOffsetMultiplier: 0.06,
+        yAxisTitleXOffsetMultiplier: 0.09,
         yAxisTitlePosition: 0.5,
         yAxisTitlePositionMinute: 0.7,
         annotations: {
@@ -190,7 +192,8 @@ export const CHART_TYPE_CONFIG = Object.freeze({
         fanLineLengthMultiplier: 0.13,
         fanLabelSizeMultiplier: 0.012,
         fanHeaderSizeMultiplier: 0.013,
-        countingTimesLabelXOffsetPx: 40,
+        countingTimesXOffsetMultiplier: 0.06,
+        yAxisTitleXOffsetMultiplier: 0.09,
         yAxisTitlePosition: 0.5,
         yAxisTitlePositionMinute: 0.7,
         annotations: {
@@ -225,7 +228,8 @@ export const CHART_TYPE_CONFIG = Object.freeze({
         fanLineLengthMultiplier: 0.13,
         fanLabelSizeMultiplier: 0.012,
         fanHeaderSizeMultiplier: 0.013,
-        countingTimesLabelXOffsetPx: 40,
+        countingTimesXOffsetMultiplier: 0.06,
+        yAxisTitleXOffsetMultiplier: 0.09,
         yAxisTitlePosition: 0.5,
         yAxisTitlePositionMinute: 0.7,
         annotations: {
@@ -262,7 +266,8 @@ export const CHART_TYPE_CONFIG = Object.freeze({
         fanLineLengthMultiplier: 0.13,
         fanLabelSizeMultiplier: 0.012,
         fanHeaderSizeMultiplier: 0.013,
-        countingTimesLabelXOffsetPx: 40,
+        countingTimesXOffsetMultiplier: 0.06,
+        yAxisTitleXOffsetMultiplier: 0.09,
         yAxisTitlePosition: 0.5,
         yAxisTitlePositionMinute: 0.7,
         annotations: {
@@ -285,7 +290,6 @@ export const RESIZE = Object.freeze({
     X_TICKS_DOWN: 36,
     Y_TICK_LENGTH_PX: 6,
     TICK_FONT_SCALE: 1.5,
-    Y_AXIS_TITLE_OFFSET: 0.6,
     DATE_LINE_LEN_SCALE: 0.8,
     CREDIT_FONT_SCALE: 0.014,
 });

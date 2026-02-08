@@ -135,10 +135,11 @@ function resizeChartByHeight(chartJson, containerWidth, containerHeight, chartTy
         chartJson.layout.yaxis.title.text = '';
 
         chartJson.layout.annotations.push({
+            name: 'yaxis-title',
             text: titleText,
             xref: 'paper',
             yref: 'paper',
-            x: -(margin.l / width) * RESIZE.Y_AXIS_TITLE_OFFSET,
+            x: -(height * config.yAxisTitleXOffsetMultiplier / xaxis_px),
             y: config.yAxisTitlePositionMinute,
             xanchor: 'center',
             yanchor: 'middle',
@@ -165,7 +166,8 @@ function resizeChartByHeight(chartJson, containerWidth, containerHeight, chartTy
         // Reposition "COUNTING TIMES" annotation (Daily chart, right y-axis label)
         // Must check before the name guard since this annotation has no name
         if (annotation.text === 'COUNTING TIMES') {
-            annotation.x = 1 + (config.countingTimesLabelXOffsetPx / xaxis_px);
+            annotation.name = 'counting-times';
+            annotation.x = 1 + (height * config.countingTimesXOffsetMultiplier / xaxis_px);
         }
 
         if (!annotation.name) return;
@@ -269,4 +271,27 @@ function emitFanReposition() {
     eventBus.emit(EVENTS.FAN_REPOSITION);
 }
 
-export { resizeChartByHeight, emitFanReposition };
+/**
+ * Reposition "COUNTING TIMES" and y-axis title annotations after chart window change.
+ * Same pattern as regenerateCredits().
+ */
+function repositionLabels() {
+    const chartDiv = document.getElementById('chart');
+    if (!chartDiv?.layout) return;
+
+    const config = CHART_TYPE_CONFIG[chartState.chartType];
+    const { margin, width, height } = chartDiv.layout;
+    const xaxis_px = width - margin.l - margin.r;
+
+    const updates = {};
+    chartDiv.layout.annotations?.forEach((ann, i) => {
+        if (ann.name === 'counting-times')
+            updates[`annotations[${i}].x`] = 1 + (height * config.countingTimesXOffsetMultiplier / xaxis_px);
+        if (ann.name === 'yaxis-title')
+            updates[`annotations[${i}].x`] = -(height * config.yAxisTitleXOffsetMultiplier / xaxis_px);
+    });
+
+    if (Object.keys(updates).length) Plotly.relayout(chartDiv, updates);
+}
+
+export { resizeChartByHeight, emitFanReposition, repositionLabels };

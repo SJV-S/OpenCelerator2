@@ -83,6 +83,26 @@ Example format:
 
 For responsive design, use Tailwind breakpoint prefixes (`sm:`, `md:`, `lg:`, `xl:`) directly in HTML classes rather than writing `@media` queries in vanilla CSS.
 
+## SVG Icon Sizing - CRITICAL
+
+**Always use fixed `rem` values for SVG dimensions, never percentages.** The Tailwind CDN (`cdn.tailwindcss.com`) preflight interferes with percentage-based SVG sizing inside buttons/containers. SVGs with `width: 100%; height: 100%` will render as invisible.
+
+```css
+/* WRONG - SVG renders invisible */
+.my-icon svg {
+    width: 100%;
+    height: 100%;
+}
+
+/* RIGHT - fixed rem values, matches existing pattern */
+.my-icon svg {
+    width: 1rem;
+    height: 1rem;
+}
+```
+
+This matches the existing `.chart-menu-icon-btn svg { width: 5rem; }` pattern. All icon containers in this project size their SVGs with fixed units.
+
 ## JavaScript Architecture - STRICT RULES
 
 **This project uses ES6 modules. NEVER violate the architecture:**
