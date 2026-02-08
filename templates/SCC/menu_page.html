@@ -640,7 +640,6 @@ html, body {
         const syncOn = await getSyncEnabled();
         if (syncOn) {
             try {
-                await initServerSync();
                 await drainPushQueue();
                 const manifest = charts.map(c => ({ chart_uuid: c.id, updated_at: c.updatedAt || 0 }));
                 const { downloads } = await checkForUpdates(manifest);

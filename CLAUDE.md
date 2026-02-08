@@ -239,3 +239,4 @@ All stored timestamps use **Unix seconds** (`Math.floor(Date.now() / 1000)`). Co
 Available in browser console:
 - `window.chartState` - Full chart state object
 - `window.testToaster()` - Creates multiple stacked notifications to test toaster behavior
+- `window.nuke()` - Wipes all charts, BIP39 passphrase, and localStorage, then reloads

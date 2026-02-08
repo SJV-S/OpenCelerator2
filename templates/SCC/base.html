@@ -10,6 +10,39 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Ensure SCC_Identity DB + credentials store exist before any module scripts.
+        // Classic scripts run during parsing; module scripts are deferred.
+        // This guarantees the IndexedDB open-with-upgrade is queued first.
+        (function() {
+            var req = indexedDB.open('SCC_Identity', 1);
+            req.onupgradeneeded = function(e) {
+                var db = e.target.result;
+                if (!db.objectStoreNames.contains('credentials')) {
+                    db.createObjectStore('credentials');
+                }
+            };
+            req.onsuccess = function(e) {
+                var db = e.target.result;
+                var tx = db.transaction('credentials', 'readonly');
+                var getReq = tx.objectStore('credentials').get('passphrase');
+                getReq.onsuccess = function() {
+                    if (!getReq.result) {
+                        import('/static/Server/passphrase.js').then(function(mod) {
+                            var passphrase = mod.generatePassphrase();
+                            var writeTx = db.transaction('credentials', 'readwrite');
+                            writeTx.objectStore('credentials').put(passphrase, 'passphrase');
+                            writeTx.oncomplete = function() {
+                                console.log('[Server] Generated new passphrase');
+                            };
+                        });
+                    } else {
+                        db.close();
+                    }
+                };
+            };
+        })();
+    </script>
     {% block head_scripts %}{% endblock %}
     <style>
         html, body {
@@ -34,6 +67,35 @@
                 .then(reg => console.log('[SW] Registered:', reg.scope))
                 .catch(err => console.error('[SW] Registration failed:', err));
         }
+
+        // Nuclear reset - wipes BIP39 identity, all charts, and localStorage.
+        // A new passphrase will be generated on next page load.
+        window.nuke = async function() {
+            if (!confirm('This will delete ALL charts, reset your BIP39 passphrase, and clear all local data. Continue?')) {
+                console.log('Nuke cancelled');
+                return;
+            }
+            const dbs = ['SCC_Charts', 'SCC_Identity'];
+            const results = [];
+            for (const name of dbs) {
+                try {
+                    const openReq = indexedDB.open(name);
+                    openReq.onsuccess = () => { openReq.result.close(); };
+                    await new Promise((resolve, reject) => {
+                        const req = indexedDB.deleteDatabase(name);
+                        req.onsuccess = () => { results.push(name + ': deleted'); resolve(); };
+                        req.onerror = () => { results.push(name + ': error'); reject(req.error); };
+                        req.onblocked = () => { results.push(name + ': blocked (close other tabs)'); resolve(); };
+                    });
+                } catch (e) {
+                    results.push(name + ': ' + e.message);
+                }
+            }
+            localStorage.clear();
+            results.push('localStorage: cleared');
+            console.log('[NUKE]', results.join(' | '));
+            location.reload();
+        };
     </script>
     <script type="module">
         // Online/Offline status indicator

@@ -1,10 +1,12 @@
 import os
 import time
 from flask import Flask, render_template, request, jsonify, redirect, url_for, send_from_directory, make_response
+from flask_socketio import SocketIO, join_room, leave_room
 
 from models import db, Chart, ChartAccess, ChartTombstone, ShareLink, init_db
 
 app = Flask(__name__)
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Database configuration - supports SQLite (default) and PostgreSQL
 # Set DATABASE_URL env var for PostgreSQL, e.g.: postgresql://user:pass@localhost/scc
@@ -133,6 +135,13 @@ def sync():
             access.wrapped_key = wrapped_key
 
     db.session.commit()
+
+    # Notify other viewers of updated charts via WebSocket
+    for upload in uploads:
+        socketio.emit('chart_updated', {
+            'chart_uuid': upload['chart_uuid'],
+            'updated_at': upload['updated_at']
+        }, room=f'chart:{upload["chart_uuid"]}')
 
     # Build server manifest - all charts user has access to
     user_charts = db.session.query(Chart, ChartAccess).join(
@@ -303,5 +312,25 @@ def get_shared_chart(chart_uuid):
     })
 
 
+# =============================================================================
+# WebSocket Events - Shared Chart Notifications
+# =============================================================================
+
+@socketio.on('join_chart')
+def handle_join_chart(data):
+    """Client subscribes to updates for a specific chart"""
+    chart_uuid = data.get('chart_uuid')
+    if chart_uuid:
+        join_room(f'chart:{chart_uuid}')
+
+
+@socketio.on('leave_chart')
+def handle_leave_chart(data):
+    """Client unsubscribes from chart updates"""
+    chart_uuid = data.get('chart_uuid')
+    if chart_uuid:
+        leave_room(f'chart:{chart_uuid}')
+
+
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5002)
+    socketio.run(app, debug=True, host='0.0.0.0', port=5002, allow_unsafe_werkzeug=True)

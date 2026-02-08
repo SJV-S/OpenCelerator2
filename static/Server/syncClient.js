@@ -6,6 +6,7 @@ import { encrypt, decrypt, generateChartKey, wrapKey, unwrapKey, deriveKey } fro
 import { getUserId, getUserKey } from './passphrase.js';
 import { openDB } from '../SCC/lib/idb.js';
 import { eventBus, EVENTS } from '../SCC/eventBus.js';
+import { connectToChart, disconnectFromChart } from './wsClient.js';
 
 async function getChartFromIndexedDB(chartId) {
     const db = await openDB('SCC_Charts', 1);
@@ -313,9 +314,7 @@ export async function joinSharedChart(chartUuid, shareSecret) {
     return chartData;
 }
 
-let syncInterval = null;
-
-export async function syncChart(chartId) {
+export async function syncChart(chartId, updatedAt = null) {
     if (!isInitialized()) return false;
 
     const db = await openDB('SCC_Charts', 1);
@@ -323,13 +322,21 @@ export async function syncChart(chartId) {
     if (!chart || !chart.shared || !chart.chartKey) return false;
 
     try {
-        // Lightweight poll first
-        const pollResponse = await fetch(`/api/chart/${chartId}/poll?t=${chart.lastModified || 0}`);
-        if (!pollResponse.ok) return false;
-        const { changed, updated_at } = await pollResponse.json();
-        if (!changed) return false;
+        // If updatedAt provided and not newer than local, skip
+        if (updatedAt !== null && updatedAt <= (chart.lastModified || 0)) {
+            return false;
+        }
 
-        // Fetch full data only if changed
+        // If updatedAt is null (reconnect or initial), use poll endpoint to check
+        if (updatedAt === null) {
+            const pollResponse = await fetch(`/api/chart/${chartId}/poll?t=${chart.lastModified || 0}`);
+            if (!pollResponse.ok) return false;
+            const pollData = await pollResponse.json();
+            if (!pollData.changed) return false;
+            updatedAt = pollData.updated_at;
+        }
+
+        // Fetch full data
         const response = await fetch(`/api/chart/${chartId}/shared`);
         if (!response.ok) return false;
         const { data } = await response.json();
@@ -341,7 +348,7 @@ export async function syncChart(chartId) {
         chartData.id = chartId;
         chartData.chartKey = chart.chartKey;
         chartData.shared = true;
-        chartData.lastModified = updated_at;
+        chartData.lastModified = updatedAt;
 
         await db.put('charts', chartData);
         eventBus.emit(EVENTS.SYNC_CHART_UPDATED, { chartId, chartData });
@@ -352,17 +359,24 @@ export async function syncChart(chartId) {
     }
 }
 
-export function startSyncPolling(chartId) {
+export async function startSyncPolling(chartId) {
     stopSyncPolling();
+
+    // Initial sync check
     syncChart(chartId);
-    syncInterval = setInterval(() => syncChart(chartId), 5000);
+
+    // Only open WebSocket for shared charts
+    const db = await openDB('SCC_Charts', 1);
+    const chart = await db.get('charts', chartId);
+    if (chart && chart.shared && chart.chartKey) {
+        connectToChart(chartId, ({ chartUuid, updatedAt }) => {
+            syncChart(chartUuid, updatedAt);
+        });
+    }
 }
 
 export function stopSyncPolling() {
-    if (syncInterval) {
-        clearInterval(syncInterval);
-        syncInterval = null;
-    }
+    disconnectFromChart();
 }
 
 export { userId, userKey };
