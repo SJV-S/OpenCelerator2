@@ -87,9 +87,26 @@ export async function jsonBackwardsCompatibilityCheck(loadedChart) {
                 entry.style = {
                     color,
                     width: LINE_DEFAULTS.TREND_WIDTH,
-                    dash: 'solid'
+                    dash: 'solid',
+                    bounceColor: color,
+                    bounceWidth: 1,
+                    bounceDash: 'dot'
                 };
                 modified = true;
+            } else {
+                // Backfill bounce fields added after initial style migration
+                if (entry.style.bounceColor == null) {
+                    entry.style.bounceColor = entry.style.color;
+                    modified = true;
+                }
+                if (entry.style.bounceWidth == null) {
+                    entry.style.bounceWidth = 1;
+                    modified = true;
+                }
+                if (entry.style.bounceDash == null) {
+                    entry.style.bounceDash = 'dot';
+                    modified = true;
+                }
             }
         }
     }

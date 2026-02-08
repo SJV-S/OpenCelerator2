@@ -12,6 +12,7 @@ import { timestampsToXPositions, dateToXPosition } from '../util/dates.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 import { createToast } from '../ui/toaster.js';
 import { removeLine } from './allLines.js';
+import { showCelLineEditor } from '../ui/celLineEditor.js';
 
 // Module-level state
 let clickHandlerAttached = false;
@@ -118,19 +119,33 @@ function handleLineClick(lineName) {
         }
     }
 
-    // Show toast with remove button
+    // Build toast buttons
+    const buttons = [];
+
+    // Cel lines get an Edit button for per-line style editing
+    if (category === 'cel') {
+        buttons.push({
+            label: 'Edit',
+            onClick: () => {
+                showCelLineEditor(lineId);
+            },
+            type: 'secondary'
+        });
+    }
+
+    buttons.push({
+        label: 'Remove',
+        onClick: () => {
+            console.log(`Remove clicked for ${lineName}`);
+            removeLine(lineType.stateKey, lineId);
+        },
+        type: 'secondary'
+    });
+
+    // Show toast with action buttons
     createToast({
         message: message,
-        buttons: [
-            {
-                label: 'Remove',
-                onClick: () => {
-                    console.log(`Remove clicked for ${lineName}`);
-                    removeLine(lineType.stateKey, lineId);
-                },
-                type: 'secondary'
-            }
-        ],
+        buttons: buttons,
         layout: 'horizontal',
         duration: 3000
     });

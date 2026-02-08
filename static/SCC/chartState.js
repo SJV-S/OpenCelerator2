@@ -48,6 +48,9 @@ export const chartState = {
     chartCapacity: 280, // Max X positions the chart can hold (Daily: 280, Weekly: 200, Monthly: 240, Yearly: 200)
     chartWindow: 140,   // Currently visible X range (always <= chartCapacity, defaults to capacity / 2)
 
+    // Container height in px (null = use flex layout default; width is derived from height)
+    containerHeight: null,
+
     // Legend configuration
     legend: {
         show: true, // Controls whether the custom legend is displayed

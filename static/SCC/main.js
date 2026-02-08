@@ -24,7 +24,7 @@ import { initializeSeriesNav } from './series/traceStyles.js';
 import { createToast } from './ui/toaster.js';
 import { refreshChart, init as replotInit } from './series/replot.js';
 import { alignStartDate, updateChartDateLabels, updateDateDisplay, adjustDateInput, initializeDateInput, updatePlotDateLabel } from './util/dates.js';
-import { initStartDateModal, initChartWindowControl } from './ui/startDateModal.js';
+import { initStartDateModal, initChartWindowControl, initChartHeightControl } from './ui/startDateModal.js';
 import { initLineSettingsModal } from './ui/lineSettingsModal.js';
 import { loadDataForDate, adjustTimestamp, updateCurrentEntry, deleteCurrentEntry, init as dataUpdateInit } from './series/dataUpdate.js';
 import {
@@ -80,10 +80,14 @@ export function initializeChart() {
 
     const chartDiv = document.getElementById('chart');
 
-    // Get container dimensions: use #chart-container on desktop, window dimensions on mobile
+    // Get container dimensions: use explicit chartState height, else flex default
     const chartContainer = document.getElementById('chart-container');
+    if (chartState.containerHeight != null) {
+        chartContainer.style.height = `${chartState.containerHeight}px`;
+    }
     const containerWidth = chartContainer ? chartContainer.clientWidth : window.innerWidth;
     const containerHeight = chartContainer ? chartContainer.clientHeight : window.innerHeight;
+    chartState.containerHeight = containerHeight;
 
     // Resize chart based on chart type (includes peeling and margin expansion for fan)
     plotData = resizeChartByHeight(plotData, containerWidth, containerHeight, chartState.chartType, {
@@ -179,6 +183,7 @@ function initializeDateInputs() {
     // Initialize start date modal and chart window control
     initStartDateModal();
     initChartWindowControl();
+    initChartHeightControl();
 }
 
 /**
@@ -480,6 +485,12 @@ export function setupEventListeners() {
     // Subscribe to chart window change events (from navigation modal)
     eventBus.subscribe(EVENTS.CHART_WINDOW_CHANGED, (newValue) => {
         applyChartWindow(newValue);
+    }, true);
+
+    // Chart height change — full re-init since height drives all dimensions
+    eventBus.subscribe(EVENTS.CHART_HEIGHT_CHANGED, (newHeight) => {
+        chartState.containerHeight = newHeight;
+        initializeChart();
     }, true);
 
     console.log('Event listeners set up');

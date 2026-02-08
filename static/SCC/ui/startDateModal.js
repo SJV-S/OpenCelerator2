@@ -580,4 +580,45 @@ export function initChartWindowControl() {
     }, true);
 }
 
+/**
+ * Chart Height control for settings tab (applies immediately via initializeChart)
+ */
+const HEIGHT_STEP = 50; // px per click
+const MIN_HEIGHT = 300;
+const MAX_HEIGHT = 2000;
+
+let chartHeightEl = null;
+
+function updateChartHeightDisplay(value) {
+    if (chartHeightEl) {
+        chartHeightEl.textContent = value ?? chartState.containerHeight ?? '';
+    }
+}
+
+function adjustChartHeight(delta) {
+    const current = chartState.containerHeight;
+    if (current == null) return;
+
+    let newHeight = current + (delta * HEIGHT_STEP);
+    newHeight = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, newHeight));
+
+    if (newHeight !== current) {
+        eventBus.emit(EVENTS.CHART_HEIGHT_CHANGED, newHeight);
+    }
+}
+
+export function initChartHeightControl() {
+    chartHeightEl = document.getElementById('chart-height-value');
+    const decBtn = document.getElementById('chart-height-dec');
+    const incBtn = document.getElementById('chart-height-inc');
+
+    if (chartHeightEl) updateChartHeightDisplay();
+    if (decBtn) decBtn.addEventListener('click', () => adjustChartHeight(-1));
+    if (incBtn) incBtn.addEventListener('click', () => adjustChartHeight(1));
+
+    eventBus.subscribe(EVENTS.CHART_HEIGHT_CHANGED, (newValue) => {
+        updateChartHeightDisplay(newValue);
+    }, true);
+}
+
 console.log('startDateModal.js loaded');

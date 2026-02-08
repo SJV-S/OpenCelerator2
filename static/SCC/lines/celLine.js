@@ -78,7 +78,8 @@ function buildCelLineElements(metadata, chartDiv) {
     const x2 = dateToXPosition(metadata.date2);
 
     // Per-line style (concrete values set at creation, backfilled by compat script)
-    const { color: celLineColor, width: celLineWidth, dash: celLineDash } = metadata.style;
+    const { color: celLineColor, width: celLineWidth, dash: celLineDash,
+            bounceColor, bounceWidth, bounceDash } = metadata.style;
 
     // Build shapes array - main trend line first
     const shapes = [];
@@ -113,9 +114,9 @@ function buildCelLineElements(metadata, chartDiv) {
             yref: 'y',
             name: `${lineName}-upper`,
             line: {
-                color: celLineColor,
-                width: 1,
-                dash: 'dot'
+                color: bounceColor,
+                width: bounceWidth,
+                dash: bounceDash
             }
         });
     }
@@ -132,9 +133,9 @@ function buildCelLineElements(metadata, chartDiv) {
             yref: 'y',
             name: `${lineName}-lower`,
             line: {
-                color: celLineColor,
-                width: 1,
-                dash: 'dot'
+                color: bounceColor,
+                width: bounceWidth,
+                dash: bounceDash
             }
         });
     }
@@ -1030,7 +1031,10 @@ function handleCelLineConfirm(data, baseKey) {
         style: {
             color: getCelLineColor(baseKey),
             width: LINE_DEFAULTS.TREND_WIDTH,
-            dash: 'solid'
+            dash: 'solid',
+            bounceColor: getCelLineColor(baseKey),
+            bounceWidth: 1,
+            bounceDash: 'dot'
         },
         shapeIndices: [],
         annotationIndex: null
@@ -1237,6 +1241,11 @@ function init() {
 
     // Redraw cel lines after chart replot completes
     eventBus.subscribe(EVENTS.DATA_CHART_REPLOT_COMPLETE, () => {
+        redrawCelLines();
+    });
+
+    // Redraw cel lines when a line's style is edited
+    eventBus.subscribe(EVENTS.LINE_CEL_STYLE_CHANGED, () => {
         redrawCelLines();
     });
 

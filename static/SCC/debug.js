@@ -13,6 +13,7 @@
  */
 
 import { chartState } from './chartState.js';
+import { initializeChart } from './main.js';
 import { createToast, createInfoToast, createConfirmToast } from './ui/toaster.js';
 import { eventBus, EVENTS } from './eventBus.js';
 
@@ -203,6 +204,21 @@ window.clearCelLines = function() {
 /**
  * Debug custom legend - prints all relevant state to console
  */
+/**
+ * Resize chart container height and re-render chart (width is derived)
+ * Usage: resizeContainer(800) or resizeContainer() to reset to flex default
+ */
+window.resizeContainer = function(height) {
+    if (height == null) {
+        chartState.containerHeight = null;
+        document.getElementById('chart-container').style.height = '';
+    } else {
+        chartState.containerHeight = height;
+    }
+    initializeChart();
+    console.log(`Container height: ${chartState.containerHeight}px`);
+};
+
 window.debugLegend = function() {
     const chartDiv = document.getElementById('chart');
     const container = document.getElementById('custom-legend');
