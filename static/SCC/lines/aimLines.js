@@ -434,6 +434,9 @@ function getPlotCoordinatesForAimLine(event, chartDiv) {
     // Round to nearest integer (day boundary) so temp line matches finalized position
     xValue = Math.round(xValue);
 
+    // Reject clicks outside the valid chart range
+    if (xValue < 0 || xValue > chartState.chartCapacity) return null;
+
     // For log scale, the range is in log10 space, so we need to convert back
     let yValue;
     if (isLogY) {

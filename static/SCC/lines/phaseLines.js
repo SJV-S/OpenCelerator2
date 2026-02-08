@@ -532,6 +532,9 @@ function getPlotCoordinates(event, chartDiv) {
     // Round x-value to nearest integer
     xValue = Math.round(xValue);
 
+    // Reject clicks outside the valid chart range
+    if (xValue < 0 || xValue > chartState.chartCapacity) return null;
+
     // For log scale, the range is in log10 space, so we need to convert back
     let yValue;
     if (isLogY) {

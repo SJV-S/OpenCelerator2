@@ -7,7 +7,7 @@
 // Set to true during development to always fetch fresh (bypasses cache)
 const DEVELOPER_MODE = true;
 
-const SW_VERSION = '0.18.0';
+const SW_VERSION = '0.19.0';
 const CACHE_NAME = `scc-cache-v${SW_VERSION}`;
 
 // HTML pages to precache
@@ -32,7 +32,7 @@ const PRECACHE_STATIC = [
     '/static/SCC/debug.js',
     '/static/SCC/eventBus.js',
     '/static/SCC/navigation.js',
-    '/static/SCC/pwaInstall.js',
+    '/static/pwaInstall.js',
     // Libraries
     '/static/SCC/lib/idb.js',
     '/static/SCC/lib/xlsx.full.min.js',
@@ -51,10 +51,17 @@ const PRECACHE_STATIC = [
     '/static/SCC/lines/celLine.js',
     '/static/SCC/lines/cutLines.js',
     '/static/SCC/lines/lineClickHandler.js',
+    '/static/SCC/lines/lineHover.js',
     '/static/SCC/lines/phaseLines.js',
     // UI
+    '/static/SCC/ui/aimLineEditor.js',
+    '/static/SCC/ui/celLineEditor.js',
+    '/static/SCC/ui/celSettingsModal.js',
     '/static/SCC/ui/crosshair.js',
     '/static/SCC/ui/icons.js',
+    '/static/SCC/ui/lineSettingsModal.js',
+    '/static/SCC/ui/panSlider.js',
+    '/static/SCC/ui/phaseLineEditor.js',
     '/static/SCC/ui/startDateModal.js',
     '/static/SCC/ui/toaster.js',
     '/static/SCC/ui/tooltip.js',
@@ -71,6 +78,7 @@ const PRECACHE_STATIC = [
     '/static/SCC/import/dataImport.js',
     '/static/SCC/import/importUI.js',
     '/static/SCC/import/jsonBackwardsCompatibility.js',
+    '/static/SCC/import/nativeImport.js',
     '/static/SCC/import/openCeleratorImport.js',
     // Misc
     '/static/SCC/misc/celerationFan.js',
@@ -98,12 +106,14 @@ const PRECACHE_STATIC = [
     '/static/Server/onlineStatus.js',
     '/static/Server/passphrase.js',
     '/static/Server/syncClient.js',
+    '/static/Server/wsClient.js',
 ];
 
 // CDN URLs to precache (fetched separately to handle cross-origin)
 const PRECACHE_CDN = [
     'https://cdn.tailwindcss.com',
     'https://cdn.plot.ly/plotly-2.35.2.min.js',
+    'https://cdn.socket.io/4.7.4/socket.io.min.js',
     'https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap',
 ];
 

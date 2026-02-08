@@ -61,12 +61,30 @@ export function connectToChart(chartId, callback) {
     socket.on('connect_error', (err) => {
         console.warn('[WS] Connection error:', err.message);
     });
+
+    // When tab becomes visible again, check connection health
+    document.addEventListener('visibilitychange', onVisibilityChange);
+}
+
+function onVisibilityChange() {
+    if (document.visibilityState !== 'visible' || !socket) return;
+
+    if (!socket.connected) {
+        console.log('[WS] Tab visible, socket disconnected — reconnecting');
+        socket.connect();
+    } else {
+        // Connected but may have missed updates during background/sleep
+        if (onChartUpdated && currentChartId) {
+            onChartUpdated({ chartUuid: currentChartId, updatedAt: null });
+        }
+    }
 }
 
 /**
  * Disconnect from WebSocket and leave the chart room.
  */
 export function disconnectFromChart() {
+    document.removeEventListener('visibilitychange', onVisibilityChange);
     if (socket) {
         if (currentChartId) {
             socket.emit('leave_chart', { chart_uuid: currentChartId });
@@ -84,4 +102,13 @@ export function disconnectFromChart() {
  */
 export function isConnected() {
     return socket !== null && socket.connected;
+}
+
+/**
+ * Check if a WebSocket exists (connected or reconnecting).
+ * Use this to avoid creating duplicate sockets while one is already trying to reconnect.
+ * @returns {boolean}
+ */
+export function hasSocket() {
+    return socket !== null;
 }

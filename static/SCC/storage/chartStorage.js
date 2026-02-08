@@ -30,7 +30,7 @@ import { jsonBackwardsCompatibilityCheck } from '../import/jsonBackwardsCompatib
 import { generateChartKey } from '../../Server/crypto.js';
 import { pushChart, isInitialized, startSyncPolling } from '../../Server/syncClient.js';
 import { isSyncEnabled } from '../../Server/init.js';
-import { isConnected } from '../../Server/wsClient.js';
+import { hasSocket } from '../../Server/wsClient.js';
 
 // Convert CryptoKey to hex string for storage
 async function exportKeyToHex(key) {
@@ -456,7 +456,7 @@ function debouncedSaveToIndexedDB() {
             console.log('[LINE SAVE] 5. saveChart completed for id:', chartState.id);
             if ((chartState.shared || isSyncEnabled()) && isInitialized()) {
                 // Reconnect WebSocket if it dropped (e.g. after sleep/tab freeze)
-                if (chartState.shared && !isConnected()) {
+                if (chartState.shared && !hasSocket()) {
                     startSyncPolling(chartState.id);
                 }
                 pushChart(chartState.id)
