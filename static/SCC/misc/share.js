@@ -4,7 +4,7 @@
 import { chartState } from '../chartState.js';
 import { createToast } from '../ui/toaster.js';
 import { icons } from '../ui/icons.js';
-import { createViewLink, createEditLink, isInitialized } from '../../Server/syncClient.js';
+import { createViewLink, createEditLink, isInitialized, startSyncPolling } from '../../Server/syncClient.js';
 import { getFirstConfig } from '../series/traceStyles.js';
 import { isOnline } from '../../Server/onlineStatus.js';
 
@@ -236,6 +236,9 @@ async function handleShareLinkClick(type) {
         if (result.chartKey) {
             chartState.chartKey = result.chartKey;
         }
+
+        // Open WebSocket connection now that chart is shared
+        startSyncPolling(chartState.id);
 
         await navigator.clipboard.writeText(url);
 
