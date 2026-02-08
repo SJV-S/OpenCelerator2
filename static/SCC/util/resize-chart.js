@@ -81,7 +81,7 @@ const CHART_CONFIG = {
         annotations: {
             'year-label': { offsetMultiplier: 3, useGeneral: true, fontScale: 1.5, prefix: true },
             'year-count': { offsetMultiplier: 5.2, useGeneral: true },
-            'top_x_title': { offsetMultiplier: 5.93, useTitle: true, yDirection: 'above' },
+            'top_x_title': { offsetMultiplier: 5.5, useTitle: true, yDirection: 'above' },
             'bottom_x_title': { offsetMultiplier: 4.44, useTitle: true, yDirection: 'below' }
         },
         shapes: {

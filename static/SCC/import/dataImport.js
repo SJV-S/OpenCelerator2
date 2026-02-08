@@ -364,71 +364,53 @@ function cleanRow(row, columnMap) {
  * @returns {number|null} Unix timestamp in seconds, or null if invalid
  */
 function parseDate(value) {
-    if (value == null || value === '') {
-        return null;
+  if (value == null || value === '') return null;
+
+  let str = String(value).trim();
+  console.log('[Import] Parsing:', str);
+
+  // Strip time prefix "00:00:00 " (handles variable length time + any whitespace)
+  str = str.replace(/^\d{1,2}:\d{2}(:\d{2})?\s+/, '');
+  console.log('[Import] After time strip:', str);
+
+  let date;
+
+  // Parse DD-MMM-YYYY (e.g., "18-Jul-2018")
+  const match = str.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
+  if (match) {
+    const [, day, mon, year] = match;
+    const months = {jan:0, feb:1, mar:2, apr:3, may:4, jun:5, jul:6, aug:7, sep:8, oct:9, nov:10, dec:11};
+    const monthIdx = months[mon.toLowerCase()];
+
+    if (monthIdx !== undefined) {
+      date = new Date(parseInt(year), monthIdx, parseInt(day));
+      console.log('[Import] Parsed DD-MMM-YYYY:', date.toISOString());
+    } else {
+      console.log('[Import] Unknown month:', mon);
     }
+  }
 
-    let date;
+  // Fallback for other formats
+  if (!date || isNaN(date.getTime())) {
+    date = new Date(str);
+  }
 
-    // If it's already a Date object
-    if (value instanceof Date) {
-        date = value;
-    }
-    // If it's a number (might be Excel serial date or timestamp)
-    else if (typeof value === 'number') {
-        // Excel serial date (days since 1900-01-01)
-        if (value > 0 && value < 100000) {
-            // Convert Excel serial to JS Date
-            date = excelSerialToDate(value);
-        }
-        // Unix timestamp (seconds or milliseconds)
-        else if (value > 100000000) {
-            date = value > 10000000000
-                ? new Date(value)           // milliseconds
-                : new Date(value * 1000);   // seconds
-        }
-    }
-    // String parsing
-    else {
-        const str = String(value).trim();
+  // Excel serial fallback
+  if ((!date || isNaN(date.getTime())) && typeof value === 'number') {
+    if (value > 0 && value < 100000) date = excelSerialToDate(value);
+  }
 
-        // Year only: "2024" -> Dec 31 of that year
-        if (/^(19|20)\d{2}$/.test(str)) {
-            date = new Date(`${str}-12-31`);
-        }
-        // Year-month: "2024-03" or "2024/03" -> last day of month
-        else if (/^(19|20)\d{2}[-/](0?[1-9]|1[0-2])$/.test(str)) {
-            const [year, month] = str.split(/[-/]/);
-            date = new Date(parseInt(year), parseInt(month), 0); // Day 0 = last day of prev month
-        }
-        // Standard date parsing
-        else {
-            date = new Date(str);
+  if (!date || isNaN(date.getTime())) {
+    console.log('[Import] Final parse failed for:', str);
+    return null;
+  }
 
-            // Fallback: strip time components (e.g. "00:00:00 07-Jan-2026" → "07-Jan-2026")
-            if (!date || isNaN(date.getTime())) {
-                const stripped = str.replace(/\b\d{1,2}:\d{2}(:\d{2})?\b/g, '').trim();
-                if (stripped && stripped !== str) {
-                    date = new Date(stripped);
-                }
-            }
-        }
-    }
+  const yr = date.getFullYear();
+  if (yr < 1900 || yr > 2100) return null;
 
-    // Validate result
-    if (!date || isNaN(date.getTime())) {
-        return null;
-    }
-
-    // Sanity check year range
-    const year = date.getFullYear();
-    if (year < 1900 || year > 2100) {
-        return null;
-    }
-
-    // Return Unix timestamp in seconds
-    return Math.floor(date.getTime() / 1000);
+  return Math.floor(date.getTime() / 1000);
 }
+
 
 /**
  * Convert Excel serial date to JavaScript Date

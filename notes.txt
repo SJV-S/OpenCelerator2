@@ -77,6 +77,19 @@ To-do
 - - Fake spine on weekly is not drawn correctly either. It might be adapted for Daily only right now
 - Import is blocking if I only pick a misc
 - There's date code duplication in the dataImport.js
+- When a misc series is imported, no default raw value is created, and so series doesn't appear until one creates it
+-- And the default name is apparently "Undefined" instead of inheriting the display name from the csv data column
+-- Default values for misc doesn't show up in series tab, same with legend.
+- Chart window always seems to default to 140, which is the Daily default. It doesn't seem to consider the other chart types
+-- Same problem with the increments, they seem specific to Daily
+-- And updating it doesn't move the fake spines automatically
+-- When not checking "replace existing data", the columns need to take into account what column names are already being used
+- Renaming display name BEFORE an aggregation take is created doesn't seem to take
+- Monthly is misallgined at the end, probably also due to Daliy values?
+- Still problems sometimes with clickablity on change lines
+- Chart window for months shows "Days"!
+- Credit lines doesn't adapt to narrow chart windows
+-
 
 - Survey prompts
 -- Investigate the occurrence of any cross-module imports that should be handled by the event bus system instead
