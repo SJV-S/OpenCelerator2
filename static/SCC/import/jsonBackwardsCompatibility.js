@@ -1,4 +1,5 @@
 import { chartState } from '../chartState.js';
+import { CORRECTS, ERRORS, TIMING, LINE_DEFAULTS, COLORS } from '../config.js';
 import { generateChartKey } from '../../Server/crypto.js';
 
 function fillMissing(target, reference, skipKeys = ['id', '_createdAt', 'lastModified']) {
@@ -71,6 +72,26 @@ export async function jsonBackwardsCompatibilityCheck(loadedChart) {
         loadedChart.chartKey = Array.from(new Uint8Array(raw))
             .map(b => b.toString(16).padStart(2, '0')).join('');
         modified = true;
+    }
+
+    // Backfill style object on existing CelLines entries with concrete defaults
+    if (loadedChart.CelLines) {
+        for (const [key, entry] of Object.entries(loadedChart.CelLines)) {
+            if (key === 'settings' || typeof entry !== 'object') continue;
+            if (!entry.style) {
+                const sk = entry.seriesKey;
+                let color = 'black';
+                if (sk === CORRECTS) color = COLORS.TREND_CORRECTS;
+                else if (sk === ERRORS) color = COLORS.TREND_ERRORS;
+                else if (sk === TIMING) color = COLORS.TREND_TIMING;
+                entry.style = {
+                    color,
+                    width: LINE_DEFAULTS.TREND_WIDTH,
+                    dash: 'solid'
+                };
+                modified = true;
+            }
+        }
     }
 
     // Track keys before fillMissing

@@ -14,7 +14,7 @@
 import { createToast } from '../ui/toaster.js';
 import { icons, applySvgCursor, restoreCursor } from '../ui/icons.js';
 import { chartState } from '../chartState.js';
-import { CORRECTS, ERRORS, TIMING } from '../config.js';
+import { CORRECTS, ERRORS, TIMING, LINE_DEFAULTS, COLORS } from '../config.js';
 import { xPositionToDate, dateToXPosition } from '../util/dates.js';
 import { fit, FIT_METHODS, BOUNCE_ENVELOPES, DEFAULT_FIT_METHOD, DEFAULT_BOUNCE_ENVELOPE, calculateBounceBounds, calculateBounceLines, formatCelerationLabel } from '../util/fit_lines.js';
 import { eventBus, EVENTS } from '../eventBus.js';
@@ -26,9 +26,9 @@ import { eventBus, EVENTS } from '../eventBus.js';
  * @returns {string} The color to use for the cel line
  */
 function getCelLineColor(seriesKey) {
-    if (seriesKey === CORRECTS) return 'green';
-    if (seriesKey === ERRORS) return 'red';
-    if (seriesKey === TIMING) return 'orange';
+    if (seriesKey === CORRECTS) return COLORS.TREND_CORRECTS;
+    if (seriesKey === ERRORS) return COLORS.TREND_ERRORS;
+    if (seriesKey === TIMING) return COLORS.TREND_TIMING;
     return 'black'; // misc series
 }
 
@@ -77,13 +77,8 @@ function buildCelLineElements(metadata, chartDiv) {
     const x1 = dateToXPosition(metadata.date1);
     const x2 = dateToXPosition(metadata.date2);
 
-    // Get trend style for width/dash
-    const trendStyle = metadata.seriesKey.startsWith('misc')
-        ? (chartState.lineStyles.trend.misc[metadata.seriesKey] || chartState.lineStyles.trend.timing)
-        : (chartState.lineStyles.trend[metadata.seriesKey] || chartState.lineStyles.trend.timing);
-
-    // Get cel line color based on series
-    const celLineColor = getCelLineColor(metadata.seriesKey);
+    // Per-line style (concrete values set at creation, backfilled by compat script)
+    const { color: celLineColor, width: celLineWidth, dash: celLineDash } = metadata.style;
 
     // Build shapes array - main trend line first
     const shapes = [];
@@ -100,8 +95,8 @@ function buildCelLineElements(metadata, chartDiv) {
         name: lineName,
         line: {
             color: celLineColor,
-            width: trendStyle.width,
-            dash: trendStyle.dash
+            width: celLineWidth,
+            dash: celLineDash
         }
     };
     shapes.push(mainShape);
@@ -1032,6 +1027,11 @@ function handleCelLineConfirm(data, baseKey) {
         bounceLowerY1: bounceLowerY1,
         bounceLowerY2: bounceLowerY2,
         text: labelText,
+        style: {
+            color: getCelLineColor(baseKey),
+            width: LINE_DEFAULTS.TREND_WIDTH,
+            dash: 'solid'
+        },
         shapeIndices: [],
         annotationIndex: null
     };
