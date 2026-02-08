@@ -116,6 +116,7 @@ export const CHART_TYPE_CONFIG = Object.freeze({
         fanYPosition: 1000,
         fanYPositionMinute: 0.01,
         fanLineLengthMultiplier: 0.13,
+        countingTimesLabelXOffsetPx: 40,
         yAxisTitlePosition: 0.5,
         yAxisTitlePositionMinute: 0.7,
         annotations: {
@@ -146,6 +147,7 @@ export const CHART_TYPE_CONFIG = Object.freeze({
         fanYPosition: 1000,
         fanYPositionMinute: 0.01,
         fanLineLengthMultiplier: 0.13,
+        countingTimesLabelXOffsetPx: 40,
         yAxisTitlePosition: 0.5,
         yAxisTitlePositionMinute: 0.7,
         annotations: {
@@ -176,6 +178,7 @@ export const CHART_TYPE_CONFIG = Object.freeze({
         fanYPosition: 1000,
         fanYPositionMinute: 0.01,
         fanLineLengthMultiplier: 0.13,
+        countingTimesLabelXOffsetPx: 40,
         yAxisTitlePosition: 0.5,
         yAxisTitlePositionMinute: 0.7,
         annotations: {
@@ -206,6 +209,7 @@ export const CHART_TYPE_CONFIG = Object.freeze({
         fanYPosition: 1000,
         fanYPositionMinute: 0.01,
         fanLineLengthMultiplier: 0.13,
+        countingTimesLabelXOffsetPx: 40,
         yAxisTitlePosition: 0.5,
         yAxisTitlePositionMinute: 0.7,
         annotations: {
@@ -238,6 +242,7 @@ export const CHART_TYPE_CONFIG = Object.freeze({
         fanYPosition: 1000,
         fanYPositionMinute: 0.01,
         fanLineLengthMultiplier: 0.13,
+        countingTimesLabelXOffsetPx: 40,
         yAxisTitlePosition: 0.5,
         yAxisTitlePositionMinute: 0.7,
         annotations: {

@@ -165,7 +165,7 @@ function resizeChartByHeight(chartJson, containerWidth, containerHeight, chartTy
         // Reposition "COUNTING TIMES" annotation (Daily chart, right y-axis label)
         // Must check before the name guard since this annotation has no name
         if (annotation.text === 'COUNTING TIMES') {
-            annotation.x = 1 + (30 / xaxis_px);
+            annotation.x = 1 + (config.countingTimesLabelXOffsetPx / xaxis_px);
         }
 
         if (!annotation.name) return;
