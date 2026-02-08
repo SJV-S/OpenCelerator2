@@ -13,6 +13,8 @@ let modalOverlay = null;
 let colorInput = null;
 let widthInput = null;
 let dashSelect = null;
+let fontColorInput = null;
+let fontSizeInput = null;
 let titleEl = null;
 
 const DASH_OPTIONS = [
@@ -116,6 +118,61 @@ function createModal() {
     dashRow.appendChild(dashLabel);
     dashRow.appendChild(dashSelect);
 
+    // --- Divider ---
+    const divider = document.createElement('div');
+    divider.className = 'border-t border-gray-200 my-4';
+
+    const fontSectionLabel = document.createElement('div');
+    fontSectionLabel.className = 'text-sm font-semibold text-gray-600 mb-3 text-center';
+    fontSectionLabel.textContent = 'Label';
+
+    // --- Font Color ---
+    const fontColorRow = document.createElement('div');
+    fontColorRow.className = 'mb-3';
+
+    const fontColorLabel = document.createElement('label');
+    fontColorLabel.className = 'block text-sm text-gray-500 mb-1';
+    fontColorLabel.textContent = 'Color';
+
+    fontColorInput = document.createElement('input');
+    fontColorInput.type = 'color';
+    fontColorInput.className = 'w-full h-9 border-2 border-gray-300 rounded cursor-pointer';
+
+    fontColorInput.addEventListener('input', (e) => {
+        const style = getActiveStyle();
+        if (style) style.fontColor = e.target.value;
+    });
+
+    fontColorRow.appendChild(fontColorLabel);
+    fontColorRow.appendChild(fontColorInput);
+
+    // --- Font Size ---
+    const fontSizeRow = document.createElement('div');
+    fontSizeRow.className = 'mb-4';
+
+    const fontSizeLabel = document.createElement('label');
+    fontSizeLabel.className = 'block text-sm text-gray-500 mb-1';
+    fontSizeLabel.textContent = 'Size';
+
+    fontSizeInput = document.createElement('input');
+    fontSizeInput.type = 'number';
+    fontSizeInput.min = '6';
+    fontSizeInput.max = '24';
+    fontSizeInput.step = '1';
+    fontSizeInput.className = 'w-full px-3 py-2 lg:px-2 lg:py-1 text-sm border-2 border-gray-300 rounded focus:outline-none focus:border-[#6ad1e3] transition-colors';
+
+    fontSizeInput.addEventListener('change', (e) => {
+        const style = getActiveStyle();
+        if (!style) return;
+        const value = parseInt(e.target.value) || 12;
+        style.fontSize = Math.max(6, Math.min(24, value));
+        e.target.value = style.fontSize;
+        e.target.blur();
+    });
+
+    fontSizeRow.appendChild(fontSizeLabel);
+    fontSizeRow.appendChild(fontSizeInput);
+
     // --- Close button ---
     const closeBtn = document.createElement('button');
     closeBtn.type = 'button';
@@ -128,6 +185,10 @@ function createModal() {
     content.appendChild(colorRow);
     content.appendChild(widthRow);
     content.appendChild(dashRow);
+    content.appendChild(divider);
+    content.appendChild(fontSectionLabel);
+    content.appendChild(fontColorRow);
+    content.appendChild(fontSizeRow);
     content.appendChild(closeBtn);
     modalOverlay.appendChild(content);
 
@@ -173,6 +234,8 @@ export function showPhaseLineEditor(lineId) {
     colorInput.value = style.color;
     widthInput.value = style.width;
     dashSelect.value = style.dash;
+    fontColorInput.value = style.fontColor;
+    fontSizeInput.value = style.fontSize;
 
     modalOverlay.style.display = 'flex';
 }
