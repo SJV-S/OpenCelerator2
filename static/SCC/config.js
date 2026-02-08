@@ -137,12 +137,12 @@ export const CHART_TYPE_CONFIG = Object.freeze({
         snapInterval: 5,
         minXmax: 10,
         capacity: 200,
-        creditMarginMultiplier: 0.10,
+        creditMarginMultiplier: 0.13,
         topMarginMultiplier: 0,
         fanMarginMinute: 0.10,
         fanMarginCount: 0.07,
         fanXOffsetPx: 30,
-        fanXOffsetPxMinute: 30,
+        fanXOffsetPxMinute: 180,
         fanYPosition: 1000,
         fanYPositionMinute: 0.01,
         fanLineLengthMultiplier: 0.13,
@@ -151,7 +151,7 @@ export const CHART_TYPE_CONFIG = Object.freeze({
         annotations: {
             'month-label': { offsetMultiplier: 2.8, useGeneral: true, fontScale: 0.85, prefix: true },
             'month-count': { offsetMultiplier: 5, useGeneral: true },
-            'top_x_title': { offsetMultiplier: 5.93, useTitle: true, yDirection: 'above' },
+            'top_x_title': { offsetMultiplier: 5.5, useTitle: true, yDirection: 'above' },
             'bottom_x_title': { offsetMultiplier: 4.44, useTitle: true, yDirection: 'below' }
         },
         shapes: {

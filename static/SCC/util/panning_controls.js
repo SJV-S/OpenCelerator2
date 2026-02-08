@@ -70,6 +70,13 @@ function setupPanConstraints(plotDiv, chartType) {
         visible ? removeDynamicSpines() : updateDynamicSpines();
     }, true);
 
+    // Reposition dynamic spines when chart window changes
+    eventBus.subscribe(EVENTS.CHART_WINDOW_CHANGED, () => {
+        if (!gridVisible) {
+            setTimeout(() => updateDynamicSpines(), 10);
+        }
+    }, true);
+
     // Hide dynamic spines immediately when dragging starts
     plotDiv.on('plotly_relayouting', function() {
         if (!gridVisible && !isDragging) {
