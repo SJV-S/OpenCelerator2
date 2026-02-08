@@ -25,6 +25,79 @@ export function isInitialized() {
     return userKey !== null && userId !== null;
 }
 
+export async function uploadCharts(localCharts) {
+    if (!isInitialized()) throw new Error('Sync not initialized - call initSync first');
+
+    const now = Math.floor(Date.now() / 1000);
+    const uploads = [];
+    for (const chart of localCharts) {
+        let chartKey;
+        if (chart.chartKeyHex) {
+            const keyBytes = new Uint8Array(chart.chartKeyHex.match(/.{1,2}/g).map(b => parseInt(b, 16)));
+            chartKey = await crypto.subtle.importKey('raw', keyBytes, { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+        } else {
+            chartKey = await generateChartKey();
+        }
+        const encryptedData = await encrypt(chartKey, chart.data);
+        const wrappedKey = await wrapKey(chartKey, userKey);
+
+        uploads.push({
+            chart_uuid: chart.id,
+            data: encryptedData,
+            updated_at: now,
+            wrapped_key: wrappedKey,
+            role: 'owner'
+        });
+    }
+
+    const response = await fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            user_id: userId,
+            last_sync_at: 0,
+            local_manifest: [],
+            uploads
+        })
+    });
+
+    if (!response.ok) throw new Error(`Upload failed: ${response.status}`);
+}
+
+export async function pullCharts() {
+    if (!isInitialized()) throw new Error('Sync not initialized - call initSync first');
+
+    const response = await fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            user_id: userId,
+            last_sync_at: lastSyncAt,
+            local_manifest: [],
+            uploads: []
+        })
+    });
+
+    if (!response.ok) throw new Error(`Pull failed: ${response.status}`);
+
+    const result = await response.json();
+    lastSyncAt = Math.floor(Date.now() / 1000);
+
+    const downloads = [];
+    for (const item of result.downloads) {
+        const chartKey = await unwrapKey(item.wrapped_key, userKey);
+        const data = await decrypt(chartKey, item.data);
+        downloads.push({
+            id: item.chart_uuid,
+            data,
+            updatedAt: item.updated_at,
+            role: item.role
+        });
+    }
+
+    return { downloads, serverManifest: result.server_manifest, tombstones: result.tombstones };
+}
+
 // NOTE: Full sync not currently in use - charts uploaded individually via share link creation
 export async function sync(localCharts) {
     if (!isInitialized()) throw new Error('Sync not initialized - call initSync first');
@@ -32,7 +105,13 @@ export async function sync(localCharts) {
     // Build upload list with encrypted data
     const uploads = [];
     for (const chart of localCharts) {
-        const chartKey = await generateChartKey();
+        let chartKey;
+        if (chart.chartKeyHex) {
+            const keyBytes = new Uint8Array(chart.chartKeyHex.match(/.{1,2}/g).map(b => parseInt(b, 16)));
+            chartKey = await crypto.subtle.importKey('raw', keyBytes, { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+        } else {
+            chartKey = await generateChartKey();
+        }
         const encryptedData = await encrypt(chartKey, chart.data);
         const wrappedKey = await wrapKey(chartKey, userKey);
 

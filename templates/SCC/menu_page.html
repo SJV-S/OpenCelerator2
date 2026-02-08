@@ -205,6 +205,23 @@ html, body {
     <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
         <h3 class="text-lg font-semibold text-gray-800 mb-4">Sync Device</h3>
 
+        <!-- Upload all charts button -->
+        <div class="mb-5">
+            <div class="flex items-center gap-2">
+                <button id="sync-upload-btn" class="flex-1 px-3 py-2 text-sm font-medium border-2 border-[#6ad1e3] text-[#05c3de] rounded-lg hover:bg-[#6ad1e3] hover:text-white transition-colors">
+                    Upload all charts to server
+                </button>
+            </div>
+            <p id="sync-upload-status" class="text-sm mt-2 hidden"></p>
+        </div>
+
+        <!-- Divider -->
+        <div class="flex items-center gap-3 mb-5">
+            <div class="flex-1 border-t border-gray-200"></div>
+            <span class="text-xs text-gray-400 uppercase">sync another device</span>
+            <div class="flex-1 border-t border-gray-200"></div>
+        </div>
+
         <!-- Copy passphrase section -->
         <div class="mb-5">
             <p class="text-sm text-gray-600 mb-2">Copy your passphrase to sync on another device</p>
@@ -223,15 +240,8 @@ html, body {
             </div>
         </div>
 
-        <!-- Divider -->
-        <div class="flex items-center gap-3 mb-5">
-            <div class="flex-1 border-t border-gray-200"></div>
-            <span class="text-xs text-gray-400 uppercase">or</span>
-            <div class="flex-1 border-t border-gray-200"></div>
-        </div>
-
         <!-- Paste passphrase section -->
-        <div class="mb-5">
+        <div id="sync-paste-section" class="mb-5">
             <p class="text-sm text-gray-600 mb-2">Sync from another device</p>
             <div class="flex items-center gap-2">
                 <input
@@ -242,6 +252,22 @@ html, body {
                     autocomplete="off"
                 >
                 <button id="sync-submit-btn" class="px-3 py-2 text-sm font-medium bg-[#6ad1e3] text-white rounded-lg hover:bg-[#5bc4d6] transition-colors">Sync</button>
+            </div>
+            <p id="sync-status" class="text-sm mt-2 hidden"></p>
+        </div>
+
+        <!-- Confirmation for existing charts -->
+        <div id="sync-confirm" class="mb-5 hidden">
+            <p class="text-sm text-gray-600 mb-4">
+                You have <span id="sync-chart-count" class="font-semibold"></span> existing chart(s) on this device. Would you like to keep them alongside synced charts, or start fresh?
+            </p>
+            <div class="flex gap-3">
+                <button id="sync-keep-btn" class="flex-1 px-3 py-2 text-sm font-medium border-2 border-gray-300 rounded-lg hover:bg-gray-50">
+                    Keep existing charts
+                </button>
+                <button id="sync-discard-btn" class="flex-1 px-3 py-2 text-sm font-medium border-2 border-red-300 text-red-600 rounded-lg hover:bg-red-50">
+                    Start fresh
+                </button>
             </div>
         </div>
 
@@ -258,6 +284,9 @@ html, body {
     import { isNativeFormat } from '/static/SCC/import/nativeImport.js';
     import { isOpenCeleratorFormat, buildChartFromOpenCelerator } from '/static/SCC/import/openCeleratorImport.js';
     import { openDB } from '/static/SCC/lib/idb.js';
+    import { validatePassphrase, getUserId } from '/static/Server/passphrase.js';
+    import { initSync, uploadCharts, pullCharts } from '/static/Server/syncClient.js';
+    import { initServerSync, resetSync } from '/static/Server/init.js';
 
     let charts = [];
     let chartToDelete = null;
@@ -791,14 +820,36 @@ html, body {
         }
     }
 
+    async function gatherLocalCharts() {
+        const allCharts = await listCharts();
+        if (allCharts.length === 0) return [];
+        const chartsDb = await openDB('SCC_Charts', 1);
+        const localCharts = [];
+        for (const chart of allCharts) {
+            const full = await chartsDb.get('charts', chart.id);
+            if (full) {
+                localCharts.push({
+                    id: full.id,
+                    data: full,
+                    updatedAt: full.lastModified || Math.floor(Date.now() / 1000),
+                    chartKeyHex: full.chartKey || null
+                });
+            }
+        }
+        return localCharts;
+    }
+
     function openSyncModal() {
         syncPassphraseVisible = false;
         document.getElementById('sync-paste-input').value = '';
         document.getElementById('sync-copy-btn').textContent = 'Copy';
+        hideUploadStatus();
+
         getPassphrase().then(p => {
             syncPassphrase = p || null;
             renderPassphraseDisplay();
         });
+
         document.getElementById('sync-modal').classList.remove('hidden');
         document.getElementById('sync-modal').classList.add('flex');
     }
@@ -808,10 +859,64 @@ html, body {
         syncPassphraseVisible = false;
         document.getElementById('sync-modal').classList.add('hidden');
         document.getElementById('sync-modal').classList.remove('flex');
+        // Reset sub-state
+        document.getElementById('sync-paste-section').classList.remove('hidden');
+        document.getElementById('sync-confirm').classList.add('hidden');
+        hideSyncStatus();
+    }
+
+    function showSyncStatus(message, isError) {
+        const el = document.getElementById('sync-status');
+        el.textContent = message;
+        el.className = `text-sm mt-2 ${isError ? 'text-red-600' : 'text-green-600'}`;
+        el.classList.remove('hidden');
+    }
+
+    function hideSyncStatus() {
+        const el = document.getElementById('sync-status');
+        el.classList.add('hidden');
+        el.textContent = '';
+    }
+
+    function showUploadStatus(message, isError) {
+        const el = document.getElementById('sync-upload-status');
+        el.textContent = message;
+        el.className = `text-sm mt-2 ${isError ? 'text-red-600' : 'text-green-600'}`;
+        el.classList.remove('hidden');
+    }
+
+    function hideUploadStatus() {
+        const el = document.getElementById('sync-upload-status');
+        el.classList.add('hidden');
+        el.textContent = '';
     }
 
     document.getElementById('sync-device-btn').addEventListener('click', openSyncModal);
     document.getElementById('sync-cancel-btn').addEventListener('click', closeSyncModal);
+
+    document.getElementById('sync-upload-btn').addEventListener('click', async () => {
+        const btn = document.getElementById('sync-upload-btn');
+        btn.disabled = true;
+        btn.textContent = 'Uploading...';
+        hideUploadStatus();
+
+        try {
+            await initServerSync();
+            const localCharts = await gatherLocalCharts();
+            if (localCharts.length === 0) {
+                showUploadStatus('No charts to upload.', false);
+            } else {
+                await uploadCharts(localCharts);
+                showUploadStatus(`Uploaded ${localCharts.length} chart(s) to server.`, false);
+            }
+        } catch (err) {
+            console.error('[Sync] Upload failed:', err);
+            showUploadStatus(`Upload failed: ${err.message}`, true);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Upload all charts to server';
+        }
+    });
 
     document.getElementById('sync-modal').addEventListener('click', (e) => {
         if (e.target.id === 'sync-modal') closeSyncModal();
@@ -835,13 +940,138 @@ html, body {
         }
     });
 
-    document.getElementById('sync-submit-btn').addEventListener('click', () => {
+    // Pending passphrase stored between validation and confirm step
+    let pendingNewPassphrase = null;
+
+    async function performSync(discardExisting) {
+        const newPassphrase = pendingNewPassphrase;
+        if (!newPassphrase) return;
+
+        try {
+            // If discarding, delete all existing charts
+            if (discardExisting) {
+                const chartsDb = await openDB('SCC_Charts', 1);
+                const tx = chartsDb.transaction('charts', 'readwrite');
+                await tx.objectStore('charts').clear();
+                await tx.done;
+            }
+
+            // Write new passphrase to SCC_Identity
+            const identityDb = await openDB('SCC_Identity', 1, {
+                upgrade(db) {
+                    if (!db.objectStoreNames.contains('credentials')) {
+                        db.createObjectStore('credentials');
+                    }
+                }
+            });
+            await identityDb.put('credentials', newPassphrase, 'passphrase');
+
+            // Reset and reinitialize sync with new passphrase
+            resetSync();
+            await initSync(newPassphrase);
+
+            // Pull all charts for the new identity
+            const result = await pullCharts();
+            const downloads = result.downloads;
+
+            // Store each downloaded chart in IndexedDB with original IDs
+            if (downloads.length > 0) {
+                const chartsDb = await openDB('SCC_Charts', 1);
+                for (const dl of downloads) {
+                    const chartData = dl.data;
+                    chartData.id = dl.id;
+                    chartData.shared = true;
+                    chartData.lastModified = dl.updatedAt;
+                    await chartsDb.put('charts', chartData);
+                }
+            }
+
+            pendingNewPassphrase = null;
+
+            if (downloads.length === 0) {
+                // Identity switched but nothing to download
+                document.getElementById('sync-confirm').classList.add('hidden');
+                document.getElementById('sync-paste-section').classList.remove('hidden');
+                showSyncStatus('Identity switched. No shared charts found on the server for this passphrase.', false);
+                await loadCharts();
+                return;
+            }
+
+            closeSyncModal();
+            await loadCharts();
+        } catch (err) {
+            console.error('[Sync] Error:', err);
+            // Show error back in paste section
+            document.getElementById('sync-confirm').classList.add('hidden');
+            document.getElementById('sync-paste-section').classList.remove('hidden');
+            showSyncStatus(`Sync failed: ${err.message}`, true);
+        }
+    }
+
+    document.getElementById('sync-submit-btn').addEventListener('click', async () => {
         const input = document.getElementById('sync-paste-input');
         const value = input.value.trim();
         if (!value) return;
-        console.log('[Sync] Passphrase entered:', value);
-        alert('Sync not yet implemented');
+
+        hideSyncStatus();
+
+        // Validate passphrase format
+        if (!validatePassphrase(value)) {
+            showSyncStatus('Invalid passphrase format', true);
+            return;
+        }
+
+        // Check if same identity — just pull from server, no passphrase switch needed
+        const currentPassphrase = await getPassphrase();
+        if (currentPassphrase) {
+            const [currentId, newId] = await Promise.all([
+                getUserId(currentPassphrase),
+                getUserId(value)
+            ]);
+            if (currentId === newId) {
+                try {
+                    await initServerSync();
+                    const result = await pullCharts();
+                    if (result.downloads.length > 0) {
+                        const chartsDb = await openDB('SCC_Charts', 1);
+                        for (const dl of result.downloads) {
+                            const chartData = dl.data;
+                            chartData.id = dl.id;
+                            chartData.shared = true;
+                            chartData.lastModified = dl.updatedAt;
+                            await chartsDb.put('charts', chartData);
+                        }
+                        closeSyncModal();
+                        await loadCharts();
+                    } else {
+                        showSyncStatus('Same identity — no new charts on server.', false);
+                    }
+                } catch (err) {
+                    console.error('[Sync] Pull error:', err);
+                    showSyncStatus(`Sync failed: ${err.message}`, true);
+                }
+                return;
+            }
+        }
+
+        pendingNewPassphrase = value;
+
+        // Check for existing charts
+        const existingCharts = await listCharts();
+        if (existingCharts.length > 0) {
+            // Show confirmation sub-modal
+            document.getElementById('sync-chart-count').textContent = existingCharts.length;
+            document.getElementById('sync-paste-section').classList.add('hidden');
+            document.getElementById('sync-confirm').classList.remove('hidden');
+        } else {
+            // No existing charts, proceed directly
+            await performSync(false);
+        }
     });
+
+    // Confirmation buttons
+    document.getElementById('sync-keep-btn').addEventListener('click', () => performSync(false));
+    document.getElementById('sync-discard-btn').addEventListener('click', () => performSync(true));
 </script>
 <script src="/static/SCC/pwaInstall.js"></script>
 {% endblock %}

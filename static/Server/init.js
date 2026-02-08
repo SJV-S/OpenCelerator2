@@ -34,3 +34,7 @@ export async function initServerSync() {
     initialized = true;
     console.log('[Server] Sync initialized');
 }
+
+export function resetSync() {
+    initialized = false;
+}
