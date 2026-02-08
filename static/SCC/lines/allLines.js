@@ -10,6 +10,7 @@
  */
 
 import { chartState } from '../chartState.js';
+import { COLORS, LINE_DEFAULTS } from '../config.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 
 /**
@@ -30,6 +31,13 @@ function phaseLineMetadata(direction, verticalLineDate, verticalLineY, horizonta
         verticalLineY: verticalLineY,
         horizontalEndDate: horizontalEndDate,
         text: text,
+        style: {
+            color: COLORS.PHASE_LINE,
+            width: LINE_DEFAULTS.PHASE_WIDTH,
+            dash: 'solid',
+            fontColor: COLORS.PHASE_LINE,
+            fontSize: 12
+        },
         shapeIndices: shapeIndices,
         annotationIndex: annotationIndex
     };
@@ -55,6 +63,13 @@ function aimLineMetadata(direction, date1, y1, date2, y2, text, shapeIndices, an
         date2: date2,
         y2: y2,
         text: text,
+        style: {
+            color: COLORS.AIM_LINE,
+            width: LINE_DEFAULTS.AIM_WIDTH,
+            dash: 'solid',
+            fontColor: COLORS.AIM_LINE,
+            fontSize: 12
+        },
         shapeIndices: shapeIndices,
         annotationIndex: annotationIndex
     };

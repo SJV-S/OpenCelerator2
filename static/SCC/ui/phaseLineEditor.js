@@ -1,0 +1,192 @@
+/**
+ * Phase Line Editor - Per-line style editor for event markers (phase lines)
+ *
+ * Opened when the user clicks an existing phase line and selects "Edit".
+ * Reads/writes the specific line's metadata.style (color, width).
+ * Triggers a redraw on close so changes are reflected immediately.
+ */
+
+import { chartState } from '../chartState.js';
+import { eventBus, EVENTS } from '../eventBus.js';
+
+let modalOverlay = null;
+let colorInput = null;
+let widthInput = null;
+let dashSelect = null;
+let titleEl = null;
+
+const DASH_OPTIONS = [
+    { value: 'solid', label: 'Solid' },
+    { value: 'dash', label: 'Dash' },
+    { value: 'dot', label: 'Dot' },
+    { value: 'dashdot', label: 'Dash-Dot' },
+    { value: 'longdash', label: 'Long Dash' },
+    { value: 'longdashdot', label: 'Long Dash-Dot' }
+];
+
+// Currently editing line
+let activeLineId = null;
+
+/**
+ * Create the modal DOM structure (once, lazily)
+ */
+function createModal() {
+    modalOverlay = document.createElement('div');
+    modalOverlay.id = 'phase-line-editor-overlay';
+    modalOverlay.className = 'fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center';
+    modalOverlay.style.display = 'none';
+
+    const content = document.createElement('div');
+    content.className = 'bg-white rounded-lg shadow-xl p-6 min-w-[280px] max-w-[90vw]';
+
+    // Title
+    titleEl = document.createElement('h2');
+    titleEl.className = 'text-lg font-semibold text-gray-700 mb-4 text-center';
+
+    // --- Color ---
+    const colorRow = document.createElement('div');
+    colorRow.className = 'mb-3';
+
+    const colorLabel = document.createElement('label');
+    colorLabel.className = 'block text-sm text-gray-500 mb-1';
+    colorLabel.textContent = 'Color';
+
+    colorInput = document.createElement('input');
+    colorInput.type = 'color';
+    colorInput.className = 'w-full h-9 border-2 border-gray-300 rounded cursor-pointer';
+
+    colorInput.addEventListener('input', (e) => {
+        const style = getActiveStyle();
+        if (style) style.color = e.target.value;
+    });
+
+    colorRow.appendChild(colorLabel);
+    colorRow.appendChild(colorInput);
+
+    // --- Width ---
+    const widthRow = document.createElement('div');
+    widthRow.className = 'mb-4';
+
+    const widthLabel = document.createElement('label');
+    widthLabel.className = 'block text-sm text-gray-500 mb-1';
+    widthLabel.textContent = 'Width';
+
+    widthInput = document.createElement('input');
+    widthInput.type = 'number';
+    widthInput.min = '0.5';
+    widthInput.max = '8';
+    widthInput.step = '0.5';
+    widthInput.className = 'w-full px-3 py-2 lg:px-2 lg:py-1 text-sm border-2 border-gray-300 rounded focus:outline-none focus:border-[#6ad1e3] transition-colors';
+
+    widthInput.addEventListener('change', (e) => {
+        const style = getActiveStyle();
+        if (!style) return;
+        const value = parseFloat(e.target.value) || 2;
+        style.width = Math.max(0.5, Math.min(8, value));
+        e.target.value = style.width;
+        e.target.blur();
+    });
+
+    widthRow.appendChild(widthLabel);
+    widthRow.appendChild(widthInput);
+
+    // --- Dash ---
+    const dashRow = document.createElement('div');
+    dashRow.className = 'mb-4';
+
+    const dashLabel = document.createElement('label');
+    dashLabel.className = 'block text-sm text-gray-500 mb-1';
+    dashLabel.textContent = 'Dash Style';
+
+    dashSelect = document.createElement('select');
+    dashSelect.className = 'w-full px-3 py-2 lg:px-2 lg:py-1 text-sm border-2 border-gray-300 rounded focus:outline-none focus:border-[#6ad1e3] transition-colors bg-white';
+    DASH_OPTIONS.forEach(opt => {
+        const option = document.createElement('option');
+        option.value = opt.value;
+        option.textContent = opt.label;
+        dashSelect.appendChild(option);
+    });
+
+    dashSelect.addEventListener('change', (e) => {
+        const style = getActiveStyle();
+        if (style) style.dash = e.target.value;
+        e.target.blur();
+    });
+
+    dashRow.appendChild(dashLabel);
+    dashRow.appendChild(dashSelect);
+
+    // --- Close button ---
+    const closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'w-full py-2 bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-medium transition-colors';
+    closeBtn.textContent = 'Close';
+    closeBtn.addEventListener('click', hideModal);
+
+    // Assemble
+    content.appendChild(titleEl);
+    content.appendChild(colorRow);
+    content.appendChild(widthRow);
+    content.appendChild(dashRow);
+    content.appendChild(closeBtn);
+    modalOverlay.appendChild(content);
+
+    // Close on overlay click
+    modalOverlay.addEventListener('click', (e) => {
+        if (e.target === modalOverlay) hideModal();
+    });
+
+    // Close on Escape
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && modalOverlay.style.display !== 'none') {
+            hideModal();
+        }
+    });
+
+    document.body.appendChild(modalOverlay);
+}
+
+/**
+ * Get the style object for the currently active line
+ */
+function getActiveStyle() {
+    if (activeLineId == null) return null;
+    const metadata = chartState.PhaseLines[activeLineId];
+    if (!metadata) return null;
+    return metadata.style;
+}
+
+/**
+ * Show the per-line style editor
+ * @param {number} lineId - The PhaseLines key to edit
+ */
+export function showPhaseLineEditor(lineId) {
+    if (!modalOverlay) createModal();
+
+    activeLineId = lineId;
+    const metadata = chartState.PhaseLines[lineId];
+    if (!metadata) return;
+
+    titleEl.textContent = `Edit: ${metadata.text || 'Event Marker'}`;
+
+    const style = metadata.style;
+    colorInput.value = style.color;
+    widthInput.value = style.width;
+    dashSelect.value = style.dash;
+
+    modalOverlay.style.display = 'flex';
+}
+
+/**
+ * Hide the modal and trigger redraw
+ */
+function hideModal() {
+    if (modalOverlay) modalOverlay.style.display = 'none';
+
+    if (activeLineId != null) {
+        eventBus.emit(EVENTS.LINE_PHASE_STYLE_CHANGED, { lineId: activeLineId });
+        activeLineId = null;
+    }
+}
+
+console.log('phaseLineEditor.js loaded');

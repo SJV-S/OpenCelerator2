@@ -7,7 +7,7 @@
 
 import { chartState } from '../chartState.js';
 import { eventBus, EVENTS } from '../eventBus.js';
-import { createToast } from './toaster.js';
+import { createToast, createConfirmToast } from './toaster.js';
 import { CHART_TYPE_CONFIG } from '../config.js';
 import {
     getMondaysInMonth,
@@ -581,13 +581,18 @@ export function initChartWindowControl() {
 }
 
 /**
- * Chart Height control for settings tab (applies immediately via initializeChart)
+ * Chart Height control for settings tab
+ * Preview: shows a rectangle outline matching proposed container size
+ * Apply: confirm toast triggers actual chart re-init
  */
 const HEIGHT_STEP = 50; // px per click
 const MIN_HEIGHT = 300;
-const MAX_HEIGHT = 2000;
 
 let chartHeightEl = null;
+let maxHeight = null;       // Flex default captured on init
+let previewHeight = null;   // Tracks in-progress preview value
+let previewRect = null;     // The preview rectangle element
+let confirmToastId = null;  // Active confirm toast
 
 function updateChartHeightDisplay(value) {
     if (chartHeightEl) {
@@ -595,30 +600,83 @@ function updateChartHeightDisplay(value) {
     }
 }
 
+function showPreviewRect(height) {
+    const container = document.getElementById('chart-container');
+    if (!container) return;
+
+    if (!previewRect) {
+        previewRect = document.createElement('div');
+        previewRect.style.cssText = 'position:absolute;top:0;left:0;border:3px dashed #6ad1e3;pointer-events:none;z-index:999;box-sizing:border-box;';
+        container.style.position = 'relative';
+        container.appendChild(previewRect);
+    }
+
+    previewRect.style.width = `${container.offsetWidth}px`;
+    previewRect.style.height = `${height}px`;
+}
+
+function removePreviewRect() {
+    if (previewRect) {
+        previewRect.remove();
+        previewRect = null;
+    }
+}
+
+function updateHeightButtons() {
+    const current = previewHeight ?? chartState.containerHeight;
+    const decBtn = document.getElementById('chart-height-dec');
+    const incBtn = document.getElementById('chart-height-inc');
+    if (decBtn) decBtn.disabled = current <= MIN_HEIGHT;
+    if (incBtn) incBtn.disabled = current >= maxHeight;
+}
+
 function adjustChartHeight(delta) {
-    const current = chartState.containerHeight;
-    if (current == null) return;
+    const base = previewHeight ?? chartState.containerHeight;
+    if (base == null) return;
 
-    let newHeight = current + (delta * HEIGHT_STEP);
-    newHeight = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, newHeight));
+    let newHeight = base + (delta * HEIGHT_STEP);
+    newHeight = Math.max(MIN_HEIGHT, Math.min(maxHeight, newHeight));
+    if (newHeight === previewHeight) return;
 
-    if (newHeight !== current) {
-        eventBus.emit(EVENTS.CHART_HEIGHT_CHANGED, newHeight);
+    previewHeight = newHeight;
+    updateChartHeightDisplay(previewHeight);
+    updateHeightButtons();
+    showPreviewRect(previewHeight);
+
+    // Show confirm toast (only once per preview session)
+    if (confirmToastId == null) {
+        confirmToastId = createConfirmToast({
+            message: 'Apply new chart height?',
+            yesLabel: 'Apply',
+            noLabel: 'Cancel',
+            onYes: () => {
+                removePreviewRect();
+                eventBus.emit(EVENTS.CHART_HEIGHT_CHANGED, previewHeight);
+                previewHeight = null;
+                confirmToastId = null;
+                updateHeightButtons();
+            },
+            onNo: () => {
+                removePreviewRect();
+                updateChartHeightDisplay(chartState.containerHeight);
+                previewHeight = null;
+                confirmToastId = null;
+                updateHeightButtons();
+            }
+        });
     }
 }
 
 export function initChartHeightControl() {
     chartHeightEl = document.getElementById('chart-height-value');
+    maxHeight = window.innerHeight;
     const decBtn = document.getElementById('chart-height-dec');
     const incBtn = document.getElementById('chart-height-inc');
 
     if (chartHeightEl) updateChartHeightDisplay();
+    updateHeightButtons();
     if (decBtn) decBtn.addEventListener('click', () => adjustChartHeight(-1));
     if (incBtn) incBtn.addEventListener('click', () => adjustChartHeight(1));
-
-    eventBus.subscribe(EVENTS.CHART_HEIGHT_CHANGED, (newValue) => {
-        updateChartHeightDisplay(newValue);
-    }, true);
 }
 
 console.log('startDateModal.js loaded');

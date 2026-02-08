@@ -111,6 +111,66 @@ export async function jsonBackwardsCompatibilityCheck(loadedChart) {
         }
     }
 
+    // Backfill style object on existing PhaseLines entries
+    if (loadedChart.PhaseLines) {
+        for (const entry of Object.values(loadedChart.PhaseLines)) {
+            if (!entry || typeof entry !== 'object' || !entry.id) continue;
+            if (!entry.style) {
+                entry.style = {
+                    color: COLORS.PHASE_LINE,
+                    width: LINE_DEFAULTS.PHASE_WIDTH,
+                    dash: 'solid',
+                    fontColor: COLORS.PHASE_LINE,
+                    fontSize: 12
+                };
+                modified = true;
+            } else {
+                if (entry.style.dash == null) {
+                    entry.style.dash = 'solid';
+                    modified = true;
+                }
+                if (entry.style.fontColor == null) {
+                    entry.style.fontColor = entry.style.color || COLORS.PHASE_LINE;
+                    modified = true;
+                }
+                if (entry.style.fontSize == null) {
+                    entry.style.fontSize = 12;
+                    modified = true;
+                }
+            }
+        }
+    }
+
+    // Backfill style object on existing AimLines entries
+    if (loadedChart.AimLines) {
+        for (const entry of Object.values(loadedChart.AimLines)) {
+            if (!entry || typeof entry !== 'object' || !entry.id) continue;
+            if (!entry.style) {
+                entry.style = {
+                    color: COLORS.AIM_LINE,
+                    width: LINE_DEFAULTS.AIM_WIDTH,
+                    dash: 'solid',
+                    fontColor: COLORS.AIM_LINE,
+                    fontSize: 12
+                };
+                modified = true;
+            } else {
+                if (entry.style.dash == null) {
+                    entry.style.dash = 'solid';
+                    modified = true;
+                }
+                if (entry.style.fontColor == null) {
+                    entry.style.fontColor = entry.style.color || COLORS.AIM_LINE;
+                    modified = true;
+                }
+                if (entry.style.fontSize == null) {
+                    entry.style.fontSize = 12;
+                    modified = true;
+                }
+            }
+        }
+    }
+
     // Track keys before fillMissing
     const keysBefore = Object.keys(loadedChart).length;
     fillMissing(loadedChart, chartState);

@@ -60,6 +60,7 @@ function buildPhaseLineElements(metadata, chartDiv) {
     const verticalX = dateToXPosition(metadata.verticalLineDate);
     const horizontalEndX = dateToXPosition(metadata.horizontalEndDate);
     const y = metadata.verticalLineY;
+    const { color, width, dash, fontColor, fontSize } = metadata.style;
 
     // Get y-axis info for vertical line endpoints
     const yaxis = chartDiv._fullLayout.yaxis;
@@ -78,8 +79,9 @@ function buildPhaseLineElements(metadata, chartDiv) {
         yref: 'y',
         name: lineName,
         line: {
-            color: chartState.lineStyles.phase.color,
-            width: chartState.lineStyles.phase.width
+            color: color,
+            width: width,
+            dash: dash
         }
     };
 
@@ -94,8 +96,9 @@ function buildPhaseLineElements(metadata, chartDiv) {
         yref: 'y',
         name: lineName,
         line: {
-            color: chartState.lineStyles.phase.color,
-            width: chartState.lineStyles.phase.width
+            color: color,
+            width: width,
+            dash: dash
         }
     };
 
@@ -110,12 +113,12 @@ function buildPhaseLineElements(metadata, chartDiv) {
         showarrow: false,
         name: lineName,
         font: {
-            color: chartState.lineStyles.phase.color,
-            size: 12,
+            color: fontColor,
+            size: fontSize,
             family: 'Arial, sans-serif'
         },
         bgcolor: 'rgba(255, 255, 255, 0.8)',
-        bordercolor: chartState.lineStyles.phase.color,
+        bordercolor: fontColor,
         borderwidth: 1,
         borderpad: 4,
         xanchor: 'left',
@@ -1071,6 +1074,11 @@ function init() {
 
     // Redraw phase lines after chart replot completes
     eventBus.subscribe(EVENTS.DATA_CHART_REPLOT_COMPLETE, () => {
+        redrawPhaseLines();
+    });
+
+    // Redraw phase lines when a line's style is edited
+    eventBus.subscribe(EVENTS.LINE_PHASE_STYLE_CHANGED, () => {
         redrawPhaseLines();
     });
 }

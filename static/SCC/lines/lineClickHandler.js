@@ -13,6 +13,8 @@ import { eventBus, EVENTS } from '../eventBus.js';
 import { createToast } from '../ui/toaster.js';
 import { removeLine } from './allLines.js';
 import { showCelLineEditor } from '../ui/celLineEditor.js';
+import { showPhaseLineEditor } from '../ui/phaseLineEditor.js';
+import { showAimLineEditor } from '../ui/aimLineEditor.js';
 
 // Module-level state
 let clickHandlerAttached = false;
@@ -122,13 +124,23 @@ function handleLineClick(lineName) {
     // Build toast buttons
     const buttons = [];
 
-    // Cel lines get an Edit button for per-line style editing
-    if (category === 'cel') {
+    // Edit button for per-line style editing
+    if (category === 'phase') {
         buttons.push({
             label: 'Edit',
-            onClick: () => {
-                showCelLineEditor(lineId);
-            },
+            onClick: () => { showPhaseLineEditor(lineId); },
+            type: 'secondary'
+        });
+    } else if (category === 'aim') {
+        buttons.push({
+            label: 'Edit',
+            onClick: () => { showAimLineEditor(lineId); },
+            type: 'secondary'
+        });
+    } else if (category === 'cel') {
+        buttons.push({
+            label: 'Edit',
+            onClick: () => { showCelLineEditor(lineId); },
             type: 'secondary'
         });
     }

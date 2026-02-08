@@ -58,6 +58,7 @@ function buildAimLineElements(metadata, chartDiv) {
     const lineName = `aim-${metadata.id}`;
     const x1 = dateToXPosition(metadata.date1);
     const x2 = dateToXPosition(metadata.date2);
+    const { color, width, dash, fontColor, fontSize } = metadata.style;
 
     // Build the shape
     const shape = {
@@ -70,8 +71,9 @@ function buildAimLineElements(metadata, chartDiv) {
         yref: 'y',
         name: lineName,
         line: {
-            color: chartState.lineStyles.aim.color,
-            width: chartState.lineStyles.aim.width
+            color: color,
+            width: width,
+            dash: dash
         }
     };
 
@@ -132,12 +134,12 @@ function buildAimLineElements(metadata, chartDiv) {
             text: metadata.text,
             showarrow: false,
             font: {
-                color: chartState.lineStyles.aim.color,
-                size: 12,
+                color: fontColor,
+                size: fontSize,
                 family: 'Arial, sans-serif'
             },
             bgcolor: 'rgba(255, 255, 255, 1.0)',
-            bordercolor: chartState.lineStyles.aim.color,
+            bordercolor: fontColor,
             borderwidth: 1,
             borderpad: 4,
             textangle: textAngle,
@@ -1081,6 +1083,11 @@ function init() {
 
     // Redraw aim lines after chart replot completes
     eventBus.subscribe(EVENTS.DATA_CHART_REPLOT_COMPLETE, () => {
+        redrawAimLines();
+    });
+
+    // Redraw aim lines when per-line style is changed
+    eventBus.subscribe(EVENTS.LINE_AIM_STYLE_CHANGED, () => {
         redrawAimLines();
     });
 }
