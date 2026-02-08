@@ -44,6 +44,7 @@ const STORE_NAME = 'charts';
 let db = null;
 let saveTimeout = null;
 const SAVE_DEBOUNCE_MS = 1000;
+const PUSH_QUEUE_KEY = 'syncPushQueue';
 
 function uuid() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
@@ -453,7 +454,12 @@ function debouncedSaveToIndexedDB() {
             await saveChart(chartState.id);
             console.log('[LINE SAVE] 5. saveChart completed for id:', chartState.id);
             if ((chartState.shared || isSyncEnabled()) && isInitialized()) {
-                pushChart(chartState.id).catch(err => console.warn('[Storage] Push failed:', err));
+                pushChart(chartState.id)
+                    .then(() => drainPushQueue())
+                    .catch(err => {
+                        console.warn('[Storage] Push failed:', err);
+                        queuePush(chartState.id);
+                    });
             }
         }
     }, SAVE_DEBOUNCE_MS);
@@ -474,22 +480,42 @@ function onStateMutation(save = true) {
     debouncedSaveToIndexedDB();
 }
 
-/**
- * Flush pending sync push immediately (e.g. on page hide / navigation)
- */
-function flushSyncPush() {
-    if (syncPushTimeout && chartState.id && isSyncEnabled() && isInitialized()) {
-        clearTimeout(syncPushTimeout);
-        syncPushTimeout = null;
-        pushChart(chartState.id).catch(err => console.warn('[Storage] Sync push failed:', err));
+// ============================================================================
+// Push Queue - persists failed pushes for retry when back online
+// ============================================================================
+
+function queuePush(chartId) {
+    try {
+        const queue = JSON.parse(localStorage.getItem(PUSH_QUEUE_KEY) || '[]');
+        if (!queue.includes(chartId)) {
+            queue.push(chartId);
+            localStorage.setItem(PUSH_QUEUE_KEY, JSON.stringify(queue));
+        }
+    } catch (err) {
+        console.warn('[Storage] Failed to queue push:', err);
     }
 }
 
-document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') {
-        flushSyncPush();
+export async function drainPushQueue() {
+    if (!isSyncEnabled() || !isInitialized()) return;
+
+    let queue;
+    try {
+        queue = JSON.parse(localStorage.getItem(PUSH_QUEUE_KEY) || '[]');
+    } catch { return; }
+
+    if (queue.length === 0) return;
+
+    const failed = [];
+    for (const chartId of queue) {
+        try {
+            await pushChart(chartId);
+        } catch {
+            failed.push(chartId);
+        }
     }
-});
+    localStorage.setItem(PUSH_QUEUE_KEY, JSON.stringify(failed));
+}
 
 /**
  * Subscribe to STATE_MUTATING category for auto-save

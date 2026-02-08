@@ -25,6 +25,7 @@ import { createToast } from './ui/toaster.js';
 import { refreshChart, init as replotInit } from './series/replot.js';
 import { alignStartDate, updateChartDateLabels, updateDateDisplay, adjustDateInput, initializeDateInput, updatePlotDateLabel } from './util/dates.js';
 import { initStartDateModal } from './ui/startDateModal.js';
+
 import { loadDataForDate, adjustTimestamp, updateCurrentEntry, deleteCurrentEntry, init as dataUpdateInit } from './series/dataUpdate.js';
 import {
     showCounter,

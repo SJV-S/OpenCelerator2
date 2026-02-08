@@ -119,6 +119,10 @@ export const EVENTS = {
 
 /**
  * Event Categories - Groups of events that share behavior
+ *
+ * STATE_MUTATING events trigger auto-save in chartStorage.js.
+ * Emitters can pass { save: false } to suppress persistence while still
+ * notifying UI subscribers (e.g. render-only calls during init/refresh).
  */
 export const EVENT_CATEGORIES = {
     STATE_MUTATING: 'category:state_mutating'

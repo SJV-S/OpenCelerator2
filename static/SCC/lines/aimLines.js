@@ -215,8 +215,8 @@ function activateAimLineMode(direction) {
     chartDiv.addEventListener('click', aimLineState.clickHandler);
     chartDiv.addEventListener('touchstart', aimLineState.touchHandler);
 
-    // Apply crosshairs cursor
-    applySvgCursor(chartDiv, icons.otherCrosshairs, {size: 32, hotspotX: 16, hotspotY: 16});
+    // Apply pen cursor (hotspot at pen tip, bottom-left)
+    applySvgCursor(chartDiv, icons.otherPen, {size: 32, hotspotX: 3, hotspotY: 27});
 
     // Show "Aim mode" toaster on the left
     showAimModeToaster(1);
@@ -390,8 +390,8 @@ function getPlotCoordinatesForAimLine(event, chartDiv) {
     // Calculate data coordinates (note: y is inverted for screen coordinates)
     let xValue = visibleXMin + (xPixelInPlotArea / plotAreaWidth) * (visibleXMax - visibleXMin);
 
-    // Round x-value to nearest number divisible by 7
-    xValue = Math.round(xValue / 7) * 7;
+    // Round to nearest integer (day boundary) so temp line matches finalized position
+    xValue = Math.round(xValue);
 
     // For log scale, the range is in log10 space, so we need to convert back
     let yValue;
@@ -517,8 +517,11 @@ function drawHorizontalAimLine(chartDiv, coords) {
     // Move to phase 3 - show text input
     aimLineState.currentPhase = 3;
 
-    // Update toaster to show phase 3
-    updateAimModeToaster(3);
+    // Remove instruction toaster - the text input dialog includes the step info
+    if (aimLineState.modeToast) {
+        aimLineState.modeToast.remove();
+        aimLineState.modeToast = null;
+    }
 
     showAimTextInput(chartDiv);
     console.log('Phase 3: Enter text label');
@@ -568,8 +571,11 @@ function drawDiagonalAimLine(chartDiv, coords) {
     // Move to phase 3 - show text input
     aimLineState.currentPhase = 3;
 
-    // Update toaster to show phase 3
-    updateAimModeToaster(3);
+    // Remove instruction toaster - the text input dialog includes the step info
+    if (aimLineState.modeToast) {
+        aimLineState.modeToast.remove();
+        aimLineState.modeToast = null;
+    }
 
     showAimTextInput(chartDiv);
     console.log('Phase 3: Enter text label');
@@ -611,8 +617,11 @@ function addAimTextLabel(chartDiv, text) {
         console.log('No text provided, skipping annotation');
         aimLineState.tempAnnotationIndex = null;
 
-        // Update toaster to show phase 4
-        updateAimModeToaster(4);
+        // Remove instruction toaster - the confirm dialog includes the step info
+        if (aimLineState.modeToast) {
+            aimLineState.modeToast.remove();
+            aimLineState.modeToast = null;
+        }
 
         showAimSaveConfirmationToast(chartDiv);
         return;
@@ -710,8 +719,11 @@ function addAimTextLabel(chartDiv, text) {
     // Store annotation index for potential removal
     aimLineState.tempAnnotationIndex = currentAnnotations.length;
 
-    // Update toaster to show phase 4
-    updateAimModeToaster(4);
+    // Remove instruction toaster - the confirm dialog includes the step info
+    if (aimLineState.modeToast) {
+        aimLineState.modeToast.remove();
+        aimLineState.modeToast = null;
+    }
 
     // Show save confirmation toast
     showAimSaveConfirmationToast(chartDiv);
@@ -899,13 +911,9 @@ function updateAimModeToaster(phase) {
  */
 function getPhaseStepText(phase) {
     if (phase === 1) {
-        return 'Step 1 of 4: Place starting point';
+        return 'Place starting point';
     } else if (phase === 2) {
-        return 'Step 2 of 4: Place target';
-    } else if (phase === 3) {
-        return 'Step 3 of 4: Enter text label';
-    } else if (phase === 4) {
-        return 'Step 4 of 4: Save confirmation';
+        return 'Place target';
     }
     return '';
 }

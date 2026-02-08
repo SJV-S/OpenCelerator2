@@ -286,7 +286,7 @@ html, body {
 
 {% block scripts %}
 <script type="module">
-    import { initStorage, listCharts, deleteChart, updateChartTags, importChart } from '/static/SCC/storage/chartStorage.js';
+    import { initStorage, listCharts, deleteChart, updateChartTags, importChart, drainPushQueue } from '/static/SCC/storage/chartStorage.js';
     import { isNativeFormat } from '/static/SCC/import/nativeImport.js';
     import { isOpenCeleratorFormat, buildChartFromOpenCelerator } from '/static/SCC/import/openCeleratorImport.js';
     import { openDB } from '/static/SCC/lib/idb.js';
@@ -641,6 +641,7 @@ html, body {
         if (syncOn) {
             try {
                 await initServerSync();
+                await drainPushQueue();
                 const manifest = charts.map(c => ({ chart_uuid: c.id, updated_at: c.updatedAt || 0 }));
                 const { downloads } = await checkForUpdates(manifest);
                 if (downloads.length > 0) {
