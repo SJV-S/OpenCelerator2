@@ -205,6 +205,12 @@ html, body {
     <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
         <h3 class="text-lg font-semibold text-gray-800 mb-4">Sync Device</h3>
 
+        <!-- Sync enabled checkbox -->
+        <label class="flex items-center gap-2 mb-5 cursor-pointer">
+            <input type="checkbox" id="sync-enabled-checkbox" class="accent-[#6ad1e3] w-4 h-4">
+            <span class="text-sm font-medium text-gray-700">Sync all charts to server</span>
+        </label>
+
         <!-- Upload all charts button -->
         <div class="mb-5">
             <div class="flex items-center gap-2">
@@ -285,8 +291,8 @@ html, body {
     import { isOpenCeleratorFormat, buildChartFromOpenCelerator } from '/static/SCC/import/openCeleratorImport.js';
     import { openDB } from '/static/SCC/lib/idb.js';
     import { validatePassphrase, getUserId } from '/static/Server/passphrase.js';
-    import { initSync, uploadCharts, pullCharts } from '/static/Server/syncClient.js';
-    import { initServerSync, resetSync } from '/static/Server/init.js';
+    import { initSync, uploadCharts, pullCharts, checkForUpdates } from '/static/Server/syncClient.js';
+    import { initServerSync, resetSync, setSyncEnabled } from '/static/Server/init.js';
 
     let charts = [];
     let chartToDelete = null;
@@ -301,7 +307,7 @@ html, body {
 
     function formatDate(timestamp) {
         if (!timestamp) return '-';
-        const date = new Date(timestamp);
+        const date = new Date(timestamp * 1000);
         return date.toLocaleDateString('en-US', {
             month: 'short',
             day: 'numeric',
@@ -629,6 +635,28 @@ html, body {
         await initStorage();
         charts = await listCharts();
         renderCharts();
+
+        // Pull updates from server if sync enabled
+        const syncOn = await getSyncEnabled();
+        if (syncOn) {
+            try {
+                await initServerSync();
+                const manifest = charts.map(c => ({ chart_uuid: c.id, updated_at: c.updatedAt || 0 }));
+                const { downloads } = await checkForUpdates(manifest);
+                if (downloads.length > 0) {
+                    const chartsDb = await openDB('SCC_Charts', 1);
+                    for (const dl of downloads) {
+                        dl.data.id = dl.id;
+                        dl.data.lastModified = dl.updatedAt;
+                        await chartsDb.put('charts', dl.data);
+                    }
+                    charts = await listCharts();
+                    renderCharts();
+                }
+            } catch (err) {
+                console.warn('[Sync] Pull on load failed:', err);
+            }
+        }
     }
 
     // Delete modal handlers
@@ -794,6 +822,15 @@ html, body {
         }
     }
 
+    async function getSyncEnabled() {
+        try {
+            const db = await openDB('SCC_Identity', 1);
+            return (await db.get('credentials', 'syncEnabled')) === true;
+        } catch {
+            return false;
+        }
+    }
+
     function renderPassphraseDisplay() {
         const display = document.getElementById('sync-passphrase-display');
         const eyeIcon = document.getElementById('sync-eye-icon');
@@ -850,6 +887,10 @@ html, body {
             renderPassphraseDisplay();
         });
 
+        getSyncEnabled().then(enabled => {
+            document.getElementById('sync-enabled-checkbox').checked = enabled;
+        });
+
         document.getElementById('sync-modal').classList.remove('hidden');
         document.getElementById('sync-modal').classList.add('flex');
     }
@@ -893,6 +934,10 @@ html, body {
 
     document.getElementById('sync-device-btn').addEventListener('click', openSyncModal);
     document.getElementById('sync-cancel-btn').addEventListener('click', closeSyncModal);
+
+    document.getElementById('sync-enabled-checkbox').addEventListener('change', (e) => {
+        setSyncEnabled(e.target.checked);
+    });
 
     document.getElementById('sync-upload-btn').addEventListener('click', async () => {
         const btn = document.getElementById('sync-upload-btn');

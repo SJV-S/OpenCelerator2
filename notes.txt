@@ -89,6 +89,7 @@ To-do
 - Still problems sometimes with clickablity on change lines
 - Chart window for months shows "Days"!
 - Credit lines doesn't adapt to narrow chart windows
+- Check clickability of dates across chart types for data entry
 -
 
 - Survey prompts

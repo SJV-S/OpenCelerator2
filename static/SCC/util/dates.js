@@ -55,6 +55,21 @@
  *
  * IMPORTANT: Never use `new Date(string)` directly - it causes timezone issues.
  * Always use parseLocalDate() for parsing and formatDateInputValue() for output.
+ *
+ * =============================================================================
+ * TIMESTAMP STANDARD
+ * =============================================================================
+ * All stored timestamps (lastModified, _createdAt, updated_at, etc.) use
+ * UNIX SECONDS — Math.floor(Date.now() / 1000).
+ *
+ * When you need a JS Date object from a stored timestamp:
+ *   new Date(timestamp * 1000)
+ *
+ * When you need to store the current time:
+ *   Math.floor(Date.now() / 1000)
+ *
+ * NO exceptions. Seconds in, seconds out. The * 1000 conversion belongs at
+ * the point of consumption (e.g. display formatting), never in storage.
  * =============================================================================
  */
 

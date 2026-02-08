@@ -5,7 +5,6 @@ SQLAlchemy models supporting both SQLite and PostgreSQL.
 Schema based on PWA_SYNC_PROPOSAL.md
 """
 
-from datetime import datetime
 from flask_sqlalchemy import SQLAlchemy
 
 db = SQLAlchemy()
@@ -21,7 +20,7 @@ class Chart(db.Model):
 
     # Relationships
     access_entries = db.relationship('ChartAccess', back_populates='chart', cascade='all, delete-orphan')
-    view_tokens = db.relationship('ViewToken', back_populates='chart', cascade='all, delete-orphan')
+    share_link = db.relationship('ShareLink', back_populates='chart', cascade='all, delete-orphan', uselist=False)
 
     def to_dict(self):
         return {
@@ -37,7 +36,6 @@ class ChartAccess(db.Model):
     chart_uuid = db.Column(db.String(36), db.ForeignKey('charts.chart_uuid'), primary_key=True)
     user_id = db.Column(db.String(64), primary_key=True)  # SHA256 of user's passphrase
     wrapped_key = db.Column(db.LargeBinary, nullable=False)  # chart_key encrypted with user's derived key
-    role = db.Column(db.String(10), nullable=False)  # 'owner' | 'editor'
 
     # Relationships
     chart = db.relationship('Chart', back_populates='access_entries')
@@ -45,21 +43,19 @@ class ChartAccess(db.Model):
     def to_dict(self):
         return {
             'chart_uuid': self.chart_uuid,
-            'user_id': self.user_id,
-            'role': self.role
+            'user_id': self.user_id
         }
 
 
-class ViewToken(db.Model):
-    """View-only tokens for magic links (separate from encrypted access)"""
-    __tablename__ = 'view_tokens'
+
+class ShareLink(db.Model):
+    """Wrapped key for share-link access (anyone with the URL)"""
+    __tablename__ = 'share_links'
 
     chart_uuid = db.Column(db.String(36), db.ForeignKey('charts.chart_uuid'), primary_key=True)
-    view_token = db.Column(db.String(64), primary_key=True)  # Random token for magic link
-    created_at = db.Column(db.Integer, nullable=False)  # Unix timestamp
+    wrapped_key = db.Column(db.LargeBinary, nullable=False)  # chart_key wrapped with share-derived key
 
-    # Relationships
-    chart = db.relationship('Chart', back_populates='view_tokens')
+    chart = db.relationship('Chart', back_populates='share_link')
 
 
 class ChartTombstone(db.Model):
@@ -69,13 +65,6 @@ class ChartTombstone(db.Model):
     chart_uuid = db.Column(db.String(36), primary_key=True)
     deleted_at = db.Column(db.Integer, nullable=False)  # Unix timestamp
 
-
-class Username(db.Model):
-    """Optional username mapping for user_id display"""
-    __tablename__ = 'usernames'
-
-    user_id = db.Column(db.String(64), primary_key=True)  # SHA256 of passphrase
-    username = db.Column(db.String(50), unique=True, nullable=False)
 
 
 def init_db(app):

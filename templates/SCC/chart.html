@@ -236,8 +236,9 @@ body {
     <script type="module">
         import { initializeChart, setupEventListeners } from '/static/SCC/main.js';
         import { initStorage, loadChart } from '/static/SCC/storage/chartStorage.js';
-        import { joinSharedChart, startSyncPolling } from '/static/Server/syncClient.js';
-        import { initServerSync } from '/static/Server/init.js';
+        import { joinSharedChart, startSyncPolling, checkForUpdates } from '/static/Server/syncClient.js';
+        import { initServerSync, isSyncEnabled } from '/static/Server/init.js';
+        import { openDB } from '/static/SCC/lib/idb.js';
         import { eventBus, EVENTS } from '/static/SCC/eventBus.js';
         import { refreshChart } from '/static/SCC/series/replot.js';
         import { chartState } from '/static/SCC/chartState.js';
@@ -286,6 +287,22 @@ body {
             }, true);
 
             startSyncPolling(chartId);
+
+            // For non-shared charts with sync enabled, check server for newer version
+            if (!chartState.shared && isSyncEnabled()) {
+                checkForUpdates([{ chart_uuid: chartId, updated_at: chartState.lastModified || 0 }])
+                    .then(async ({ downloads }) => {
+                        if (downloads.length > 0) {
+                            const dl = downloads[0];
+                            dl.data.id = dl.id;
+                            dl.data.lastModified = dl.updatedAt;
+                            const db = await openDB('SCC_Charts', 1);
+                            await db.put('charts', dl.data);
+                            eventBus.emit(EVENTS.SYNC_CHART_UPDATED, { chartId: dl.id, chartData: dl.data });
+                        }
+                    })
+                    .catch(err => console.warn('[Sync] Pull on load failed:', err));
+            }
         }
 
         init();

@@ -45,8 +45,7 @@ export async function uploadCharts(localCharts) {
             chart_uuid: chart.id,
             data: encryptedData,
             updated_at: now,
-            wrapped_key: wrappedKey,
-            role: 'owner'
+            wrapped_key: wrappedKey
         });
     }
 
@@ -90,12 +89,42 @@ export async function pullCharts() {
         downloads.push({
             id: item.chart_uuid,
             data,
-            updatedAt: item.updated_at,
-            role: item.role
+            updatedAt: item.updated_at
         });
     }
 
     return { downloads, serverManifest: result.server_manifest, tombstones: result.tombstones };
+}
+
+export async function checkForUpdates(localManifest) {
+    if (!isInitialized()) throw new Error('Sync not initialized - call initSync first');
+
+    const response = await fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            user_id: userId,
+            local_manifest: localManifest,
+            uploads: []
+        })
+    });
+
+    if (!response.ok) throw new Error(`Sync check failed: ${response.status}`);
+
+    const result = await response.json();
+
+    const downloads = [];
+    for (const item of result.downloads) {
+        const chartKey = await unwrapKey(item.wrapped_key, userKey);
+        const data = await decrypt(chartKey, item.data);
+        downloads.push({
+            id: item.chart_uuid,
+            data,
+            updatedAt: item.updated_at
+        });
+    }
+
+    return { downloads };
 }
 
 // NOTE: Full sync not currently in use - charts uploaded individually via share link creation
@@ -119,8 +148,7 @@ export async function sync(localCharts) {
             chart_uuid: chart.id,
             data: encryptedData,
             updated_at: chart.updatedAt,
-            wrapped_key: wrappedKey,
-            role: 'owner'
+            wrapped_key: wrappedKey
         });
     }
 
@@ -151,8 +179,7 @@ export async function sync(localCharts) {
         downloads.push({
             id: item.chart_uuid,
             data,
-            updatedAt: item.updated_at,
-            role: item.role
+            updatedAt: item.updated_at
         });
     }
 
@@ -184,8 +211,7 @@ export async function pushChart(chartUuid) {
                 chart_uuid: chartUuid,
                 data: encryptedData,
                 updated_at: chart.lastModified || Math.floor(Date.now() / 1000),
-                wrapped_key: wrappedKey,
-                role: 'owner'
+                wrapped_key: wrappedKey
             }]
         })
     });

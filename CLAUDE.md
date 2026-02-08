@@ -47,6 +47,10 @@
 - **Cut lines**: Vertical segment boundaries for aggregation
 - **Celeration lines**: Log-scale trend analysis
 
+## Execution Rules
+
+**NEVER run the application.** Do not attempt to start the Flask server, import `app`, or execute any Python command that boots the application. The user manages their own server and virtual environment. Your job is to write code, not verify it runs.
+
 ## File Handling
 - **NEVER create new directories** - always use existing project structure. If unsure where a file belongs, ASK first.
 - **Documentation goes in `Docs/`** (capital D) - NOT `docs/`

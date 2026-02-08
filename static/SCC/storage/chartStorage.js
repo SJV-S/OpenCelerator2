@@ -29,6 +29,7 @@ import { findNearestMonday } from '../util/dates.js';
 import { jsonBackwardsCompatibilityCheck } from '../import/jsonBackwardsCompatibility.js';
 import { generateChartKey } from '../../Server/crypto.js';
 import { pushChart, isInitialized } from '../../Server/syncClient.js';
+import { isSyncEnabled } from '../../Server/init.js';
 
 // Convert CryptoKey to hex string for storage
 async function exportKeyToHex(key) {
@@ -43,6 +44,8 @@ const STORE_NAME = 'charts';
 let db = null;
 let saveTimeout = null;
 const SAVE_DEBOUNCE_MS = 1000;
+let syncPushTimeout = null;
+const SYNC_PUSH_DEBOUNCE_MS = 60000;
 
 function uuid() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
@@ -347,7 +350,7 @@ export async function createChart(name, chartType, minuteChart) {
     const chartId = uuid();
     const startDate = findNearestMonday(new Date());
     startDate.setHours(0, 0, 0, 0);
-    const now = Date.now();
+    const now = Math.floor(Date.now() / 1000);
 
     // Generate encryption key for this chart
     const cryptoKey = await generateChartKey();
@@ -453,6 +456,11 @@ function debouncedSaveToIndexedDB() {
             console.log('[LINE SAVE] 5. saveChart completed for id:', chartState.id);
             if (chartState.shared && isInitialized()) {
                 pushChart(chartState.id).catch(err => console.warn('[Storage] Push failed:', err));
+            } else if (isSyncEnabled() && isInitialized()) {
+                if (syncPushTimeout) clearTimeout(syncPushTimeout);
+                syncPushTimeout = setTimeout(() => {
+                    pushChart(chartState.id).catch(err => console.warn('[Storage] Sync push failed:', err));
+                }, SYNC_PUSH_DEBOUNCE_MS);
             }
         }
     }, SAVE_DEBOUNCE_MS);

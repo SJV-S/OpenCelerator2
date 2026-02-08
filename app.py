@@ -1,9 +1,8 @@
 import os
 import time
-import secrets
 from flask import Flask, render_template, request, jsonify, redirect, url_for, send_from_directory, make_response
 
-from models import db, Chart, ChartAccess, ViewToken, ChartTombstone, init_db
+from models import db, Chart, ChartAccess, ChartTombstone, ShareLink, init_db
 
 app = Flask(__name__)
 
@@ -102,10 +101,9 @@ def sync():
         chart_data = bytes.fromhex(upload['data']) if isinstance(upload['data'], str) else upload['data']
         wrapped_key = bytes.fromhex(upload['wrapped_key']) if isinstance(upload['wrapped_key'], str) else upload['wrapped_key']
         updated_at = upload['updated_at']
-        role = upload.get('role', 'owner')
 
         # Check if chart exists
-        existing = Chart.query.get(chart_uuid)
+        existing = db.session.get(Chart, chart_uuid)
 
         if existing:
             # Update if newer
@@ -122,13 +120,12 @@ def sync():
             db.session.add(new_chart)
 
         # Ensure user has access entry
-        access = ChartAccess.query.get((chart_uuid, user_id))
+        access = db.session.get(ChartAccess, (chart_uuid, user_id))
         if not access:
             access = ChartAccess(
                 chart_uuid=chart_uuid,
                 user_id=user_id,
-                wrapped_key=wrapped_key,
-                role=role
+                wrapped_key=wrapped_key
             )
             db.session.add(access)
         else:
@@ -158,8 +155,7 @@ def sync():
                 'chart_uuid': chart.chart_uuid,
                 'data': chart.data.hex(),
                 'updated_at': chart.last_modified,
-                'wrapped_key': access.wrapped_key.hex(),
-                'role': access.role
+                'wrapped_key': access.wrapped_key.hex()
             })
 
     # Get tombstones since last sync
@@ -184,13 +180,12 @@ def delete_chart():
     if not chart_uuid or not user_id:
         return jsonify({'error': 'chart_uuid and user_id required'}), 400
 
-    # Verify user is owner
-    access = ChartAccess.query.get((chart_uuid, user_id))
-    if not access or access.role != 'owner':
+    access = db.session.get(ChartAccess, (chart_uuid, user_id))
+    if not access:
         return jsonify({'error': 'Not authorized'}), 403
 
-    # Delete chart (cascades to chart_access and view_tokens)
-    chart = Chart.query.get(chart_uuid)
+    # Delete chart (cascades to chart_access and share_links)
+    chart = db.session.get(Chart, chart_uuid)
     if chart:
         db.session.delete(chart)
 
@@ -215,7 +210,7 @@ def leave_chart():
     if not chart_uuid or not user_id:
         return jsonify({'error': 'chart_uuid and user_id required'}), 400
 
-    access = ChartAccess.query.get((chart_uuid, user_id))
+    access = db.session.get(ChartAccess, (chart_uuid, user_id))
     if access:
         db.session.delete(access)
         db.session.commit()
@@ -226,36 +221,6 @@ def leave_chart():
 # =============================================================================
 # API Routes - Share Links
 # =============================================================================
-
-@app.route('/api/share/view', methods=['POST'])
-def create_view_link():
-    """Create a view-only magic link"""
-    data = request.get_json()
-    chart_uuid = data.get('chart_uuid')
-    user_id = data.get('user_id')
-
-    if not chart_uuid or not user_id:
-        return jsonify({'error': 'chart_uuid and user_id required'}), 400
-
-    # Verify user has access
-    access = ChartAccess.query.get((chart_uuid, user_id))
-    if not access:
-        return jsonify({'error': 'Not authorized'}), 403
-
-    # Generate view token
-    view_token = secrets.token_urlsafe(32)
-
-    token_entry = ViewToken(
-        chart_uuid=chart_uuid,
-        view_token=view_token,
-        created_at=int(time.time())
-    )
-    db.session.add(token_entry)
-    db.session.commit()
-
-    return jsonify({
-        'view_url': f'/view/{chart_uuid}/{view_token}'
-    })
 
 
 @app.route('/api/share/edit', methods=['POST'])
@@ -291,16 +256,16 @@ def create_edit_link():
     # Store owner access
     access = db.session.get(ChartAccess, (chart_uuid, user_id))
     if not access:
-        access = ChartAccess(chart_uuid=chart_uuid, user_id=user_id, wrapped_key=wrapped_key_bytes, role='owner')
+        access = ChartAccess(chart_uuid=chart_uuid, user_id=user_id, wrapped_key=wrapped_key_bytes)
         db.session.add(access)
 
-    # Store share access (user_id = 'share' as placeholder for share link access)
-    share_access = db.session.get(ChartAccess, (chart_uuid, 'share'))
-    if share_access:
-        share_access.wrapped_key = wrapped_share_bytes
+    # Store share link wrapped key
+    share_link = db.session.get(ShareLink, chart_uuid)
+    if share_link:
+        share_link.wrapped_key = wrapped_share_bytes
     else:
-        share_access = ChartAccess(chart_uuid=chart_uuid, user_id='share', wrapped_key=wrapped_share_bytes, role='editor')
-        db.session.add(share_access)
+        share_link = ShareLink(chart_uuid=chart_uuid, wrapped_key=wrapped_share_bytes)
+        db.session.add(share_link)
 
     db.session.commit()
     return jsonify({'success': True})
@@ -326,14 +291,14 @@ def get_shared_chart(chart_uuid):
     if not chart:
         return jsonify({'error': 'Chart not found'}), 404
 
-    share_access = db.session.get(ChartAccess, (chart_uuid, 'share'))
-    if not share_access:
-        return jsonify({'error': 'No share access'}), 404
+    share_link = db.session.get(ShareLink, chart_uuid)
+    if not share_link:
+        return jsonify({'error': 'No share link'}), 404
 
     return jsonify({
         'chart_uuid': chart_uuid,
         'data': chart.data.hex(),
-        'wrapped_key': share_access.wrapped_key.hex(),
+        'wrapped_key': share_link.wrapped_key.hex(),
         'updated_at': chart.last_modified
     })
 
