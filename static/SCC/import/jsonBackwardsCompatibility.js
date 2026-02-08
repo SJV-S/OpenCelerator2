@@ -171,6 +171,13 @@ export async function jsonBackwardsCompatibilityCheck(loadedChart) {
         }
     }
 
+    // Migrate lineVisibility.grid from boolean to per-component object
+    if (typeof loadedChart.lineVisibility?.grid === 'boolean') {
+        const val = loadedChart.lineVisibility.grid;
+        loadedChart.lineVisibility.grid = { dateLines: val, countLines: val, minorGrid: val };
+        modified = true;
+    }
+
     // Track keys before fillMissing
     const keysBefore = Object.keys(loadedChart).length;
     fillMissing(loadedChart, chartState);

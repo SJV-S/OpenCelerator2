@@ -402,36 +402,51 @@ export function setupEventListeners() {
         });
     }
 
-    // Grid toggles
+    // Grid toggles — initialize from chartState and update on change
+    const isAnyGridOn = () => {
+        const g = chartState.lineVisibility.grid;
+        return g.dateLines || g.countLines || g.minorGrid;
+    };
+
     const gridDateLinesToggle = document.getElementById('grid-date-lines-toggle');
     if (gridDateLinesToggle) {
+        gridDateLinesToggle.checked = chartState.lineVisibility.grid.dateLines;
         gridDateLinesToggle.addEventListener('change', (e) => {
+            chartState.lineVisibility.grid.dateLines = e.target.checked;
             toggleDateLines(e.target.checked);
+            eventBus.emit(EVENTS.CHART_GRID_VISIBILITY_CHANGED, { visible: isAnyGridOn() });
             e.target.blur();
         });
     }
 
     const gridCountLinesToggle = document.getElementById('grid-count-lines-toggle');
     if (gridCountLinesToggle) {
+        gridCountLinesToggle.checked = chartState.lineVisibility.grid.countLines;
         gridCountLinesToggle.addEventListener('change', (e) => {
+            chartState.lineVisibility.grid.countLines = e.target.checked;
             toggleCountLines(e.target.checked);
+            eventBus.emit(EVENTS.CHART_GRID_VISIBILITY_CHANGED, { visible: isAnyGridOn() });
             e.target.blur();
         });
     }
 
     const gridMinorToggle = document.getElementById('grid-minor-toggle');
     if (gridMinorToggle) {
+        gridMinorToggle.checked = chartState.lineVisibility.grid.minorGrid;
         gridMinorToggle.addEventListener('change', (e) => {
+            chartState.lineVisibility.grid.minorGrid = e.target.checked;
             toggleMinorGrid(e.target.checked);
+            eventBus.emit(EVENTS.CHART_GRID_VISIBILITY_CHANGED, { visible: isAnyGridOn() });
             e.target.blur();
         });
     }
 
-    // Sync grid toggles when legend toggles entire grid
-    eventBus.subscribe(EVENTS.CHART_GRID_VISIBILITY_CHANGED, ({ visible }) => {
-        if (gridDateLinesToggle) gridDateLinesToggle.checked = visible;
-        if (gridCountLinesToggle) gridCountLinesToggle.checked = visible;
-        if (gridMinorToggle) gridMinorToggle.checked = visible;
+    // Sync grid toggles from chartState (handles both legend all-at-once and individual changes)
+    eventBus.subscribe(EVENTS.CHART_GRID_VISIBILITY_CHANGED, () => {
+        const g = chartState.lineVisibility.grid;
+        if (gridDateLinesToggle) gridDateLinesToggle.checked = g.dateLines;
+        if (gridCountLinesToggle) gridCountLinesToggle.checked = g.countLines;
+        if (gridMinorToggle) gridMinorToggle.checked = g.minorGrid;
     }, true);
 
     // Chart name input

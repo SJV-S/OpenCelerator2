@@ -45,7 +45,7 @@ class WeeklySCC:
         self.margin_b = 90
 
         self.deg = 34
-        self.unit = 4  # weeks per doubling
+        self.unit = 5  # weeks per doubling
         self.yaxis_px = self.height - (self.margin_t + self.margin_b)
         self.y_axis = math.log10(self.ymax) - math.log10(self.ymin)
         self.delta_y = math.log10(2 ** (self.chart_window_in_weeks / self.unit))

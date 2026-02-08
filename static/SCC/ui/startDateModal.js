@@ -227,26 +227,6 @@ function setInputValues() {
 }
 
 /**
- * Get start date label based on chart type
- */
-function getStartDateLabel() {
-    const chartType = chartState.chartType.toLowerCase();
-
-    switch (chartType) {
-        case 'daily':
-            return 'Start Date (Monday)';
-        case 'weekly':
-            return 'Start Date (Month)';
-        case 'monthly':
-            return 'Start Date (Year)';
-        case 'yearly':
-            return 'Start Date (Decade)';
-        default:
-            return 'Start Date';
-    }
-}
-
-/**
  * Create arrow button SVG
  */
 function createArrowSVG(direction) {
@@ -264,7 +244,7 @@ function createArrowSVG(direction) {
  */
 function createSpinboxRow(id, labelText) {
     const row = document.createElement('div');
-    row.className = 'flex items-center justify-center gap-3';
+    row.className = 'flex items-center gap-3';
     row.id = `${id}-row`;
     row.style.display = 'none';
 
@@ -333,12 +313,6 @@ function createModal() {
     title.className = 'text-lg font-semibold text-gray-700 mb-4 text-center';
     title.textContent = 'Start Date';
 
-    // Start Date Section
-    const startDateLabel = document.createElement('div');
-    startDateLabel.id = 'start-date-section-label';
-    startDateLabel.className = 'text-sm font-semibold text-gray-600 mb-2 text-center';
-    startDateLabel.textContent = 'Start Date';
-
     // Start date controls container
     const startDateContainer = document.createElement('div');
     startDateContainer.className = 'flex flex-col gap-3 mb-4';
@@ -379,7 +353,6 @@ function createModal() {
     buttonContainer.appendChild(saveBtn);
 
     modalContent.appendChild(title);
-    modalContent.appendChild(startDateLabel);
     modalContent.appendChild(startDateContainer);
     modalContent.appendChild(buttonContainer);
     modalOverlay.appendChild(modalContent);
@@ -494,12 +467,6 @@ export function showStartDateModal() {
     if (!modalOverlay) {
         createModal();
         setupModalEventListeners();
-    }
-
-    // Update start date section label
-    const label = document.getElementById('start-date-section-label');
-    if (label) {
-        label.textContent = getStartDateLabel();
     }
 
     // Update visibility and values

@@ -64,10 +64,10 @@ function setupPanConstraints(plotDiv, chartType) {
         }
     }
 
-    // Subscribe to grid visibility changes
-    eventBus.subscribe(EVENTS.CHART_GRID_VISIBILITY_CHANGED, ({ visible }) => {
-        gridVisible = visible;
-        visible ? removeDynamicSpines() : updateDynamicSpines();
+    // Subscribe to grid visibility changes — spines depend on vertical date lines only
+    eventBus.subscribe(EVENTS.CHART_GRID_VISIBILITY_CHANGED, () => {
+        gridVisible = chartState.lineVisibility.grid.dateLines;
+        gridVisible ? removeDynamicSpines() : updateDynamicSpines();
     }, true);
 
     // Reposition dynamic spines when chart window changes

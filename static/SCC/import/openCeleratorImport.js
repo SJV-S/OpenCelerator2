@@ -430,7 +430,7 @@ export function buildChartFromOpenCelerator(json, fileName) {
             CelLines: { settings: {} },
             LineCuts: {},
             legend: { show: true, position: 'top-right' },
-            lineVisibility: { phase: true, aim: true, change: true, grid: true },
+            lineVisibility: { phase: true, aim: true, change: true, grid: { dateLines: true, countLines: true, minorGrid: true } },
             fanVisible: true,
             placeZerosBelowFloor: placeZerosBelowFloor ?? true
         },

@@ -183,7 +183,10 @@ function createLinesSection(scale = 1) {
         item.style.gap = `${Math.round(4 * scale)}px`;
         item.style.padding = `${Math.round(2 * scale)}px ${Math.round(4 * scale)}px`;
 
-        if (!chartState.lineVisibility[lineType.key]) {
+        const isVisible = lineType.key === 'grid'
+            ? (chartState.lineVisibility.grid.dateLines || chartState.lineVisibility.grid.countLines || chartState.lineVisibility.grid.minorGrid)
+            : chartState.lineVisibility[lineType.key];
+        if (!isVisible) {
             item.classList.add('legend-item-hidden');
         }
 
@@ -213,23 +216,31 @@ function createLinesSection(scale = 1) {
  * @param {string} lineType - Line type identifier
  */
 function toggleLineVisibility(lineType) {
+    // Grid is an object with three states — legend flips all at once
+    if (lineType === 'grid') {
+        const g = chartState.lineVisibility.grid;
+        const anyOn = g.dateLines || g.countLines || g.minorGrid;
+        const newState = !anyOn;
+        g.dateLines = newState;
+        g.countLines = newState;
+        g.minorGrid = newState;
+
+        const legendItem = document.querySelector(`.legend-line-item[data-line-type="grid"]`);
+        if (legendItem) {
+            legendItem.classList.toggle('legend-item-hidden', !newState);
+        }
+
+        toggleGrid(newState);
+        eventBus.emit(EVENTS.CHART_GRID_VISIBILITY_CHANGED, { visible: newState });
+        return;
+    }
+
     chartState.lineVisibility[lineType] = !chartState.lineVisibility[lineType];
 
     // Update UI
     const legendItem = document.querySelector(`.legend-line-item[data-line-type="${lineType}"]`);
     if (legendItem) {
-        if (chartState.lineVisibility[lineType]) {
-            legendItem.classList.remove('legend-item-hidden');
-        } else {
-            legendItem.classList.add('legend-item-hidden');
-        }
-    }
-
-    // Handle grid specially - call toggleGrid directly
-    if (lineType === 'grid') {
-        toggleGrid(chartState.lineVisibility[lineType]);
-        eventBus.emit(EVENTS.CHART_GRID_VISIBILITY_CHANGED, { visible: chartState.lineVisibility[lineType] });
-        return;
+        legendItem.classList.toggle('legend-item-hidden', !chartState.lineVisibility[lineType]);
     }
 
     // Emit event for line modules to handle visibility

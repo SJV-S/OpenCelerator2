@@ -14,7 +14,7 @@
 import { createToast } from '../ui/toaster.js';
 import { icons, applySvgCursor, restoreCursor } from '../ui/icons.js';
 import { chartState } from '../chartState.js';
-import { CORRECTS, ERRORS, TIMING, LINE_DEFAULTS, COLORS } from '../config.js';
+import { CORRECTS, ERRORS, TIMING, LINE_DEFAULTS, COLORS, CHART_TYPE_CONFIG } from '../config.js';
 import { xPositionToDate, dateToXPosition } from '../util/dates.js';
 import { fit, FIT_METHODS, BOUNCE_ENVELOPES, DEFAULT_FIT_METHOD, DEFAULT_BOUNCE_ENVELOPE, calculateBounceBounds, calculateBounceLines, formatCelerationLabel } from '../util/fit_lines.js';
 import { eventBus, EVENTS } from '../eventBus.js';
@@ -983,7 +983,8 @@ function handleCelLineConfirm(data, baseKey) {
     const y1_display = Math.pow(10, logY1);
     const y2_display = Math.pow(10, logY2);
 
-    const labelText = formatCelerationLabel(fitResult.slope, 'weekly');
+    const config = CHART_TYPE_CONFIG[chartState.chartType] || CHART_TYPE_CONFIG.Daily;
+    const labelText = formatCelerationLabel(fitResult.slope, config.unit);
 
     // Calculate bounce bounds if envelope is enabled
     const bounceBounds = calculateBounceBounds(filteredLogY, filteredX, fitResult.slope, fitResult.intercept, bounceEnvelope);

@@ -470,28 +470,15 @@ export function calculateBounceLines(xPositions, slope, intercept, bounds) {
 
 /**
  * Format celeration value as a display label
- * Converts log-space slope to multiplication/division factor per time unit
+ * Converts log-space slope to multiplication/division factor per standard period
  *
- * @param {number} slope - Slope in log-space per x-unit (day)
- * @param {string} timeUnit - Time unit for display ('daily', 'weekly', etc.)
+ * @param {number} slope - Slope in log-space per x-unit (chart-native unit)
+ * @param {number} unit - Number of x-units per standard period (from CHART_TYPE_CONFIG)
  * @returns {string} Formatted label like "×2.50" or "÷1.25"
  */
-export function formatCelerationLabel(slope, timeUnit = 'weekly') {
-    const dayMultiples = {
-        'daily': 1,
-        'weekly': 7,
-        'monthly': 28,       // 4 weeks
-        'six-monthly': 182,  // 26 weeks
-        'yearly': 365,
-        'five-yearly': 1825  // 5 years
-    };
+export function formatCelerationLabel(slope, unit) {
+    let cel = Math.pow(10, slope * unit);
 
-    const daysPerUnit = dayMultiples[timeUnit] || 7;
-
-    // Calculate celeration factor
-    let cel = Math.pow(10, slope * daysPerUnit);
-
-    // Format the label
     let symbol = '×';
     if (cel < 1) {
         symbol = '÷';

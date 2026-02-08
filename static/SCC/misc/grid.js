@@ -109,15 +109,18 @@ export function initGridToggle() {
     const chartDiv = document.getElementById('chart');
     if (chartDiv && chartDiv.data) {
         const gridIndices = getGridTraceIndices(chartDiv);
-        gridVisible = chartState.lineVisibility.grid;
+        const g = chartState.lineVisibility.grid;
+        gridVisible = g.dateLines || g.countLines || g.minorGrid;
         console.log(`Grid toggle initialized (${gridIndices.length} grid traces, visible: ${gridVisible})`);
     }
 
-    // Re-apply grid visibility after each replot (replot recreates grid traces as visible)
+    // Re-apply per-component grid visibility after each replot (replot recreates grid traces as visible)
     eventBus.subscribe(EVENTS.DATA_CHART_REPLOT_COMPLETE, () => {
-        if (!chartState.lineVisibility.grid) {
-            toggleGrid(false);
-            eventBus.emit(EVENTS.CHART_GRID_VISIBILITY_CHANGED, { visible: false, save: false });
-        }
+        const g = chartState.lineVisibility.grid;
+        if (!g.dateLines) toggleDateLines(false);
+        if (!g.countLines) toggleCountLines(false);
+        if (!g.minorGrid) toggleMinorGrid(false);
+        // Notify panning_controls so it can manage dynamic spines
+        eventBus.emit(EVENTS.CHART_GRID_VISIBILITY_CHANGED, { save: false });
     });
 }
