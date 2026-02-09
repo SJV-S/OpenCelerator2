@@ -2,7 +2,7 @@
  * Auto-initialize sync client with stored or new passphrase
  */
 
-import { openDB } from '../SCC/lib/idb.js';
+import { openDB } from '../lib/idb.js';
 import { generatePassphrase } from './passphrase.js';
 import { initSync } from './syncClient.js';
 

@@ -5,6 +5,11 @@
  * - Creates clickable marker overlays when edit mode is enabled
  * - Handles click events and shows removal toasts
  * - Removes lines when user confirms
+ *
+ * NOTE: Hover labels on lines are NOT handled here. They live in
+ * lineHover.js, which creates its own invisible scatter traces with
+ * hovertext along every line (main + bounce). Any changes to what
+ * appears when the user hovers over a line must be made there.
  */
 
 import { chartState } from '../chartState.js';

@@ -26,6 +26,9 @@ const PRECACHE_STATIC = [
     // CSS
     '/static/SCC/css/chart_menu.css',
     '/static/SCC/css/tailwind.css',
+    '/static/SCC/css/fonts.css',
+    '/static/SCC/fonts/open-sans-latin.woff2',
+    '/static/SCC/fonts/open-sans-latin-ext.woff2',
     // Core modules
     '/static/SCC/main.js',
     '/static/SCC/chartState.js',
@@ -35,8 +38,10 @@ const PRECACHE_STATIC = [
     '/static/SCC/navigation.js',
     '/static/pwaInstall.js',
     // Libraries
-    '/static/SCC/lib/idb.js',
-    '/static/SCC/lib/xlsx.full.min.js',
+    '/static/lib/idb.js',
+    '/static/lib/plotly-2.35.2.min.js',
+    '/static/lib/socket.io-4.7.4.min.js',
+    '/static/lib/xlsx.full.min.js',
     // Storage
     '/static/SCC/storage/chartStorage.js',
     // Series
@@ -87,19 +92,6 @@ const PRECACHE_STATIC = [
     '/static/SCC/misc/customLegend.js',
     '/static/SCC/misc/grid.js',
     '/static/SCC/misc/share.js',
-    // Temp
-    '/static/SCC/temp/hover_mode.js',
-    // Temp icons
-    '/static/SCC/temp/icons/camera-solid-full.svg',
-    '/static/SCC/temp/icons/celeration.svg',
-    '/static/SCC/temp/icons/crosshairs-solid-full.svg',
-    '/static/SCC/temp/icons/flag-solid-full.svg',
-    '/static/SCC/temp/icons/gear-solid-full.svg',
-    '/static/SCC/temp/icons/images-solid-full.svg',
-    '/static/SCC/temp/icons/phase_text_bottom.svg',
-    '/static/SCC/temp/icons/phase_text_top.svg',
-    '/static/SCC/temp/icons/scissors-solid-full.svg',
-    '/static/SCC/temp/icons/trash-solid-full.svg',
     // Server sync
     '/static/Server/BIP39Words.js',
     '/static/Server/crypto.js',
@@ -109,20 +101,6 @@ const PRECACHE_STATIC = [
     '/static/Server/syncClient.js',
     '/static/Server/wsClient.js',
 ];
-
-// CDN URLs to precache (fetched separately to handle cross-origin)
-const PRECACHE_CDN = [
-    'https://cdn.plot.ly/plotly-2.35.2.min.js',
-    'https://cdn.socket.io/4.7.4/socket.io.min.js',
-    'https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap',
-];
-
-// Check if URL is a CDN we want to cache
-function isCachableCDN(url) {
-    return url.startsWith('https://cdn.') ||
-           url.startsWith('https://fonts.googleapis.com') ||
-           url.startsWith('https://fonts.gstatic.com');
-}
 
 // Check if URL is a local static asset
 function isStaticAsset(url) {
@@ -149,18 +127,6 @@ self.addEventListener('install', (event) => {
             .then(async (cache) => {
                 await cache.addAll(PRECACHE_PAGES);
                 await cache.addAll(PRECACHE_STATIC);
-
-                // Precache CDN resources (fetch individually to handle failures gracefully)
-                for (const url of PRECACHE_CDN) {
-                    try {
-                        const response = await fetch(url, { mode: 'cors' });
-                        if (response.ok) {
-                            await cache.put(url, response);
-                        }
-                    } catch (err) {
-                        // CDN will be cached on first use if precache fails
-                    }
-                }
             })
             .then(() => self.skipWaiting())
             .catch(err => {
@@ -210,12 +176,6 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // Strategy: CDN resources - Cache first, network fallback
-    if (isCachableCDN(url)) {
-        event.respondWith(cacheFirstWithNetwork(request));
-        return;
-    }
-
     // Strategy: Static assets - Cache first, network fallback
     if (isStaticAsset(url)) {
         event.respondWith(cacheFirstWithNetwork(request));
@@ -257,7 +217,7 @@ async function networkFirstWithCache(request) {
     }
 }
 
-// Cache first, fall back to network (for static assets and CDN)
+// Cache first, fall back to network (for static assets)
 async function cacheFirstWithNetwork(request) {
     const cachedResponse = await caches.match(request);
     if (cachedResponse) {

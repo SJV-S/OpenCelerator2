@@ -9,7 +9,6 @@ import { importChart, deleteChart } from '../storage/chartStorage.js';
 import { getFirstConfig } from '../series/traceStyles.js';
 import { isOnline } from '../../Server/onlineStatus.js';
 import { eventBus, EVENTS } from '../eventBus.js';
-import { COLORS } from '../config.js';
 
 /**
  * Takes a screenshot of the Plotly chart and downloads it as PNG
@@ -437,32 +436,15 @@ function initializeShareTab() {
                 onYes: () => unshareChart(),
                 yesLabel: 'Unshare',
                 noLabel: 'Cancel',
-                primaryColor: COLORS.PRIMARY
+                primaryColor: '#dc2626'
             });
         });
     }
 
-    // Show/hide unshare button + color cue shared state after chart loads from IDB
+    // Show/hide unshare button after chart loads from IDB (chartState.shared is set by then)
     eventBus.subscribe(EVENTS.STORAGE_CHART_LOADED, () => {
         const btn = document.getElementById('unshare-btn');
-        const editIcon = document.getElementById('edit-link-icon');
-        if (chartState.shared) {
-            if (btn) {
-                btn.hidden = false;
-                btn.style.borderColor = COLORS.PRIMARY;
-                btn.style.color = COLORS.PRIMARY;
-            }
-            if (editIcon) {
-                const svg = editIcon.querySelector('svg');
-                if (svg) svg.style.fill = COLORS.PRIMARY;
-            }
-        } else {
-            if (btn) btn.hidden = true;
-            if (editIcon) {
-                const svg = editIcon.querySelector('svg');
-                if (svg) svg.style.fill = '';
-            }
-        }
+        if (btn) btn.hidden = !chartState.shared;
     }, true);
 
     console.log('Share tab initialized');

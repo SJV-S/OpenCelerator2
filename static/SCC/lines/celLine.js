@@ -140,53 +140,31 @@ function buildCelLineElements(metadata, chartDiv) {
         });
     }
 
-    // Build hover text: celeration + fit method, plus bounce info if present
+    // Hover is handled by lineHover.js traces — no annotation needed for hover.
+    // Annotation kept only as a named placeholder for redraw/visibility filtering.
     const centerX = (x1 + x2) / 2;
     const logY1 = Math.log10(metadata.y1);
     const logY2 = Math.log10(metadata.y2);
     const centerLogY = (logY1 + logY2) / 2;
 
-    let hoverLines = [metadata.text];
-
-    if (metadata.bounceUpperOffset != null && metadata.bounceLowerOffset != null) {
-        const upperRaw = Math.pow(10, metadata.bounceUpperOffset);
-        const upperSymbol = metadata.bounceUpperOffset >= 0 ? '×' : '÷';
-        const upperVal = metadata.bounceUpperOffset >= 0 ? upperRaw : 1 / upperRaw;
-
-        const lowerRaw = Math.pow(10, metadata.bounceLowerOffset);
-        const lowerSymbol = metadata.bounceLowerOffset >= 0 ? '×' : '÷';
-        const lowerVal = metadata.bounceLowerOffset >= 0 ? lowerRaw : 1 / lowerRaw;
-
-        hoverLines.push(`${metadata.bounceEnvelope}: ${upperSymbol}${upperVal.toFixed(2)} / ${lowerSymbol}${lowerVal.toFixed(2)}`);
-    }
-
-    const hoverText = hoverLines.join('<br>');
-
-    const annotations = [];
-
-    annotations.push({
+    const annotation = {
         x: centerX,
         y: centerLogY,
         xref: 'x',
         yref: 'y',
-        text: metadata.text,
+        text: '',
         showarrow: false,
-        font: { color: 'rgba(0,0,0,0)', size: 12 },
+        font: { color: 'rgba(0,0,0,0)', size: 1 },
         bgcolor: 'rgba(0,0,0,0)',
         bordercolor: 'rgba(0,0,0,0)',
         borderwidth: 0,
-        borderpad: 8,
+        borderpad: 0,
         xanchor: 'center',
         yanchor: 'middle',
-        name: lineName,
-        hovertext: hoverText,
-        hoverlabel: {
-            bgcolor: celLineColor,
-            font: { color: 'white', size: 18 }
-        }
-    });
+        name: lineName
+    };
 
-    return { shapes, annotations };
+    return { shapes, annotation };
 }
 
 /**
@@ -1002,7 +980,7 @@ function handleCelLineConfirm(data, baseKey) {
     const y2_display = Math.pow(10, logY2);
 
     const config = CHART_TYPE_CONFIG[chartState.chartType] || CHART_TYPE_CONFIG.Daily;
-    const labelText = `${formatCelerationLabel(fitResult.slope, config.unit)} (${fitMethod})`;
+    const labelText = `${fitMethod}: ${formatCelerationLabel(fitResult.slope, config.unit)}`;
 
     // Calculate bounce bounds if envelope is enabled
     const bounceBounds = calculateBounceBounds(filteredLogY, filteredX, fitResult.slope, fitResult.intercept, bounceEnvelope);
@@ -1071,7 +1049,7 @@ function handleCelLineConfirm(data, baseKey) {
 
     Plotly.relayout(chartDiv, {
         shapes: [...currentShapes, ...elements.shapes],
-        annotations: [...currentAnnotations, ...elements.annotations]
+        annotations: [...currentAnnotations, elements.annotation]
     }).catch(err => {
         console.error('[CEL DEBUG] Plotly.relayout FAILED:', err);
     });
@@ -1130,14 +1108,14 @@ function redrawCelLines() {
         const lineVisible = globalVisible && isSeriesVisible(metadata.seriesKey);
         if (!lineVisible) {
             elements.shapes.forEach(s => s.visible = false);
-            elements.annotations.forEach(a => a.visible = false);
+            elements.annotation.visible = false;
         }
 
         // Add shapes
         celShapes.push(...elements.shapes);
 
         // Add annotation
-        celAnnotations.push(...elements.annotations);
+        celAnnotations.push(elements.annotation);
     });
 
     Plotly.relayout(chartDiv, {

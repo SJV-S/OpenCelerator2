@@ -59,7 +59,7 @@ class ShareLink(db.Model):
 
 
 class ChartTombstone(db.Model):
-    """Tombstones for deleted charts (retained 30 days for sync)"""
+    """Tombstones for deleted charts (retained 1 year for sync)"""
     __tablename__ = 'chart_tombstones'
 
     chart_uuid = db.Column(db.String(36), primary_key=True)

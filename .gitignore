@@ -17,6 +17,7 @@ build/
 *.swp
 *.swo
 .vscode/
+.claude/
 
 # Environment
 .env

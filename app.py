@@ -19,6 +19,8 @@ if database_url.startswith('postgres://'):
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+STORAGE_LIMIT_BYTES = 5 * 1024 * 1024 * 1024  # 5 GB
+
 # Initialize database
 init_db(app)
 
@@ -64,6 +66,56 @@ def chart(chart_id, share_secret=None):
 
 
 # =============================================================================
+# Storage Purge - evict oldest charts when over STORAGE_LIMIT_BYTES
+# =============================================================================
+
+_last_purge = 0
+_last_tombstone_purge = 0
+
+TOMBSTONE_RETENTION_SECONDS = 365 * 24 * 3600  # 1 year
+
+def purge_old_tombstones():
+    """Delete tombstones older than 1 year. Runs at most once per day."""
+    global _last_tombstone_purge
+    now = int(time.time())
+    if now - _last_tombstone_purge < 86400:
+        return
+    _last_tombstone_purge = now
+
+    cutoff = now - TOMBSTONE_RETENTION_SECONDS
+    deleted = ChartTombstone.query.filter(ChartTombstone.deleted_at < cutoff).delete()
+    if deleted:
+        db.session.commit()
+        app.logger.info(f'[Purge] Removed {deleted} tombstones older than 1 year')
+
+def purge_if_over_limit():
+    """Delete oldest charts until total storage is under STORAGE_LIMIT_BYTES. Runs at most once per hour."""
+    global _last_purge
+    now = int(time.time())
+    if now - _last_purge < 3600:
+        return
+    _last_purge = now
+
+    total = db.session.query(db.func.sum(db.func.length(Chart.data))).scalar() or 0
+    if total <= STORAGE_LIMIT_BYTES:
+        return
+
+    # Fetch oldest charts first
+    oldest = Chart.query.order_by(Chart.last_modified.asc()).all()
+    purged = 0
+    for chart in oldest:
+        if total <= STORAGE_LIMIT_BYTES:
+            break
+        total -= len(chart.data)
+        db.session.delete(chart)  # cascades to chart_access, share_links
+        purged += 1
+
+    if purged:
+        db.session.commit()
+        app.logger.info(f'[Purge] Evicted {purged} oldest charts to stay under storage limit')
+
+
+# =============================================================================
 # API Routes - Sync
 # =============================================================================
 
@@ -87,6 +139,9 @@ def sync():
         "tombstones": [{"chart_uuid": "...", "deleted_at": ...}, ...]
     }
     """
+    purge_if_over_limit()
+    purge_old_tombstones()
+
     data = request.get_json()
 
     if not data or 'user_id' not in data:

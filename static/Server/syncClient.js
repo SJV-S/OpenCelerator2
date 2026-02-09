@@ -4,7 +4,7 @@
 
 import { encrypt, decrypt, generateChartKey, wrapKey, unwrapKey, deriveKey } from './crypto.js';
 import { getUserId, getUserKey } from './passphrase.js';
-import { openDB } from '../SCC/lib/idb.js';
+import { openDB } from '../lib/idb.js';
 import { eventBus, EVENTS } from '../SCC/eventBus.js';
 import { connectToChart, disconnectFromChart } from './wsClient.js';
 

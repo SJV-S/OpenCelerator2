@@ -46,6 +46,7 @@ export function initImportUI() {
     setupDropZone();
     setupFileInput();
     setupMappingControls();
+    setupHelpers();
     setupEventSubscriptions();
     updateTimingRowVisibility();
 }
@@ -73,7 +74,11 @@ function cacheElements() {
         replaceOption: document.getElementById('import-replace-option'),
         replaceCheckbox: document.getElementById('import-replace-checkbox'),
         cancelBtn: document.getElementById('import-cancel-btn'),
-        confirmBtn: document.getElementById('import-confirm-btn')
+        confirmBtn: document.getElementById('import-confirm-btn'),
+
+        // Helpers
+        downloadTemplateBtn: document.getElementById('import-download-template'),
+        copyAiPromptBtn: document.getElementById('import-copy-ai-prompt')
     };
 }
 
@@ -121,6 +126,103 @@ function setupFileInput() {
         }
         // Reset input so same file can be selected again
         fileInput.value = '';
+    });
+}
+
+// ============================================================================
+// Import Helpers (template download + AI prompt copy)
+// ============================================================================
+
+function setupHelpers() {
+    elements.downloadTemplateBtn?.addEventListener('click', downloadTemplate);
+    elements.copyAiPromptBtn?.addEventListener('click', copyAiPrompt);
+}
+
+function downloadTemplate() {
+    const isMinute = chartState.minuteChart;
+    const headers = isMinute
+        ? 'Date,Corrects,Errors,Minutes,Prompts'
+        : 'Date,Corrects,Errors,Prompts';
+
+    const rows = isMinute
+        ? [
+            '2024-01-15,45,3,1,5',
+            '2024-01-16,52,1,1,3',
+            '2024-01-17,,2,1,',
+            '2024-01-18,60,,1,4'
+        ]
+        : [
+            '2024-01-15,45,3,5',
+            '2024-01-16,52,1,3',
+            '2024-01-17,,2,',
+            '2024-01-18,60,,4'
+        ];
+
+    const csv = [headers, ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'scc-import-template.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function buildAiPrompt() {
+    const base = `I need you to format my data as a CSV for import into a Standard Celeration Chart (SCC). Here are the rules:
+
+**Required columns:**
+- Date — use YYYY-MM-DD format
+- At least one of: Corrects, Errors, or a Misc column
+
+**Optional columns:**
+- Corrects — non-negative numbers (behavioral count/frequency data)
+- Errors — non-negative numbers (error count/frequency data)
+- Additional numeric columns become "Misc" series (up to 10) — these are extra numeric data series plotted alongside corrects/errors (e.g. prompts, trials, dosage)`;
+
+    const minuteLine = `
+- Minutes — positive number, the timing floor for each observation`;
+
+    const rules = `
+
+**Formatting rules:**
+- Leave cells empty for missing data (do NOT use 0, N/A, or dashes)
+- All numeric values must be non-negative
+- Dates must be parseable (YYYY-MM-DD preferred)
+- First row must be column headers
+
+**Before formatting, ask me to clarify:**
+1. Which column is "corrects" vs "errors" if it's ambiguous
+2. Whether any additional numeric columns should be included as Misc series`;
+
+    const minuteClarify = `
+3. What the timing floor is (in minutes) if a Minutes column is needed`;
+
+    const warnings = `
+
+**Warn me if:**
+- Any values are negative
+- Any cells contain non-numeric data in numeric columns
+- Any dates can't be parsed
+`;
+
+    const isMinute = chartState.minuteChart;
+    return base + (isMinute ? minuteLine : '') + rules + (isMinute ? minuteClarify : '') + warnings;
+}
+
+function copyAiPrompt() {
+    const btn = elements.copyAiPromptBtn;
+    if (!btn) return;
+
+    navigator.clipboard.writeText(buildAiPrompt()).then(() => {
+        const original = btn.textContent;
+        btn.textContent = 'Copied ✓';
+        btn.classList.add('copied');
+        setTimeout(() => {
+            btn.textContent = original;
+            btn.classList.remove('copied');
+        }, 2000);
     });
 }
 

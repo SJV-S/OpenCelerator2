@@ -3,9 +3,9 @@
 {% block title %}Chart{% endblock %}
 
 {% block head_scripts %}
-<script src="{{ url_for('static', filename='SCC/lib/xlsx.full.min.js') }}"></script>
-<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
-<script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+<script src="{{ url_for('static', filename='lib/xlsx.full.min.js') }}"></script>
+<script src="{{ url_for('static', filename='lib/plotly-2.35.2.min.js') }}"></script>
+<script src="{{ url_for('static', filename='lib/socket.io-4.7.4.min.js') }}"></script>
 <link rel="stylesheet" href="{{ url_for('static', filename='SCC/css/chart_menu.css') }}">
 {% endblock %}
 
@@ -239,7 +239,7 @@ body {
         import { initStorage, loadChart } from '/static/SCC/storage/chartStorage.js';
         import { joinSharedChart, startSyncPolling, checkForUpdates } from '/static/Server/syncClient.js';
         import { initServerSync, isSyncEnabled } from '/static/Server/init.js';
-        import { openDB } from '/static/SCC/lib/idb.js';
+        import { openDB } from '/static/lib/idb.js';
         import { eventBus, EVENTS } from '/static/SCC/eventBus.js';
         import { refreshChart } from '/static/SCC/series/replot.js';
         import { chartState } from '/static/SCC/chartState.js';
@@ -292,7 +292,14 @@ body {
             // For non-shared charts with sync enabled, check server for newer version
             if (!chartState.shared && isSyncEnabled()) {
                 checkForUpdates([{ chart_uuid: chartId, updated_at: chartState.lastModified || 0 }])
-                    .then(async ({ downloads }) => {
+                    .then(async ({ downloads, tombstones }) => {
+                        // Chart was deleted on another device — remove locally and go to menu
+                        if (tombstones?.some(t => t.chart_uuid === chartId)) {
+                            const idb = await openDB('SCC_Charts', 1);
+                            await idb.delete('charts', chartId);
+                            window.location.href = '/';
+                            return;
+                        }
                         if (downloads.length > 0) {
                             const dl = downloads[0];
                             dl.data.id = dl.id;

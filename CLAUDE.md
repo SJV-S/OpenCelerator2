@@ -4,6 +4,8 @@
 
 **Answer questions before writing code.** When the user asks a question, answer it. A question is never an invitation to start coding just because auto-edit is enabled. Respond to what was asked, then wait for direction.
 
+**Never tell the user to refresh the page.** The user manages their own browser and server. Suggesting a page refresh is obvious and unhelpful. If stale state is a problem, fix it in the code (e.g., trigger a redraw programmatically) rather than telling the user to refresh.
+
 ## Codebase Overview
 
 **Single-Case Chart (SCC) Application** - A behavioral data visualization tool displaying time-series data (correct/incorrect responses, timing) on logarithmic charts with analytical line drawing tools.

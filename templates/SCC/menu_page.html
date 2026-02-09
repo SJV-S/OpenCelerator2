@@ -289,7 +289,7 @@ html, body {
     import { initStorage, listCharts, deleteChart, updateChartTags, importChart, drainPushQueue } from '/static/SCC/storage/chartStorage.js';
     import { isNativeFormat } from '/static/SCC/import/nativeImport.js';
     import { isOpenCeleratorFormat, buildChartFromOpenCelerator } from '/static/SCC/import/openCeleratorImport.js';
-    import { openDB } from '/static/SCC/lib/idb.js';
+    import { openDB } from '/static/lib/idb.js';
     import { validatePassphrase, getUserId } from '/static/Server/passphrase.js';
     import { initSync, uploadCharts, pullCharts, checkForUpdates } from '/static/Server/syncClient.js';
     import { initServerSync, resetSync, setSyncEnabled } from '/static/Server/init.js';
@@ -642,7 +642,20 @@ html, body {
             try {
                 await drainPushQueue();
                 const manifest = charts.map(c => ({ chart_uuid: c.id, updated_at: c.updatedAt || 0 }));
-                const { downloads } = await checkForUpdates(manifest);
+                const { downloads, tombstones } = await checkForUpdates(manifest);
+                let changed = false;
+
+                // Delete locally any non-shared charts tombstoned on another device
+                if (tombstones?.length > 0) {
+                    for (const t of tombstones) {
+                        const local = charts.find(c => c.id === t.chart_uuid && !c.shared);
+                        if (local) {
+                            await deleteChart(t.chart_uuid);
+                            changed = true;
+                        }
+                    }
+                }
+
                 if (downloads.length > 0) {
                     const chartsDb = await openDB('SCC_Charts', 1);
                     for (const dl of downloads) {
@@ -650,6 +663,10 @@ html, body {
                         dl.data.lastModified = dl.updatedAt;
                         await chartsDb.put('charts', dl.data);
                     }
+                    changed = true;
+                }
+
+                if (changed) {
                     charts = await listCharts();
                     renderCharts();
                 }

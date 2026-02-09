@@ -21,14 +21,14 @@
  *   await deleteChart('chart-id');                             // Delete a chart
  */
 
-import { openDB } from '../lib/idb.js';
+import { openDB } from '../../lib/idb.js';
 import { eventBus, EVENTS, EVENT_CATEGORIES } from '../eventBus.js';
 import { chartState } from '../chartState.js';
 import { CHART_TYPE_CONFIG } from '../config.js';
 import { findNearestMonday } from '../util/dates.js';
 import { jsonBackwardsCompatibilityCheck } from '../import/jsonBackwardsCompatibility.js';
 import { generateChartKey } from '../../Server/crypto.js';
-import { pushChart, isInitialized, startSyncPolling, leaveChart as syncLeaveChart } from '../../Server/syncClient.js';
+import { pushChart, isInitialized, startSyncPolling, leaveChart as syncLeaveChart, deleteChart as syncDeleteChart } from '../../Server/syncClient.js';
 import { isSyncEnabled } from '../../Server/init.js';
 import { hasSocket } from '../../Server/wsClient.js';
 
@@ -284,11 +284,18 @@ export async function deleteChart(id) {
             chartState.id = null;
         }
 
-        // Leave the shared chart on the server (fire-and-forget)
-        if (wasShared && isInitialized()) {
-            syncLeaveChart(id).catch(err =>
-                console.warn('[Storage] leaveChart failed:', err)
-            );
+        if (isInitialized()) {
+            if (wasShared) {
+                // Leave the shared chart on the server (fire-and-forget)
+                syncLeaveChart(id).catch(err =>
+                    console.warn('[Storage] leaveChart failed:', err)
+                );
+            } else if (isSyncEnabled()) {
+                // Delete on server so other devices get the tombstone
+                syncDeleteChart(id).catch(err =>
+                    console.warn('[Storage] server deleteChart failed:', err)
+                );
+            }
         }
 
         console.log(`[Storage] Deleted chart: ${id}`);

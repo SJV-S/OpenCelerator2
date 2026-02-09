@@ -48,9 +48,6 @@ To-do
 -- Also, when removing, is it also removing the associated text?
 - There's no line handling for stacking data points at the moment
 - There's no Ux for unsharing at the moment, although I think the infrastructure should be there...
-- If the user deletes a shared chart, we need to make sure no errors or resurrections occur
-- importing a chart json should generate a new UUID, and chart key?
-- and, yet again, auto save is triggered without me doing anything when loading the chart
 - The idea of saving 1s in count chart is a waste of space. Just auto generate it.
 - Is there protection against a user find out someoeone else's UUID for a chart and attempting to overwrite it on the server?
 - Default chart capacity doesn't seem to respect, or at least not for monthly (and the chart generated was not aligned with what was showing for chart capacity)
