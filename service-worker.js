@@ -25,6 +25,7 @@ const PRECACHE_STATIC = [
     '/static/SCC/icons/celeration.svg',
     // CSS
     '/static/SCC/css/chart_menu.css',
+    '/static/SCC/css/tailwind.css',
     // Core modules
     '/static/SCC/main.js',
     '/static/SCC/chartState.js',
@@ -111,7 +112,6 @@ const PRECACHE_STATIC = [
 
 // CDN URLs to precache (fetched separately to handle cross-origin)
 const PRECACHE_CDN = [
-    'https://cdn.tailwindcss.com',
     'https://cdn.plot.ly/plotly-2.35.2.min.js',
     'https://cdn.socket.io/4.7.4/socket.io.min.js',
     'https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap',

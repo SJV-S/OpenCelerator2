@@ -28,7 +28,7 @@ import { CHART_TYPE_CONFIG } from '../config.js';
 import { findNearestMonday } from '../util/dates.js';
 import { jsonBackwardsCompatibilityCheck } from '../import/jsonBackwardsCompatibility.js';
 import { generateChartKey } from '../../Server/crypto.js';
-import { pushChart, isInitialized, startSyncPolling } from '../../Server/syncClient.js';
+import { pushChart, isInitialized, startSyncPolling, leaveChart as syncLeaveChart } from '../../Server/syncClient.js';
 import { isSyncEnabled } from '../../Server/init.js';
 import { hasSocket } from '../../Server/wsClient.js';
 
@@ -274,10 +274,21 @@ export async function deleteChart(id) {
     }
 
     try {
+        // Check if chart is shared before deleting from IDB
+        const chart = await db.get(STORE_NAME, id);
+        const wasShared = chart?.shared;
+
         await db.delete(STORE_NAME, id);
 
         if (chartState.id === id) {
             chartState.id = null;
+        }
+
+        // Leave the shared chart on the server (fire-and-forget)
+        if (wasShared && isInitialized()) {
+            syncLeaveChart(id).catch(err =>
+                console.warn('[Storage] leaveChart failed:', err)
+            );
         }
 
         console.log(`[Storage] Deleted chart: ${id}`);

@@ -31,3 +31,4 @@ Thumbs.db
 *.log
 push.sh
 notes.txt
+scripts/build/Tailwind/tailwindcss

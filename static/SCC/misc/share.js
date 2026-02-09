@@ -2,11 +2,14 @@
 // Handles chart screenshot, data export, and share link generation
 
 import { chartState } from '../chartState.js';
-import { createToast } from '../ui/toaster.js';
+import { createToast, createConfirmToast } from '../ui/toaster.js';
 import { icons } from '../ui/icons.js';
-import { createViewLink, createEditLink, isInitialized, startSyncPolling } from '../../Server/syncClient.js';
+import { createViewLink, createEditLink, isInitialized, startSyncPolling, stopSyncPolling } from '../../Server/syncClient.js';
+import { importChart, deleteChart } from '../storage/chartStorage.js';
 import { getFirstConfig } from '../series/traceStyles.js';
 import { isOnline } from '../../Server/onlineStatus.js';
+import { eventBus, EVENTS } from '../eventBus.js';
+import { COLORS } from '../config.js';
 
 /**
  * Takes a screenshot of the Plotly chart and downloads it as PNG
@@ -327,6 +330,35 @@ function exportChartStateToJSON() {
 }
 
 /**
+ * Unshares the current chart: creates a private fork, deletes the old shared copy
+ * (which also calls leaveChart on the server), stops WebSocket, and navigates to the new chart.
+ */
+async function unshareChart() {
+    const oldId = chartState.id;
+
+    // Serialize current chartState into a plain object for import
+    const snapshot = serializeValue(chartState);
+
+    // importChart assigns a new UUID, new chartKey, sets shared: false
+    const newId = await importChart(snapshot);
+    if (!newId) {
+        createToast({ message: 'Unshare failed', duration: 2000, position: 'top-right' });
+        return;
+    }
+
+    // Delete old shared copy locally (also fires leaveChart on server)
+    await deleteChart(oldId);
+
+    // Disconnect WebSocket
+    stopSyncPolling();
+
+    // Navigate to the new private chart
+    const chartType = chartState.chartType || 'Daily';
+    const minuteType = chartState.minuteChart ? 'minute' : 'count';
+    window.location.href = `/chart/${chartType}/${minuteType}?load=${newId}`;
+}
+
+/**
  * Initializes the share tab functionality
  *
  * Data flow:
@@ -395,6 +427,43 @@ function initializeShareTab() {
     if (jsonExportBtn) {
         jsonExportBtn.addEventListener('click', exportChartStateToJSON);
     }
+
+    // Wire unshare button (handler attached once, visibility toggled on chart load)
+    const unshareBtn = document.getElementById('unshare-btn');
+    if (unshareBtn) {
+        unshareBtn.addEventListener('click', () => {
+            createConfirmToast({
+                message: 'Unshare this chart? A private copy will be created and you will leave the shared version.',
+                onYes: () => unshareChart(),
+                yesLabel: 'Unshare',
+                noLabel: 'Cancel',
+                primaryColor: COLORS.PRIMARY
+            });
+        });
+    }
+
+    // Show/hide unshare button + color cue shared state after chart loads from IDB
+    eventBus.subscribe(EVENTS.STORAGE_CHART_LOADED, () => {
+        const btn = document.getElementById('unshare-btn');
+        const editIcon = document.getElementById('edit-link-icon');
+        if (chartState.shared) {
+            if (btn) {
+                btn.hidden = false;
+                btn.style.borderColor = COLORS.PRIMARY;
+                btn.style.color = COLORS.PRIMARY;
+            }
+            if (editIcon) {
+                const svg = editIcon.querySelector('svg');
+                if (svg) svg.style.fill = COLORS.PRIMARY;
+            }
+        } else {
+            if (btn) btn.hidden = true;
+            if (editIcon) {
+                const svg = editIcon.querySelector('svg');
+                if (svg) svg.style.fill = '';
+            }
+        }
+    }, true);
 
     console.log('Share tab initialized');
 }

@@ -272,26 +272,144 @@ function emitFanReposition() {
 }
 
 /**
- * Reposition "COUNTING TIMES" and y-axis title annotations after chart window change.
- * Same pattern as regenerateCredits().
+ * Rescale all template chart elements after a dimension change.
+ * Mirrors the scaling logic in resizeChartByHeight but operates on a live chart
+ * via surgical Plotly.relayout with indexed property updates.
+ *
+ * Skips runtime-managed elements (credits, fan, phase/aim/cel lines).
+ *
+ * @param {HTMLElement} chartDiv - The Plotly chart DOM element
  */
-function repositionLabels() {
-    const chartDiv = document.getElementById('chart');
+function rescaleChartElements(chartDiv) {
     if (!chartDiv?.layout) return;
 
     const config = CHART_TYPE_CONFIG[chartState.chartType];
+    if (!config) return;
+
     const { margin, width, height } = chartDiv.layout;
     const xaxis_px = width - margin.l - margin.r;
+    const yaxis_px = height - margin.t - margin.b;
+
+    // Scaling factors (same math as resizeChartByHeight)
+    const generalFontScale = height * RESIZE.GENERAL_FONT_SCALE;
+    const titleFontScale = height * RESIZE.TITLE_FONT_SCALE;
 
     const updates = {};
-    chartDiv.layout.annotations?.forEach((ann, i) => {
-        if (ann.name === 'counting-times')
+
+    // --- Axes ---
+    updates['xaxis.ticklabelstandoff'] = Math.round(height / RESIZE.X_TICKS_DOWN);
+    updates['yaxis.title.font.size'] = titleFontScale;
+    updates['yaxis.tickfont.size'] = generalFontScale * RESIZE.TICK_FONT_SCALE;
+    if (chartDiv.layout.xaxis?.tickfont?.size !== undefined) {
+        updates['xaxis.tickfont.size'] = generalFontScale * RESIZE.TICK_FONT_SCALE;
+    }
+    if (chartDiv.layout.yaxis2?.tickfont?.size !== undefined) {
+        updates['yaxis2.tickfont.size'] = generalFontScale;
+    }
+
+    // --- Annotations ---
+    // Skip runtime-managed annotations (credits, fan, user-drawn lines)
+    const SKIP_PREFIXES = ['credit-', 'fan-', 'phase-', 'aim-', 'cel-'];
+
+    (chartDiv.layout.annotations || []).forEach((ann, i) => {
+        if (ann.name && SKIP_PREFIXES.some(p => ann.name.startsWith(p))) return;
+
+        // Universal font scaling for template annotations
+        updates[`annotations[${i}].font.size`] = generalFontScale;
+
+        // Special: counting-times x-position (depends on xaxis_px)
+        if (ann.name === 'counting-times') {
             updates[`annotations[${i}].x`] = 1 + (height * config.countingTimesXOffsetMultiplier / xaxis_px);
-        if (ann.name === 'yaxis-title')
+        }
+
+        // Special: yaxis-title x-position (depends on xaxis_px)
+        if (ann.name === 'yaxis-title') {
             updates[`annotations[${i}].x`] = -(height * config.yAxisTitleXOffsetMultiplier / xaxis_px);
+        }
+
+        if (!ann.name) return;
+
+        // On mobile, hide top_x_title
+        if (isMobile() && ann.name === 'top_x_title') {
+            updates[`annotations[${i}].visible`] = false;
+            return;
+        }
+
+        // Config-pattern annotations: font size and y-position
+        for (const [pattern, settings] of Object.entries(config.annotations)) {
+            const matches = settings.prefix
+                ? ann.name.startsWith(pattern)
+                : ann.name === pattern;
+
+            if (matches) {
+                const baseScale = settings.useTitle ? titleFontScale : generalFontScale;
+                const pixelOffset = baseScale * settings.offsetMultiplier;
+
+                if (settings.fontScale) {
+                    updates[`annotations[${i}].font.size`] = (settings.useTitle ? titleFontScale : generalFontScale) * settings.fontScale;
+                } else if (settings.useTitle) {
+                    updates[`annotations[${i}].font.size`] = titleFontScale;
+                }
+
+                if (!settings.skipPosition && settings.offsetMultiplier) {
+                    if (settings.yDirection === 'below') {
+                        updates[`annotations[${i}].y`] = 0 - (pixelOffset / yaxis_px);
+                    } else {
+                        updates[`annotations[${i}].y`] = 1 + (pixelOffset / yaxis_px);
+                    }
+                }
+                break;
+            }
+        }
     });
 
-    if (Object.keys(updates).length) Plotly.relayout(chartDiv, updates);
+    // --- Shapes ---
+    const paper_y_tick_len = RESIZE.Y_TICK_LENGTH_PX / xaxis_px;
+
+    (chartDiv.layout.shapes || []).forEach((shape, i) => {
+        if (!shape.name) return;
+
+        // Y-tick and spine scaling (paper x-coordinates depend on xaxis_px)
+        if (shape.name === 'left-y-tick') {
+            updates[`shapes[${i}].x1`] = -paper_y_tick_len;
+        } else if (shape.name === 'right-y-tick' && !config.shapes.noRightYTick) {
+            updates[`shapes[${i}].x1`] = 1 + paper_y_tick_len;
+        } else if (shape.name === 'top-spine') {
+            updates[`shapes[${i}].x0`] = -paper_y_tick_len;
+        }
+
+        // Date-line shapes (Daily chart)
+        if (config.shapes.hasDateLine && shape.name === 'date-line') {
+            const dateLineOffset = generalFontScale * config.shapes.dateLineOffsetMultiplier;
+            const px_date_line_len = dateLineOffset * RESIZE.DATE_LINE_LEN_SCALE;
+            const paper_date_line_len = px_date_line_len / xaxis_px;
+
+            updates[`shapes[${i}].y0`] = 1 + (dateLineOffset / yaxis_px);
+            updates[`shapes[${i}].y1`] = 1 + (dateLineOffset / yaxis_px);
+
+            // Recover original center from symmetrically-offset x0/x1
+            const middle = (shape.x0 + shape.x1) / 2;
+            updates[`shapes[${i}].x0`] = middle + paper_date_line_len;
+            updates[`shapes[${i}].x1`] = middle - paper_date_line_len;
+        }
+
+        // Top x-axis tick shapes
+        if (shape.name === 'top-x-tick') {
+            if (config.shapes.useDecadeTicks) {
+                const fullHeight = (generalFontScale * config.shapes.topXTickFullMultiplier) / yaxis_px;
+                const halfHeight = (generalFontScale * config.shapes.topXTickHalfMultiplier) / yaxis_px;
+                const xPos = shape.x0;
+                updates[`shapes[${i}].y0`] = 1 + (xPos % 10 === 0 ? fullHeight : halfHeight);
+            } else if (config.shapes.hasTopXTick) {
+                const tickHeight = (generalFontScale * config.shapes.topXTickMultiplier) / yaxis_px;
+                updates[`shapes[${i}].y0`] = 1 + tickHeight;
+            }
+        }
+    });
+
+    if (Object.keys(updates).length) {
+        Plotly.relayout(chartDiv, updates);
+    }
 }
 
-export { resizeChartByHeight, emitFanReposition, repositionLabels };
+export { resizeChartByHeight, emitFanReposition, rescaleChartElements };

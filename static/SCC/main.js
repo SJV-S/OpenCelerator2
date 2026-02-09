@@ -55,7 +55,7 @@ import { injectCelerationFan, initFanDrag, toggleCelerationFan, init as celerati
 import { injectCredits, initCreditClick, regenerateCredits, init as creditInit } from './misc/credit.js';
 import { toggleLegend, renderCustomLegend, init as customLegendInit } from './misc/customLegend.js';
 import { setupPanConstraints } from './util/panning_controls.js';
-import { resizeChartByHeight, emitFanReposition, repositionLabels } from './util/resize-chart.js';
+import { resizeChartByHeight, emitFanReposition, rescaleChartElements } from './util/resize-chart.js';
 import { getTemplate } from './util/chartLayouts.js';
 import { showInitialMenuHint } from './ui/tooltip.js';
 import { icons } from './ui/icons.js';
@@ -491,7 +491,7 @@ export function setupEventListeners() {
         }).then(() => {
             emitFanReposition();
             regenerateCredits();
-            repositionLabels();
+            rescaleChartElements(chartDiv);
             renderCustomLegend();
             // Slider updates automatically via plotly_relayout event
         });
