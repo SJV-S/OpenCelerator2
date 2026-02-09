@@ -29,7 +29,10 @@ build/
 Thumbs.db
 
 # Project specific
+instance/
 *.log
 push.sh
 notes.txt
 scripts/build/Tailwind/tailwindcss
+CLAUDE.md
+

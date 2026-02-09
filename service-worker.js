@@ -7,7 +7,7 @@
 // Set to true during development to always fetch fresh (bypasses cache)
 const DEVELOPER_MODE = true;
 
-const SW_VERSION = '0.19.0';
+const SW_VERSION = '0.1.5';
 const CACHE_NAME = `scc-cache-v${SW_VERSION}`;
 
 // HTML pages to precache
@@ -36,7 +36,7 @@ const PRECACHE_STATIC = [
     '/static/SCC/debug.js',
     '/static/SCC/eventBus.js',
     '/static/SCC/navigation.js',
-    '/static/pwaInstall.js',
+    '/static/SCC/pwaInstall.js',
     // Libraries
     '/static/lib/idb.js',
     '/static/lib/plotly-2.35.2.min.js',
@@ -148,6 +148,10 @@ self.addEventListener('activate', (event) => {
                 return Promise.all(deletePromises);
             })
             .then(() => self.clients.claim())
+            .then(() => self.clients.matchAll())
+            .then(clients => {
+                clients.forEach(c => c.postMessage({ type: 'SW_VERSION', version: SW_VERSION }));
+            })
     );
 });
 
@@ -238,6 +242,13 @@ async function cacheFirstWithNetwork(request) {
         throw err;
     }
 }
+
+// Respond with version when asked
+self.addEventListener('message', (event) => {
+    if (event.data?.type === 'GET_VERSION') {
+        event.ports[0].postMessage({ version: SW_VERSION });
+    }
+});
 
 // Fetch with timeout
 function fetchWithTimeout(request, timeoutMs) {

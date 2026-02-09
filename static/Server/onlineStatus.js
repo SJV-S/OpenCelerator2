@@ -2,12 +2,29 @@
 // Displays connection status in top-right corner and provides isOnline() check
 
 let statusElement = null;
+let appVersion = null;
 
 /**
  * Check if the browser is online
  */
 export function isOnline() {
     return navigator.onLine;
+}
+
+/**
+ * Request version from service worker via MessageChannel
+ */
+function fetchVersion() {
+    if (!navigator.serviceWorker) return;
+
+    navigator.serviceWorker.ready.then((registration) => {
+        const channel = new MessageChannel();
+        channel.port1.onmessage = (event) => {
+            appVersion = event.data.version;
+            updateStatus();
+        };
+        registration.active.postMessage({ type: 'GET_VERSION' }, [channel.port2]);
+    });
 }
 
 /**
@@ -41,13 +58,15 @@ function createStatusElement() {
 function updateStatus() {
     if (!statusElement) createStatusElement();
 
+    const prefix = appVersion ? `v${appVersion} · ` : '';
+
     if (navigator.onLine) {
-        statusElement.textContent = 'online';
+        statusElement.textContent = `${prefix}online`;
         statusElement.style.color = '#059669';
         statusElement.style.backgroundColor = 'rgba(209, 250, 229, 0.9)';
         statusElement.style.opacity = '1';
     } else {
-        statusElement.textContent = 'offline';
+        statusElement.textContent = `${prefix}offline`;
         statusElement.style.color = '#dc2626';
         statusElement.style.backgroundColor = 'rgba(254, 226, 226, 0.9)';
         statusElement.style.opacity = '1';
@@ -61,6 +80,14 @@ function updateStatus() {
 export function initOnlineStatus() {
     createStatusElement();
     updateStatus();
+    fetchVersion();
+
+    navigator.serviceWorker?.addEventListener('message', (event) => {
+        if (event.data?.type === 'SW_VERSION') {
+            appVersion = event.data.version;
+            updateStatus();
+        }
+    });
 
     window.addEventListener('online', () => {
         console.log('[Status] Back online');
