@@ -269,7 +269,9 @@ body {
                 return;
             }
 
-            document.getElementById('chart-menu-content').classList.remove('menu-loading');
+            const menuContent = document.getElementById('chart-menu-content');
+            menuContent.classList.remove('menu-loading');
+            requestAnimationFrame(() => menuContent.classList.add('visible'));
             setupEventListeners();
             initializeChart();
 

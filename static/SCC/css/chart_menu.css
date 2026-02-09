@@ -29,10 +29,7 @@
     }
 }
 
-/* Hide menu content until chart is loaded and visibility states are set */
-.menu-loading .chart-menu-tab-inner {
-    visibility: hidden;
-}
+/* Menu content hidden until chart loads — handled by .page-fade opacity */
 
 /* ===== TAB BUTTONS PANEL ===== */
 .chart-menu-tabs {

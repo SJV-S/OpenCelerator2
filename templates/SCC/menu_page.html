@@ -83,7 +83,7 @@ html, body {
     </div>
 </header>
 
-<main class="max-w-5xl mx-auto px-6 py-8">
+<main class="page-fade max-w-5xl mx-auto px-6 py-8">
     <!-- Search Bar -->
     <div class="mb-6">
         <div class="flex items-center gap-4">
@@ -205,22 +205,6 @@ html, body {
     <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
         <h3 class="text-lg font-semibold text-gray-800 mb-4">Sync Device</h3>
 
-        <!-- Sync enabled checkbox -->
-        <label class="flex items-center gap-2 mb-5 cursor-pointer">
-            <input type="checkbox" id="sync-enabled-checkbox" class="accent-[#6ad1e3] w-4 h-4">
-            <span class="text-sm font-medium text-gray-700">Sync all charts to server</span>
-        </label>
-
-        <!-- Upload all charts button -->
-        <div class="mb-5">
-            <div class="flex items-center gap-2">
-                <button id="sync-upload-btn" class="flex-1 px-3 py-2 text-sm font-medium border-2 border-[#6ad1e3] text-[#05c3de] rounded-lg hover:bg-[#6ad1e3] hover:text-white transition-colors">
-                    Upload all charts to server
-                </button>
-            </div>
-            <p id="sync-upload-status" class="text-sm mt-2 hidden"></p>
-        </div>
-
         <!-- Divider -->
         <div class="flex items-center gap-3 mb-5">
             <div class="flex-1 border-t border-gray-200"></div>
@@ -291,8 +275,8 @@ html, body {
     import { isOpenCeleratorFormat, buildChartFromOpenCelerator } from '/static/SCC/import/openCeleratorImport.js';
     import { openDB } from '/static/lib/idb.js';
     import { validatePassphrase, getUserId } from '/static/Server/passphrase.js';
-    import { initSync, uploadCharts, pullCharts, checkForUpdates } from '/static/Server/syncClient.js';
-    import { initServerSync, resetSync, setSyncEnabled } from '/static/Server/init.js';
+    import { initSync, pullCharts, checkForUpdates } from '/static/Server/syncClient.js';
+    import { initServerSync, resetSync, isSyncEnabled } from '/static/Server/init.js';
 
     let charts = [];
     let chartToDelete = null;
@@ -637,8 +621,8 @@ html, body {
         renderCharts();
 
         // Pull updates from server if sync enabled
-        const syncOn = await getSyncEnabled();
-        if (syncOn) {
+        await initServerSync();
+        if (isSyncEnabled()) {
             try {
                 await drainPushQueue();
                 const manifest = charts.map(c => ({ chart_uuid: c.id, updated_at: c.updatedAt || 0 }));
@@ -846,15 +830,6 @@ html, body {
         }
     }
 
-    async function getSyncEnabled() {
-        try {
-            const db = await openDB('SCC_Identity', 1);
-            return (await db.get('credentials', 'syncEnabled')) === true;
-        } catch {
-            return false;
-        }
-    }
-
     function renderPassphraseDisplay() {
         const display = document.getElementById('sync-passphrase-display');
         const eyeIcon = document.getElementById('sync-eye-icon');
@@ -881,38 +856,14 @@ html, body {
         }
     }
 
-    async function gatherLocalCharts() {
-        const allCharts = await listCharts();
-        if (allCharts.length === 0) return [];
-        const chartsDb = await openDB('SCC_Charts', 1);
-        const localCharts = [];
-        for (const chart of allCharts) {
-            const full = await chartsDb.get('charts', chart.id);
-            if (full) {
-                localCharts.push({
-                    id: full.id,
-                    data: full,
-                    updatedAt: full.lastModified || Math.floor(Date.now() / 1000),
-                    chartKeyHex: full.chartKey || null
-                });
-            }
-        }
-        return localCharts;
-    }
-
     function openSyncModal() {
         syncPassphraseVisible = false;
         document.getElementById('sync-paste-input').value = '';
         document.getElementById('sync-copy-btn').textContent = 'Copy';
-        hideUploadStatus();
 
         getPassphrase().then(p => {
             syncPassphrase = p || null;
             renderPassphraseDisplay();
-        });
-
-        getSyncEnabled().then(enabled => {
-            document.getElementById('sync-enabled-checkbox').checked = enabled;
         });
 
         document.getElementById('sync-modal').classList.remove('hidden');
@@ -943,49 +894,8 @@ html, body {
         el.textContent = '';
     }
 
-    function showUploadStatus(message, isError) {
-        const el = document.getElementById('sync-upload-status');
-        el.textContent = message;
-        el.className = `text-sm mt-2 ${isError ? 'text-red-600' : 'text-green-600'}`;
-        el.classList.remove('hidden');
-    }
-
-    function hideUploadStatus() {
-        const el = document.getElementById('sync-upload-status');
-        el.classList.add('hidden');
-        el.textContent = '';
-    }
-
     document.getElementById('sync-device-btn').addEventListener('click', openSyncModal);
     document.getElementById('sync-cancel-btn').addEventListener('click', closeSyncModal);
-
-    document.getElementById('sync-enabled-checkbox').addEventListener('change', (e) => {
-        setSyncEnabled(e.target.checked);
-    });
-
-    document.getElementById('sync-upload-btn').addEventListener('click', async () => {
-        const btn = document.getElementById('sync-upload-btn');
-        btn.disabled = true;
-        btn.textContent = 'Uploading...';
-        hideUploadStatus();
-
-        try {
-            await initServerSync();
-            const localCharts = await gatherLocalCharts();
-            if (localCharts.length === 0) {
-                showUploadStatus('No charts to upload.', false);
-            } else {
-                await uploadCharts(localCharts);
-                showUploadStatus(`Uploaded ${localCharts.length} chart(s) to server.`, false);
-            }
-        } catch (err) {
-            console.error('[Sync] Upload failed:', err);
-            showUploadStatus(`Upload failed: ${err.message}`, true);
-        } finally {
-            btn.disabled = false;
-            btn.textContent = 'Upload all charts to server';
-        }
-    });
 
     document.getElementById('sync-modal').addEventListener('click', (e) => {
         if (e.target.id === 'sync-modal') closeSyncModal();
