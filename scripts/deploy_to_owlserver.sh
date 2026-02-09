@@ -29,4 +29,3 @@ echo "[5/5] Cleanup..."
 rm -rf "$TMP"
 
 echo "Done. Deployed to ${VPS}:${VPS_PATH}"
-
