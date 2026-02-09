@@ -5,6 +5,14 @@
 
 set -e
 
+FOREGROUND=false
+while getopts "f" opt; do
+    case $opt in
+        f) FOREGROUND=true ;;
+        *) echo "Usage: $0 [-f]  (-f = foreground)"; exit 1 ;;
+    esac
+done
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_DIR="$(dirname "$SCRIPT_DIR")"
 VENV_DIR="$APP_DIR/venv"
@@ -67,6 +75,11 @@ EOF
     echo "Systemd service installed and enabled."
 fi
 
-echo "Starting server via systemd..."
-sudo systemctl start "$SERVICE"
-echo "Running. Use 'sudo journalctl -u $SERVICE -f' to tail logs."
+if [ "$FOREGROUND" = true ]; then
+    echo "Starting server in foreground (Ctrl+C to stop)..."
+    "$VENV_DIR/bin/gunicorn" -w 1 -k eventlet -b 0.0.0.0:5002 app:app
+else
+    echo "Starting server via systemd..."
+    sudo systemctl start "$SERVICE"
+    echo "Running. Use 'sudo journalctl -u $SERVICE -f' to tail logs."
+fi
