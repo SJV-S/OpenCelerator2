@@ -190,6 +190,7 @@ function openCreditEditDialog() {
         chartState.credits[1] = document.getElementById('credit-input-1').value;
         renderCredits();
         overlay.remove();
+        eventBus.emit(EVENTS.CREDITS_UPDATED);
     };
 
     const handleCancel = () => overlay.remove();

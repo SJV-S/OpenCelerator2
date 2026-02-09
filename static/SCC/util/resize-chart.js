@@ -322,8 +322,9 @@ function rescaleChartElements(chartDiv) {
             updates[`annotations[${i}].x`] = 1 + (height * config.countingTimesXOffsetMultiplier / xaxis_px);
         }
 
-        // Special: yaxis-title x-position (depends on xaxis_px)
+        // Special: yaxis-title — uses titleFontScale (matching resizeChartByHeight)
         if (ann.name === 'yaxis-title') {
+            updates[`annotations[${i}].font.size`] = titleFontScale;
             updates[`annotations[${i}].x`] = -(height * config.yAxisTitleXOffsetMultiplier / xaxis_px);
         }
 
@@ -408,7 +409,7 @@ function rescaleChartElements(chartDiv) {
     });
 
     if (Object.keys(updates).length) {
-        Plotly.relayout(chartDiv, updates);
+        return Plotly.relayout(chartDiv, updates);
     }
 }
 

@@ -488,10 +488,10 @@ export function setupEventListeners() {
         Plotly.relayout(chartDiv, {
             'xaxis.range': [-LAYOUT.X_AXIS_MARGIN_OFFSET, newValue + LAYOUT.X_AXIS_MARGIN_OFFSET],
             width: newWidth
-        }).then(() => {
+        }).then(async () => {
             emitFanReposition();
+            await rescaleChartElements(chartDiv);
             regenerateCredits();
-            rescaleChartElements(chartDiv);
             renderCustomLegend();
             // Slider updates automatically via plotly_relayout event
         });

@@ -71,6 +71,15 @@
  * NO exceptions. Seconds in, seconds out. The * 1000 conversion belongs at
  * the point of consumption (e.g. display formatting), never in storage.
  * =============================================================================
+ *
+ * =============================================================================
+ * DST-SAFE DAY ARITHMETIC
+ * =============================================================================
+ * All day-difference calculations use Date.UTC() normalization, NOT raw local
+ * date subtraction. Local midnight-to-midnight spans 23 or 25 hours across DST
+ * transitions, so Math.floor(localDiff / 86400000) silently loses or gains a
+ * day. Date.UTC() strips timezone offset, making the division exact.
+ * =============================================================================
  */
 
 import { chartState } from '../chartState.js';
@@ -348,7 +357,11 @@ function dateToXPosition(date) {
     const startDate = parseLocalDate(chartState.startDate);
 
     // Calculate days difference (used by daily and weekly)
-    const daysDiff = Math.floor((inputDate - startDate) / (1000 * 60 * 60 * 24));
+    // Use Date.UTC to avoid DST causing off-by-one (spring-forward makes local
+    // midnight-to-midnight 23 hours, and Math.floor rounds that down)
+    const utcInput = Date.UTC(inputDate.getFullYear(), inputDate.getMonth(), inputDate.getDate());
+    const utcStart = Date.UTC(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+    const daysDiff = Math.round((utcInput - utcStart) / (1000 * 60 * 60 * 24));
 
     switch (chartType) {
         case 'yearly':

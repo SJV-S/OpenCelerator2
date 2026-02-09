@@ -438,12 +438,23 @@ function handlePhaseLineDrawClick(event, chartDiv) {
 }
 
 /**
- * Rounds y-value to nearest value from [0.01, 0.1, 1, 10, 100, 500]
+ * Rounds y-value to nearest allowed snap target across all decades
  * @param {number} yValue - Raw y value
  * @returns {number} Rounded y value
  */
 function roundYValue(yValue) {
-    const allowedValues = [0.01, 0.1, 1, 10, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 2000, 3000, 4000, 5000, 10000, 20000, 30000, 40000, 50000, 100000, 200000, 300000, 400000, 500000, 600000, 700000, 800000, 900000, 1000000];
+    const allowedValues = [
+        0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009,
+        0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09,
+        0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,
+        1, 2, 3, 4, 5, 6, 7, 8, 9,
+        10, 20, 30, 40, 50, 60, 70, 80, 90,
+        100, 200, 300, 400, 500, 600, 700, 800, 900,
+        1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000,
+        10000, 20000, 30000, 40000, 50000, 60000, 70000, 80000, 90000,
+        100000, 200000, 300000, 400000, 500000, 600000, 700000, 800000, 900000,
+        1000000,
+    ];
 
     // Find the closest allowed value
     let closest = allowedValues[0];

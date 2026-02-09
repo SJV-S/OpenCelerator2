@@ -5,6 +5,13 @@
  */
 
 /* ===== MENU CONTAINER ===== */
+@media (max-width: 1023px) {
+    #counter-overlay {
+        width: 100%;
+        height: 100%;
+    }
+}
+
 @media (min-width: 1024px) {
     #counter-overlay {
         display: flex !important;
