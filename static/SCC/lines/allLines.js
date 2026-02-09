@@ -116,8 +116,8 @@ function removeLine(lineType, lineId) {
     }
 
     const lineIdStr = `${category}-${lineId}`;
-    const shapes = (chartDiv.layout.shapes || []).filter(s => s.name !== lineIdStr);
-    const annotations = (chartDiv.layout.annotations || []).filter(a => a.name !== lineIdStr);
+    const shapes = (chartDiv.layout.shapes || []).filter(s => !s.name?.startsWith(lineIdStr));
+    const annotations = (chartDiv.layout.annotations || []).filter(a => !a.name?.startsWith(lineIdStr));
 
     Plotly.relayout(chartDiv, { shapes, annotations });
     delete chartState[lineType][lineId];
