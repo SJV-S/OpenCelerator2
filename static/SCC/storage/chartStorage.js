@@ -28,7 +28,7 @@ import { CHART_TYPE_CONFIG } from '../config.js';
 import { findNearestMonday, serializeDate, deserializeDate } from '../util/dates.js';
 import { jsonBackwardsCompatibilityCheck } from '../import/jsonBackwardsCompatibility.js';
 import { generateChartKey } from '../../Server/crypto.js';
-import { pushChart, isInitialized, startSyncPolling, leaveChart as syncLeaveChart, deleteChart as syncDeleteChart } from '../../Server/syncClient.js';
+import { pushChart, isInitialized, startSyncWatch, leaveChart as syncLeaveChart, deleteChart as syncDeleteChart } from '../../Server/syncClient.js';
 import { isSyncEnabled } from '../../Server/init.js';
 import { hasSocket } from '../../Server/wsClient.js';
 
@@ -462,7 +462,7 @@ function debouncedSaveToIndexedDB() {
             if ((chartState.shared || isSyncEnabled()) && isInitialized()) {
                 // Reconnect WebSocket if it dropped (e.g. after sleep/tab freeze)
                 if (chartState.shared && !hasSocket()) {
-                    startSyncPolling(chartState.id);
+                    startSyncWatch(chartState.id);
                 }
                 pushChart(chartState.id)
                     .then(() => drainPushQueue())

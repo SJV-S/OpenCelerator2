@@ -72,7 +72,7 @@ async function init() {
     await loadChart(chartId);      // 3. DATA: hydrate chartState from IndexedDB
     setupEventListeners();         // 4. Bind all UI event listeners
     initializeChart();             // 5. VISUAL: build and render the Plotly chart
-    startSyncPolling(chartId);     // 6. Begin polling for remote updates
+    startSyncWatch(chartId);       // 6. Begin watching for remote updates
 }
 ```
 
@@ -144,7 +144,7 @@ The `loadCharts()` function in `templates/SCC/menu_page.html:542` is a completel
 │  └──────────────────────────────────┘                │
 │       │                                              │
 │       ▼                                              │
-│  startSyncPolling()                                  │
+│  startSyncWatch()                                    │
 └─────────────────────────────────────────────────────┘
 
          ┌─────────── SYNC UPDATE ───────────┐

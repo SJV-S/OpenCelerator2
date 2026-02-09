@@ -326,8 +326,9 @@ def create_edit_link():
     share_link = db.session.get(ShareLink, chart_uuid)
     if share_link:
         share_link.wrapped_key = wrapped_share_bytes
+        share_link.created_at = int(time.time())
     else:
-        share_link = ShareLink(chart_uuid=chart_uuid, wrapped_key=wrapped_share_bytes)
+        share_link = ShareLink(chart_uuid=chart_uuid, wrapped_key=wrapped_share_bytes, created_at=int(time.time()))
         db.session.add(share_link)
 
     db.session.commit()
@@ -353,11 +354,23 @@ def get_shared_chart(chart_uuid):
     """Get chart data and wrapped key for share link"""
     chart = db.session.get(Chart, chart_uuid)
     if not chart:
-        return jsonify({'error': 'Chart not found'}), 404
+        return jsonify({'error': 'This link has expired or does not exist'}), 404
 
     share_link = db.session.get(ShareLink, chart_uuid)
     if not share_link:
-        return jsonify({'error': 'No share link'}), 404
+        return jsonify({'error': 'This link has expired or does not exist'}), 404
+
+    # TTL check — expire links older than SHARE_LINK_TTL_SECONDS
+    now = int(time.time())
+    if share_link.created_at + config.SHARE_LINK_TTL_SECONDS < now:
+        # Opportunistic cleanup: delete all expired share links
+        expired = ShareLink.query.filter(
+            ShareLink.created_at + config.SHARE_LINK_TTL_SECONDS < now
+        ).delete()
+        db.session.commit()
+        if expired:
+            app.logger.info(f'[TTL] Removed {expired} expired share link(s)')
+        return jsonify({'error': 'This link has expired or does not exist'}), 404
 
     return jsonify({
         'chart_uuid': chart_uuid,

@@ -4,7 +4,7 @@
 import { chartState } from '../chartState.js';
 import { createToast, createConfirmToast } from '../ui/toaster.js';
 import { icons } from '../ui/icons.js';
-import { createViewLink, createEditLink, isInitialized, startSyncPolling, stopSyncPolling } from '../../Server/syncClient.js';
+import { createViewLink, createEditLink, isInitialized, startSyncWatch, stopSyncWatch } from '../../Server/syncClient.js';
 import { importChart, deleteChart } from '../storage/chartStorage.js';
 import { getFirstConfig } from '../series/traceStyles.js';
 import { isOnline } from '../../Server/onlineStatus.js';
@@ -242,7 +242,7 @@ async function handleShareLinkClick(type) {
         }
 
         // Open WebSocket connection now that chart is shared
-        startSyncPolling(chartState.id);
+        startSyncWatch(chartState.id);
 
         await navigator.clipboard.writeText(url);
 
@@ -343,7 +343,7 @@ async function unshareChart() {
     await deleteChart(oldId);
 
     // Disconnect WebSocket
-    stopSyncPolling();
+    stopSyncWatch();
 
     // Navigate to the new private chart
     window.location.href = `/chart/${newId}`;

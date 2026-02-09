@@ -5,6 +5,8 @@ SQLAlchemy models supporting both SQLite and PostgreSQL.
 Schema based on PWA_SYNC_PROPOSAL.md
 """
 
+import time
+
 from flask_sqlalchemy import SQLAlchemy
 
 db = SQLAlchemy()
@@ -54,6 +56,7 @@ class ShareLink(db.Model):
 
     chart_uuid = db.Column(db.String(36), db.ForeignKey('charts.chart_uuid'), primary_key=True)
     wrapped_key = db.Column(db.LargeBinary, nullable=False)  # chart_key wrapped with share-derived key
+    created_at = db.Column(db.Integer, nullable=False)  # Unix seconds
 
     chart = db.relationship('Chart', back_populates='share_link')
 
@@ -86,6 +89,16 @@ def init_db(app):
     db.init_app(app)
     with app.app_context():
         db.create_all()
+
+        # Migration: add created_at to share_links (create_all won't alter existing tables)
+        try:
+            db.session.execute(db.text('ALTER TABLE share_links ADD COLUMN created_at INTEGER'))
+            db.session.execute(db.text('UPDATE share_links SET created_at = :now WHERE created_at IS NULL'),
+                               {'now': int(time.time())})
+            db.session.commit()
+        except Exception:
+            db.session.rollback()  # Column already exists
+
         if 'sqlite' in app.config['SQLALCHEMY_DATABASE_URI']:
             db.session.execute(db.text('PRAGMA journal_mode=WAL'))
             db.session.commit()

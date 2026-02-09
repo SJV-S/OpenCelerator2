@@ -814,6 +814,21 @@ html, body {
         }
     });
 
+    // Show share-link error banner if redirected from an expired/invalid link
+    function showShareError() {
+        const msg = sessionStorage.getItem('scc-share-error');
+        if (!msg) return;
+        sessionStorage.removeItem('scc-share-error');
+
+        const banner = document.createElement('div');
+        banner.className = 'fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-red-50 border border-red-300 text-red-800 px-5 py-3 rounded-lg shadow-md text-sm font-medium flex items-center gap-3';
+        banner.innerHTML = `<span>${msg}</span><button class="text-red-400 hover:text-red-600 text-lg leading-none">&times;</button>`;
+        banner.querySelector('button').addEventListener('click', () => banner.remove());
+        document.body.appendChild(banner);
+        setTimeout(() => banner.remove(), 8000);
+    }
+    showShareError();
+
     // Load on page show (handles back button)
     window.addEventListener('pageshow', loadCharts);
 

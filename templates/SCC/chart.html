@@ -237,7 +237,7 @@ body {
     <script type="module">
         import { initializeChart, setupEventListeners } from '/static/SCC/main.js';
         import { initStorage, loadChart } from '/static/SCC/storage/chartStorage.js';
-        import { joinSharedChart, startSyncPolling, checkForUpdates } from '/static/Server/syncClient.js';
+        import { joinSharedChart, startSyncWatch, checkForUpdates } from '/static/Server/syncClient.js';
         import { initServerSync, isSyncEnabled } from '/static/Server/init.js';
         import { openDB } from '/static/lib/idb.js';
         import { eventBus, EVENTS } from '/static/SCC/eventBus.js';
@@ -258,6 +258,7 @@ body {
                     window.history.replaceState({}, '', `/chart/${chartId}`);
                 } catch (err) {
                     console.error('Share link failed:', err);
+                    sessionStorage.setItem('scc-share-error', err.message);
                     window.location.href = '/';
                     return;
                 }
@@ -290,7 +291,7 @@ body {
                 }
             }, true);
 
-            startSyncPolling(chartId);
+            startSyncWatch(chartId);
 
             // For non-shared charts with sync enabled, check server for newer version
             if (!chartState.shared && isSyncEnabled()) {

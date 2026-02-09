@@ -285,7 +285,10 @@ export async function leaveChart(chartUuid) {
 export async function joinSharedChart(chartUuid, shareSecret) {
     // Fetch chart data and wrapped key from server
     const response = await fetch(`/api/chart/${chartUuid}/shared`);
-    if (!response.ok) throw new Error(`Failed to fetch shared chart: ${response.status}`);
+    if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || `Failed to fetch shared chart: ${response.status}`);
+    }
     const { data, wrapped_key, updated_at } = await response.json();
 
     // Derive key from share secret
@@ -359,8 +362,8 @@ export async function syncChart(chartId, updatedAt = null) {
     }
 }
 
-export async function startSyncPolling(chartId) {
-    stopSyncPolling();
+export async function startSyncWatch(chartId) {
+    stopSyncWatch();
 
     // Initial sync check
     syncChart(chartId);
@@ -375,7 +378,7 @@ export async function startSyncPolling(chartId) {
     }
 }
 
-export function stopSyncPolling() {
+export function stopSyncWatch() {
     disconnectFromChart();
 }
 
