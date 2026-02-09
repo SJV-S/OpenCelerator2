@@ -75,11 +75,14 @@ EOF
     echo "Systemd service installed and enabled."
 fi
 
+IP=$(hostname -I | awk '{print $1}')
 if [ "$FOREGROUND" = true ]; then
     echo "Starting server in foreground (Ctrl+C to stop)..."
+    echo "Visit http://${IP}:5002"
     "$VENV_DIR/bin/gunicorn" -w 1 -k eventlet -b 0.0.0.0:5002 app:app
 else
     echo "Starting server via systemd..."
     sudo systemctl start "$SERVICE"
-    echo "Running. Use 'sudo journalctl -u $SERVICE -f' to tail logs."
+    echo "Visit http://${IP}:5002"
+    echo "Use 'sudo journalctl -u $SERVICE -f' to tail logs."
 fi
