@@ -10,6 +10,7 @@ import { getFirstConfig } from '../series/traceStyles.js';
 import { isOnline } from '../../Server/onlineStatus.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 import { serializeDate } from '../util/dates.js';
+import { DEVELOPER_MODE } from '../config.js';
 
 /**
  * Takes a screenshot of the Plotly chart and downloads it as PNG
@@ -277,7 +278,9 @@ function exportChartStateToJSON() {
 
         // Build exportable object: spread chartState, override startDate to ISO string
         const exportObj = { ...chartState, startDate: serializeDate(chartState.startDate) };
-        const jsonContent = JSON.stringify(exportObj, null, 2);
+        const jsonContent = DEVELOPER_MODE
+            ? JSON.stringify(exportObj, null, 2)
+            : JSON.stringify(exportObj);
 
         console.log('[IMPORT DEBUG] Serialized JSON total size:', jsonContent.length, 'chars (' + (jsonContent.length / 1024).toFixed(1) + ' KB)');
         console.log('[IMPORT DEBUG] === exportChartStateToJSON END ===');

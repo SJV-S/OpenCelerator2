@@ -2,6 +2,9 @@
  * Application Configuration
  */
 
+// Mirror of DEVELOPER_MODE in service-worker.js (SW scope is isolated)
+export const DEVELOPER_MODE = true;
+
 // Series name constants (used as keys in chartState)
 export const CORRECTS = 'corrects';
 export const ERRORS = 'errors';
