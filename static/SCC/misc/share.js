@@ -9,6 +9,7 @@ import { importChart, deleteChart } from '../storage/chartStorage.js';
 import { getFirstConfig } from '../series/traceStyles.js';
 import { isOnline } from '../../Server/onlineStatus.js';
 import { eventBus, EVENTS } from '../eventBus.js';
+import { serializeDate } from '../util/dates.js';
 
 /**
  * Takes a screenshot of the Plotly chart and downloads it as PNG
@@ -128,7 +129,7 @@ function exportDataToCSV() {
         });
         csvContent += '\n';
 
-        // Helper function to format value (convert NaN to empty string)
+        // Helper function to format value (convert null/NaN to empty string)
         const formatValue = (val) => {
             if (val === undefined || val === null || Number.isNaN(val)) return '';
             return val;
@@ -136,7 +137,7 @@ function exportDataToCSV() {
 
         // Iterate through each data point
         for (let i = 0; i < dataLength; i++) {
-            // Skip rows where all data columns are empty/NaN
+            // Skip rows where all data columns are empty/null
             const hasCorrect = includeCorrects && Number.isFinite(chartState.series.corrects[i]);
             const hasError = includeErrors && Number.isFinite(chartState.series.errors[i]);
             const hasMinute = includeMinutes && Number.isFinite(chartState.series.timing[i]);
@@ -253,43 +254,33 @@ async function handleShareLinkClick(type) {
 }
 
 /**
- * Recursively serialize a value, handling Date and NaN
- * Must match the format in chartStorage.js serializeValue
- */
-function serializeValue(value) {
-    if (value instanceof Date) {
-        return { __date__: value.toISOString() };
-    }
-    if (typeof value === 'number' && Number.isNaN(value)) {
-        return '__NaN__';
-    }
-    if (Array.isArray(value)) {
-        return value.map(serializeValue);
-    }
-    if (typeof value === 'object' && value !== null) {
-        const result = {};
-        for (const [k, v] of Object.entries(value)) {
-            result[k] = serializeValue(v);
-        }
-        return result;
-    }
-    return value;
-}
-
-/**
  * Exports the entire chartState as a JSON file download
  *
  * Data flow:
- * - Serializes chartState object to JSON (preserving NaN and Date values)
+ * - Serializes chartState object to JSON (null for missing data, ISO string for startDate)
  * - Creates a downloadable JSON file via blob
  * - Triggers browser download with filename based on chartName or 'chart-data.json'
  */
 function exportChartStateToJSON() {
     try {
-        // Serialize chartState using same format as chartStorage.js
-        // This converts NaN to '__NaN__' and Date to { __date__: ... } BEFORE JSON.stringify
-        const serialized = serializeValue(chartState);
-        const jsonContent = JSON.stringify(serialized, null, 2);
+        // === IMPORT DEBUG: measure chartState before serialization ===
+        console.log('[IMPORT DEBUG] === exportChartStateToJSON START ===');
+        console.log('[IMPORT DEBUG] chartState top-level keys:', Object.keys(chartState));
+        for (const key of Object.keys(chartState)) {
+            try {
+                const keySize = JSON.stringify(chartState[key]).length;
+                console.log(`[IMPORT DEBUG]   chartState.${key}: ${keySize} chars`);
+            } catch {
+                console.log(`[IMPORT DEBUG]   chartState.${key}: [not serializable]`);
+            }
+        }
+
+        // Build exportable object: spread chartState, override startDate to ISO string
+        const exportObj = { ...chartState, startDate: serializeDate(chartState.startDate) };
+        const jsonContent = JSON.stringify(exportObj, null, 2);
+
+        console.log('[IMPORT DEBUG] Serialized JSON total size:', jsonContent.length, 'chars (' + (jsonContent.length / 1024).toFixed(1) + ' KB)');
+        console.log('[IMPORT DEBUG] === exportChartStateToJSON END ===');
 
         // Create a blob from the JSON content
         const blob = new Blob([jsonContent], { type: 'application/json;charset=utf-8;' });
@@ -336,7 +327,7 @@ async function unshareChart() {
     const oldId = chartState.id;
 
     // Serialize current chartState into a plain object for import
-    const snapshot = serializeValue(chartState);
+    const snapshot = { ...chartState, startDate: serializeDate(chartState.startDate) };
 
     // importChart assigns a new UUID, new chartKey, sets shared: false
     const newId = await importChart(snapshot);

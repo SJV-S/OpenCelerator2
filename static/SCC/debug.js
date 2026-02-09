@@ -6,10 +6,10 @@
  * - Call window.downloadDebugLog() to download the log file
  * - Call window.clearDebugLog() to clear collected logs
  *
- * Current debug focus (misc series change line bugs):
- * - Series selection flow (which series is selected)
- * - Trace meta.seriesName values (are they distinct?)
- * - Date storage/retrieval round-trip (timezone shifts)
+ * Current debug focus (import/export bloat investigation):
+ * - OpenCelerator import: input size, conversion output size, per-key sizes
+ * - chartStorage import/load/save: IDB record sizes
+ * - JSON export: chartState size breakdown, flags keys > 1KB
  */
 
 import { chartState } from './chartState.js';
@@ -27,7 +27,7 @@ const debugLog = [];
 // DEVELOPMENT NOTE: [SW] prefix added for service worker debugging.
 // Service worker logs appear in DevTools console (separate context from page).
 // Page-side SW-related logs (e.g., registration) will be captured here.
-const DEBUG_PREFIXES = ['[CEL DEBUG]', '[STORAGE]', '[LINE SAVE]', '[SW]'];
+const DEBUG_PREFIXES = ['[CEL DEBUG]', '[STORAGE]', '[LINE SAVE]', '[SW]', '[IMPORT DEBUG]'];
 
 // Store original console methods
 const originalLog = console.log.bind(console);

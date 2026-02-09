@@ -17,7 +17,8 @@
  */
 
 import { chartState } from '../chartState.js';
-import { createMiscTraceConfig, MISC_COLORS } from '../config.js';
+import { createMiscTraceConfig, MISC_COLORS, MISSING } from '../config.js';
+import { isMissing } from '../util/format.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 
 // ============================================================================
@@ -322,15 +323,15 @@ function cleanRow(row, columnMap) {
         return { data: null, error: `Invalid date: ${dateValue}` };
     }
 
-    // Parse corrects (optional, defaults to NaN)
+    // Parse corrects (optional, defaults to MISSING)
     const corrects = columnMap.corrects
         ? cleanNumeric(row[columnMap.corrects])
-        : NaN;
+        : MISSING;
 
-    // Parse errors (optional, defaults to NaN)
+    // Parse errors (optional, defaults to MISSING)
     const errors = columnMap.errors
         ? cleanNumeric(row[columnMap.errors])
-        : NaN;
+        : MISSING;
 
     // Parse timing (optional, defaults to 1)
     const timing = columnMap.timing
@@ -348,8 +349,8 @@ function cleanRow(row, columnMap) {
     }
 
     // At least one data series should have data (corrects, errors, or any misc)
-    const hasMiscData = Object.values(misc).some(v => !isNaN(v));
-    if (isNaN(corrects) && isNaN(errors) && !hasMiscData) {
+    const hasMiscData = Object.values(misc).some(v => !isMissing(v));
+    if (isMissing(corrects) && isMissing(errors) && !hasMiscData) {
         return { data: null, error: 'No count data (corrects, errors, or misc)' };
     }
 
@@ -430,20 +431,20 @@ function excelSerialToDate(serial) {
 /**
  * Clean a numeric value
  * @param {*} value - Value to clean
- * @returns {number} Cleaned number, or NaN if invalid/negative
+ * @returns {number|null} Cleaned number, or MISSING if invalid/negative
  */
 function cleanNumeric(value) {
     if (value == null || value === '') {
-        return NaN;
+        return MISSING;
     }
 
     const num = typeof value === 'number'
         ? value
         : parseFloat(String(value).trim());
 
-    // Reject NaN and negative values
+    // Reject invalid and negative values
     if (isNaN(num) || num < 0) {
-        return NaN;
+        return MISSING;
     }
 
     return num;
@@ -523,7 +524,7 @@ export function importToChartState(cleanedRows, options = { replace: true }) {
                     chartState.series.misc[miscId] = [];
                 }
                 const miscValue = row.misc?.[miscId];
-                chartState.series.misc[miscId].push(miscValue !== undefined ? miscValue : NaN);
+                chartState.series.misc[miscId].push(miscValue !== undefined ? miscValue : MISSING);
             }
         }
 

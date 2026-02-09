@@ -7,6 +7,9 @@ export const CORRECTS = 'corrects';
 export const ERRORS = 'errors';
 export const TIMING = 'timing';  // Series name identifier
 
+// Missing-data sentinel — used in series arrays for "no observation"
+export const MISSING = null;
+
 // ============================================================================
 // RESPONSIVE BREAKPOINTS
 // ============================================================================

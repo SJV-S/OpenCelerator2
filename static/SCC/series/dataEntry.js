@@ -10,7 +10,7 @@
  */
 
 import { chartState } from '../chartState.js';
-import { TIMING_MS, COLORS, CHART_MATH } from '../config.js';
+import { TIMING_MS, COLORS, CHART_MATH, MISSING } from '../config.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 import { snapToChartBoundary, formatDateInputValue, xPositionToDate, dateToXPosition } from '../util/dates.js';
 import { relayout } from '../util/plotlyWrapper.js';
@@ -125,7 +125,8 @@ function submitEntry() {
     // Append data points to dynamic misc series
     Object.keys(chartState.series.misc).forEach(miscId => {
         const input = document.getElementById(miscId);
-        const value = input ? parseInt(input.value) : NaN;
+        const raw = input ? parseInt(input.value) : MISSING;
+        const value = (typeof raw === 'number' && isNaN(raw)) ? MISSING : raw;
         chartState.series.misc[miscId].push(value);
 
         // Clear the input

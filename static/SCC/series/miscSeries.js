@@ -9,7 +9,7 @@
 
 import { eventBus, EVENTS } from '../eventBus.js';
 import { chartState } from '../chartState.js';
-import { createMiscTraceConfig, MISC_COLORS, LIMITS } from '../config.js';
+import { createMiscTraceConfig, MISC_COLORS, LIMITS, MISSING } from '../config.js';
 
 const MAX_MISC_SERIES = LIMITS.MAX_MISC_SERIES;
 
@@ -44,9 +44,9 @@ export function addMiscSeries() {
     const num = parseInt(id.slice(4));
     const index = num - 1;
 
-    // Initialize empty data array (same length as other series, filled with NaN)
+    // Initialize empty data array (same length as other series, filled with MISSING)
     const dataLength = chartState.series.xValues.length;
-    chartState.series.misc[id] = new Array(dataLength).fill(NaN);
+    chartState.series.misc[id] = new Array(dataLength).fill(MISSING);
 
     // Initialize trace styles
     chartState.traceStyles.misc[id] = {

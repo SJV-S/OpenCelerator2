@@ -11,7 +11,8 @@
  */
 
 import { chartState } from '../chartState.js';
-import { CORRECTS, ERRORS, LIMITS, CHART_MATH } from '../config.js';
+import { CORRECTS, ERRORS, LIMITS, CHART_MATH, MISSING } from '../config.js';
+import { isMissing } from '../util/format.js';
 import { median, mean, min, max, first, last, sum, aggregateByX } from '../util/agg.js';
 
 const AUTO_AGG_THRESHOLD = LIMITS.AUTO_AGG_THRESHOLD;
@@ -189,14 +190,14 @@ function applyAggregation(xPositions, yData, aggType) {
  * Convert timing values to frequency values (inverse)
  */
 function timingToFrequency(timingArray) {
-    return timingArray.map(t => 1 / t);
+    return timingArray.map(t => isMissing(t) ? MISSING : 1 / t);
 }
 
 /**
  * Apply floor threshold to a frequency value
  */
 function placeBelowFloor(freq, timing) {
-    if (isNaN(freq) || isNaN(timing) || timing <= 0) {
+    if (isMissing(freq) || isMissing(timing) || timing <= 0) {
         return freq;
     }
     const floorTiming = Math.floor(timing);
@@ -214,7 +215,7 @@ function placeBelowFloor(freq, timing) {
  * Check if a frequency value is below the floor threshold
  */
 function isBelowFloor(freq, timing) {
-    if (isNaN(freq) || isNaN(timing) || timing <= 0) return false;
+    if (isMissing(freq) || isMissing(timing) || timing <= 0) return false;
     const floorTiming = Math.floor(timing);
     if (floorTiming === 0) return false;
     const threshold = 1 / floorTiming;
@@ -236,30 +237,31 @@ function calculateFrequencies(sort = (arr) => arr) {
         ? sort(chartState.series.timing)
         : sort(chartState.series.timing).map(() => 1);
 
-    // Helper: convert zeros to NaN when placeZerosBelowFloor is false
+    // Helper: convert zeros to MISSING when placeZerosBelowFloor is false
     const handleZero = (freq) => {
-        if (freq === 0 && !chartState.placeZerosBelowFloor) return NaN;
+        if (freq === 0 && !chartState.placeZerosBelowFloor) return MISSING;
         return freq;
     };
 
-    // Calculate raw frequencies for fixed series (convert zeros to NaN if setting is off)
-    const correctsFreqRaw = sort(chartState.series.corrects).map((count, i) => handleZero(count / timingMinutes[i]));
-    const errorsFreqRaw = sort(chartState.series.errors).map((count, i) => handleZero(count / timingMinutes[i]));
+    // Calculate raw frequencies for fixed series (convert zeros to MISSING if setting is off)
+    const freq = (count, i) => isMissing(count) || isMissing(timingMinutes[i]) ? MISSING : handleZero(count / timingMinutes[i]);
+    const correctsFreqRaw = sort(chartState.series.corrects).map(freq);
+    const errorsFreqRaw = sort(chartState.series.errors).map(freq);
 
-    // Create original frequency arrays (below-floor values set to NaN)
+    // Create original frequency arrays (below-floor values set to MISSING)
     const correctsFreq = correctsFreqRaw.map((freq, i) =>
-        isBelowFloor(freq, timingMinutes[i]) ? NaN : freq
+        isBelowFloor(freq, timingMinutes[i]) ? MISSING : freq
     );
     const errorsFreq = errorsFreqRaw.map((freq, i) =>
-        isBelowFloor(freq, timingMinutes[i]) ? NaN : freq
+        isBelowFloor(freq, timingMinutes[i]) ? MISSING : freq
     );
 
-    // Create floor-adjusted shadow arrays (only show floor-adjusted values, above-floor as NaN)
+    // Create floor-adjusted shadow arrays (only show floor-adjusted values, above-floor as MISSING)
     const correctsFloor = correctsFreqRaw.map((freq, i) =>
-        isBelowFloor(freq, timingMinutes[i]) ? placeBelowFloor(freq, timingMinutes[i]) : NaN
+        isBelowFloor(freq, timingMinutes[i]) ? placeBelowFloor(freq, timingMinutes[i]) : MISSING
     );
     const errorsFloor = errorsFreqRaw.map((freq, i) =>
-        isBelowFloor(freq, timingMinutes[i]) ? placeBelowFloor(freq, timingMinutes[i]) : NaN
+        isBelowFloor(freq, timingMinutes[i]) ? placeBelowFloor(freq, timingMinutes[i]) : MISSING
     );
 
     const result = {
@@ -271,16 +273,16 @@ function calculateFrequencies(sort = (arr) => arr) {
         miscFloor: {}
     };
 
-    // Calculate frequencies for dynamic misc series (convert zeros to NaN if setting is off)
+    // Calculate frequencies for dynamic misc series (convert zeros to MISSING if setting is off)
     Object.entries(chartState.series.misc).forEach(([miscId, data]) => {
-        const miscFreqRaw = sort(data).map((count, i) => handleZero(count / timingMinutes[i]));
+        const miscFreqRaw = sort(data).map(freq);
 
         result.misc[miscId] = miscFreqRaw.map((freq, i) =>
-            isBelowFloor(freq, timingMinutes[i]) ? NaN : freq
+            isBelowFloor(freq, timingMinutes[i]) ? MISSING : freq
         );
 
         result.miscFloor[miscId] = miscFreqRaw.map((freq, i) =>
-            isBelowFloor(freq, timingMinutes[i]) ? placeBelowFloor(freq, timingMinutes[i]) : NaN
+            isBelowFloor(freq, timingMinutes[i]) ? placeBelowFloor(freq, timingMinutes[i]) : MISSING
         );
     });
 

@@ -10,6 +10,8 @@
 import { chartState } from '../chartState.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 import { createToast, createConfirmToast } from '../ui/toaster.js';
+import { MISSING } from '../config.js';
+import { isMissing } from '../util/format.js';
 import { getFirstConfig } from './traceStyles.js';
 
 // Track current state
@@ -30,7 +32,7 @@ export function loadDataForDate() {
     const startOfDay = Math.floor(selectedDate.getTime() / 1000);
     const endOfDay = startOfDay + (24 * 60 * 60);
 
-    // Filter data for this date (preserve NaN for non-observations)
+    // Filter data for this date (preserve null for non-observations)
     currentDataForDate = [];
     for (let i = 0; i < chartState.series.xValues.length; i++) {
         const timestamp = chartState.series.xValues[i];
@@ -133,12 +135,12 @@ function renderCurrentEntry() {
     const minutes = Math.floor(totalMinutes % 60);
     const seconds = Math.round((totalMinutes % 1) * 60);
 
-    // Display values - empty string for NaN (non-observations)
-    const correctsValue = isNaN(point.corrects) ? '' : point.corrects;
-    const errorsValue = isNaN(point.errors) ? '' : point.errors;
-    const hoursValue = isNaN(hours) ? '' : hours;
-    const minutesValue = isNaN(minutes) ? '' : minutes;
-    const secondsValue = isNaN(seconds) ? '' : seconds;
+    // Display values - empty string for missing (non-observations)
+    const correctsValue = isMissing(point.corrects) ? '' : point.corrects;
+    const errorsValue = isMissing(point.errors) ? '' : point.errors;
+    const hoursValue = isMissing(hours) ? '' : hours;
+    const minutesValue = isMissing(minutes) ? '' : minutes;
+    const secondsValue = isMissing(seconds) ? '' : seconds;
 
     // Get sorted misc series IDs
     const miscIds = Object.keys(chartState.series.misc).sort((a, b) =>
@@ -152,7 +154,7 @@ function renderCurrentEntry() {
         miscIds.forEach(miscId => {
             const config = getFirstConfig(miscId, true);
             const label = config?.seriesName || miscId;
-            const value = isNaN(point.misc[miscId]) ? '' : point.misc[miscId];
+            const value = isMissing(point.misc[miscId]) ? '' : point.misc[miscId];
             miscFieldsHtml += `
                 <div>
                     <label class="block text-sm font-semibold text-gray-600 mb-2 text-center">${label}</label>
@@ -247,12 +249,13 @@ export function updateCurrentEntry() {
     const container = document.getElementById('data-entry-block');
     if (!container) return;
 
-    // Get values from input fields (same as dataEntry.js - allow NaN for non-entries)
-    const corrects = parseInt(container.querySelector('[data-field="corrects"]').value);
-    const errors = parseInt(container.querySelector('[data-field="errors"]').value);
-    const hours = parseInt(container.querySelector('[data-field="hours"]').value);
-    const minutes = parseInt(container.querySelector('[data-field="minutes"]').value);
-    const seconds = parseInt(container.querySelector('[data-field="seconds"]').value);
+    // Get values from input fields — parseInt returns NaN for empty, convert to MISSING
+    const parseOrMissing = (el) => { const n = parseInt(el.value); return isNaN(n) ? MISSING : n; };
+    const corrects = parseOrMissing(container.querySelector('[data-field="corrects"]'));
+    const errors = parseOrMissing(container.querySelector('[data-field="errors"]'));
+    const hours = parseOrMissing(container.querySelector('[data-field="hours"]'));
+    const minutes = parseOrMissing(container.querySelector('[data-field="minutes"]'));
+    const seconds = parseOrMissing(container.querySelector('[data-field="seconds"]'));
 
     // Convert timing back to total minutes (same as dataEntry.js)
     const timingMinutes = (hours || 0) * 60 + (minutes || 0) + (seconds || 0) / 60;
@@ -267,7 +270,7 @@ export function updateCurrentEntry() {
     Object.keys(chartState.series.misc).forEach(miscId => {
         const input = container.querySelector(`[data-field="${miscId}"]`);
         if (input) {
-            const value = parseInt(input.value);
+            const value = parseOrMissing(input);
             chartState.series.misc[miscId][dataIndex] = value;
             currentDataForDate[currentTimestampIndex].misc[miscId] = value;
         }

@@ -178,6 +178,30 @@ export async function jsonBackwardsCompatibilityCheck(loadedChart) {
         modified = true;
     }
 
+    // Migrate '__NaN__' strings to null in series arrays (old serialization format)
+    if (loadedChart.series) {
+        const migrateArray = (arr) => {
+            if (!Array.isArray(arr)) return false;
+            let changed = false;
+            for (let i = 0; i < arr.length; i++) {
+                if (arr[i] === '__NaN__') {
+                    arr[i] = null;
+                    changed = true;
+                }
+            }
+            return changed;
+        };
+
+        if (migrateArray(loadedChart.series.corrects)) modified = true;
+        if (migrateArray(loadedChart.series.errors)) modified = true;
+        if (migrateArray(loadedChart.series.timing)) modified = true;
+        if (loadedChart.series.misc) {
+            for (const arr of Object.values(loadedChart.series.misc)) {
+                if (migrateArray(arr)) modified = true;
+            }
+        }
+    }
+
     // Track keys before fillMissing
     const keysBefore = Object.keys(loadedChart).length;
     fillMissing(loadedChart, chartState);

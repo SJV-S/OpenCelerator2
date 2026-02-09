@@ -25,7 +25,7 @@ import { openDB } from '../../lib/idb.js';
 import { eventBus, EVENTS, EVENT_CATEGORIES } from '../eventBus.js';
 import { chartState } from '../chartState.js';
 import { CHART_TYPE_CONFIG } from '../config.js';
-import { findNearestMonday } from '../util/dates.js';
+import { findNearestMonday, serializeDate, deserializeDate } from '../util/dates.js';
 import { jsonBackwardsCompatibilityCheck } from '../import/jsonBackwardsCompatibility.js';
 import { generateChartKey } from '../../Server/crypto.js';
 import { pushChart, isInitialized, startSyncPolling, leaveChart as syncLeaveChart, deleteChart as syncDeleteChart } from '../../Server/syncClient.js';
@@ -59,73 +59,31 @@ function uuid() {
 // ============================================================================
 
 /**
- * Recursively serialize a value, handling Date and NaN
- */
-function serializeValue(value) {
-    if (value instanceof Date) {
-        return { __date__: value.toISOString() };
-    }
-    if (typeof value === 'number' && Number.isNaN(value)) {
-        return '__NaN__';
-    }
-    if (Array.isArray(value)) {
-        return value.map(serializeValue);
-    }
-    if (typeof value === 'object' && value !== null) {
-        const result = {};
-        for (const [k, v] of Object.entries(value)) {
-            result[k] = serializeValue(v);
-        }
-        return result;
-    }
-    return value;
-}
-
-/**
- * Convert chartState to a serializable object
+ * Convert chartState to a serializable object for IndexedDB.
+ * startDate is the only value needing explicit conversion (Date → ISO string).
+ * Series arrays use null for missing data, which IDB handles natively.
  */
 function serializeChart(id, state) {
-    const serialized = serializeValue(state);
+    const serialized = { ...state };
     serialized.id = id;
+    serialized.startDate = serializeDate(state.startDate);
     serialized.lastModified = Math.floor(Date.now() / 1000);
     serialized._createdAt = state._createdAt || serialized.lastModified;
     return serialized;
 }
 
 /**
- * Recursively deserialize a value, restoring Date and NaN
- */
-function deserializeValue(value) {
-    if (value === '__NaN__') {
-        return NaN;
-    }
-    if (typeof value === 'object' && value !== null && value.__date__) {
-        return new Date(value.__date__);
-    }
-    if (Array.isArray(value)) {
-        return value.map(deserializeValue);
-    }
-    if (typeof value === 'object' && value !== null) {
-        const result = {};
-        for (const [k, v] of Object.entries(value)) {
-            result[k] = deserializeValue(v);
-        }
-        return result;
-    }
-    return value;
-}
-
-/**
- * Restore chartState from a serialized object
+ * Restore chartState from a serialized object.
+ * startDate is the only value needing explicit restoration (ISO string → Date).
  */
 function deserializeChart(data) {
-    const deserialized = deserializeValue(data);
-    for (const key in deserialized) {
+    for (const key in data) {
         if (key !== 'id' && key !== '_createdAt') {
-            chartState[key] = deserialized[key];
+            chartState[key] = data[key];
         }
     }
     chartState._createdAt = data._createdAt;
+    chartState.startDate = deserializeDate(chartState.startDate);
 }
 
 // ============================================================================
@@ -176,6 +134,9 @@ export async function saveChart(id = null) {
         const data = serializeChart(chartId, chartState);
         console.log('[Storage] saveChart - serialized chartKey:', data.chartKey?.slice(0, 16) + '...');
 
+        const saveSize = JSON.stringify(data).length;
+        console.log(`[IMPORT DEBUG] saveChart — size: ${saveSize} chars (${(saveSize / 1024).toFixed(1)} KB)`);
+
         await db.put(STORE_NAME, data);
 
         console.log(`[Storage] Saved chart: ${chartId}`);
@@ -208,6 +169,18 @@ export async function loadChart(id) {
         if (!data) {
             console.warn(`[Storage] Chart not found: ${id}`);
             return false;
+        }
+
+        const idbSize = JSON.stringify(data).length;
+        console.log('[IMPORT DEBUG] loadChart — IDB record size:', idbSize, 'chars (' + (idbSize / 1024).toFixed(1) + ' KB)');
+        // Flag large keys in loaded data
+        for (const [key, val] of Object.entries(data)) {
+            try {
+                const keySize = JSON.stringify(val).length;
+                if (keySize > 1000) {
+                    console.log(`[IMPORT DEBUG]   loaded.${key}: ${keySize} chars (${(keySize / 1024).toFixed(1)} KB)`);
+                }
+            } catch { /* skip */ }
         }
 
         const wasModified = await jsonBackwardsCompatibilityCheck(data);
@@ -430,19 +403,33 @@ export async function importChart(chartData) {
         const cryptoKey = await generateChartKey();
         const chartKey = await exportKeyToHex(cryptoKey);
 
-        // Serialize the data to handle NaN → '__NaN__' and Date → { __date__: ... }
-        // Safe for native imports (already serialized values pass through unchanged)
-        // Required for OpenCelerator imports (raw JS values need conversion)
-        const serialized = serializeValue(chartData);
+        console.log('[IMPORT DEBUG] === importChart (chartStorage) START ===');
+        console.log('[IMPORT DEBUG] chartData top-level keys:', Object.keys(chartData));
+        const inputSize = JSON.stringify(chartData).length;
+        console.log('[IMPORT DEBUG] chartData input size:', inputSize, 'chars (' + (inputSize / 1024).toFixed(1) + ' KB)');
 
         const data = {
-            ...serialized,
+            ...chartData,
+            startDate: serializeDate(chartData.startDate),
             id: chartId,
             chartKey,
             shared: false,
             lastModified: Math.floor(Date.now() / 1000),
-            _createdAt: serialized._createdAt || Math.floor(Date.now() / 1000)
+            _createdAt: chartData._createdAt || Math.floor(Date.now() / 1000)
         };
+
+        const storedSize = JSON.stringify(data).length;
+        console.log('[IMPORT DEBUG] Final IDB data size:', storedSize, 'chars (' + (storedSize / 1024).toFixed(1) + ' KB)');
+        // Flag any large keys
+        for (const [key, val] of Object.entries(data)) {
+            try {
+                const keySize = JSON.stringify(val).length;
+                if (keySize > 1000) {
+                    console.log(`[IMPORT DEBUG]   data.${key}: ${keySize} chars (${(keySize / 1024).toFixed(1)} KB) *** LARGE ***`);
+                }
+            } catch { /* skip */ }
+        }
+        console.log('[IMPORT DEBUG] === importChart (chartStorage) END ===');
 
         await db.put(STORE_NAME, data);
         console.log(`[STORAGE] Imported chart: ${chartId} (${data.chartName || 'Unnamed'})`);

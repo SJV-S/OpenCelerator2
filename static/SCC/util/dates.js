@@ -719,6 +719,20 @@ function userToInternalDate(values, chartType) {
     return new Date();
 }
 
+/** Convert a Date to an ISO string for storage */
+function serializeDate(date) {
+    if (date instanceof Date) return date.toISOString();
+    return date; // already a string or null
+}
+
+/** Restore a Date from stored format (handles old { __date__ } and new ISO string) */
+function deserializeDate(value) {
+    if (value instanceof Date) return value;
+    if (typeof value === 'string') return new Date(value);
+    if (value && value.__date__) return new Date(value.__date__); // backwards compat
+    return value; // null
+}
+
 export {
     findNearestMonday,
     findNearestSunday, // deprecated, use findNearestMonday
@@ -743,5 +757,7 @@ export {
     parseYearInput,
     createDate,
     internalToUserDate,
-    userToInternalDate
+    userToInternalDate,
+    serializeDate,
+    deserializeDate
 };

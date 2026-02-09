@@ -2,6 +2,11 @@
  * Formatting utilities
  */
 
+import { MISSING } from '../config.js';
+
+/** Check if a value is the missing-data sentinel (null or undefined) */
+export function isMissing(value) { return value == null; }
+
 /**
  * Format numeric value for display with appropriate decimal places
  * @param {number} value - The value to format
