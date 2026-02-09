@@ -58,6 +58,20 @@ class ShareLink(db.Model):
     chart = db.relationship('Chart', back_populates='share_link')
 
 
+class RequestLog(db.Model):
+    """Telemetry: one row per HTTP request"""
+    __tablename__ = 'request_logs'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    timestamp = db.Column(db.Integer, nullable=False)
+    ip_hash = db.Column(db.String(64), nullable=False)
+    method = db.Column(db.String(8), nullable=False)
+    path = db.Column(db.String(256), nullable=False)
+    status = db.Column(db.Integer, nullable=False)
+    user_id = db.Column(db.String(64), nullable=True)
+    chart_uuid = db.Column(db.String(36), nullable=True)
+
+
 class ChartTombstone(db.Model):
     """Tombstones for deleted charts (retained 1 year for sync)"""
     __tablename__ = 'chart_tombstones'
@@ -72,3 +86,6 @@ def init_db(app):
     db.init_app(app)
     with app.app_context():
         db.create_all()
+        if 'sqlite' in app.config['SQLALCHEMY_DATABASE_URI']:
+            db.session.execute(db.text('PRAGMA journal_mode=WAL'))
+            db.session.commit()

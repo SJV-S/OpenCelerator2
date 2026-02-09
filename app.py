@@ -3,6 +3,7 @@ from flask import Flask, render_template, request, jsonify, redirect, url_for, s
 from flask_socketio import SocketIO, join_room, leave_room
 
 from models import db, Chart, ChartAccess, ChartTombstone, ShareLink, init_db
+from telemetry import log_request
 import config
 
 app = Flask(__name__)
@@ -13,6 +14,9 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = config.SQLALCHEMY_TRACK_MODIFICAT
 
 # Initialize database
 init_db(app)
+
+# Telemetry — log every request
+app.after_request(log_request)
 
 
 # =============================================================================

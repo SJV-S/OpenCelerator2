@@ -16,6 +16,14 @@ SERVICE_FILE="/etc/systemd/system/${SERVICE}.service"
 
 cd "$APP_DIR"
 
+# Generate .env with random IP_HASH_SECRET on first run
+if [ ! -f "$APP_DIR/.env" ]; then
+    echo "Generating .env with random IP_HASH_SECRET..."
+    SECRET=$(python3 -c "import secrets; print(secrets.token_hex(32))")
+    echo "IP_HASH_SECRET=$SECRET" > "$APP_DIR/.env"
+    chmod 600 "$APP_DIR/.env"
+fi
+
 # Check if virtual environment exists, create if not
 if [ ! -d "$VENV_DIR" ]; then
     echo "Creating virtual environment at $VENV_DIR..."

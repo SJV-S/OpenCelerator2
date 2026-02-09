@@ -1,4 +1,24 @@
+import os
+
 DEVELOPER_MODE = True
+
+# --- Load .env file ---
+_env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+if os.path.exists(_env_path):
+    with open(_env_path) as _f:
+        for _line in _f:
+            _line = _line.strip()
+            if _line and not _line.startswith('#') and '=' in _line:
+                _key, _val = _line.split('=', 1)
+                os.environ.setdefault(_key.strip(), _val.strip())
+
+# --- Telemetry ---
+if DEVELOPER_MODE:
+    IP_HASH_SECRET = os.environ.get('IP_HASH_SECRET', 'dev-insecure-key')
+else:
+    IP_HASH_SECRET = os.environ.get('IP_HASH_SECRET')
+    if not IP_HASH_SECRET:
+        raise RuntimeError('IP_HASH_SECRET must be set in .env for production')
 
 # --- Database ---
 DATABASE_URL = 'sqlite:///scc_charts.db'
