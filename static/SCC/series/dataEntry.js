@@ -75,8 +75,10 @@ function generateMiscInputs() {
  */
 function submitEntry() {
     const entryDate = document.getElementById('entry-date').value;
-    const corrects = parseInt(document.getElementById('corrects').value);
-    const incorrects = parseInt(document.getElementById('incorrects').value);
+    const rawC = parseInt(document.getElementById('corrects').value);
+    const corrects = isNaN(rawC) ? MISSING : rawC;
+    const rawI = parseInt(document.getElementById('incorrects').value);
+    const incorrects = isNaN(rawI) ? MISSING : rawI;
 
     let timingMinutes;
 
