@@ -2,12 +2,16 @@ import { chartState } from '../chartState.js';
 import { CORRECTS, ERRORS, TIMING, LINE_DEFAULTS, COLORS } from '../config.js';
 import { generateChartKey } from '../../Server/crypto.js';
 
+// Keys whose contents are dynamic user data, not structural schema.
+// fillMissing backfills these wholesale if absent, but never recurses into them.
+const NO_RECURSE_KEYS = ['traceStyles'];
+
 function fillMissing(target, reference, skipKeys = ['id', '_createdAt', 'lastModified']) {
     for (const key in reference) {
         if (skipKeys.includes(key)) continue;
         if (!(key in target) || target[key] == null) {
             target[key] = reference[key];
-        } else if (typeof reference[key] === 'object' && reference[key] !== null && !Array.isArray(reference[key])) {
+        } else if (typeof reference[key] === 'object' && reference[key] !== null && !Array.isArray(reference[key]) && !NO_RECURSE_KEYS.includes(key)) {
             fillMissing(target[key], reference[key], []);
         }
     }
