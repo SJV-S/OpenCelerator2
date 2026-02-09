@@ -1,25 +1,15 @@
-import os
 import time
 from flask import Flask, render_template, request, jsonify, redirect, url_for, send_from_directory, make_response
 from flask_socketio import SocketIO, join_room, leave_room
 
 from models import db, Chart, ChartAccess, ChartTombstone, ShareLink, init_db
+import config
 
 app = Flask(__name__)
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins=config.CORS_ALLOWED_ORIGINS)
 
-# Database configuration - supports SQLite (default) and PostgreSQL
-# Set DATABASE_URL env var for PostgreSQL, e.g.: postgresql://user:pass@localhost/scc
-database_url = os.environ.get('DATABASE_URL', 'sqlite:///scc_charts.db')
-
-# Handle Heroku-style postgres:// URLs (need postgresql://)
-if database_url.startswith('postgres://'):
-    database_url = database_url.replace('postgres://', 'postgresql://', 1)
-
-app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-STORAGE_LIMIT_BYTES = 5 * 1024 * 1024 * 1024  # 5 GB
+app.config['SQLALCHEMY_DATABASE_URI'] = config.DATABASE_URL
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = config.SQLALCHEMY_TRACK_MODIFICATIONS
 
 # Initialize database
 init_db(app)
@@ -32,18 +22,9 @@ init_db(app)
 @app.route('/service-worker.js')
 def service_worker():
     response = make_response(send_from_directory(app.root_path, 'service-worker.js'))
-    # Prevent browser from caching the SW file - always check for updates
-    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-    response.headers['Pragma'] = 'no-cache'
-    response.headers['Expires'] = '0'
+    for header, value in config.SW_CACHE_HEADERS.items():
+        response.headers[header] = value
     return response
-
-# @app.route('/service-worker.js')
-# def service_worker():
-#     response = make_response(send_from_directory(app.root_path, 'service-worker.js'))
-#     # Check for SW updates every 2 hours
-#     response.headers['Cache-Control'] = 'max-age=7200'
-#     return response
 
 # =============================================================================
 # HTML Routes (existing)
@@ -66,13 +47,13 @@ def chart(chart_id, share_secret=None):
 
 
 # =============================================================================
-# Storage Purge - evict oldest charts when over STORAGE_LIMIT_BYTES
+# Storage Purge - evict oldest charts when over config.STORAGE_LIMIT_BYTES
 # =============================================================================
 
 _last_purge = 0
 _last_tombstone_purge = 0
 
-TOMBSTONE_RETENTION_SECONDS = 365 * 24 * 3600  # 1 year
+config.TOMBSTONE_RETENTION_SECONDS = 365 * 24 * 3600  # 1 year
 
 def purge_old_tombstones():
     """Delete tombstones older than 1 year. Runs at most once per day."""
@@ -82,14 +63,14 @@ def purge_old_tombstones():
         return
     _last_tombstone_purge = now
 
-    cutoff = now - TOMBSTONE_RETENTION_SECONDS
+    cutoff = now - config.TOMBSTONE_RETENTION_SECONDS
     deleted = ChartTombstone.query.filter(ChartTombstone.deleted_at < cutoff).delete()
     if deleted:
         db.session.commit()
         app.logger.info(f'[Purge] Removed {deleted} tombstones older than 1 year')
 
 def purge_if_over_limit():
-    """Delete oldest charts until total storage is under STORAGE_LIMIT_BYTES. Runs at most once per hour."""
+    """Delete oldest charts until total storage is under config.STORAGE_LIMIT_BYTES. Runs at most once per hour."""
     global _last_purge
     now = int(time.time())
     if now - _last_purge < 3600:
@@ -97,14 +78,14 @@ def purge_if_over_limit():
     _last_purge = now
 
     total = db.session.query(db.func.sum(db.func.length(Chart.data))).scalar() or 0
-    if total <= STORAGE_LIMIT_BYTES:
+    if total <= config.STORAGE_LIMIT_BYTES:
         return
 
     # Fetch oldest charts first
     oldest = Chart.query.order_by(Chart.last_modified.asc()).all()
     purged = 0
     for chart in oldest:
-        if total <= STORAGE_LIMIT_BYTES:
+        if total <= config.STORAGE_LIMIT_BYTES:
             break
         total -= len(chart.data)
         db.session.delete(chart)  # cascades to chart_access, share_links
@@ -388,4 +369,4 @@ def handle_leave_chart(data):
 
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True, host='0.0.0.0', port=5002, allow_unsafe_werkzeug=True)
+    socketio.run(app, debug=True, host=config.DEV_HOST, port=config.DEV_PORT, allow_unsafe_werkzeug=True)

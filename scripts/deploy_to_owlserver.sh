@@ -20,6 +20,7 @@ echo "[3/5] Preparing for production..."
 rm -rf "$TMP/.git"
 sed -i 's/const DEVELOPER_MODE = true/const DEVELOPER_MODE = false/' "$TMP/service-worker.js"
 sed -i 's/export const DEVELOPER_MODE = true/export const DEVELOPER_MODE = false/' "$TMP/static/SCC/config.js"
+sed -i 's/DEVELOPER_MODE = True/DEVELOPER_MODE = False/' "$TMP/config.py"
 
 echo "[4/5] Deploying to server via tar+ssh..."
 tar czf - -C "$TMP" . | ssh "$VPS" "mkdir -p \"$VPS_PATH\" && tar xzf - -C \"$VPS_PATH\""

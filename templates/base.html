@@ -61,6 +61,12 @@
     <script>
         // Service Worker Registration
         if ('serviceWorker' in navigator) {
+            let refreshing = false;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (refreshing) return;
+                refreshing = true;
+                location.reload();
+            });
             navigator.serviceWorker.register('/service-worker.js')
                 .then(reg => console.log('[SW] Registered:', reg.scope))
                 .catch(err => console.error('[SW] Registration failed:', err));
