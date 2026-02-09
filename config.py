@@ -51,6 +51,7 @@ RATELIMIT_API_WRITE = '20/minute'
 RATELIMIT_API_DELETE = '10/minute'
 RATELIMIT_POLL = '120/minute'
 RATELIMIT_STORAGE_URI = 'memory://'
+MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16 MB
 
 # --- Dev server ---
 DEV_HOST = '0.0.0.0'
