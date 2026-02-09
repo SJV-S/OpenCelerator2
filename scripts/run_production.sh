@@ -1,27 +1,64 @@
-I need you to format my data as a CSV for import into a Standard Celeration Chart (SCC). Here are the rules:
+#!/bin/bash
+# Production server for StandardChangeChart
+# Runs gunicorn with eventlet worker for WebSocket support
+# Bound to 0.0.0.0:5002 for Pangolin/WireGuard tunnel
 
-**Required columns:**
-- Date — use YYYY-MM-DD format
-- At least one of: Corrects, Errors, or a Misc column
+set -e
 
-**Optional columns:**
-- Corrects — non-negative numbers (behavioral count/frequency data)
-- Errors — non-negative numbers (error count/frequency data)
-- Additional numeric columns become "Misc" series (up to 10) — these are extra numeric data series plotted alongside corrects/errors (e.g. prompts, trials, dosage)
-- Minutes — positive number, the timing floor for each observation
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+APP_DIR="$(dirname "$SCRIPT_DIR")"
+VENV_DIR="$APP_DIR/venv"
+SERVICE="scc"
+SERVICE_FILE="/etc/systemd/system/${SERVICE}.service"
 
-**Formatting rules:**
-- Leave cells empty for missing data (do NOT use 0, N/A, or dashes)
-- All numeric values must be non-negative
-- Dates must be parseable (YYYY-MM-DD preferred)
-- First row must be column headers
+# Kill any existing server first
+"$SCRIPT_DIR/kill_production.sh"
 
-**Before formatting, ask me to clarify:**
-1. Which column is "corrects" vs "errors" if it's ambiguous
-2. Whether any additional numeric columns should be included as Misc series
-3. What the timing floor is (in minutes) if a Minutes column is needed
+cd "$APP_DIR"
 
-**Warn me if:**
-- Any values are negative
-- Any cells contain non-numeric data in numeric columns
-- Any dates can't be parsed
+# Check if virtual environment exists, create if not
+if [ ! -d "$VENV_DIR" ]; then
+    echo "Creating virtual environment at $VENV_DIR..."
+    python3 -m venv "$VENV_DIR"
+fi
+
+# Activate virtual environment
+source "$VENV_DIR/bin/activate"
+
+# Check dependencies
+echo "Checking dependencies..."
+if pip install --dry-run -r requirements.txt 2>&1 | grep -q "Would install"; then
+    echo "Installing/updating dependencies..."
+    pip install -r requirements.txt
+else
+    echo "All dependencies satisfied."
+fi
+
+# Set up systemd service if not already installed
+if [ ! -f "$SERVICE_FILE" ]; then
+    echo "Installing systemd service..."
+    sudo tee "$SERVICE_FILE" > /dev/null << EOF
+[Unit]
+Description=StandardChangeChart
+After=network.target
+
+[Service]
+Type=exec
+User=$(whoami)
+WorkingDirectory=$APP_DIR
+ExecStart=$VENV_DIR/bin/gunicorn -w 1 -k eventlet -b 0.0.0.0:5002 app:app
+ExecStop=/bin/kill -TERM \$MAINPID
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    sudo systemctl daemon-reload
+    sudo systemctl enable "$SERVICE"
+    echo "Systemd service installed and enabled."
+fi
+
+echo "Starting server via systemd..."
+sudo systemctl start "$SERVICE"
+echo "Running. Use 'sudo journalctl -u $SERVICE -f' to tail logs."

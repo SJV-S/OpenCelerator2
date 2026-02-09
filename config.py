@@ -9,7 +9,7 @@ if DATABASE_URL.startswith('postgres://'):
 SQLALCHEMY_TRACK_MODIFICATIONS = False
 
 # --- Storage limits ---
-STORAGE_LIMIT_BYTES = 5 * 1024 * 1024 * 1024  # 5 GB
+STORAGE_LIMIT_BYTES = 10 * 1024 * 1024 * 1024  # 10 GB
 TOMBSTONE_RETENTION_SECONDS = 365 * 24 * 3600  # 1 year
 
 # --- Service Worker ---
