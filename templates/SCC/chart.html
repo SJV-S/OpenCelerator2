@@ -244,8 +244,9 @@ body {
         import { refreshChart } from '/static/SCC/series/replot.js';
         import { chartState } from '/static/SCC/chartState.js';
 
-        const chartId = '{{ chart_id }}';
-        const shareSecret = window.location.pathname.split('/')[3]; // /chart/{uuid}/{secret}
+        const pathParts = window.location.pathname.split('/'); // /chart/{uuid}/{secret}
+        const chartId = pathParts[2];
+        const shareSecret = pathParts[3];
 
         async function init() {
             await initStorage();

@@ -346,9 +346,7 @@ async function unshareChart() {
     stopSyncPolling();
 
     // Navigate to the new private chart
-    const chartType = chartState.chartType || 'Daily';
-    const minuteType = chartState.minuteChart ? 'minute' : 'count';
-    window.location.href = `/chart/${chartType}/${minuteType}?load=${newId}`;
+    window.location.href = `/chart/${newId}`;
 }
 
 /**

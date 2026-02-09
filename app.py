@@ -1,5 +1,7 @@
 import time
 from flask import Flask, render_template, request, jsonify, redirect, url_for, send_from_directory, make_response
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from flask_socketio import SocketIO, join_room, leave_room
 
 from models import db, Chart, ChartAccess, ChartTombstone, ShareLink, init_db
@@ -8,6 +10,13 @@ import config
 
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins=config.CORS_ALLOWED_ORIGINS)
+
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=[config.RATELIMIT_DEFAULT],
+    storage_uri=config.RATELIMIT_STORAGE_URI,
+)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = config.DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = config.SQLALCHEMY_TRACK_MODIFICATIONS
@@ -105,6 +114,7 @@ def purge_if_over_limit():
 # =============================================================================
 
 @app.route('/api/sync', methods=['POST'])
+@limiter.limit(config.RATELIMIT_API_WRITE)
 def sync():
     """
     Main sync endpoint - handles upload/download of encrypted charts.
@@ -220,6 +230,7 @@ def sync():
 
 
 @app.route('/api/chart', methods=['DELETE'])
+@limiter.limit(config.RATELIMIT_API_DELETE)
 def delete_chart():
     """Owner deletes chart entirely"""
     data = request.get_json()
@@ -250,6 +261,7 @@ def delete_chart():
 
 
 @app.route('/api/chart/leave', methods=['DELETE'])
+@limiter.limit(config.RATELIMIT_API_DELETE)
 def leave_chart():
     """Collaborator removes their own access"""
     data = request.get_json()
@@ -273,6 +285,7 @@ def leave_chart():
 
 
 @app.route('/api/share/edit', methods=['POST'])
+@limiter.limit(config.RATELIMIT_API_WRITE)
 def create_edit_link():
     """
     Store chart with wrapped key for sharing.
@@ -321,6 +334,7 @@ def create_edit_link():
 
 
 @app.route('/api/chart/<chart_uuid>/poll')
+@limiter.limit(config.RATELIMIT_POLL)
 def poll_chart(chart_uuid):
     """Lightweight check if chart has been updated"""
     last_known = request.args.get('t', 0, type=int)

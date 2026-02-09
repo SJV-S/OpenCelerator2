@@ -45,6 +45,13 @@ else:
 # --- WebSocket ---
 CORS_ALLOWED_ORIGINS = '*'
 
+# --- Rate Limiting ---
+RATELIMIT_DEFAULT = '60/minute'
+RATELIMIT_API_WRITE = '20/minute'
+RATELIMIT_API_DELETE = '10/minute'
+RATELIMIT_POLL = '120/minute'
+RATELIMIT_STORAGE_URI = 'memory://'
+
 # --- Dev server ---
 DEV_HOST = '0.0.0.0'
 DEV_PORT = 5002

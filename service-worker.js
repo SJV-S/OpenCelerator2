@@ -208,12 +208,13 @@ async function networkFirstWithCache(request) {
             return cachedResponse;
         }
 
-        // For chart pages, try to return the cached root as fallback
-        // The app will handle loading the specific chart from IndexedDB
+        // For chart pages, serve any cached chart page (template is identical for all charts)
         if (isChartPage(request.url)) {
-            const fallback = await caches.match('/');
-            if (fallback) {
-                return fallback;
+            const cache = await caches.open(CACHE_NAME);
+            const keys = await cache.keys();
+            const chartKey = keys.find(k => isChartPage(k.url));
+            if (chartKey) {
+                return cache.match(chartKey);
             }
         }
 
