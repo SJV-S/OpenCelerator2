@@ -60,11 +60,12 @@ html, body {
                 </svg>
                 Install App
             </button>
-            <button id="sync-device-btn" class="px-5 py-2 rounded-lg border-2 border-[#6ad1e3] text-[#05c3de] font-medium text-sm flex items-center gap-2 hover:bg-[#6ad1e3] hover:text-white transition-colors">
+            <button id="settings-btn" class="px-5 py-2 rounded-lg border-2 border-[#6ad1e3] text-[#05c3de] font-medium text-sm flex items-center gap-2 hover:bg-[#6ad1e3] hover:text-white transition-colors">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.573-1.066z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                 </svg>
-                Sync Device
+                Settings
             </button>
             <button id="import-chart-btn" class="px-5 py-2 rounded-lg border-2 border-[#6ad1e3] text-[#05c3de] font-medium text-sm flex items-center gap-2 hover:bg-[#6ad1e3] hover:text-white transition-colors">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -200,10 +201,29 @@ html, body {
         </div>
     </div>
 </div>
-<!-- Sync Device Modal -->
-<div id="sync-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
+<!-- Settings Modal -->
+<div id="settings-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
     <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
-        <h3 class="text-lg font-semibold text-gray-800 mb-4">Sync Device</h3>
+        <h3 class="text-lg font-semibold text-gray-800 mb-5">Settings</h3>
+
+        <!-- Sync toggle -->
+        <label class="flex items-center gap-3 mb-5 cursor-pointer">
+            <input type="checkbox" id="settings-sync-checkbox" class="accent-[#6ad1e3] w-4 h-4">
+            <span class="text-sm text-gray-700">Sync charts to server</span>
+        </label>
+
+        <!-- Owner name -->
+        <div class="mb-6">
+            <label for="settings-owner-name" class="block text-sm text-gray-700 mb-1">Owner name</label>
+            <input
+                type="text"
+                id="settings-owner-name"
+                class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg text-sm"
+                placeholder="Your name"
+                autocomplete="off"
+            >
+            <p class="text-xs text-gray-400 mt-1">Stamped into every chart you create</p>
+        </div>
 
         <!-- Divider -->
         <div class="flex items-center gap-3 mb-5">
@@ -262,7 +282,7 @@ html, body {
         </div>
 
         <div class="flex justify-end">
-            <button id="sync-cancel-btn" class="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium">Cancel</button>
+            <button id="settings-close-btn" class="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium">Close</button>
         </div>
     </div>
 </div>
@@ -276,7 +296,7 @@ html, body {
     import { openDB } from '/static/lib/idb.js';
     import { validatePassphrase, getUserId } from '/static/Server/passphrase.js';
     import { initSync, pullCharts, checkForUpdates } from '/static/Server/syncClient.js';
-    import { initServerSync, resetSync, isSyncEnabled } from '/static/Server/init.js';
+    import { initServerSync, resetSync, isSyncEnabled, setUserPreference, getUserPreferences, getDisplayName, setDisplayName } from '/static/Server/init.js';
 
     let charts = [];
     let chartToDelete = null;
@@ -832,7 +852,56 @@ html, body {
     // Load on page show (handles back button)
     window.addEventListener('pageshow', loadCharts);
 
-    // --- Sync Device Modal ---
+    // --- Settings Modal ---
+    async function openSettingsModal() {
+        const prefs = getUserPreferences();
+        document.getElementById('settings-sync-checkbox').checked = prefs.syncAllChartsToServer;
+
+        const displayName = await getDisplayName();
+        document.getElementById('settings-owner-name').value = displayName || '';
+
+        // Initialize sync passphrase section
+        syncPassphraseVisible = false;
+        document.getElementById('sync-paste-input').value = '';
+        document.getElementById('sync-copy-btn').textContent = 'Copy';
+
+        getPassphrase().then(p => {
+            syncPassphrase = p || null;
+            renderPassphraseDisplay();
+        });
+
+        document.getElementById('settings-modal').classList.remove('hidden');
+        document.getElementById('settings-modal').classList.add('flex');
+    }
+
+    function closeSettingsModal() {
+        document.getElementById('settings-modal').classList.add('hidden');
+        document.getElementById('settings-modal').classList.remove('flex');
+
+        // Reset sync state
+        syncPassphrase = null;
+        syncPassphraseVisible = false;
+        document.getElementById('sync-paste-section').classList.remove('hidden');
+        document.getElementById('sync-confirm').classList.add('hidden');
+        hideSyncStatus();
+    }
+
+    document.getElementById('settings-btn').addEventListener('click', openSettingsModal);
+    document.getElementById('settings-close-btn').addEventListener('click', closeSettingsModal);
+
+    document.getElementById('settings-modal').addEventListener('click', (e) => {
+        if (e.target.id === 'settings-modal') closeSettingsModal();
+    });
+
+    document.getElementById('settings-sync-checkbox').addEventListener('change', (e) => {
+        setUserPreference('syncAllChartsToServer', e.target.checked);
+    });
+
+    document.getElementById('settings-owner-name').addEventListener('blur', (e) => {
+        setDisplayName(e.target.value.trim());
+    });
+
+    // --- Sync Device (inside Settings modal) ---
     let syncPassphrase = null;
     let syncPassphraseVisible = false;
 
@@ -871,31 +940,6 @@ html, body {
         }
     }
 
-    function openSyncModal() {
-        syncPassphraseVisible = false;
-        document.getElementById('sync-paste-input').value = '';
-        document.getElementById('sync-copy-btn').textContent = 'Copy';
-
-        getPassphrase().then(p => {
-            syncPassphrase = p || null;
-            renderPassphraseDisplay();
-        });
-
-        document.getElementById('sync-modal').classList.remove('hidden');
-        document.getElementById('sync-modal').classList.add('flex');
-    }
-
-    function closeSyncModal() {
-        syncPassphrase = null;
-        syncPassphraseVisible = false;
-        document.getElementById('sync-modal').classList.add('hidden');
-        document.getElementById('sync-modal').classList.remove('flex');
-        // Reset sub-state
-        document.getElementById('sync-paste-section').classList.remove('hidden');
-        document.getElementById('sync-confirm').classList.add('hidden');
-        hideSyncStatus();
-    }
-
     function showSyncStatus(message, isError) {
         const el = document.getElementById('sync-status');
         el.textContent = message;
@@ -908,13 +952,6 @@ html, body {
         el.classList.add('hidden');
         el.textContent = '';
     }
-
-    document.getElementById('sync-device-btn').addEventListener('click', openSyncModal);
-    document.getElementById('sync-cancel-btn').addEventListener('click', closeSyncModal);
-
-    document.getElementById('sync-modal').addEventListener('click', (e) => {
-        if (e.target.id === 'sync-modal') closeSyncModal();
-    });
 
     document.getElementById('sync-toggle-visibility').addEventListener('click', () => {
         if (!syncPassphrase) return;
@@ -991,7 +1028,7 @@ html, body {
                 return;
             }
 
-            closeSyncModal();
+            closeSettingsModal();
             await loadCharts();
         } catch (err) {
             console.error('[Sync] Error:', err);
@@ -1035,7 +1072,7 @@ html, body {
                             chartData.lastModified = dl.updatedAt;
                             await chartsDb.put('charts', chartData);
                         }
-                        closeSyncModal();
+                        closeSettingsModal();
                         await loadCharts();
                     } else {
                         showSyncStatus('Same identity — no new charts on server.', false);
