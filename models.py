@@ -19,6 +19,7 @@ class Chart(db.Model):
     chart_uuid = db.Column(db.String(36), primary_key=True)
     data = db.Column(db.LargeBinary, nullable=False)  # Encrypted chart JSON
     last_modified = db.Column(db.Integer, nullable=False)  # Client timestamp (unencrypted metadata)
+    signature = db.Column(db.LargeBinary, nullable=True)  # ECDSA signature of encrypted data
 
     # Relationships
     access_entries = db.relationship('ChartAccess', back_populates='chart', cascade='all, delete-orphan')
@@ -95,6 +96,13 @@ def init_db(app):
             db.session.execute(db.text('ALTER TABLE share_links ADD COLUMN created_at INTEGER'))
             db.session.execute(db.text('UPDATE share_links SET created_at = :now WHERE created_at IS NULL'),
                                {'now': int(time.time())})
+            db.session.commit()
+        except Exception:
+            db.session.rollback()  # Column already exists
+
+        # Migration: add signature to charts
+        try:
+            db.session.execute(db.text('ALTER TABLE charts ADD COLUMN signature BLOB'))
             db.session.commit()
         except Exception:
             db.session.rollback()  # Column already exists

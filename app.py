@@ -154,6 +154,7 @@ def sync():
         chart_data = bytes.fromhex(upload['data']) if isinstance(upload['data'], str) else upload['data']
         wrapped_key = bytes.fromhex(upload['wrapped_key']) if isinstance(upload['wrapped_key'], str) else upload['wrapped_key']
         updated_at = upload['updated_at']
+        signature = bytes.fromhex(upload['signature']) if upload.get('signature') else None
 
         # Check if chart exists
         existing = db.session.get(Chart, chart_uuid)
@@ -163,12 +164,14 @@ def sync():
             if updated_at > existing.last_modified:
                 existing.data = chart_data
                 existing.last_modified = updated_at
+                existing.signature = signature
         else:
             # Create new chart
             new_chart = Chart(
                 chart_uuid=chart_uuid,
                 data=chart_data,
-                last_modified=updated_at
+                last_modified=updated_at,
+                signature=signature
             )
             db.session.add(new_chart)
 
@@ -215,7 +218,8 @@ def sync():
                 'chart_uuid': chart.chart_uuid,
                 'data': chart.data.hex(),
                 'updated_at': chart.last_modified,
-                'wrapped_key': access.wrapped_key.hex()
+                'wrapped_key': access.wrapped_key.hex(),
+                'signature': chart.signature.hex() if chart.signature else None
             })
 
     # Get tombstones since last sync
@@ -306,14 +310,17 @@ def create_edit_link():
     chart_data = bytes.fromhex(encrypted_data)
     wrapped_key_bytes = bytes.fromhex(wrapped_key)
     wrapped_share_bytes = bytes.fromhex(wrapped_key_for_share)
+    signature_hex = data.get('signature')
+    signature_bytes = bytes.fromhex(signature_hex) if signature_hex else None
 
     # Store/update chart
     chart = db.session.get(Chart, chart_uuid)
     if chart:
         chart.data = chart_data
         chart.last_modified = last_modified
+        chart.signature = signature_bytes
     else:
-        chart = Chart(chart_uuid=chart_uuid, data=chart_data, last_modified=last_modified)
+        chart = Chart(chart_uuid=chart_uuid, data=chart_data, last_modified=last_modified, signature=signature_bytes)
         db.session.add(chart)
 
     # Store owner access
@@ -376,7 +383,8 @@ def get_shared_chart(chart_uuid):
         'chart_uuid': chart_uuid,
         'data': chart.data.hex(),
         'wrapped_key': share_link.wrapped_key.hex(),
-        'updated_at': chart.last_modified
+        'updated_at': chart.last_modified,
+        'signature': chart.signature.hex() if chart.signature else None
     })
 
 

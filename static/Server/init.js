@@ -1,11 +1,13 @@
 /**
  * Auto-initialize sync client with stored or new passphrase.
  * Manages user_preferences in SCC_Identity for sync settings.
+ * Derives ECDSA signing key pair deterministically from passphrase.
  */
 
 import { openDB } from '../lib/idb.js';
 import { generatePassphrase } from './passphrase.js';
 import { initSync } from './syncClient.js';
+import { deriveSigningKeyPair, exportPublicKey } from './crypto.js';
 
 const DB_NAME = 'SCC_Identity';
 const STORE_NAME = 'credentials';
@@ -44,9 +46,53 @@ export async function initServerSync() {
     }
     userPreferences = prefs;
 
-    await initSync(passphrase);
+    // Derive ECDSA signing key pair deterministically from passphrase
+    const keyPair = await deriveSigningKeyPair(passphrase);
+    const publicKeyB64 = await exportPublicKey(keyPair.publicKey);
+
+    // One-time migration: reclaim broken-era charts with stale random publicKey
+    await migrateSigningKeys(publicKeyB64);
+
+    await initSync(passphrase, keyPair.privateKey, publicKeyB64);
     initialized = true;
     console.log('[Server] Sync initialized');
+}
+
+async function migrateSigningKeys(newPublicKeyB64) {
+    try {
+        const db = await openDB('SCC_Charts', 1);
+        const tx = db.transaction('charts', 'readwrite');
+        const store = tx.objectStore('charts');
+        let cursor = await store.openCursor();
+        let migrated = 0;
+
+        while (cursor) {
+            const chart = cursor.value;
+            let updated = false;
+
+            // Clean up legacy owner field
+            if ('owner' in chart) {
+                delete chart.owner;
+                updated = true;
+            }
+
+            // Reclaim broken-era charts: stale random publicKey, not an edit-link chart
+            if (chart.publicKey && chart.publicKey !== newPublicKeyB64 && !chart.acceptingEdits) {
+                chart.publicKey = newPublicKeyB64;
+                updated = true;
+                migrated++;
+            }
+
+            if (updated) await cursor.update(chart);
+            cursor = await cursor.continue();
+        }
+
+        await tx.done;
+        if (migrated > 0) console.log(`[Server] Migrated ${migrated} chart(s) to deterministic signing key`);
+    } catch (e) {
+        // SCC_Charts DB may not exist yet on first visit
+        console.debug('[Server] Chart migration skipped:', e.message);
+    }
 }
 
 export function isSyncEnabled() {

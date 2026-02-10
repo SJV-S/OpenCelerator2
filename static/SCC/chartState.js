@@ -26,6 +26,8 @@ export const chartState = {
     chartKey: null,  // Encryption key for this chart (hex string)
     shared: false,  // If true, this chart syncs with server
     lastModified: null,  // Unix timestamp of last modification
+    publicKey: null,  // Owner's ECDSA P-256 public key (base64, deterministic from passphrase)
+    acceptingEdits: false,  // true = edit link recipients can push, false = view-only
 
     // Raw data series (append-only arrays, all same length)
     series: {
