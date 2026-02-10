@@ -54,20 +54,18 @@ const _writeBackInProgress = new Set();
  * @returns {{ accepted: boolean, reason?: string }}
  */
 async function verifyPull(encryptedDataHex, signatureHex, chartData, localChart) {
-    // Legacy chart: no publicKey means pre-signing era — accept without verification
-    if (!chartData.publicKey) {
-        return { accepted: true };
+    if (!chartData.publicKey || !signatureHex) {
+        return { accepted: false, reason: 'Missing publicKey or signature' };
     }
 
-    if (!signatureHex) {
-        return { accepted: false, reason: 'Missing signature on signed chart' };
-    }
+    // Use local acceptingEdits, not the incoming value (attacker could flip it)
+    const acceptingEdits = localChart?.acceptingEdits ?? chartData.acceptingEdits;
 
     if (chartData.publicKey === signingPublicKeyB64) {
         if (!await verify(encryptedDataHex, signatureHex, signingPublicKey)) {
             return { accepted: false, reason: 'Signature does not match owner key' };
         }
-    } else if (chartData.acceptingEdits) {
+    } else if (acceptingEdits) {
         // Edit link: skip verification, accept any push
     } else {
         const trustedKey = localChart?.publicKey;

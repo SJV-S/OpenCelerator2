@@ -153,7 +153,7 @@ def sync():
         chart_uuid = upload['chart_uuid']
         chart_data = bytes.fromhex(upload['data']) if isinstance(upload['data'], str) else upload['data']
         wrapped_key = bytes.fromhex(upload['wrapped_key']) if isinstance(upload['wrapped_key'], str) else upload['wrapped_key']
-        updated_at = upload['updated_at']
+        updated_at = min(upload['updated_at'], int(time.time()) + 300)
         signature = bytes.fromhex(upload['signature']) if upload.get('signature') else None
 
         # Check if chart exists
@@ -302,7 +302,7 @@ def create_edit_link():
     encrypted_data = data.get('data')
     wrapped_key = data.get('wrapped_key')
     wrapped_key_for_share = data.get('wrapped_key_for_share')
-    last_modified = data.get('last_modified')
+    last_modified = min(data.get('last_modified', 0), int(time.time()) + 300)
 
     if not all([chart_uuid, user_id, encrypted_data, wrapped_key, wrapped_key_for_share, last_modified]):
         return jsonify({'error': 'Missing required fields'}), 400
