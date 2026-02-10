@@ -26,15 +26,42 @@ import { alignStartDate } from '../util/dates.js';
 // Constants
 // ============================================================================
 
-// Regex patterns for column type detection
-// Date pattern: requires at least one 2-digit number AND at least 2 separators (-, /, or .)
-// Matches: "2024-01-15", "01/15/2024", "15.01.2024", etc.
-const DATE_PATTERN = /^(?=.*\d{2})(?:[^-/.\n]*[-/.]){2,}[^-/.\n]*$/;
-const NUMERIC_PATTERN = /^\s*-?\d+(\.\d+)?\s*$/;
+/** Number of rows to sample for type detection */
+const SAMPLE_SIZE = 20;
 
-// Detection thresholds
-const DETECTION_THRESHOLD = 0.7;  // 70% of sampled cells must match
-const DETECTION_SAMPLE_SIZE = 15; // Number of rows to sample
+/** Column is date if ≥70% of non-empty sampled values are date-typed */
+const DATE_THRESHOLD = 0.7;
+
+/** Column is numeric if ≥70% of non-empty sampled values are numbers */
+const NUMERIC_THRESHOLD = 0.7;
+
+/**
+ * Strict date patterns for string values.
+ * All require non-digit separator characters (-, /, ., space).
+ * Pure numeric strings are excluded BEFORE these are tested.
+ */
+const STRING_DATE_PATTERNS = [
+    // ISO: 2024-01-15, 2024-01-15T00:00:00.000Z
+    /^\d{4}-\d{1,2}-\d{1,2}(T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?)?$/,
+    // US slash: 01/15/2024, 1/15/24
+    /^\d{1,2}\/\d{1,2}\/\d{2,4}$/,
+    // EU dot: 15.01.2024
+    /^\d{1,2}\.\d{1,2}\.\d{2,4}$/,
+    // Dash-separated numeric: 15-01-2024
+    /^\d{1,2}-\d{1,2}-\d{2,4}$/,
+    // DD-Mon-YYYY: 15-Jul-2024
+    /^\d{1,2}-[A-Za-z]{3,}-\d{2,4}$/,
+    // Mon DD, YYYY: Jul 15, 2024 or July 15 2024
+    /^[A-Za-z]{3,}\s+\d{1,2},?\s+\d{2,4}$/,
+    // Mon YYYY: Jul 2024, January 2024
+    /^[A-Za-z]{3,}\s+\d{4}$/,
+    // Mon-YYYY: Jul-2024
+    /^[A-Za-z]{3,}-\d{4}$/,
+    // YYYY-MM: 2024-01
+    /^\d{4}-\d{1,2}$/,
+    // MM/YYYY: 01/2024
+    /^\d{1,2}\/\d{4}$/,
+];
 
 // ============================================================================
 // File Reading
@@ -65,7 +92,7 @@ export async function readSpreadsheet(file) {
                     }
 
                     const data = new Uint8Array(e.target.result);
-                    const workbook = XLSX.read(data, { type: 'array' });
+                    const workbook = XLSX.read(data, { type: 'array', codepage: 65001, cellDates: true });
 
                     // Get first sheet
                     const sheetName = workbook.SheetNames[0];
@@ -115,9 +142,18 @@ export async function readSpreadsheet(file) {
 // ============================================================================
 
 /**
- * Detect column types by sampling data
- * Uses lazy evaluation - only checks first N rows
- * @param {object[]} rows - Array of row objects from spreadsheet
+ * Detect column types from spreadsheet rows.
+ *
+ * Design principles (zero false positives on numeric data):
+ *   1. Type-first: instanceof Date is the primary date signal (from cellDates: true)
+ *   2. Numbers NEVER enter the date path — typeof 'number' is always numeric
+ *   3. Strings: numbers-before-dates check (+value), then strict regex with separators
+ *   4. No new Date() fallback — too permissive, causes false positives
+ *   5. Default to numeric/other when uncertain — a missed date column is a minor
+ *      inconvenience (user picks it from dropdown), but a false date classification
+ *      removes a data column from the user's options entirely
+ *
+ * @param {object[]} rows - Array of row objects from sheet_to_json
  * @returns {{dateColumns: string[], numericColumns: string[]}}
  */
 export function detectColumnTypes(rows) {
@@ -126,136 +162,105 @@ export function detectColumnTypes(rows) {
     }
 
     const columns = Object.keys(rows[0]);
+    const sample = rows.slice(0, SAMPLE_SIZE);
+    const dateCandidates = [];
+    const numericColumns = [];
 
-    // First pass: detect date columns
-    const dateColumns = lazyCheck(rows, columns, DATE_PATTERN, true);
+    for (const col of columns) {
+        const { type, confidence } = classifyColumn(sample, col);
+        if (type === 'date') dateCandidates.push({ col, confidence });
+        else if (type === 'numeric') numericColumns.push(col);
+    }
 
-    // Second pass: detect numeric columns (excluding date columns)
-    const remainingColumns = columns.filter(col => !dateColumns.includes(col));
-    const numericColumns = lazyCheck(rows, remainingColumns, NUMERIC_PATTERN, false);
+    // Sort date candidates by confidence (strongest first) so the UI
+    // can auto-select the best candidate in the date dropdown
+    dateCandidates.sort((a, b) => b.confidence - a.confidence);
+    const dateColumns = dateCandidates.map(d => d.col);
 
     return { dateColumns, numericColumns };
 }
 
 /**
- * Check columns against a pattern using lazy evaluation
- * For date detection, uses a multi-stage approach:
- *   Stage 0: Check if value is already a Date object (XLSX may parse dates)
- *   Stage 1: Check if value is an Excel serial date number
- *   Stage 2: Primary regex pattern (2+ separators)
- *   Stage 3: Fallback for partial dates (year-only, year-month)
+ * Classify a single column by examining sampled values.
  *
- * @param {object[]} rows - Data rows
- * @param {string[]} columns - Columns to check
- * @param {RegExp} pattern - Pattern to match
- * @param {boolean} isDateCheck - Whether this is date detection (uses fallback heuristics)
- * @returns {string[]} Columns that match the pattern
+ * Per-value priority chain (mirrors D3/pandas/readr):
+ *   1. empty/null       → skip
+ *   2. instanceof Date  → date  (unambiguous, from cellDates: true)
+ *   3. typeof 'number'  → numeric (NEVER date — no serial number guessing)
+ *   4. typeof 'string':
+ *      a. pure numeric string (+value works) → numeric
+ *      b. matches strict date pattern        → date
+ *      c. otherwise                          → other
+ *
+ * @param {object[]} sample - Sampled rows
+ * @param {string} col - Column name
+ * @returns {{type: 'date'|'numeric'|'other', confidence: number}}
  */
-function lazyCheck(rows, columns, pattern, isDateCheck) {
-    const matchingColumns = [];
-    const sampleRows = rows.slice(0, DETECTION_SAMPLE_SIZE);
-    const MIN_YEAR = 1900;
-    const MAX_YEAR = 2100;
+function classifyColumn(sample, col) {
+    let dateCount = 0;
+    let numericCount = 0;
+    let total = 0;
 
-    for (const col of columns) {
-        let matches = 0;
-        let total = 0;
+    for (const row of sample) {
+        const value = row[col];
 
-        for (const row of sampleRows) {
-            const value = row[col];
+        if (value == null || value === '') continue;
+        total++;
 
-            // Skip empty/null values
-            if (value == null || value === '') continue;
+        // Date objects from cellDates: true — the primary, unambiguous signal
+        if (value instanceof Date) {
+            if (!isNaN(value.getTime())) dateCount++;
+            continue;
+        }
 
-            total++;
+        // Numbers are ALWAYS numeric — never enter the date path.
+        // This is the key protection: integer values like 18, 42868, 0
+        // can never be misclassified as Excel serial dates.
+        if (typeof value === 'number') {
+            numericCount++;
+            continue;
+        }
 
-            if (isDateCheck) {
-                // Stage 0: Check if already a Date object (XLSX parses dates)
-                if (value instanceof Date) {
-                    if (!isNaN(value.getTime())) {
-                        const year = value.getFullYear();
-                        if (year >= MIN_YEAR && year <= MAX_YEAR) {
-                            matches++;
-                            continue;
-                        }
-                    }
-                }
+        // String values — check numbers before dates (D3/pandas pattern)
+        if (typeof value === 'string') {
+            const trimmed = value.trim();
 
-                // Stage 1: Check if Excel serial date (number between ~1 and ~60000)
-                if (typeof value === 'number' && value > 0 && value < 100000) {
-                    // Excel serial dates: 1 = Jan 1, 1900, ~45000 = ~2023
-                    // Valid range roughly 1 (1900) to 73000 (2100)
-                    if (value >= 1 && value <= 73050) {
-                        matches++;
-                        continue;
-                    }
-                }
-            }
-
-            const strValue = String(value).trim();
-
-            // Stage 2: Try primary regex pattern (for strings)
-            if (pattern.test(strValue)) {
-                matches++;
+            // Pure numeric string → numeric (must check BEFORE date patterns)
+            if (trimmed !== '' && !isNaN(+trimmed)) {
+                numericCount++;
                 continue;
             }
 
-            // Stage 3: Fallback for date detection only
-            if (isDateCheck) {
-                // Year-only: "2024" (exactly 4 digits, valid year range)
-                if (/^\d{4}$/.test(strValue)) {
-                    const year = parseInt(strValue);
-                    if (year >= MIN_YEAR && year <= MAX_YEAR) {
-                        matches++;
-                        continue;
-                    }
-                }
-
-                // Year-month formats: normalize separators and split
-                const parts = strValue.replace(/[/.]/g, '-').split('-');
-                if (parts.length === 2) {
-                    const [p1, p2] = parts;
-
-                    // YYYY-MM format (e.g., "2024-06", "2024/06")
-                    if (p1.length === 4 && /^\d+$/.test(p1) && /^\d+$/.test(p2)) {
-                        const year = parseInt(p1);
-                        const month = parseInt(p2);
-                        if (year >= MIN_YEAR && year <= MAX_YEAR && month >= 1 && month <= 12) {
-                            matches++;
-                            continue;
-                        }
-                    }
-
-                    // MM-YYYY format (e.g., "06-2024", "06/2024")
-                    if (p2.length === 4 && /^\d+$/.test(p1) && /^\d+$/.test(p2)) {
-                        const month = parseInt(p1);
-                        const year = parseInt(p2);
-                        if (year >= MIN_YEAR && year <= MAX_YEAR && month >= 1 && month <= 12) {
-                            matches++;
-                            continue;
-                        }
-                    }
-                }
-
-                // Final fallback: try native Date parsing on string
-                const parsed = new Date(strValue);
-                if (!isNaN(parsed.getTime())) {
-                    const year = parsed.getFullYear();
-                    if (year >= MIN_YEAR && year <= MAX_YEAR) {
-                        matches++;
-                        continue;
-                    }
-                }
+            // Strict date pattern match — requires separators, no permissive fallback
+            if (isDateString(trimmed)) {
+                dateCount++;
+                continue;
             }
         }
 
-        // Column matches if threshold percentage of non-empty cells match
-        if (total > 0 && (matches / total) >= DETECTION_THRESHOLD) {
-            matchingColumns.push(col);
-        }
+        // Anything else (boolean, unrecognized string, invalid Date) → other
     }
 
-    return matchingColumns;
+    if (total === 0) return { type: 'other', confidence: 0 };
+
+    const dateRatio = dateCount / total;
+    const numericRatio = numericCount / total;
+
+    if (dateRatio >= DATE_THRESHOLD) return { type: 'date', confidence: dateRatio };
+    if (numericRatio >= NUMERIC_THRESHOLD) return { type: 'numeric', confidence: numericRatio };
+    return { type: 'other', confidence: 0 };
+}
+
+/**
+ * Test whether a string matches any strict date pattern.
+ * All patterns require non-digit separators — pure numeric strings
+ * must be excluded by the caller before reaching this function.
+ *
+ * @param {string} str - Trimmed string value
+ * @returns {boolean}
+ */
+function isDateString(str) {
+    return STRING_DATE_PATTERNS.some(pattern => pattern.test(str));
 }
 
 // ============================================================================
@@ -369,10 +374,15 @@ function cleanRow(row, columnMap) {
 function parseDate(value) {
   if (value == null || value === '') return null;
 
-  // Handle numeric values as Excel serial dates FIRST.
-  // SheetJS converts dates to serial numbers for all formats (CSV, XLSX, etc.).
-  // If we stringify these and pass to new Date(), 4-digit serials like 2039
-  // get misinterpreted as year 2039 instead of the Excel date ~July 1905.
+  // Handle Date objects (cellDates: true makes SheetJS return these)
+  if (value instanceof Date) {
+    if (isNaN(value.getTime())) return null;
+    if (value.getFullYear() > 2200) return null;
+    return Math.floor(value.getTime() / 1000);
+  }
+
+  // Handle numeric values as Excel serial dates.
+  // Fallback for files where cellDates didn't produce Date objects.
   if (typeof value === 'number') {
     const date = excelSerialToDate(value);
     if (!date || isNaN(date.getTime())) return null;
