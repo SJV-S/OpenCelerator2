@@ -28,7 +28,7 @@ import { CHART_TYPE_CONFIG } from '../config.js';
 import { findNearestMonday, serializeDate, deserializeDate } from '../util/dates.js';
 import { jsonBackwardsCompatibilityCheck } from '../import/jsonBackwardsCompatibility.js';
 import { generateChartKey } from '../../Server/crypto.js';
-import { pushChart, isInitialized, startSyncWatch, leaveChart as syncLeaveChart, deleteChart as syncDeleteChart } from '../../Server/syncClient.js';
+import { pushChart, isInitialized, isChartOwner, startSyncWatch, leaveChart as syncLeaveChart, deleteChart as syncDeleteChart } from '../../Server/syncClient.js';
 import { isSyncEnabled } from '../../Server/init.js';
 import { hasSocket } from '../../Server/wsClient.js';
 
@@ -482,6 +482,8 @@ function debouncedSaveToIndexedDB() {
  */
 function onStateMutation(save = true) {
     if (!save) return;
+    // Don't persist mutations on view-only charts we don't own
+    if (!isChartOwner(chartState) && !chartState.acceptingEdits) return;
     console.log('[LINE SAVE] 3. onStateMutation triggered, PhaseLines count:', Object.keys(chartState.PhaseLines).length);
     if (!chartState.id) {
         console.warn('[Storage] No chart ID - chart should be created before mutations');

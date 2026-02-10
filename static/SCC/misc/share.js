@@ -352,6 +352,29 @@ async function unshareChart() {
 }
 
 /**
+ * Forks a private copy of a shared chart the user doesn't own.
+ * Does NOT delete the original or leave the server — just creates a local copy.
+ */
+async function copyChart() {
+    const snapshot = {
+        ...chartState,
+        startDate: serializeDate(chartState.startDate),
+        chartName: (chartState.chartName || 'Unnamed') + ' \u2013 copy',
+        publicKey: null,
+        ownerName: null,
+        acceptingEdits: false
+    };
+
+    const newId = await importChart(snapshot);
+    if (!newId) {
+        createToast({ message: 'Copy failed', duration: 2000, position: 'top-right' });
+        return;
+    }
+
+    window.location.href = `/chart/${newId}`;
+}
+
+/**
  * Initializes the share tab functionality
  *
  * Data flow:
@@ -421,37 +444,59 @@ function initializeShareTab() {
         jsonExportBtn.addEventListener('click', exportChartStateToJSON);
     }
 
-    // Wire unshare button (handler attached once, visibility toggled on chart load)
+    // Wire unshare/copy button (handler swapped on chart load based on ownership)
     const unshareBtn = document.getElementById('unshare-btn');
     if (unshareBtn) {
         unshareBtn.addEventListener('click', () => {
-            createConfirmToast({
-                message: 'Unshare this chart? A private copy will be created and you will leave the shared version.',
-                onYes: () => unshareChart(),
-                yesLabel: 'Unshare',
-                noLabel: 'Cancel',
-                primaryColor: '#dc2626'
-            });
+            if (isChartOwner(chartState)) {
+                createConfirmToast({
+                    message: 'Unshare this chart? A private copy will be created and you will leave the shared version.',
+                    onYes: () => unshareChart(),
+                    yesLabel: 'Unshare',
+                    noLabel: 'Cancel',
+                    primaryColor: '#dc2626'
+                });
+            } else {
+                createConfirmToast({
+                    message: 'Create a private copy of this chart?',
+                    onYes: () => copyChart(),
+                    yesLabel: 'Copy',
+                    noLabel: 'Cancel'
+                });
+            }
         });
     }
 
     // Show/hide unshare button after chart loads from IDB (chartState.shared is set by then)
-    // Also disable share buttons for non-owners
+    // Also disable share buttons and swap label for non-owners
     eventBus.subscribe(EVENTS.STORAGE_CHART_LOADED, () => {
-        const btn = document.getElementById('unshare-btn');
-        if (btn) btn.hidden = !chartState.shared;
-
         const owner = isChartOwner(chartState);
+
+        const btn = document.getElementById('unshare-btn');
+        if (btn) {
+            btn.hidden = !chartState.shared;
+            if (chartState.shared) {
+                if (owner) {
+                    btn.textContent = 'Stop sharing chart';
+                    btn.classList.add('text-red-600', 'border-red-300', 'hover:bg-red-50');
+                    btn.classList.remove('text-blue-600', 'border-blue-300', 'hover:bg-blue-50');
+                } else {
+                    btn.textContent = 'Copy chart';
+                    btn.classList.remove('text-red-600', 'border-red-300', 'hover:bg-red-50');
+                    btn.classList.add('text-blue-600', 'border-blue-300', 'hover:bg-blue-50');
+                }
+            }
+        }
         const shareBtns = [document.getElementById('share-view-btn'), document.getElementById('share-edit-btn')];
         for (const el of shareBtns) {
             if (!el) continue;
             if (owner) {
-                el.style.pointerEvents = '';
                 el.style.opacity = '';
+                el.style.cursor = '';
                 el.title = '';
             } else {
-                el.style.pointerEvents = 'none';
                 el.style.opacity = '0.45';
+                el.style.cursor = 'not-allowed';
                 el.title = chartState.ownerName
                     ? `${chartState.ownerName} owns this chart`
                     : 'Someone else owns this chart';
