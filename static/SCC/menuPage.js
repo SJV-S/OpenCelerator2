@@ -1,0 +1,1009 @@
+import { initStorage, listCharts, deleteChart, updateChartTags, importChart, drainPushQueue } from '/static/SCC/storage/chartStorage.js';
+import { isNativeFormat } from '/static/SCC/import/nativeImport.js';
+import { isOpenCeleratorFormat, buildChartFromOpenCelerator } from '/static/SCC/import/openCeleratorImport.js';
+import { openDB } from '/static/lib/idb.js';
+import { validatePassphrase, getUserId } from '/static/Server/passphrase.js';
+import { initSync, pullCharts, checkForUpdates } from '/static/Server/syncClient.js';
+import { initServerSync, resetSync, isSyncEnabled, setUserPreference, getUserPreferences, getDisplayName, setDisplayName } from '/static/Server/init.js';
+
+let charts = [];
+let chartToDelete = null;
+let chartToEditTags = null;
+let editingTags = [];
+let searchQuery = '';
+let searchMode = localStorage.getItem('scc-search-mode') || 'name';
+let filterShared = false;
+let searchDebounceTimer = null;
+let currentPage = 1;
+const CHARTS_PER_PAGE = 20;
+
+function formatDate(timestamp) {
+    if (!timestamp) return '-';
+    const date = new Date(timestamp * 1000);
+    return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+    });
+}
+
+function formatChartType(chartType, minuteChart) {
+    const typeLabel = chartType === 'FrequencyCollections' ? 'Freq. Collections' : chartType;
+    const variant = minuteChart ? 'Minute' : 'Count';
+    return `${typeLabel} (${variant})`;
+}
+
+function parseCredits(credits) {
+    if (!credits || typeof credits !== 'object') return [];
+    const lines = [];
+    if (credits[0]) lines.push(credits[0]);
+    if (credits[1]) lines.push(credits[1]);
+    return lines;
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function createTagHtml(tag) {
+    const escaped = escapeHtml(tag);
+    return `<span class="tag inline-flex items-center px-2 py-0.5 rounded text-xs border border-gray-300 text-gray-600">${escaped}</span>`;
+}
+
+function createChartRow(chart) {
+    const credits = parseCredits(chart.credits);
+    const hasCredits = credits.length > 0 && credits.some(c => c && c.trim());
+    const tags = chart.tags || [];
+
+    const row = document.createElement('tr');
+    row.className = 'table-row';
+    row.dataset.id = chart.id;
+    row.dataset.tags = JSON.stringify(tags);
+    row.innerHTML = `
+        <td class="py-3 pl-2 pr-3">
+            ${hasCredits ? `
+                <button class="expand-btn text-gray-400 hover:text-gray-600 p-1" data-id="${chart.id}">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </button>
+            ` : '<span class="w-6 inline-block"></span>'}
+        </td>
+        <td class="py-3">
+            <a href="/chart/${chart.id}" class="chart-link text-gray-800 text-[15px] font-medium hover:underline">${escapeHtml(chart.chartName || 'Unnamed')}</a>
+            <div class="text-xs text-gray-400 mt-0.5">Updated ${formatDate(chart.updatedAt)}</div>
+        </td>
+        <td class="py-3 text-gray-600 text-sm">${formatChartType(chart.chartType, chart.minuteChart)}</td>
+        <td class="py-3">
+            <div class="flex items-center gap-1 flex-wrap">
+                ${tags.map(t => createTagHtml(t)).join('')}
+                <button class="edit-tags-btn text-gray-400 hover:text-gray-600 p-1" data-id="${chart.id}">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                </button>
+            </div>
+        </td>
+        <td class="py-3 text-center">
+            ${chart.shared
+                ? `<svg class="w-5 h-5 text-green-500 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                   </svg>`
+                : `<span class="text-gray-400 text-sm">-</span>`}
+        </td>
+        <td class="py-3 pr-2 text-right">
+            <button class="delete-btn text-gray-400 hover:text-red-500 p-1" data-id="${chart.id}" data-name="${escapeHtml(chart.chartName || 'Unnamed')}">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+            </button>
+        </td>
+    `;
+
+    // Create credits expansion row
+    const creditsRow = document.createElement('tr');
+    creditsRow.className = 'credits-row';
+    creditsRow.id = `credits-${chart.id}`;
+    creditsRow.innerHTML = `
+        <td></td>
+        <td colspan="5" class="pb-4 pt-1">
+            <div class="bg-gray-50 rounded-lg p-4 text-xs text-gray-600 font-mono leading-relaxed">
+                ${credits.map(line => `<div class="mb-1 last:mb-0">${escapeHtml(line || '')}</div>`).join('')}
+            </div>
+        </td>
+    `;
+
+    return { row, creditsRow };
+}
+
+
+function searchCharts(charts) {
+    if (!searchQuery.trim()) return charts;
+
+    const query = searchQuery.toLowerCase().trim();
+
+    return charts.filter(chart => {
+        switch (searchMode) {
+            case 'name':
+                return (chart.chartName || '').toLowerCase().includes(query);
+            case 'credits':
+                const credits = chart.credits || {};
+                const creditText = [credits[0] || '', credits[1] || ''].join(' ').toLowerCase();
+                return creditText.includes(query);
+            case 'tags':
+                return (chart.tags || []).some(t => t.toLowerCase().includes(query));
+            default:
+                return true;
+        }
+    });
+}
+
+function filterCharts(charts) {
+    let filtered = searchCharts(charts);
+    if (filterShared) {
+        filtered = filtered.filter(chart => chart.shared);
+    }
+    return filtered;
+}
+
+function renderCharts(resetPage = false) {
+    if (resetPage) currentPage = 1;
+
+    const emptyState = document.getElementById('empty-state');
+    const noResults = document.getElementById('no-results');
+    const chartsContainer = document.getElementById('charts-container');
+    const tableBody = document.getElementById('charts-table');
+    const pagination = document.getElementById('pagination');
+
+    if (charts.length === 0) {
+        emptyState.classList.remove('hidden');
+        noResults.classList.add('hidden');
+        chartsContainer.classList.add('hidden');
+        pagination.classList.add('hidden');
+        return;
+    }
+
+    const filteredCharts = filterCharts(charts);
+
+    if (filteredCharts.length === 0) {
+        emptyState.classList.add('hidden');
+        noResults.classList.remove('hidden');
+        chartsContainer.classList.add('hidden');
+        pagination.classList.add('hidden');
+        return;
+    }
+
+    // Sort by most recently modified
+    filteredCharts.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+
+    // Pagination
+    const totalPages = Math.ceil(filteredCharts.length / CHARTS_PER_PAGE);
+    if (currentPage > totalPages) currentPage = totalPages;
+    const startIndex = (currentPage - 1) * CHARTS_PER_PAGE;
+    const pageCharts = filteredCharts.slice(startIndex, startIndex + CHARTS_PER_PAGE);
+
+    emptyState.classList.add('hidden');
+    noResults.classList.add('hidden');
+    chartsContainer.classList.remove('hidden');
+    tableBody.innerHTML = '';
+
+    for (const chart of pageCharts) {
+        const { row, creditsRow } = createChartRow(chart);
+        tableBody.appendChild(row);
+        tableBody.appendChild(creditsRow);
+    }
+
+    attachRowListeners();
+    updatePagination(filteredCharts.length, totalPages);
+}
+
+function updatePagination(totalCharts, totalPages) {
+    const pagination = document.getElementById('pagination');
+    const pageInfo = document.getElementById('page-info');
+    const prevBtn = document.getElementById('prev-page');
+    const nextBtn = document.getElementById('next-page');
+
+    if (totalPages <= 1) {
+        pagination.classList.add('hidden');
+        return;
+    }
+
+    pagination.classList.remove('hidden');
+    const start = (currentPage - 1) * CHARTS_PER_PAGE + 1;
+    const end = Math.min(currentPage * CHARTS_PER_PAGE, totalCharts);
+    pageInfo.textContent = `${start}-${end} of ${totalCharts}`;
+
+    prevBtn.disabled = currentPage === 1;
+    nextBtn.disabled = currentPage === totalPages;
+}
+
+function attachRowListeners() {
+    // Single-click row to toggle credits, double-click to open chart
+    document.querySelectorAll('.table-row').forEach(row => {
+        row.addEventListener('click', (e) => {
+            // Don't toggle if clicking on interactive elements
+            if (e.target.closest('a, button')) return;
+
+            const chartId = row.dataset.id;
+            const expandBtn = row.querySelector('.expand-btn');
+            const creditsRow = document.getElementById(`credits-${chartId}`);
+
+            // Only toggle if this chart has credits (has expand button)
+            if (expandBtn && creditsRow) {
+                expandBtn.classList.toggle('expanded');
+                creditsRow.classList.toggle('expanded');
+            }
+        });
+
+        row.addEventListener('dblclick', () => {
+            const chartId = row.dataset.id;
+            if (chartId) {
+                window.location.href = `/chart/${chartId}`;
+            }
+        });
+    });
+
+    // Expand buttons (still functional for direct clicks)
+    document.querySelectorAll('.expand-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent row click from also firing
+            const id = btn.dataset.id;
+            const creditsRow = document.getElementById(`credits-${id}`);
+            btn.classList.toggle('expanded');
+            creditsRow.classList.toggle('expanded');
+        });
+    });
+
+    // Delete buttons
+    document.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            chartToDelete = btn.dataset.id;
+            document.getElementById('delete-chart-name').textContent = btn.dataset.name;
+            document.getElementById('delete-modal').classList.remove('hidden');
+            document.getElementById('delete-modal').classList.add('flex');
+        });
+    });
+
+    // Edit tags buttons
+    document.querySelectorAll('.edit-tags-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const chartId = btn.dataset.id;
+            const chart = charts.find(c => c.id === chartId);
+            chartToEditTags = chartId;
+            editingTags = chart ? [...(chart.tags || [])] : [];
+            openTagsModal();
+        });
+    });
+}
+
+// Tags modal functions
+function openTagsModal() {
+    document.getElementById('tags-input').value = '';
+    renderCurrentTags();
+    document.getElementById('tags-modal').classList.remove('hidden');
+    document.getElementById('tags-modal').classList.add('flex');
+    document.getElementById('tags-input').focus();
+}
+
+function closeTagsModal() {
+    chartToEditTags = null;
+    editingTags = [];
+    document.getElementById('tags-modal').classList.add('hidden');
+    document.getElementById('tags-modal').classList.remove('flex');
+}
+
+function renderCurrentTags() {
+    const container = document.getElementById('current-tags');
+    const input = document.getElementById('tags-input');
+
+    container.innerHTML = editingTags.map(tag => `
+        <span class="inline-flex items-center gap-1 px-2 py-1 rounded text-xs bg-gray-100 text-gray-700">
+            ${escapeHtml(tag)}
+            <button class="remove-tag hover:text-red-500" data-tag="${escapeHtml(tag)}">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </span>
+    `).join('');
+
+    // Disable input when max tags reached
+    input.disabled = editingTags.length >= MAX_TAGS;
+
+    container.querySelectorAll('.remove-tag').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tagToRemove = btn.dataset.tag.toLowerCase();
+            editingTags = editingTags.filter(t => t.toLowerCase() !== tagToRemove);
+            renderCurrentTags();
+        });
+    });
+}
+
+const MAX_TAGS = 5;
+
+function addTagsFromInput() {
+    const input = document.getElementById('tags-input');
+    const newTags = input.value
+        .split(',')
+        .map(t => t.trim().toLowerCase())
+        .filter(t => t.length > 0);
+
+    for (const tag of newTags) {
+        if (editingTags.length >= MAX_TAGS) break;
+        if (!editingTags.some(t => t.toLowerCase() === tag)) {
+            editingTags.push(tag);
+        }
+    }
+
+    input.value = '';
+    renderCurrentTags();
+}
+
+async function loadCharts() {
+    await initStorage();
+    charts = await listCharts();
+    renderCharts();
+
+    // Pull updates from server if sync enabled
+    await initServerSync();
+    if (isSyncEnabled()) {
+        try {
+            await drainPushQueue();
+            const manifest = charts.map(c => ({ chart_uuid: c.id, updated_at: c.updatedAt || 0 }));
+            const { downloads, tombstones } = await checkForUpdates(manifest);
+            let changed = false;
+
+            // Delete locally any non-shared charts tombstoned on another device
+            if (tombstones?.length > 0) {
+                for (const t of tombstones) {
+                    const local = charts.find(c => c.id === t.chart_uuid && !c.shared);
+                    if (local) {
+                        await deleteChart(t.chart_uuid);
+                        changed = true;
+                    }
+                }
+            }
+
+            if (downloads.length > 0) {
+                const chartsDb = await openDB('SCC_Charts', 1);
+                for (const dl of downloads) {
+                    dl.data.id = dl.id;
+                    dl.data.lastModified = dl.updatedAt;
+                    await chartsDb.put('charts', dl.data);
+                }
+                changed = true;
+            }
+
+            if (changed) {
+                charts = await listCharts();
+                renderCharts();
+            }
+        } catch (err) {
+            console.warn('[Sync] Pull on load failed:', err);
+        }
+    }
+}
+
+// Delete modal handlers
+document.getElementById('cancel-delete').addEventListener('click', () => {
+    chartToDelete = null;
+    document.getElementById('delete-modal').classList.add('hidden');
+    document.getElementById('delete-modal').classList.remove('flex');
+});
+
+document.getElementById('confirm-delete').addEventListener('click', async () => {
+    if (chartToDelete) {
+        await deleteChart(chartToDelete);
+        chartToDelete = null;
+        document.getElementById('delete-modal').classList.add('hidden');
+        document.getElementById('delete-modal').classList.remove('flex');
+        await loadCharts();
+    }
+});
+
+document.getElementById('delete-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'delete-modal') {
+        chartToDelete = null;
+        document.getElementById('delete-modal').classList.add('hidden');
+        document.getElementById('delete-modal').classList.remove('flex');
+    }
+});
+
+// Tags modal handlers
+document.getElementById('cancel-tags').addEventListener('click', closeTagsModal);
+
+document.getElementById('save-tags').addEventListener('click', async () => {
+    if (chartToEditTags) {
+        // Add any remaining input
+        addTagsFromInput();
+        await updateChartTags(chartToEditTags, editingTags);
+        closeTagsModal();
+        await loadCharts();
+    }
+});
+
+document.getElementById('tags-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'tags-modal') {
+        closeTagsModal();
+    }
+});
+
+document.getElementById('tags-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        addTagsFromInput();
+    }
+});
+
+// Search input with debounce
+document.getElementById('search-input').addEventListener('input', (e) => {
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(() => {
+        searchQuery = e.target.value;
+        renderCharts(true);
+    }, 200);
+});
+
+// Search mode radio buttons
+document.querySelectorAll('input[name="search-mode"]').forEach(radio => {
+    // Set initial state from localStorage
+    radio.checked = radio.value === searchMode;
+
+    radio.addEventListener('change', (e) => {
+        searchMode = e.target.value;
+        localStorage.setItem('scc-search-mode', searchMode);
+        if (searchQuery.trim()) {
+            renderCharts(true);
+        }
+    });
+});
+
+// Filter shared toggle
+document.getElementById('filter-shared').addEventListener('change', (e) => {
+    filterShared = e.target.checked;
+    renderCharts(true);
+});
+
+// Pagination
+document.getElementById('prev-page').addEventListener('click', () => {
+    if (currentPage > 1) {
+        currentPage--;
+        renderCharts();
+    }
+});
+
+document.getElementById('next-page').addEventListener('click', () => {
+    currentPage++;
+    renderCharts();
+});
+
+// Import chart button
+document.getElementById('import-chart-btn').addEventListener('click', () => {
+    document.getElementById('import-chart-input').click();
+});
+
+document.getElementById('import-chart-input').addEventListener('change', async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Reset input so same file can be selected again
+    e.target.value = '';
+
+    try {
+        const text = await file.text();
+        console.log(`[IMPORT DEBUG] === FILE IMPORT START: ${file.name} ===`);
+        console.log(`[IMPORT DEBUG] Raw file size: ${text.length} chars (${(text.length / 1024).toFixed(1)} KB)`);
+
+        let json;
+        try {
+            json = JSON.parse(text);
+        } catch (parseErr) {
+            alert(`Invalid JSON file: ${parseErr.message}`);
+            return;
+        }
+
+        console.log('[IMPORT DEBUG] Parsed JSON top-level keys:', Object.keys(json));
+
+        // Detect format and import
+        if (isNativeFormat(json)) {
+            console.log('[IMPORT DEBUG] Format detected: TC2 Native');
+            await importChart(json);
+            await loadCharts();
+            alert(`Imported "${json.chartName || 'Unnamed'}"`);
+
+        } else if (isOpenCeleratorFormat(json)) {
+            console.log('[IMPORT DEBUG] Format detected: OpenCelerator');
+            const result = buildChartFromOpenCelerator(json, file.name);
+            if (!result.success) {
+                alert(`Import failed: ${result.error}`);
+                return;
+            }
+
+            await importChart(result.chartData);
+            await loadCharts();
+
+            let message = `Imported "${result.chartData.chartName}"`;
+            if (result.warnings.length > 0) {
+                message += ` (${result.warnings.length} feature(s) not supported)`;
+            }
+            alert(message);
+
+        } else {
+            alert('Unrecognized JSON format. Expected TC2 or OpenCelerator export.');
+        }
+
+    } catch (err) {
+        console.error('Import error:', err);
+        alert(`Import failed: ${err.message}`);
+    }
+});
+
+// Show share-link error banner if redirected from an expired/invalid link
+function showShareError() {
+    const msg = sessionStorage.getItem('scc-share-error');
+    if (!msg) return;
+    sessionStorage.removeItem('scc-share-error');
+
+    const banner = document.createElement('div');
+    banner.className = 'fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-red-50 border border-red-300 text-red-800 px-5 py-3 rounded-lg shadow-md text-sm font-medium flex items-center gap-3';
+    banner.innerHTML = `<span>${msg}</span><button class="text-red-400 hover:text-red-600 text-lg leading-none">&times;</button>`;
+    banner.querySelector('button').addEventListener('click', () => banner.remove());
+    document.body.appendChild(banner);
+    setTimeout(() => banner.remove(), 8000);
+}
+showShareError();
+
+// Load on page show (handles back button)
+window.addEventListener('pageshow', loadCharts);
+
+// --- Settings Modal ---
+async function openSettingsModal() {
+    const prefs = getUserPreferences();
+    document.getElementById('settings-sync-checkbox').checked = prefs.syncAllChartsToServer;
+
+    const displayName = await getDisplayName();
+    document.getElementById('settings-owner-name').value = displayName || '';
+
+    // Initialize sync passphrase section
+    syncPassphraseVisible = false;
+    document.getElementById('sync-paste-input').value = '';
+    document.getElementById('sync-copy-btn').textContent = 'Copy';
+
+    getPassphrase().then(p => {
+        syncPassphrase = p || null;
+        renderPassphraseDisplay();
+    });
+
+    document.getElementById('settings-modal').classList.remove('hidden');
+    document.getElementById('settings-modal').classList.add('flex');
+}
+
+function closeSettingsModal() {
+    document.getElementById('settings-modal').classList.add('hidden');
+    document.getElementById('settings-modal').classList.remove('flex');
+
+    // Reset sync state
+    syncPassphrase = null;
+    syncPassphraseVisible = false;
+    pendingAction = null;
+    pendingBackupData = null;
+    document.getElementById('sync-paste-section').classList.remove('hidden');
+    document.getElementById('backup-import-section').classList.remove('hidden');
+    document.getElementById('sync-confirm').classList.add('hidden');
+    hideSyncStatus();
+    hideImportStatus();
+
+    // Collapse both groups
+    document.getElementById('backup-group').classList.add('hidden');
+    document.getElementById('sync-group').classList.add('hidden');
+    document.getElementById('backup-chevron').style.transform = '';
+    document.getElementById('sync-chevron').style.transform = '';
+}
+
+document.getElementById('settings-btn').addEventListener('click', openSettingsModal);
+document.getElementById('settings-close-btn').addEventListener('click', closeSettingsModal);
+
+document.getElementById('settings-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'settings-modal') closeSettingsModal();
+});
+
+document.getElementById('settings-sync-checkbox').addEventListener('change', (e) => {
+    setUserPreference('syncAllChartsToServer', e.target.checked);
+});
+
+document.getElementById('settings-owner-name').addEventListener('blur', (e) => {
+    setDisplayName(e.target.value.trim());
+});
+
+// --- Section Toggle Handlers ---
+document.getElementById('backup-toggle').addEventListener('click', () => {
+    const group = document.getElementById('backup-group');
+    const chevron = document.getElementById('backup-chevron');
+    group.classList.toggle('hidden');
+    chevron.style.transform = group.classList.contains('hidden') ? '' : 'rotate(90deg)';
+});
+
+document.getElementById('sync-toggle').addEventListener('click', () => {
+    const group = document.getElementById('sync-group');
+    const chevron = document.getElementById('sync-chevron');
+    group.classList.toggle('hidden');
+    chevron.style.transform = group.classList.contains('hidden') ? '' : 'rotate(90deg)';
+});
+
+// --- Backup Export ---
+document.getElementById('backup-export-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('backup-export-btn');
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.textContent = 'Exporting...';
+
+    try {
+        const identityDb = await openDB('SCC_Identity', 1);
+        const identity = {
+            passphrase: await identityDb.get('credentials', 'passphrase') || null,
+            publicKey: await identityDb.get('credentials', 'publicKey') || null,
+            display_name: await identityDb.get('credentials', 'display_name') || null,
+            user_preferences: await identityDb.get('credentials', 'user_preferences') || null,
+        };
+
+        const chartsDb = await openDB('SCC_Charts', 1);
+        const allCharts = await chartsDb.getAll('charts');
+
+        const backup = {
+            backupVersionFormat: 1,
+            exportedAt: new Date().toISOString(),
+            identity,
+            charts: allCharts,
+        };
+
+        const json = JSON.stringify(backup);
+        const blob = new Blob([json], { type: 'application/json;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+
+        const today = new Date().toISOString().slice(0, 10);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `tc2-backup-${today}.json`;
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    } catch (err) {
+        console.error('Backup export failed:', err);
+        alert('Backup export failed. Check console for details.');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+});
+
+// --- Sync Device (inside Settings modal) ---
+let syncPassphrase = null;
+let syncPassphraseVisible = false;
+
+async function getPassphrase() {
+    try {
+        const db = await openDB('SCC_Identity', 1);
+        return await db.get('credentials', 'passphrase');
+    } catch {
+        return null;
+    }
+}
+
+function renderPassphraseDisplay() {
+    const display = document.getElementById('sync-passphrase-display');
+    const eyeIcon = document.getElementById('sync-eye-icon');
+    const eyeOffIcon = document.getElementById('sync-eye-off-icon');
+
+    if (!syncPassphrase) {
+        display.textContent = 'No passphrase generated yet';
+        display.classList.add('text-gray-400', 'italic');
+        display.classList.remove('text-gray-800');
+        return;
+    }
+
+    display.classList.remove('text-gray-400', 'italic');
+    display.classList.add('text-gray-800');
+
+    if (syncPassphraseVisible) {
+        display.textContent = syncPassphrase;
+        eyeIcon.classList.add('hidden');
+        eyeOffIcon.classList.remove('hidden');
+    } else {
+        display.textContent = syncPassphrase.split(' ').map(() => '\u2022\u2022\u2022\u2022').join(' ');
+        eyeIcon.classList.remove('hidden');
+        eyeOffIcon.classList.add('hidden');
+    }
+}
+
+function showSyncStatus(message, isError) {
+    const el = document.getElementById('sync-status');
+    el.textContent = message;
+    el.className = `text-sm mt-2 ${isError ? 'text-red-600' : 'text-green-600'}`;
+    el.classList.remove('hidden');
+}
+
+function hideSyncStatus() {
+    const el = document.getElementById('sync-status');
+    el.classList.add('hidden');
+    el.textContent = '';
+}
+
+document.getElementById('sync-toggle-visibility').addEventListener('click', () => {
+    if (!syncPassphrase) return;
+    syncPassphraseVisible = !syncPassphraseVisible;
+    renderPassphraseDisplay();
+});
+
+document.getElementById('sync-copy-btn').addEventListener('click', async () => {
+    if (!syncPassphrase) return;
+    try {
+        await navigator.clipboard.writeText(syncPassphrase);
+        const btn = document.getElementById('sync-copy-btn');
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+    } catch {
+        // Fallback silently
+    }
+});
+
+// Pending passphrase stored between validation and confirm step
+let pendingNewPassphrase = null;
+let pendingAction = null;
+let pendingBackupData = null;
+
+async function performSync(discardExisting) {
+    const newPassphrase = pendingNewPassphrase;
+    if (!newPassphrase) return;
+
+    try {
+        // If discarding, delete all existing charts
+        if (discardExisting) {
+            const chartsDb = await openDB('SCC_Charts', 1);
+            const tx = chartsDb.transaction('charts', 'readwrite');
+            await tx.objectStore('charts').clear();
+            await tx.done;
+        }
+
+        // Write new passphrase to SCC_Identity
+        const identityDb = await openDB('SCC_Identity', 1, {
+            upgrade(db) {
+                if (!db.objectStoreNames.contains('credentials')) {
+                    db.createObjectStore('credentials');
+                }
+            }
+        });
+        await identityDb.put('credentials', newPassphrase, 'passphrase');
+
+        // Reset and reinitialize sync with new passphrase
+        resetSync();
+        await initSync(newPassphrase);
+
+        // Pull all charts for the new identity
+        const result = await pullCharts();
+        const downloads = result.downloads;
+
+        // Store each downloaded chart in IndexedDB with original IDs
+        if (downloads.length > 0) {
+            const chartsDb = await openDB('SCC_Charts', 1);
+            for (const dl of downloads) {
+                const chartData = dl.data;
+                chartData.id = dl.id;
+                chartData.shared = true;
+                chartData.lastModified = dl.updatedAt;
+                await chartsDb.put('charts', chartData);
+            }
+        }
+
+        pendingNewPassphrase = null;
+
+        if (downloads.length === 0) {
+            // Identity switched but nothing to download
+            document.getElementById('sync-confirm').classList.add('hidden');
+            document.getElementById('sync-paste-section').classList.remove('hidden');
+            document.getElementById('backup-import-section').classList.remove('hidden');
+            showSyncStatus('Identity switched. No shared charts found on the server for this passphrase.', false);
+            await loadCharts();
+            return;
+        }
+
+        closeSettingsModal();
+        await loadCharts();
+    } catch (err) {
+        console.error('[Sync] Error:', err);
+        // Show error back in paste section
+        document.getElementById('sync-confirm').classList.add('hidden');
+        document.getElementById('sync-paste-section').classList.remove('hidden');
+        document.getElementById('backup-import-section').classList.remove('hidden');
+        showSyncStatus(`Sync failed: ${err.message}`, true);
+    }
+}
+
+document.getElementById('sync-submit-btn').addEventListener('click', async () => {
+    const input = document.getElementById('sync-paste-input');
+    const value = input.value.trim();
+    if (!value) return;
+
+    hideSyncStatus();
+
+    // Validate passphrase format
+    if (!validatePassphrase(value)) {
+        showSyncStatus('Invalid passphrase format', true);
+        return;
+    }
+
+    // Check if same identity — just pull from server, no passphrase switch needed
+    const currentPassphrase = await getPassphrase();
+    if (currentPassphrase) {
+        const [currentId, newId] = await Promise.all([
+            getUserId(currentPassphrase),
+            getUserId(value)
+        ]);
+        if (currentId === newId) {
+            try {
+                await initServerSync();
+                const result = await pullCharts();
+                if (result.downloads.length > 0) {
+                    const chartsDb = await openDB('SCC_Charts', 1);
+                    for (const dl of result.downloads) {
+                        const chartData = dl.data;
+                        chartData.id = dl.id;
+                        chartData.shared = true;
+                        chartData.lastModified = dl.updatedAt;
+                        await chartsDb.put('charts', chartData);
+                    }
+                    closeSettingsModal();
+                    await loadCharts();
+                } else {
+                    showSyncStatus('Same identity — no new charts on server.', false);
+                }
+            } catch (err) {
+                console.error('[Sync] Pull error:', err);
+                showSyncStatus(`Sync failed: ${err.message}`, true);
+            }
+            return;
+        }
+    }
+
+    pendingNewPassphrase = value;
+    pendingAction = 'passphrase';
+
+    // Check for existing charts
+    const existingCharts = await listCharts();
+    if (existingCharts.length > 0) {
+        // Show confirmation sub-modal
+        document.getElementById('sync-chart-count').textContent = existingCharts.length;
+        document.getElementById('sync-paste-section').classList.add('hidden');
+        document.getElementById('backup-import-section').classList.add('hidden');
+        document.getElementById('sync-confirm').classList.remove('hidden');
+    } else {
+        // No existing charts, proceed directly
+        await performSync(false);
+    }
+});
+
+// Confirmation buttons (shared by passphrase sync and backup import)
+document.getElementById('sync-keep-btn').addEventListener('click', () => {
+    if (pendingAction === 'backup-import') performBackupImport(false);
+    else performSync(false);
+});
+document.getElementById('sync-discard-btn').addEventListener('click', () => {
+    if (pendingAction === 'backup-import') performBackupImport(true);
+    else performSync(true);
+});
+
+// --- Backup Import ---
+function showImportStatus(message, isError) {
+    const el = document.getElementById('import-status');
+    el.textContent = message;
+    el.className = `text-sm mt-2 ${isError ? 'text-red-600' : 'text-green-600'}`;
+    el.classList.remove('hidden');
+}
+
+function hideImportStatus() {
+    const el = document.getElementById('import-status');
+    el.classList.add('hidden');
+    el.textContent = '';
+}
+
+document.getElementById('backup-import-btn').addEventListener('click', () => {
+    document.getElementById('backup-import-input').click();
+});
+
+document.getElementById('backup-import-input').addEventListener('change', async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+
+    hideImportStatus();
+
+    try {
+        const text = await file.text();
+        let json;
+        try {
+            json = JSON.parse(text);
+        } catch (parseErr) {
+            showImportStatus(`Invalid JSON file: ${parseErr.message}`, true);
+            return;
+        }
+
+        if (!json.backupVersionFormat) {
+            showImportStatus('Invalid backup file: missing backup format identifier.', true);
+            return;
+        }
+
+        pendingBackupData = json;
+        pendingAction = 'backup-import';
+
+        const existingCharts = await listCharts();
+        if (existingCharts.length > 0) {
+            document.getElementById('sync-chart-count').textContent = existingCharts.length;
+            document.getElementById('sync-paste-section').classList.add('hidden');
+            document.getElementById('backup-import-section').classList.add('hidden');
+            document.getElementById('sync-confirm').classList.remove('hidden');
+        } else {
+            await performBackupImport(false);
+        }
+    } catch (err) {
+        console.error('[Backup Import] Parse error:', err);
+        showImportStatus(`Import failed: ${err.message}`, true);
+    }
+});
+
+async function performBackupImport(discardExisting) {
+    const backup = pendingBackupData;
+    if (!backup) return;
+
+    try {
+        if (discardExisting) {
+            const chartsDb = await openDB('SCC_Charts', 1);
+            const tx = chartsDb.transaction('charts', 'readwrite');
+            await tx.objectStore('charts').clear();
+            await tx.done;
+        }
+
+        // Write identity data
+        const identityDb = await openDB('SCC_Identity', 1, {
+            upgrade(db) {
+                if (!db.objectStoreNames.contains('credentials')) {
+                    db.createObjectStore('credentials');
+                }
+            }
+        });
+
+        const identity = backup.identity || {};
+        if (identity.passphrase) await identityDb.put('credentials', identity.passphrase, 'passphrase');
+        if (identity.publicKey) await identityDb.put('credentials', identity.publicKey, 'publicKey');
+        if (identity.display_name) await identityDb.put('credentials', identity.display_name, 'display_name');
+        if (identity.user_preferences) await identityDb.put('credentials', identity.user_preferences, 'user_preferences');
+
+        // Write all backup charts
+        if (backup.charts?.length > 0) {
+            const chartsDb = await openDB('SCC_Charts', 1);
+            for (const chart of backup.charts) {
+                await chartsDb.put('charts', chart);
+            }
+        }
+
+        // Reset sync state and reinitialize
+        resetSync();
+        await initServerSync();
+
+        pendingBackupData = null;
+        pendingAction = null;
+
+        closeSettingsModal();
+        await loadCharts();
+    } catch (err) {
+        console.error('[Backup Import] Error:', err);
+        document.getElementById('sync-confirm').classList.add('hidden');
+        document.getElementById('sync-paste-section').classList.remove('hidden');
+        document.getElementById('backup-import-section').classList.remove('hidden');
+        showImportStatus(`Import failed: ${err.message}`, true);
+    }
+}
