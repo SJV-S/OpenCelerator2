@@ -27,6 +27,7 @@ import { chartState } from '../chartState.js';
 import { CHART_TYPE_CONFIG } from '../config.js';
 import { findNearestMonday, serializeDate, deserializeDate } from '../util/dates.js';
 import { jsonBackwardsCompatibilityCheck } from '../import/jsonBackwardsCompatibility.js';
+import { compactChart, expandChart } from './compactJson.js';
 import { generateChartKey } from '../../Server/crypto.js';
 import { pushChart, isInitialized, isChartOwner, startSyncWatch, leaveChart as syncLeaveChart, deleteChart as syncDeleteChart } from '../../Server/syncClient.js';
 import { isSyncEnabled, getPublicKeyB64 } from '../../Server/init.js';
@@ -69,6 +70,7 @@ function serializeChart(id, state) {
     serialized.startDate = serializeDate(state.startDate);
     serialized.lastModified = Math.floor(Date.now() / 1000);
     serialized._createdAt = state._createdAt || serialized.lastModified;
+    compactChart(serialized);
     return serialized;
 }
 
@@ -183,6 +185,7 @@ export async function loadChart(id) {
             } catch { /* skip */ }
         }
 
+        expandChart(data);
         const wasModified = await jsonBackwardsCompatibilityCheck(data);
         deserializeChart(data);
         chartState.id = id;

@@ -11,6 +11,7 @@ import { isOnline } from '../../Server/onlineStatus.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 import { serializeDate } from '../util/dates.js';
 import { DEVELOPER_MODE } from '../config.js';
+import { compactChart } from '../storage/compactJson.js';
 
 /**
  * Takes a screenshot of the Plotly chart and downloads it as PNG
@@ -280,6 +281,7 @@ function exportChartStateToJSON() {
 
         // Build exportable object: spread chartState, override startDate to ISO string
         const exportObj = { ...chartState, startDate: serializeDate(chartState.startDate) };
+        compactChart(exportObj);
         const jsonContent = DEVELOPER_MODE
             ? JSON.stringify(exportObj, null, 2)
             : JSON.stringify(exportObj);
