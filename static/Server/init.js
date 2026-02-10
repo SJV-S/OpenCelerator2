@@ -79,8 +79,8 @@ async function migrateSigningKeys(newPublicKeyB64) {
                 updated = true;
             }
 
-            // Reclaim broken-era charts: stale random publicKey, not an edit-link chart
-            if (chart.publicKey && chart.publicKey !== newPublicKeyB64 && !chart.acceptingEdits) {
+            // Reclaim broken-era charts: stale random publicKey, not shared or edit-link
+            if (chart.publicKey && chart.publicKey !== newPublicKeyB64 && !chart.acceptingEdits && !chart.shared) {
                 chart.publicKey = newPublicKeyB64;
                 updated = true;
                 migrated++;

@@ -70,9 +70,17 @@ async function verifyPull(encryptedDataHex, signatureHex, chartData, localChart)
     } else if (chartData.acceptingEdits) {
         // Edit link: skip verification, accept any push
     } else {
-        const ownerPub = await importPublicKey(chartData.publicKey);
-        if (!await verify(encryptedDataHex, signatureHex, ownerPub)) {
-            return { accepted: false, reason: 'Signature verification failed for view-only chart' };
+        const trustedKey = localChart?.publicKey;
+        if (trustedKey) {
+            const trustedPub = await importPublicKey(trustedKey);
+            if (!await verify(encryptedDataHex, signatureHex, trustedPub)) {
+                return { accepted: false, reason: 'Signature does not match trusted owner' };
+            }
+        } else {
+            const claimedPub = await importPublicKey(chartData.publicKey);
+            if (!await verify(encryptedDataHex, signatureHex, claimedPub)) {
+                return { accepted: false, reason: 'Signature verification failed for view-only chart' };
+            }
         }
     }
 

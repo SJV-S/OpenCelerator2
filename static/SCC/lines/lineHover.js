@@ -135,8 +135,34 @@ function isSeriesVisible(seriesKey) {
 }
 
 /**
- * Builds hover traces for cel lines only.
- * Skips lines whose shapes are hidden (global change visibility off,
+ * Builds the hover label for an aim line (user text + celeration for diagonal).
+ */
+function buildAimHoverLabel(aimLine) {
+    const lines = [];
+
+    // User-supplied text label
+    if (aimLine.text && aimLine.text.trim() !== '') {
+        lines.push(aimLine.text);
+    }
+
+    // Celeration value for diagonal lines
+    if (aimLine.direction === 'diagonal') {
+        const x1 = dateToXPosition(aimLine.date1);
+        const x2 = dateToXPosition(aimLine.date2);
+        const dx = x2 - x1;
+        if (dx > 0 && aimLine.y1 > 0 && aimLine.y2 > 0) {
+            const logSlope = (Math.log10(aimLine.y2) - Math.log10(aimLine.y1)) / dx;
+            const config = CHART_TYPE_CONFIG[chartState.chartType] || CHART_TYPE_CONFIG.Daily;
+            lines.push(formatCelerationLabel(logSlope, config.unit));
+        }
+    }
+
+    return lines.join('<br>');
+}
+
+/**
+ * Builds hover traces for cel lines and aim lines.
+ * Skips lines whose shapes are hidden (global visibility off,
  * or underlying data series hidden).
  */
 function buildAllHoverTraces() {
@@ -145,17 +171,17 @@ function buildAllHoverTraces() {
 
     const yaxis = chartDiv._fullLayout.yaxis;
     const isLogY = yaxis.type === 'log';
-    const globalVisible = chartState.lineVisibility.change;
 
     const traces = [];
 
-    // Cel lines only
+    // Cel lines
+    const celVisible = chartState.lineVisibility.change;
     if (chartState.CelLines) {
         Object.values(chartState.CelLines).forEach(celLine => {
             if (!celLine.id) return; // Skip settings object
 
             // Same visibility rule as redrawCelLines in celLine.js
-            if (!globalVisible || !isSeriesVisible(celLine.seriesKey)) return;
+            if (!celVisible || !isSeriesVisible(celLine.seriesKey)) return;
 
             const lineName = `cel-${celLine.id}`;
             const label = buildCelHoverLabel(celLine);
@@ -179,6 +205,25 @@ function buildAllHoverTraces() {
                 const lowerPoints = interpolateLinePoints(x1, celLine.bounceLowerY1, x2, celLine.bounceLowerY2, isLogY);
                 traces.push(createHoverTrace(lowerPoints, `${lineName}-lower`, label, color));
             }
+        });
+    }
+
+    // Aim lines
+    const aimVisible = chartState.lineVisibility.aim;
+    if (chartState.AimLines && aimVisible) {
+        Object.values(chartState.AimLines).forEach(aimLine => {
+            if (!aimLine.id) return;
+
+            const lineName = `aim-${aimLine.id}`;
+            const label = buildAimHoverLabel(aimLine);
+            if (!label) return; // No text and not diagonal — nothing to show
+
+            const color = aimLine.style?.color || 'rgba(0,0,0,0.85)';
+            const x1 = dateToXPosition(aimLine.date1);
+            const x2 = dateToXPosition(aimLine.date2);
+
+            const points = interpolateLinePoints(x1, aimLine.y1, x2, aimLine.y2, isLogY);
+            traces.push(createHoverTrace(points, lineName, label, color));
         });
     }
 
@@ -219,9 +264,18 @@ function init() {
         setTimeout(refreshHoverTraces, 50);
     }, true);
 
-    // Refresh when global change-line visibility toggles
+    // Refresh when aim lines are saved or restyled
+    eventBus.subscribe(EVENTS.LINE_AIM_SAVED, () => {
+        setTimeout(refreshHoverTraces, 50);
+    }, true);
+
+    eventBus.subscribe(EVENTS.LINE_AIM_STYLE_CHANGED, () => {
+        setTimeout(refreshHoverTraces, 50);
+    }, true);
+
+    // Refresh when global line visibility toggles (change or aim)
     eventBus.subscribe(EVENTS.LINE_VISIBILITY_CHANGED, (data) => {
-        if (data.lineType === 'change') {
+        if (data.lineType === 'change' || data.lineType === 'aim') {
             setTimeout(refreshHoverTraces, 50);
         }
     }, true);

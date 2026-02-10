@@ -13,8 +13,7 @@
  */
 
 import { chartState } from '../chartState.js';
-import { COLORS, CHART_TYPE_CONFIG } from '../config.js';
-import { formatCelerationLabel } from '../util/fit_lines.js';
+import { COLORS } from '../config.js';
 import { createToast, createTextInputDialog, createConfirmToast } from '../ui/toaster.js';
 import { xPositionToDate, dateToXPosition } from '../util/dates.js';
 import { aimLineMetadata } from './allLines.js';
@@ -151,45 +150,8 @@ function buildAimLineElements(metadata, chartDiv) {
         };
     }
 
-    // For diagonal lines, add invisible hover annotation showing celeration
-    let celAnnotation = null;
-    if (metadata.direction === 'diagonal') {
-        const dx = x2 - x1;
-        if (dx > 0) {
-            const logSlope = (Math.log10(metadata.y2) - Math.log10(metadata.y1)) / dx;
-            const config = CHART_TYPE_CONFIG[chartState.chartType] || CHART_TYPE_CONFIG.Daily;
-            const celText = formatCelerationLabel(logSlope, config.unit);
-
-            const celCenterX = (x1 + x2) / 2;
-            const celLogY1 = Math.log10(metadata.y1);
-            const celLogY2 = Math.log10(metadata.y2);
-            const celCenterLogY = (celLogY1 + celLogY2) / 2;
-
-            celAnnotation = {
-                x: celCenterX,
-                y: celCenterLogY,
-                xref: 'x',
-                yref: 'y',
-                text: celText,
-                showarrow: false,
-                font: { color: 'rgba(0,0,0,0)', size: 12 },
-                bgcolor: 'rgba(0,0,0,0)',
-                bordercolor: 'rgba(0,0,0,0)',
-                borderwidth: 0,
-                borderpad: 8,
-                xanchor: 'center',
-                yanchor: 'middle',
-                name: `${lineName}-cel`,
-                hovertext: celText,
-                hoverlabel: {
-                    bgcolor: color,
-                    font: { color: 'white', size: 14 }
-                }
-            };
-        }
-    }
-
-    return { shape, annotation, celAnnotation };
+    // Hover is handled by lineHover.js traces — no celAnnotation needed.
+    return { shape, annotation };
 }
 
 /**
@@ -851,11 +813,6 @@ function finalizeAimLine(chartDiv) {
         metadata.annotationIndex = null;
     }
 
-    // Add celeration hover annotation for diagonal lines
-    if (elements.celAnnotation) {
-        annotations.push(elements.celAnnotation);
-    }
-
     Plotly.relayout(chartDiv, { shapes, annotations });
 
     chartState.AimLines[lineId] = metadata;
@@ -1090,7 +1047,6 @@ function redrawAimLines() {
         if (!isVisible) {
             elements.shape.visible = false;
             if (elements.annotation) elements.annotation.visible = false;
-            if (elements.celAnnotation) elements.celAnnotation.visible = false;
         }
 
         // Add shape
@@ -1099,11 +1055,6 @@ function redrawAimLines() {
         // Add annotation (if exists)
         if (elements.annotation) {
             annotations.push(elements.annotation);
-        }
-
-        // Add celeration hover annotation for diagonal lines
-        if (elements.celAnnotation) {
-            annotations.push(elements.celAnnotation);
         }
     });
 
