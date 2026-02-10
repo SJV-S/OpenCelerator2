@@ -63,7 +63,10 @@ async function verifyPull(encryptedDataHex, signatureHex, chartData, localChart)
 
     if (chartData.publicKey === signingPublicKeyB64) {
         if (!await verify(encryptedDataHex, signatureHex, signingPublicKey)) {
-            return { accepted: false, reason: 'Signature does not match owner key' };
+            // Collaborator signed with their key, not ours — allow if accepting edits
+            if (!acceptingEdits) {
+                return { accepted: false, reason: 'Signature does not match owner key' };
+            }
         }
     } else if (acceptingEdits) {
         // Edit link: skip verification, accept any push

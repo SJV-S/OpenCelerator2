@@ -240,6 +240,7 @@ async function handleShareLinkClick(type) {
 
         // Update in-memory state so auto-save triggers pushes
         chartState.shared = true;
+        chartState.acceptingEdits = (type === 'edit');
         if (result.chartKey) {
             chartState.chartKey = result.chartKey;
         }
