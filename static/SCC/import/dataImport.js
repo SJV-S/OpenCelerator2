@@ -539,6 +539,9 @@ export function importToChartState(cleanedRows, options = { replace: true }) {
             }
         }
 
+        // Mark that xValues contain timestamps requiring conversion to x-positions
+        chartState.hasTimestamps = true;
+
         // Align startDate to chart type (decade start for yearly, prev year for monthly, etc.)
         if (chartState.series.xValues.length > 0) {
             const earliestTimestamp = Math.min(...chartState.series.xValues);
