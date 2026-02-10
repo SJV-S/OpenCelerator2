@@ -20,13 +20,19 @@ let lastSyncAt = 0;
 let signingPrivateKey = null;   // CryptoKey (ECDSA P-256), set by initSync
 let signingPublicKeyB64 = null; // base64 string (for embedding in chart JSON), set by initSync
 let signingPublicKey = null;    // CryptoKey (for verification), set by initSync
+let signingDisplayName = null;  // Human-readable owner name (display only), set by initSync
 
-export async function initSync(passphrase, privateKey, publicKeyB64) {
+export async function initSync(passphrase, privateKey, publicKeyB64, displayName = null) {
     userId = await getUserId(passphrase);
     userKey = await getUserKey(passphrase);
     signingPrivateKey = privateKey;
     signingPublicKeyB64 = publicKeyB64;
     signingPublicKey = await importPublicKey(publicKeyB64);
+    signingDisplayName = displayName || null;
+}
+
+export function setSigningDisplayName(name) {
+    signingDisplayName = name || null;
 }
 
 export function isInitialized() {
@@ -111,6 +117,7 @@ function stampOwnerFields(chart) {
     delete chart.owner;
     if (!chart.publicKey || chart.publicKey === signingPublicKeyB64) {
         chart.publicKey = signingPublicKeyB64;
+        chart.ownerName = signingDisplayName;
     }
 }
 
@@ -491,6 +498,10 @@ export async function startSyncWatch(chartId) {
 
 export function stopSyncWatch() {
     disconnectFromChart();
+}
+
+export function isChartOwner(chart) {
+    return !chart.publicKey || chart.publicKey === signingPublicKeyB64;
 }
 
 export { userId, userKey };

@@ -6,7 +6,7 @@
 
 import { openDB } from '../lib/idb.js';
 import { generatePassphrase } from './passphrase.js';
-import { initSync } from './syncClient.js';
+import { initSync, setSigningDisplayName } from './syncClient.js';
 import { deriveSigningKeyPair, exportPublicKey } from './crypto.js';
 
 const DB_NAME = 'SCC_Identity';
@@ -46,6 +46,9 @@ export async function initServerSync() {
     }
     userPreferences = prefs;
 
+    // Read display name (human-readable, display only)
+    const displayName = await db.get(STORE_NAME, 'display_name') || null;
+
     // Derive ECDSA signing key pair deterministically from passphrase
     const keyPair = await deriveSigningKeyPair(passphrase);
     const publicKeyB64 = await exportPublicKey(keyPair.publicKey);
@@ -53,7 +56,7 @@ export async function initServerSync() {
     // One-time migration: reclaim broken-era charts with stale random publicKey
     await migrateSigningKeys(publicKeyB64);
 
-    await initSync(passphrase, keyPair.privateKey, publicKeyB64);
+    await initSync(passphrase, keyPair.privateKey, publicKeyB64, displayName);
     initialized = true;
     console.log('[Server] Sync initialized');
 }
@@ -110,6 +113,18 @@ export async function setUserPreference(key, value) {
     userPreferences[key] = value;
     const db = await openDB(DB_NAME, 1);
     await db.put(STORE_NAME, { ...userPreferences }, PREFS_KEY);
+}
+
+export async function getDisplayName() {
+    const db = await openDB(DB_NAME, 1);
+    return await db.get(STORE_NAME, 'display_name') || null;
+}
+
+export async function setDisplayName(name) {
+    const val = name || null;
+    const db = await openDB(DB_NAME, 1);
+    await db.put(STORE_NAME, val, 'display_name');
+    setSigningDisplayName(val);
 }
 
 export function resetSync() {

@@ -208,17 +208,17 @@ See `Docs/plotly-shapes-vs-dom.md` for full explanation.
 
 ## Sync Architecture
 
-Two sync mechanisms for server communication, both user-action-triggered (no background polling except shared chart polling).
+Two sync mechanisms for server communication, both user-action-triggered (no background polling).
 
 ### Files
 
 | File | Role |
 |------|------|
 | `static/Server/init.js` | `syncEnabled` flag (IndexedDB-backed), `isSyncEnabled()` / `setSyncEnabled()` |
-| `static/Server/syncClient.js` | `pushChart()`, `checkForUpdates()`, `startSyncPolling()` (shared only) |
+| `static/Server/syncClient.js` | `pushChart()`, `checkForUpdates()`, `startSyncWatch()` (shared only) |
 | `static/SCC/storage/chartStorage.js` | Push after save, push queue (`queuePush` / `drainPushQueue`) |
 | `templates/SCC/menu_page.html` | Sync checkbox UI, pull + drain queue on page load |
-| `templates/SCC/chart.html` | Pull on load (non-shared), `startSyncPolling` (shared) |
+| `templates/SCC/chart.html` | Pull on load (non-shared), `startSyncWatch` (shared) |
 | `app.py` | `/api/sync` — manifest comparison, upload/download |
 
 ### Push Flow
@@ -229,7 +229,7 @@ Two sync mechanisms for server communication, both user-action-triggered (no bac
 ### Pull Flow
 - **Menu page load**: drain push queue → send `local_manifest` timestamps → server returns only newer charts
 - **Chart page load** (non-shared, sync enabled): single-chart manifest check → replot if newer
-- **Shared charts**: `startSyncPolling()` polls every 5s (the one exception to "no timers")
+- **Shared charts**: `startSyncWatch()` opens a WebSocket (Socket.IO) for real-time push notifications; HTTP fetch on `/api/chart/{id}/poll` used only as reconnect fallback
 
 ### Timestamp Standard
 All stored timestamps use **Unix seconds** (`Math.floor(Date.now() / 1000)`). Convert at point of consumption: `new Date(timestamp * 1000)`. See `static/SCC/util/dates.js` header for full policy.

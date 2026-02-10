@@ -4,7 +4,7 @@
 import { chartState } from '../chartState.js';
 import { createToast, createConfirmToast } from '../ui/toaster.js';
 import { icons } from '../ui/icons.js';
-import { createViewLink, createEditLink, isInitialized, startSyncWatch, stopSyncWatch } from '../../Server/syncClient.js';
+import { createViewLink, createEditLink, isInitialized, isChartOwner, startSyncWatch, stopSyncWatch } from '../../Server/syncClient.js';
 import { importChart, deleteChart } from '../storage/chartStorage.js';
 import { getFirstConfig } from '../series/traceStyles.js';
 import { isOnline } from '../../Server/onlineStatus.js';
@@ -205,6 +205,8 @@ function exportDataToCSV() {
  * @param {string} type - 'view' or 'edit'
  */
 async function handleShareLinkClick(type) {
+    if (!isChartOwner(chartState)) return;
+
     const viewStatus = document.getElementById('share-view-status');
     const editStatus = document.getElementById('share-edit-status');
     const status = type === 'view' ? viewStatus : editStatus;
@@ -434,9 +436,27 @@ function initializeShareTab() {
     }
 
     // Show/hide unshare button after chart loads from IDB (chartState.shared is set by then)
+    // Also disable share buttons for non-owners
     eventBus.subscribe(EVENTS.STORAGE_CHART_LOADED, () => {
         const btn = document.getElementById('unshare-btn');
         if (btn) btn.hidden = !chartState.shared;
+
+        const owner = isChartOwner(chartState);
+        const shareBtns = [document.getElementById('share-view-btn'), document.getElementById('share-edit-btn')];
+        for (const el of shareBtns) {
+            if (!el) continue;
+            if (owner) {
+                el.style.pointerEvents = '';
+                el.style.opacity = '';
+                el.title = '';
+            } else {
+                el.style.pointerEvents = 'none';
+                el.style.opacity = '0.45';
+                el.title = chartState.ownerName
+                    ? `${chartState.ownerName} owns this chart`
+                    : 'Someone else owns this chart';
+            }
+        }
     }, true);
 
     console.log('Share tab initialized');
