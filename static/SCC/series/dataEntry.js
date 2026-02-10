@@ -112,6 +112,9 @@ function submitEntry() {
     // Emit event to hide counter - navigation subscribes to this
     eventBus.emit(EVENTS.DATA_ENTRY_SUBMITTED);
 
+    // Manual entry always uses timestamps (not raw x-positions)
+    chartState.hasTimestamps = true;
+
     // Combine selected date with current time to create Unix timestamp
     const now = new Date();
     const selectedDate = new Date(entryDate);
