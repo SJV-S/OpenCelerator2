@@ -29,7 +29,7 @@ import { findNearestMonday, serializeDate, deserializeDate } from '../util/dates
 import { jsonBackwardsCompatibilityCheck } from '../import/jsonBackwardsCompatibility.js';
 import { generateChartKey } from '../../Server/crypto.js';
 import { pushChart, isInitialized, isChartOwner, startSyncWatch, leaveChart as syncLeaveChart, deleteChart as syncDeleteChart } from '../../Server/syncClient.js';
-import { isSyncEnabled } from '../../Server/init.js';
+import { isSyncEnabled, getPublicKeyB64 } from '../../Server/init.js';
 import { hasSocket } from '../../Server/wsClient.js';
 
 // Convert CryptoKey to hex string for storage
@@ -347,21 +347,29 @@ export async function createChart(name, chartType, minuteChart) {
     const cryptoKey = await generateChartKey();
     const chartKey = await exportKeyToHex(cryptoKey);
 
-    // TODO: Remove test data - to disable hardcoded test data in chartState.js:
-    // 1. Uncomment `hasTimestamps: false` below
-    // 2. Uncomment the `series: {...}` block below to reset series to empty arrays
-    // 3. Uncomment `startDate` below
-    // 4. Delete TEST_DATA and its usage in chartState.js
+    // In-memory cache first, fall back to IndexedDB (base.html persists it before modules run)
+    let publicKey = getPublicKeyB64();
+    if (!publicKey) {
+        const identityDb = await openDB('SCC_Identity', 1);
+        publicKey = await identityDb.get('credentials', 'publicKey');
+        identityDb.close();
+    }
+    if (!publicKey) {
+        console.error('[Storage] No public key available — cannot create chart');
+        return null;
+    }
+
     const data = serializeChart(chartId, {
         ...chartState,
         chartType,
         minuteChart,
         chartName: name.trim(),
         chartKey,
+        publicKey,
         shared: false,
-        // hasTimestamps: false,  // Commented out for test data - uncomment to disable
-        // series: { xValues: [], corrects: [], errors: [], timing: [], misc: {} },
-        // startDate,  // Commented out for test data - uncomment to disable
+        hasTimestamps: false,
+        series: { xValues: [], corrects: [], errors: [], timing: [], misc: {} },
+        startDate,
         chartCapacity: CHART_TYPE_CONFIG[chartType]?.capacity || 280,
         chartWindow: (CHART_TYPE_CONFIG[chartType]?.capacity || 280) / 2,
         _createdAt: now

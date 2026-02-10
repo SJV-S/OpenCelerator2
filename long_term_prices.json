@@ -1,0 +1,429 @@
+{
+  "id": "cfd8842d-9a32-4a17-bd62-e8fb9f662ac7",
+  "chartKey": "7ac84d8e4c73df4871d00c6eba403e1bf9f8224908888f749a28cb377b949074",
+  "shared": false,
+  "lastModified": 1770721196,
+  "publicKey": null,
+  "ownerName": null,
+  "acceptingEdits": false,
+  "series": {
+    "xValues": [
+      -2206483200,
+      -1672531200,
+      -1640998800,
+      -725846400,
+      -694314000,
+      -315622800,
+      -284000400,
+      252460800,
+      283993200,
+      662684400,
+      694220400,
+      946681200,
+      1199145600,
+      1262300400,
+      2177452800,
+      2208985200,
+      3155760000,
+      3187292400,
+      4102444800
+    ],
+    "corrects": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ],
+    "errors": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ],
+    "timing": [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ],
+    "misc": {
+      "misc1": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "misc2": [
+        18.96,
+        18.92,
+        18.94,
+        18.92,
+        18.94,
+        18.96,
+        18.94,
+        18.92,
+        18.94,
+        18.96,
+        18.94,
+        18.94,
+        18.92,
+        18.94,
+        18.92,
+        18.94,
+        18.92,
+        18.94,
+        18.92
+      ],
+      "misc3": [
+        6.055,
+        9.05,
+        4.48,
+        8.94,
+        4.41,
+        6.21,
+        0,
+        8.5,
+        4.25,
+        6.26,
+        6.37,
+        6.02,
+        8.6,
+        4.34,
+        8.87,
+        4.4,
+        9.2,
+        4.57,
+        9.23
+      ],
+      "misc4": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        3.37,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "misc5": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  },
+  "chartType": "Yearly",
+  "minuteChart": false,
+  "chartName": "long_term_prices",
+  "tags": [],
+  "hasTimestamps": true,
+  "startDate": "1819-12-31T23:06:32.000Z",
+  "chartCapacity": 200,
+  "chartWindow": 100,
+  "containerHeight": 936,
+  "legend": {
+    "show": true,
+    "position": "top-right",
+    "config": {
+      "x": 1,
+      "y": 1,
+      "xanchor": "right",
+      "yanchor": "top",
+      "bgcolor": "rgba(255, 255, 255, 0.8)",
+      "bordercolor": "black",
+      "borderwidth": 1,
+      "font": {
+        "size": 12,
+        "family": "Arial",
+        "color": "black"
+      }
+    }
+  },
+  "LineCuts": {},
+  "PhaseLines": {},
+  "AimLines": {},
+  "CelLines": {
+    "settings": {
+      "fitMethod": "Theil-Sen",
+      "bounceEnvelope": "None",
+      "forecast": 0
+    }
+  },
+  "lineVisibility": {
+    "phase": true,
+    "aim": true,
+    "change": true,
+    "grid": {
+      "dateLines": false,
+      "countLines": false,
+      "minorGrid": false
+    }
+  },
+  "seriesVisibility": {
+    "misc1_raw": false,
+    "misc2_raw": true,
+    "misc3_raw": true,
+    "misc4_raw": true,
+    "misc5_raw": true,
+    "misc1_mean": false
+  },
+  "fanVisible": true,
+  "placeZerosBelowFloor": true,
+  "lineStyles": {
+    "phase": {
+      "color": "black",
+      "width": 2
+    },
+    "aim": {
+      "color": "black",
+      "width": 2
+    },
+    "trend": {
+      "corrects": {
+        "color": "green",
+        "width": 2
+      },
+      "errors": {
+        "color": "red",
+        "width": 2
+      },
+      "timing": {
+        "color": "orange",
+        "width": 2
+      },
+      "misc": {
+        "misc1": {
+          "color": "#FFA500",
+          "width": 2
+        },
+        "misc2": {
+          "color": "#FF0000",
+          "width": 2
+        },
+        "misc3": {
+          "color": "#00AA00",
+          "width": 2
+        },
+        "misc4": {
+          "color": "#0000FF",
+          "width": 2
+        },
+        "misc5": {
+          "color": "#FF00FF",
+          "width": 2
+        }
+      }
+    }
+  },
+  "traceStyles": {
+    "corrects": {
+      "raw": {
+        "seriesName": "correct",
+        "showLine": true,
+        "lineDash": "solid",
+        "lineWidth": 0.7,
+        "lineColor": "black",
+        "markerSize": 8,
+        "markerSymbol": "circle",
+        "markerColor": "black",
+        "markerEdgeColor": "black"
+      }
+    },
+    "errors": {
+      "raw": {
+        "seriesName": "incorrect",
+        "showLine": true,
+        "lineDash": "solid",
+        "lineWidth": 0.7,
+        "lineColor": "black",
+        "markerSize": 20,
+        "markerSymbol": "x",
+        "markerColor": "black",
+        "markerEdgeColor": "black"
+      }
+    },
+    "timing": {
+      "raw": {
+        "seriesName": "Timing",
+        "showLine": false,
+        "lineDash": "solid",
+        "lineWidth": 0.7,
+        "lineColor": "black",
+        "markerSize": 30,
+        "markerSymbol": "-",
+        "markerColor": "black",
+        "markerEdgeColor": "black"
+      }
+    },
+    "misc": {
+      "misc1": {
+        "raw": {
+          "seriesName": "Bitcoin",
+          "showLine": true,
+          "lineDash": "solid",
+          "lineWidth": 0.7,
+          "lineColor": "black",
+          "markerSize": 8,
+          "markerSymbol": "square",
+          "markerColor": "#FFA500",
+          "markerEdgeColor": "black"
+        },
+        "mean": {
+          "seriesName": "Bitcoin",
+          "showLine": true,
+          "lineDash": "solid",
+          "lineWidth": 0.7,
+          "lineColor": "black",
+          "markerSize": 8,
+          "markerSymbol": "square",
+          "markerColor": "#FFA500",
+          "markerEdgeColor": "black"
+        }
+      },
+      "misc2": {
+        "raw": {
+          "seriesName": "Gold",
+          "showLine": true,
+          "lineDash": "solid",
+          "lineWidth": 0.7,
+          "lineColor": "black",
+          "markerSize": 8,
+          "markerSymbol": "triangle-up",
+          "markerColor": "#FF0000",
+          "markerEdgeColor": "black"
+        }
+      },
+      "misc3": {
+        "raw": {
+          "seriesName": "S&P500",
+          "showLine": true,
+          "lineDash": "solid",
+          "lineWidth": 0.7,
+          "lineColor": "black",
+          "markerSize": 8,
+          "markerSymbol": "diamond",
+          "markerColor": "#00AA00",
+          "markerEdgeColor": "black"
+        }
+      },
+      "misc4": {
+        "raw": {
+          "seriesName": "CSHPNI (CaseâShiller index)",
+          "showLine": true,
+          "lineDash": "solid",
+          "lineWidth": 0.7,
+          "lineColor": "black",
+          "markerSize": 8,
+          "markerSymbol": "star",
+          "markerColor": "#0000FF",
+          "markerEdgeColor": "black"
+        }
+      },
+      "misc5": {
+        "raw": {
+          "seriesName": "M2 (billions)",
+          "showLine": true,
+          "lineDash": "solid",
+          "lineWidth": 0.7,
+          "lineColor": "black",
+          "markerSize": 8,
+          "markerSymbol": "hexagon",
+          "markerColor": "#FF00FF",
+          "markerEdgeColor": "black"
+        }
+      }
+    }
+  },
+  "credits": {
+    "0": "SUPERVISOR: ________________    PERFORMER: ________________       TIMER: ________________     COUNTED: ________________     ADVISOR: ________________",
+    "1": "ORGANIZATION: ________________     MANAGER: ________________     COUNTER: ________________     CHARTER: ________________     ROOM: ________________"
+  },
+  "_createdAt": 1770720269
+}

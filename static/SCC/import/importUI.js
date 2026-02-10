@@ -17,6 +17,7 @@ import {
     importToChartState
 } from './dataImport.js';
 import { createToast } from '../ui/toaster.js';
+import { timestampsToXPositions } from '../util/dates.js';
 
 // ============================================================================
 // State
@@ -352,10 +353,13 @@ function populateMappingDropdowns(data) {
     // Date dropdown - prioritize detected date columns
     populateDropdown(elements.mapDate, columns, dateColumns, 'Select');
 
-    // Numeric dropdowns - prioritize detected numeric columns
-    populateDropdown(elements.mapCorrects, columns, numericColumns, 'Select');
-    populateDropdown(elements.mapErrors, columns, numericColumns, 'Select');
-    populateDropdown(elements.mapTiming, columns, numericColumns, 'Select');
+    // Non-date dropdowns should never show date columns
+    const nonDateColumns = columns.filter(c => !dateColumns.includes(c));
+
+    // Numeric dropdowns - prioritize detected numeric columns, exclude date columns
+    populateDropdown(elements.mapCorrects, nonDateColumns, numericColumns, 'Select');
+    populateDropdown(elements.mapErrors, nonDateColumns, numericColumns, 'Select');
+    populateDropdown(elements.mapTiming, nonDateColumns, numericColumns, 'Select');
 
     // Auto-select if only one date column detected
     if (dateColumns.length === 1) {
@@ -495,8 +499,11 @@ function addMiscColumn() {
     select.className = 'import-mapping-select import-misc-select';
     select.id = `import-map-${miscId}`;
 
-    // Populate with all columns (no priority for misc)
-    populateDropdown(select, currentFileData.columns, [], 'Select');
+    // Populate with non-date columns (no priority for misc)
+    const nonDateColumns = currentFileData.columns.filter(
+        c => !currentFileData.dateColumns.includes(c)
+    );
+    populateDropdown(select, nonDateColumns, [], 'Select');
 
     select.addEventListener('change', () => {
         updateDropdownOptions();
@@ -631,13 +638,24 @@ async function performImport() {
             throw new Error(errors.join('. ') || 'No valid data found');
         }
 
-        // Import to chartState
+        // Import to chartState (does NOT emit events — we do that below after setup)
         const shouldReplace = !hasExistingData() || elements.replaceCheckbox?.checked !== false;
         const result = importToChartState(valid, { replace: shouldReplace });
 
         if (result.success) {
-            // Update display names from CSV column names
+            // Set display names BEFORE any events fire
             updateSeriesDisplayNames(columnMap);
+
+            // Auto-aggregate if multiple data points map to the same x-position
+            // (e.g. monthly data on a yearly chart → 12 points/year)
+            autoAggregateImport();
+
+            // NOW emit events — chart renders with correct names and aggregation
+            eventBus.emit(EVENTS.DATA_IMPORT_COMPLETED, {
+                count: result.count,
+                replaced: shouldReplace
+            });
+            eventBus.emit(EVENTS.DATA_CHART_REFRESH);
 
             // Show success message
             let message = `Imported ${result.count} entries`;
@@ -666,6 +684,34 @@ async function performImport() {
             duration: 4000,
             position: 'top-right'
         });
+    }
+}
+
+/**
+ * Check if imported data has multiple points per x-position (due to chart-type binning)
+ * and switch from raw to median aggregation if so.
+ */
+function autoAggregateImport() {
+    const xPositions = timestampsToXPositions(chartState.series.xValues);
+    const xCounts = new Map();
+    xPositions.forEach(x => xCounts.set(x, (xCounts.get(x) || 0) + 1));
+    const maxPerX = xCounts.size > 0 ? Math.max(...xCounts.values()) : 0;
+
+    if (maxPerX <= 1) return;
+
+    // Multiple points per position — switch all series from raw to median
+    const promote = (styles) => {
+        if (styles?.raw) {
+            styles.median = styles.raw;
+            delete styles.raw;
+        }
+    };
+
+    promote(chartState.traceStyles[CORRECTS]);
+    promote(chartState.traceStyles[ERRORS]);
+    promote(chartState.traceStyles.timing);
+    for (const configs of Object.values(chartState.traceStyles.misc)) {
+        promote(configs);
     }
 }
 

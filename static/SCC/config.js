@@ -306,12 +306,10 @@ export const RESIZE = Object.freeze({
 export const LIMITS = Object.freeze({
     MAX_MISC_SERIES: 10,
     MAX_TAB_NAME_LENGTH: 17,
-    AUTO_AGG_THRESHOLD: 15,
+    AUTO_AGG_THRESHOLD: 10,
     TEXT_INPUT_MAX_LENGTH: 50,
 });
 
-// Legacy export for backward compatibility during transition
-export const AUTO_AGG_THRESHOLD = LIMITS.AUTO_AGG_THRESHOLD;
 
 // ============================================================================
 // LINE DEFAULTS

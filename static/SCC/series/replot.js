@@ -17,7 +17,7 @@ import {
     createFloorShadowTraces
 } from './tracePipeline.js';
 import { initializeAllSeriesInputs } from './traceStyles.js';
-import { AUTO_AGG_THRESHOLD } from '../config.js';
+import { LIMITS } from '../config.js';
 import { timestampsToXPositions, updateChartDateLabels } from '../util/dates.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 
@@ -79,7 +79,7 @@ function refreshChart() {
             initializeAllSeriesInputs();
             eventBus.emit(EVENTS.UI_TRACE_STYLE_CHANGED);
             createToast({
-                message: `Auto-aggregated to median: ${displayNames.join(', ')} (>${AUTO_AGG_THRESHOLD} points/position)`,
+                message: `Auto-aggregated to median: ${displayNames.join(', ')} (>${LIMITS.AUTO_AGG_THRESHOLD} points/position)`,
                 duration: 4000
             });
         }

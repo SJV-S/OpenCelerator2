@@ -598,7 +598,8 @@ function drawCanvas() {
 
     // Draw markers at data points
     if (state.currentTraceData && state.lastXRounded !== null) {
-        const xMarkerPixel = cache.plotLeft + (state.lastXRounded - cache.xRange[0]) * cache.xScale;
+        const fullLayout = state.elements.chart._fullLayout;
+        const xMarkerPixel = fullLayout.xaxis._offset + fullLayout.xaxis.l2p(state.lastXRounded);
 
         for (const [seriesName, data] of state.currentTraceData) {
             if (!data || data.value <= 0) continue;
@@ -606,9 +607,9 @@ function drawCanvas() {
             const config = state.elements.seriesConfigs.get(seriesName);
             if (!config) continue;
 
-            // Calculate y pixel position (log scale)
+            // Calculate y pixel position using Plotly's axis mapping (log scale)
             const yLog = Math.log10(data.value);
-            const yMarkerPixel = cache.plotBottom - (yLog - cache.yRange[0]) * cache.yScale;
+            const yMarkerPixel = fullLayout.yaxis._offset + fullLayout.yaxis.l2p(yLog);
 
             // Draw marker
             ctx.globalAlpha = MARKER_OPACITY;

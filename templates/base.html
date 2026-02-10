@@ -12,6 +12,7 @@
         // Ensure SCC_Identity DB + credentials store exist before any module scripts.
         // Classic scripts run during parsing; module scripts are deferred.
         // This guarantees the IndexedDB open-with-upgrade is queued first.
+        // Identity = passphrase + publicKey (ECDSA P-256, derived deterministically).
         (function() {
             var req = indexedDB.open('SCC_Identity', 1);
             req.onupgradeneeded = function(e) {
@@ -23,22 +24,43 @@
             req.onsuccess = function(e) {
                 var db = e.target.result;
                 var tx = db.transaction('credentials', 'readonly');
-                var getReq = tx.objectStore('credentials').get('passphrase');
-                getReq.onsuccess = function() {
-                    if (!getReq.result) {
+                var s = tx.objectStore('credentials');
+                var pReq = s.get('passphrase');
+                var kReq = s.get('publicKey');
+                tx.oncomplete = function() {
+                    var passphrase = pReq.result;
+                    var publicKey = kReq.result;
+                    if (!passphrase) {
                         import('/static/Server/passphrase.js').then(function(mod) {
-                            var passphrase = mod.generatePassphrase();
-                            var writeTx = db.transaction('credentials', 'readwrite');
-                            writeTx.objectStore('credentials').put(passphrase, 'passphrase');
-                            writeTx.oncomplete = function() {
+                            passphrase = mod.generatePassphrase();
+                            var wt = db.transaction('credentials', 'readwrite');
+                            wt.objectStore('credentials').put(passphrase, 'passphrase');
+                            wt.oncomplete = function() {
                                 console.log('[Server] Generated new passphrase');
+                                ensurePublicKey(db, passphrase);
                             };
                         });
+                    } else if (!publicKey) {
+                        ensurePublicKey(db, passphrase);
                     } else {
                         db.close();
                     }
                 };
             };
+            function ensurePublicKey(db, passphrase) {
+                import('/static/Server/crypto.js').then(function(mod) {
+                    mod.deriveSigningKeyPair(passphrase).then(function(keyPair) {
+                        return mod.exportPublicKey(keyPair.publicKey);
+                    }).then(function(publicKeyB64) {
+                        var wt = db.transaction('credentials', 'readwrite');
+                        wt.objectStore('credentials').put(publicKeyB64, 'publicKey');
+                        wt.oncomplete = function() {
+                            console.log('[Server] Stored public key');
+                            db.close();
+                        };
+                    });
+                });
+            }
         })();
     </script>
     {% block head_scripts %}{% endblock %}

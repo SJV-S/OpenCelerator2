@@ -106,13 +106,6 @@ function findNearestMonday(date) {
 }
 
 /**
- * @deprecated Use findNearestMonday instead
- */
-function findNearestSunday(date) {
-    return findNearestMonday(date);
-}
-
-/**
  * Align a date to the appropriate start boundary based on chart type.
  * - Daily: Previous Monday
  * - Weekly: Monday at or before 1st of previous month (ensures week binning aligns with calendar weeks)
@@ -738,18 +731,16 @@ function serializeDate(date) {
     return date; // already a string or null
 }
 
-/** Restore a Date from stored format (handles old { __date__ } and new ISO string) */
+/** Restore a Date from stored format (ISO string) */
 function deserializeDate(value) {
     if (value instanceof Date) return value;
     if (typeof value === 'string') return new Date(value);
-    if (value && value.__date__) return new Date(value.__date__); // backwards compat
     return value; // null
 }
 
 export {
     findNearestMonday,
-    findNearestSunday, // deprecated, use findNearestMonday
-    alignStartDate,
+alignStartDate,
     calculateStartDate,
     parseLocalDate,
     snapToChartBoundary,

@@ -7,7 +7,7 @@
 import { openDB } from '../lib/idb.js';
 import { generatePassphrase } from './passphrase.js';
 import { initSync, setSigningDisplayName } from './syncClient.js';
-import { deriveSigningKeyPair, exportPublicKey } from './crypto.js';
+import { deriveSigningKeyPair } from './crypto.js';
 
 const DB_NAME = 'SCC_Identity';
 const STORE_NAME = 'credentials';
@@ -19,6 +19,7 @@ const DEFAULT_PREFERENCES = {
 
 let initialized = false;
 let userPreferences = null;
+let publicKeyB64Cache = null;
 
 export async function initServerSync() {
     if (initialized) return;
@@ -49,53 +50,19 @@ export async function initServerSync() {
     // Read display name (human-readable, display only)
     const displayName = await db.get(STORE_NAME, 'display_name') || null;
 
-    // Derive ECDSA signing key pair deterministically from passphrase
+    // Derive ECDSA signing key pair (need private key for signing)
     const keyPair = await deriveSigningKeyPair(passphrase);
-    const publicKeyB64 = await exportPublicKey(keyPair.publicKey);
 
-    // One-time migration: reclaim broken-era charts with stale random publicKey
-    await migrateSigningKeys(publicKeyB64);
+    // Read publicKey from IDB — base.html derives and persists it before modules run
+    publicKeyB64Cache = await db.get(STORE_NAME, 'publicKey');
 
-    await initSync(passphrase, keyPair.privateKey, publicKeyB64, displayName);
+    await initSync(passphrase, keyPair.privateKey, publicKeyB64Cache, displayName);
     initialized = true;
     console.log('[Server] Sync initialized');
 }
 
-async function migrateSigningKeys(newPublicKeyB64) {
-    try {
-        const db = await openDB('SCC_Charts', 1);
-        const tx = db.transaction('charts', 'readwrite');
-        const store = tx.objectStore('charts');
-        let cursor = await store.openCursor();
-        let migrated = 0;
-
-        while (cursor) {
-            const chart = cursor.value;
-            let updated = false;
-
-            // Clean up legacy owner field
-            if ('owner' in chart) {
-                delete chart.owner;
-                updated = true;
-            }
-
-            // Reclaim broken-era charts: stale random publicKey, not shared or edit-link
-            if (chart.publicKey && chart.publicKey !== newPublicKeyB64 && !chart.acceptingEdits && !chart.shared) {
-                chart.publicKey = newPublicKeyB64;
-                updated = true;
-                migrated++;
-            }
-
-            if (updated) await cursor.update(chart);
-            cursor = await cursor.continue();
-        }
-
-        await tx.done;
-        if (migrated > 0) console.log(`[Server] Migrated ${migrated} chart(s) to deterministic signing key`);
-    } catch (e) {
-        // SCC_Charts DB may not exist yet on first visit
-        console.debug('[Server] Chart migration skipped:', e.message);
-    }
+export function getPublicKeyB64() {
+    return publicKeyB64Cache;
 }
 
 export function isSyncEnabled() {

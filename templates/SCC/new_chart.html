@@ -85,8 +85,10 @@ html, body {
 {% block scripts %}
 <script type="module">
     import { initStorage, createChart } from '/static/SCC/storage/chartStorage.js';
+    import { initServerSync } from '/static/Server/init.js';
 
     await initStorage();
+    await initServerSync();
 
     const nameInput = document.getElementById('chart-name');
     const nameError = document.getElementById('name-error');

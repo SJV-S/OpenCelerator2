@@ -20,6 +20,7 @@ import { chartState } from '../chartState.js';
 import { createMiscTraceConfig, MISC_COLORS, MISSING } from '../config.js';
 import { isMissing } from '../util/format.js';
 import { eventBus, EVENTS } from '../eventBus.js';
+import { alignStartDate } from '../util/dates.js';
 
 // ============================================================================
 // Constants
@@ -368,12 +369,22 @@ function cleanRow(row, columnMap) {
 function parseDate(value) {
   if (value == null || value === '') return null;
 
+  // Handle numeric values as Excel serial dates FIRST.
+  // SheetJS converts dates to serial numbers for all formats (CSV, XLSX, etc.).
+  // If we stringify these and pass to new Date(), 4-digit serials like 2039
+  // get misinterpreted as year 2039 instead of the Excel date ~July 1905.
+  if (typeof value === 'number') {
+    const date = excelSerialToDate(value);
+    if (!date || isNaN(date.getTime())) return null;
+    if (date.getFullYear() > 2200) return null;
+    return Math.floor(date.getTime() / 1000);
+  }
+
+  // String path — for values SheetJS didn't auto-convert
   let str = String(value).trim();
-  console.log('[Import] Parsing:', str);
 
   // Strip time prefix "00:00:00 " (handles variable length time + any whitespace)
   str = str.replace(/^\d{1,2}:\d{2}(:\d{2})?\s+/, '');
-  console.log('[Import] After time strip:', str);
 
   let date;
 
@@ -386,29 +397,19 @@ function parseDate(value) {
 
     if (monthIdx !== undefined) {
       date = new Date(parseInt(year), monthIdx, parseInt(day));
-      console.log('[Import] Parsed DD-MMM-YYYY:', date.toISOString());
-    } else {
-      console.log('[Import] Unknown month:', mon);
     }
   }
 
-  // Fallback for other formats
+  // Fallback for other string formats (ISO, locale, etc.)
   if (!date || isNaN(date.getTime())) {
     date = new Date(str);
   }
 
-  // Excel serial fallback
-  if ((!date || isNaN(date.getTime())) && typeof value === 'number') {
-    if (value > 0 && value < 100000) date = excelSerialToDate(value);
-  }
-
   if (!date || isNaN(date.getTime())) {
-    console.log('[Import] Final parse failed for:', str);
     return null;
   }
 
-  const yr = date.getFullYear();
-  if (yr < 1900 || yr > 2100) return null;
+  if (date.getFullYear() > 2200) return null;
 
   return Math.floor(date.getTime() / 1000);
 }
@@ -528,29 +529,16 @@ export function importToChartState(cleanedRows, options = { replace: true }) {
             }
         }
 
-        // Update startDate to Monday before earliest data point (ISO 8601)
+        // Align startDate to chart type (decade start for yearly, prev year for monthly, etc.)
         if (chartState.series.xValues.length > 0) {
-            // Find earliest timestamp in all data (could be existing or new)
             const earliestTimestamp = Math.min(...chartState.series.xValues);
             const earliestDate = new Date(earliestTimestamp * 1000);
-            const dayOfWeek = earliestDate.getDay();
-            // getDay(): 0=Sun, 1=Mon, ..., 6=Sat
-            // Days to subtract to reach Monday: Mon(1)->0, Tue(2)->1, ..., Sun(0)->6
-            const daysToMonday = (dayOfWeek === 0) ? 6 : dayOfWeek - 1;
-            const mondayOffset = daysToMonday * 86400 * 1000;
-            const mondayDate = new Date(earliestDate.getTime() - mondayOffset);
-            mondayDate.setHours(0, 0, 0, 0);
-            chartState.startDate = mondayDate;
+            chartState.startDate = alignStartDate(earliestDate, chartState.chartType || 'Daily');
         }
 
-        // Emit success event
-        eventBus.emit(EVENTS.DATA_IMPORT_COMPLETED, {
-            count: sortedRows.length,
-            replaced: options.replace
-        });
-
-        // Trigger chart refresh
-        eventBus.emit(EVENTS.DATA_CHART_REFRESH);
+        // NOTE: Events (DATA_IMPORT_COMPLETED, DATA_CHART_REFRESH) are NOT emitted here.
+        // The caller (performImport) emits them after setting display names and aggregation,
+        // so the chart renders with correct names and aggregation from the first frame.
 
         return {
             success: true,

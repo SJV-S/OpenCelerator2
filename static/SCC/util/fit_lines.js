@@ -488,14 +488,4 @@ export function formatCelerationLabel(slope, unit) {
     return `${symbol}${cel.toFixed(2)}`;
 }
 
-// ============================================================================
-// Backward Compatibility Export
-// ============================================================================
-
-// Legacy export for compatibility with old theilSen.js imports
-// Old file exported: calculateMedian, theilSenFit
-// theilSenFit is already exported above
-// Export median as calculateMedian for any code that used the old helper
-export { median as calculateMedian };
-
 console.log('fit_lines.js loaded');

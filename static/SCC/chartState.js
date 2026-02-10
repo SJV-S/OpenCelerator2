@@ -58,7 +58,7 @@ export const chartState = {
     legend: {
         show: true, // Controls whether the custom legend is displayed
         position: 'top-right', // Position: 'top-right', 'top-left', 'bottom-right', 'bottom-left'
-        config: { ...DEFAULT_LEGEND_CONFIG } // Legacy Plotly legend styling configuration (unused)
+        config: { ...DEFAULT_LEGEND_CONFIG }
     },
 
     // Drawn lines (keyed by ID)
