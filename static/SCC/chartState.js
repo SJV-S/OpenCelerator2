@@ -13,6 +13,7 @@ import {
     defaultCorrectTraceConfig, defaultErrorTraceConfig, defaultTimingTraceConfig,
     DEFAULT_LEGEND_CONFIG
 } from './config.js';
+import { CURRENT_SCHEMA_VERSION } from './import/jsonBackwardsCompatibility.js';
 
 // ============================================================================
 // Chart State (Combined Data & Metadata)
@@ -29,6 +30,7 @@ export const chartState = {
     publicKey: null,  // Owner's ECDSA P-256 public key (base64, deterministic from passphrase)
     ownerName: null,  // Human-readable name of chart owner (display only, not for auth)
     acceptingEdits: false,  // true = edit link recipients can push, false = view-only
+    _schemaVersion: CURRENT_SCHEMA_VERSION,  // Schema migration version (see jsonBackwardsCompatibility.js)
 
     // Raw data series (append-only arrays, all same length)
     series: {

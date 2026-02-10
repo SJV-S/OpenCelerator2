@@ -234,6 +234,32 @@ Two sync mechanisms for server communication, both user-action-triggered (no bac
 ### Timestamp Standard
 All stored timestamps use **Unix seconds** (`Math.floor(Date.now() / 1000)`). Convert at point of consumption: `new Date(timestamp * 1000)`. See `static/SCC/util/dates.js` header for full policy.
 
+## Schema Migration System
+
+Chart data evolves over time. Migrations handle upgrading stored charts to the current schema.
+
+### Key File
+`static/SCC/import/jsonBackwardsCompatibility.js` — migration runner + all migration functions
+
+### How It Works
+- `chartState._schemaVersion` integer tracks the current schema version
+- Charts without `_schemaVersion` are treated as version 0
+- `migrateChart(data)` runs all needed migrations in order (0→1, 1→2, etc.)
+- Called from `loadChart()` and `importChart()` in `chartStorage.js`
+
+### When chartState Schema Changes
+1. Bump `CURRENT_SCHEMA_VERSION` in `jsonBackwardsCompatibility.js`
+2. Add a new `async function migrate_N_to_N+1(chart)` that makes the targeted change
+3. Append it to the `migrations` array
+4. The function receives the raw chart object, mutates it in place, returns `boolean` (whether it changed anything)
+5. Use explicit default values from `config.js` — never reference the live `chartState` object
+6. Document what changed in the migration function's JSDoc comment
+
+### Rules
+- **Never import chartState** in the migration file — migrations must use explicit defaults
+- **Never use fillMissing / recursive backfill** — every field change must be a targeted migration
+- **Keep migrations idempotent** — safe to re-run if already applied
+
 ## Debugging
 
 `static/SCC/debug.js` exposes internals to `window` for console access. This is the ONE exception to the "no window object" rule - debugging utilities are allowed.

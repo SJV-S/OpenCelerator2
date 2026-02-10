@@ -26,7 +26,7 @@ import { eventBus, EVENTS, EVENT_CATEGORIES } from '../eventBus.js';
 import { chartState } from '../chartState.js';
 import { CHART_TYPE_CONFIG } from '../config.js';
 import { findNearestMonday, serializeDate, deserializeDate } from '../util/dates.js';
-import { jsonBackwardsCompatibilityCheck } from '../import/jsonBackwardsCompatibility.js';
+import { migrateChart } from '../import/jsonBackwardsCompatibility.js';
 import { compactChart, expandChart } from './compactJson.js';
 import { generateChartKey } from '../../Server/crypto.js';
 import { pushChart, isInitialized, isChartOwner, startSyncWatch, leaveChart as syncLeaveChart, deleteChart as syncDeleteChart } from '../../Server/syncClient.js';
@@ -186,7 +186,7 @@ export async function loadChart(id) {
         }
 
         expandChart(data);
-        const wasModified = await jsonBackwardsCompatibilityCheck(data);
+        const wasModified = await migrateChart(data);
         deserializeChart(data);
         chartState.id = id;
         console.log('[LINE SAVE] LOAD 3. After deserialize, chartState.PhaseLines count:', Object.keys(chartState.PhaseLines).length);
@@ -428,6 +428,8 @@ export async function importChart(chartData) {
             lastModified: Math.floor(Date.now() / 1000),
             _createdAt: chartData._createdAt || Math.floor(Date.now() / 1000)
         };
+
+        await migrateChart(data);
 
         const storedSize = JSON.stringify(data).length;
         console.log('[IMPORT DEBUG] Final IDB data size:', storedSize, 'chars (' + (storedSize / 1024).toFixed(1) + ' KB)');
