@@ -178,6 +178,7 @@ function renderSeriesNav() {
         heading.className = 'series-heading';
         heading.dataset.series = seriesName;
         heading.textContent = truncateTabName(displayName);
+        heading.title = displayName;
         if (seriesName === TIMING) {
             heading.dataset.seriesType = 'timing';
             heading.style.display = chartState.minuteChart ? '' : 'none';
@@ -206,6 +207,7 @@ function renderSeriesNav() {
             const nameSpan = document.createElement('span');
             nameSpan.className = 'series-name';
             nameSpan.textContent = truncateTabName(label);
+            nameSpan.title = label;
             btn.appendChild(nameSpan);
 
             if (seriesName === currentSeries && aggId === currentAggId) {
