@@ -61,10 +61,11 @@ def new_chart():
     return render_template('SCC/new_chart.html')
 
 
+@app.route('/chart/_shell')
 @app.route('/chart/<chart_id>')
 @app.route('/chart/<chart_id>/<share_secret>')
-def chart(chart_id, share_secret=None):
-    return render_template('SCC/view_chart.html', chart_id=chart_id)
+def chart(chart_id=None, share_secret=None):
+    return render_template('SCC/view_chart.html')
 
 
 # =============================================================================

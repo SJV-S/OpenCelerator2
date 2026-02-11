@@ -7,13 +7,14 @@
 // Set to true during development to always fetch fresh (bypasses cache)
 const DEVELOPER_MODE = true;
 
-const SW_VERSION = '0.1.0';
+const SW_VERSION = '0.1.1';
 const CACHE_NAME = `scc-cache-v${SW_VERSION}`;
 
 // HTML pages to precache
 const PRECACHE_PAGES = [
     '/',
     '/new',
+    '/chart/_shell',
 ];
 
 // Static assets to precache (all JS, CSS, icons)
@@ -220,13 +221,11 @@ async function networkFirstWithCache(request) {
             return cachedResponse;
         }
 
-        // For chart pages, serve any cached chart page (template is identical for all charts)
+        // For chart pages, serve the precached shell (template is identical for all charts)
         if (isChartPage(request.url)) {
-            const cache = await caches.open(CACHE_NAME);
-            const keys = await cache.keys();
-            const chartKey = keys.find(k => isChartPage(k.url));
-            if (chartKey) {
-                return cache.match(chartKey);
+            const shellResponse = await caches.match(new URL('/chart/_shell', self.location.origin).href);
+            if (shellResponse) {
+                return shellResponse;
             }
         }
 
