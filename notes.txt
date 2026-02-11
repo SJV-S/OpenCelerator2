@@ -26,6 +26,9 @@ To-do
 - Renaming display name BEFORE an aggregation take is created doesn't seem to take
 - Credit lines doesn't adapt to narrow chart windows
 - Check clickability of dates across chart types for data entry
+- Coming back online while a chart is viewing does not sync latest changes. In such situations, it should check for stuff that may have been missed.
+- - Hmm, refresh doesn't actually help. Maybe because a NEW save event is required? It doesn't actually know that there are changes pending that need to be pushed to the server?
+- - Confirmed: I had to trigger another save event to get changes sent. We need place to put pending changes while offline. I thought we had that, but apparently not.
 
 - Survey prompts
 -- Investigate the occurrence of any cross-module imports that should be handled by the event bus system instead
