@@ -91,32 +91,79 @@ function getLegendItems() {
 }
 
 /**
- * Get the appropriate SVG marker for a series
+ * Map Plotly lineDash names to SVG stroke-dasharray values
+ */
+const DASH_MAP = {
+    'solid': '',
+    'dash': '6,3',
+    'dot': '2,3',
+    'dashdot': '6,3,2,3',
+    'longdash': '10,5',
+    'longdashdot': '10,5,2,5'
+};
+
+/**
+ * Get the appropriate SVG swatch for a legend item.
+ * Draws a horizontal line behind the marker when config.showLine is true,
+ * matching Plotly's built-in legend style.
  * @param {string} seriesKey - Series identifier (correct, incorrect, timing, misc1, misc2)
  * @param {Object} config - Trace configuration object
  * @param {number} scale - Scale factor for sizing
  * @returns {string} SVG string
  */
 function getMarkerSVG(seriesKey, config, scale = 1) {
-    const baseSize = 20;
-    const scaledSize = Math.round(baseSize * scale);
+    const hasLine = config.showLine;
+    const isTextMarker = seriesKey === ERRORS || seriesKey === TIMING;
+    const hasMarker = isTextMarker || config.markerSymbol !== 'none';
 
-    if (seriesKey === ERRORS) {
-        return icons.markerX(scaledSize, config.markerColor);
-    } else if (seriesKey === TIMING) {
-        return icons.markerDash(scaledSize, config.markerColor);
-    } else {
-        // Map Plotly symbol names to icon functions
-        const symbolMap = {
-            'circle': icons.markerCircle,
-            'square': icons.markerSquare,
-            'triangle-up': icons.markerTriangle,
-            'diamond': icons.markerDiamond
-        };
+    const vbWidth = 40;
+    const cy = 10;
+    const cx = 20; // marker center
 
-        const iconFn = symbolMap[config.markerSymbol] || icons.markerCircle;
-        return iconFn(Math.round((config.markerSize || baseSize) * scale), config.markerColor, config.markerEdgeColor);
+    let inner = '';
+
+    // 1. Line (drawn first = rendered behind marker; transparent when showLine is off)
+    const dashArray = DASH_MAP[config.lineDash] || '';
+    const dashAttr = dashArray ? ` stroke-dasharray="${dashArray}"` : '';
+    const lw = Math.max(config.lineWidth || 1, 1);
+    const lineColor = hasLine ? config.lineColor : 'transparent';
+    inner += `<line x1="5" y1="${cy}" x2="${vbWidth - 5}" y2="${cy}" stroke="${lineColor}" stroke-width="${lw}"${dashAttr}/>`;
+
+    // 2. Marker (drawn second = rendered on top)
+    if (hasMarker) {
+        if (seriesKey === ERRORS) {
+            const fs = Math.min(Math.round((config.markerSize || 20) * scale), 18);
+            inner += `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central" font-size="${fs}" font-family="Arial" fill="${config.markerColor}">X</text>`;
+        } else if (seriesKey === TIMING) {
+            const fs = Math.min(Math.round((config.markerSize || 20) * scale), 18);
+            inner += `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central" font-size="${fs}" font-family="Arial" fill="${config.markerColor}">−</text>`;
+        } else {
+            const r = Math.min(Math.round((config.markerSize || 8) * scale) / 2, 9);
+            const fill = config.markerColor;
+            const stroke = config.markerEdgeColor;
+            switch (config.markerSymbol) {
+                case 'square':
+                    inner += `<rect x="${cx - r}" y="${cy - r}" width="${r * 2}" height="${r * 2}" fill="${fill}" stroke="${stroke}" stroke-width="1"/>`;
+                    break;
+                case 'triangle-up':
+                    inner += `<polygon points="${cx},${cy - r} ${cx + r},${cy + r} ${cx - r},${cy + r}" fill="${fill}" stroke="${stroke}" stroke-width="1"/>`;
+                    break;
+                case 'diamond':
+                    inner += `<polygon points="${cx},${cy - r} ${cx + r},${cy} ${cx},${cy + r} ${cx - r},${cy}" fill="${fill}" stroke="${stroke}" stroke-width="1"/>`;
+                    break;
+                default: // circle
+                    inner += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="1"/>`;
+                    break;
+            }
+        }
     }
+
+    // Fallback: neither line nor marker (shouldn't happen, but safety net)
+    if (!inner) {
+        inner = `<line x1="4" y1="${cy}" x2="16" y2="${cy}" stroke="gray" stroke-width="2"/>`;
+    }
+
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${vbWidth} 20" width="${vbWidth}" height="20">${inner}</svg>`;
 }
 
 /**

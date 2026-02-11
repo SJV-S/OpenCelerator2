@@ -296,9 +296,10 @@ function loadAddAggPanel(seriesName) {
     }
 
     if (acrossXSelect) {
+        const rollingAggs = aggTypes.filter(a => !['raw', 'first', 'last', 'sum'].includes(a));
         acrossXSelect.innerHTML =
             `<option value="none">None</option>` +
-            aggTypes.map(a =>
+            rollingAggs.map(a =>
                 `<option value="${a}">${a.charAt(0).toUpperCase() + a.slice(1)}</option>`
             ).join('');
     }
@@ -369,10 +370,9 @@ function loadConfigPanel(seriesName, aggId) {
 
     const isMisc = isMiscSeries(seriesName);
 
-    // Show/hide marker symbol row (only for misc series)
     const symbolRow = document.getElementById('marker-symbol-row');
     if (symbolRow) {
-        symbolRow.style.display = isMisc ? '' : 'none';
+        symbolRow.style.display = '';
     }
 
     // Show/hide marker edge color row (only for corrects and misc)
