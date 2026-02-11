@@ -40,6 +40,13 @@ def service_worker():
         response.headers[header] = value
     return response
 
+
+@app.route('/api/health')
+@limiter.exempt
+def health():
+    return '', 204
+
+
 # =============================================================================
 # HTML Routes (existing)
 # =============================================================================

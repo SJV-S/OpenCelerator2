@@ -1,14 +1,58 @@
 // Online/Offline status indicator
-// Displays connection status in top-right corner and provides isOnline() check
+// Pings /api/health to detect actual server reachability (not just network adapter state)
+
+import { TIMING_MS } from '../SCC/config.js';
 
 let statusElement = null;
 let appVersion = null;
+let _serverReachable = true;    // optimistic until first ping
+let _pingIntervalId = null;
+
+const HEALTH_URL = '/api/health';
 
 /**
- * Check if the browser is online
+ * Check if the server is reachable (cached result from periodic ping)
  */
 export function isOnline() {
-    return navigator.onLine;
+    return _serverReachable;
+}
+
+/**
+ * Ping the server health endpoint
+ */
+async function pingServer() {
+    if (!navigator.onLine) {
+        setReachable(false);
+        return;
+    }
+
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), TIMING_MS.HEALTH_PING_TIMEOUT);
+
+        const response = await fetch(HEALTH_URL, {
+            method: 'GET',
+            cache: 'no-store',
+            signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+        setReachable(response.ok);
+    } catch {
+        setReachable(false);
+    }
+}
+
+/**
+ * Update reachable state and refresh the indicator
+ */
+function setReachable(reachable) {
+    const changed = _serverReachable !== reachable;
+    _serverReachable = reachable;
+    if (changed) {
+        console.log(`[Status] ${reachable ? 'Server reachable' : 'Server unreachable'}`);
+    }
+    updateStatus();
 }
 
 /**
@@ -60,7 +104,7 @@ function updateStatus() {
 
     const prefix = appVersion ? `v${appVersion} · ` : '';
 
-    if (navigator.onLine) {
+    if (_serverReachable) {
         statusElement.textContent = `${prefix}online`;
         statusElement.style.color = '#059669';
         statusElement.style.backgroundColor = 'rgba(209, 250, 229, 0.9)';
@@ -89,13 +133,26 @@ export function initOnlineStatus() {
         }
     });
 
-    window.addEventListener('online', () => {
-        console.log('[Status] Back online');
-        updateStatus();
+    // Immediate first ping, then periodic
+    pingServer();
+    _pingIntervalId = setInterval(pingServer, TIMING_MS.HEALTH_PING_INTERVAL);
+
+    // Browser offline → instant unreachable (no need to wait for ping)
+    window.addEventListener('offline', () => {
+        console.log('[Status] Browser reports offline');
+        setReachable(false);
     });
 
-    window.addEventListener('offline', () => {
-        console.log('[Status] Gone offline');
-        updateStatus();
+    // Browser online → verify with actual server ping
+    window.addEventListener('online', () => {
+        console.log('[Status] Browser reports online — verifying');
+        pingServer();
+    });
+
+    // Tab becomes visible → refresh status (intervals throttled in background tabs)
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+            pingServer();
+        }
     });
 }
