@@ -366,6 +366,36 @@ function loadAddAggPanel(seriesName) {
 // CONFIG PANEL
 // ============================================================================
 
+/**
+ * Enable/disable line and marker sub-fields based on current dropdown values.
+ * When line style is "none", line width and color are meaningless.
+ * When marker symbol is "none", marker size, color, and edge color are meaningless.
+ */
+function updateFieldStates() {
+    const lineDash = document.getElementById('config-line-dash')?.value;
+    const markerSymbol = document.getElementById('config-marker-symbol')?.value;
+
+    const lineDisabled = lineDash === 'none';
+    const markerDisabled = markerSymbol === 'none';
+
+    const setDisabled = (id, disabled) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.disabled = disabled;
+        const wrapper = el.closest('div');
+        if (wrapper) {
+            wrapper.classList.toggle('opacity-40', disabled);
+            wrapper.classList.toggle('pointer-events-none', disabled);
+        }
+    };
+
+    setDisabled('config-line-width', lineDisabled);
+    setDisabled('config-line-color', lineDisabled);
+    setDisabled('config-marker-size', markerDisabled);
+    setDisabled('config-marker-color', markerDisabled);
+    setDisabled('config-marker-edge-color', markerDisabled);
+}
+
 function loadConfigPanel(seriesName, aggId) {
     const config = getConfig(seriesName, aggId);
     if (!config) return;
@@ -400,6 +430,8 @@ function loadConfigPanel(seriesName, aggId) {
     // Line style: "none" if showLine is false, otherwise the actual dash value
     const showLine = config.showLine ?? true;
     document.getElementById('config-line-dash').value = showLine ? (config.lineDash || 'solid') : 'none';
+
+    updateFieldStates();
 }
 
 function applyConfig() {
@@ -741,6 +773,10 @@ function initializeSeriesNav() {
             }
         });
     }
+
+    // Live-update field states when line style or marker symbol changes
+    document.getElementById('config-line-dash')?.addEventListener('change', updateFieldStates);
+    document.getElementById('config-marker-symbol')?.addEventListener('change', updateFieldStates);
 
     // Set up config panel buttons
     document.getElementById('apply-config-btn')?.addEventListener('click', applyConfig);

@@ -58,6 +58,7 @@ function takeChartScreenshot() {
         format: 'png',
         width: chartWidth,
         height: chartHeight,
+        scale: 3,
         filename: fileName
     }).then(() => {
         createToast({
