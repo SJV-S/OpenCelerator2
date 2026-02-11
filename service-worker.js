@@ -7,7 +7,7 @@
 // Set to true during development to always fetch fresh (bypasses cache)
 const DEVELOPER_MODE = true;
 
-const SW_VERSION = '0.1.6';
+const SW_VERSION = '0.1.0';
 const CACHE_NAME = `scc-cache-v${SW_VERSION}`;
 
 // HTML pages to precache
@@ -31,6 +31,8 @@ const PRECACHE_STATIC = [
     '/static/SCC/fonts/open-sans-latin-ext.woff2',
     // Core modules
     '/static/SCC/main.js',
+    '/static/SCC/chartExplorer.js',
+    '/static/SCC/chartPage.js',
     '/static/SCC/chartState.js',
     '/static/SCC/config.js',
     '/static/SCC/debug.js',
@@ -43,10 +45,14 @@ const PRECACHE_STATIC = [
     '/static/lib/socket.io-4.7.4.min.js',
     '/static/lib/xlsx.full.min.js',
     // Storage
+    '/static/SCC/storage/backupStorage.js',
     '/static/SCC/storage/chartStorage.js',
+    '/static/SCC/storage/compactJson.js',
+    '/static/SCC/storage/passphrase.js',
     // Series
     '/static/SCC/series/dataEntry.js',
     '/static/SCC/series/dataUpdate.js',
+    '/static/SCC/series/grid.js',
     '/static/SCC/series/miscSeries.js',
     '/static/SCC/series/replot.js',
     '/static/SCC/series/tracePipeline.js',
@@ -63,42 +69,48 @@ const PRECACHE_STATIC = [
     '/static/SCC/ui/aimLineEditor.js',
     '/static/SCC/ui/celLineEditor.js',
     '/static/SCC/ui/celSettingsModal.js',
+    '/static/SCC/ui/celerationFan.js',
+    '/static/SCC/ui/credit.js',
     '/static/SCC/ui/crosshair.js',
+    '/static/SCC/ui/customLegend.js',
     '/static/SCC/ui/icons.js',
+    '/static/SCC/ui/lineEditorFactory.js',
     '/static/SCC/ui/lineSettingsModal.js',
+    '/static/SCC/ui/modalHelpers.js',
     '/static/SCC/ui/panSlider.js',
     '/static/SCC/ui/phaseLineEditor.js',
+    '/static/SCC/ui/settingsModal.js',
+    '/static/SCC/ui/share.js',
     '/static/SCC/ui/startDateModal.js',
     '/static/SCC/ui/toaster.js',
     '/static/SCC/ui/tooltip.js',
     // Util
     '/static/SCC/util/agg.js',
+    '/static/SCC/util/BIP39Words.js',
     '/static/SCC/util/chartLayouts.js',
     '/static/SCC/util/dates.js',
+    '/static/SCC/util/dom.js',
+    '/static/SCC/util/download.js',
     '/static/SCC/util/fit_lines.js',
     '/static/SCC/util/format.js',
+    '/static/SCC/util/lineInterpolation.js',
     '/static/SCC/util/panning_controls.js',
+    '/static/SCC/util/plotCoordinates.js',
     '/static/SCC/util/plotlyWrapper.js',
     '/static/SCC/util/resize-chart.js',
     // Import
+    '/static/SCC/import/chartImport.js',
     '/static/SCC/import/dataImport.js',
     '/static/SCC/import/importUI.js',
     '/static/SCC/import/jsonBackwardsCompatibility.js',
     '/static/SCC/import/nativeImport.js',
     '/static/SCC/import/openCeleratorImport.js',
-    // Misc
-    '/static/SCC/misc/celerationFan.js',
-    '/static/SCC/misc/credit.js',
-    '/static/SCC/misc/customLegend.js',
-    '/static/SCC/misc/grid.js',
-    '/static/SCC/misc/share.js',
     // Server sync
-    '/static/Server/BIP39Words.js',
     '/static/Server/crypto.js',
     '/static/Server/init.js',
     '/static/Server/onlineStatus.js',
-    '/static/Server/passphrase.js',
     '/static/Server/syncClient.js',
+    '/static/Server/syncDevice.js',
     '/static/Server/wsClient.js',
 ];
 
