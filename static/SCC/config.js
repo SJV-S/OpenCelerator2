@@ -20,6 +20,10 @@ export const MOBILE_BREAKPOINT = 768;
 export const MIN_DESKTOP_WIDTH = 900;
 export const MIN_DESKTOP_HEIGHT = 500;
 
+export function isMobile() {
+    return window.innerWidth < MOBILE_BREAKPOINT;
+}
+
 // ============================================================================
 // TIMING CONSTANTS (milliseconds)
 // ============================================================================
@@ -440,6 +444,18 @@ export function createMiscTraceConfig(index) {
         markerEdgeColor: 'black'
     };
 }
+
+// ============================================================================
+// LINE DASH OPTIONS (for editor modals)
+// ============================================================================
+export const DASH_OPTIONS = Object.freeze([
+    { value: 'solid', label: 'Solid' },
+    { value: 'dash', label: 'Dash' },
+    { value: 'dot', label: 'Dot' },
+    { value: 'dashdot', label: 'Dash-Dot' },
+    { value: 'longdash', label: 'Long Dash' },
+    { value: 'longdashdot', label: 'Long Dash-Dot' }
+]);
 
 // ============================================================================
 // DEFAULT LEGEND CONFIGURATION

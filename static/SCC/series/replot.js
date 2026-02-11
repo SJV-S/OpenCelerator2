@@ -4,12 +4,14 @@
  * This module is responsible for:
  * - Orchestrating the complete chart refresh pipeline
  * - Calling tracePipeline.js to get traces
- * - Executing Plotly.react() and Plotly.addTraces()
+ * - Executing react() and addTraces()
  * - Managing chart state during replotting
  */
 
 import { chartState } from '../chartState.js';
 import { removeAllToasts, createToast } from '../ui/toaster.js';
+import { react, addTraces, relayout } from '../util/plotlyWrapper.js';
+import { getChartDiv } from '../util/dom.js';
 import {
     calculateFrequencies,
     createFrequencyTraces,
@@ -26,7 +28,7 @@ import { eventBus, EVENTS } from '../eventBus.js';
  * This is the main entry point for replotting the chart
  */
 function refreshChart() {
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
 
     // Remove all clickable objects before replotting
     eventBus.emit(EVENTS.NAV_LINE_CLICKABILITY_TOGGLE, { enabled: false });
@@ -103,18 +105,18 @@ function refreshChart() {
     // Check if data traces already exist
     const dataTracesExist = chartDiv.data.length > 2;
     if (dataTracesExist) {
-        // Update existing traces with new data using Plotly.react()
+        // Update existing traces with new data using react()
         // Disable Plotly's legend - we use custom legend instead
         const layout = {
             ...chartDiv.layout,
             showlegend: false
         };
-        Plotly.react(chartDiv, updatedData, layout);
+        react(chartDiv, updatedData, layout);
     } else {
         // First time adding data - add new traces to the existing chart
-        Plotly.addTraces(chartDiv, dataTraces);
+        addTraces(chartDiv, dataTraces);
         // Disable Plotly's legend
-        Plotly.relayout(chartDiv, {
+        relayout(chartDiv, {
             showlegend: false
         });
     }

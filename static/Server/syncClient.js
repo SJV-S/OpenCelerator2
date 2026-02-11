@@ -3,8 +3,8 @@
  * Signs all pushes with ECDSA, verifies pulls based on chart ownership policy
  */
 
-import { encrypt, decrypt, generateChartKey, wrapKey, unwrapKey, deriveKey, sign, verify, importPublicKey } from './crypto.js';
-import { getUserId, getUserKey } from './passphrase.js';
+import { encrypt, decrypt, generateChartKey, wrapKey, unwrapKey, deriveKey, sign, verify, importPublicKey, fromHex } from './crypto.js';
+import { getUserId, getUserKey } from '../SCC/storage/passphrase.js';
 import { openDB } from '../lib/idb.js';
 import { eventBus, EVENTS } from '../SCC/eventBus.js';
 import { connectToChart, disconnectFromChart } from './wsClient.js';
@@ -165,7 +165,7 @@ export async function uploadCharts(localCharts) {
     for (const chart of localCharts) {
         let chartKey;
         if (chart.chartKeyHex) {
-            const keyBytes = new Uint8Array(chart.chartKeyHex.match(/.{1,2}/g).map(b => parseInt(b, 16)));
+            const keyBytes = fromHex(chart.chartKeyHex);
             chartKey = await crypto.subtle.importKey('raw', keyBytes, { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
         } else {
             chartKey = await generateChartKey();
@@ -250,7 +250,7 @@ export async function sync(localCharts) {
     for (const chart of localCharts) {
         let chartKey;
         if (chart.chartKeyHex) {
-            const keyBytes = new Uint8Array(chart.chartKeyHex.match(/.{1,2}/g).map(b => parseInt(b, 16)));
+            const keyBytes = fromHex(chart.chartKeyHex);
             chartKey = await crypto.subtle.importKey('raw', keyBytes, { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
         } else {
             chartKey = await generateChartKey();
@@ -298,7 +298,7 @@ export async function pushChart(chartUuid) {
 
     if (chart.publicKey && chart.publicKey !== signingPublicKeyB64 && !chart.acceptingEdits) return;
 
-    const chartKeyBytes = new Uint8Array(chart.chartKey.match(/.{1,2}/g).map(b => parseInt(b, 16)));
+    const chartKeyBytes = fromHex(chart.chartKey);
     const chartKey = await crypto.subtle.importKey('raw', chartKeyBytes, { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
 
     // Stamp identity for signature verification
@@ -342,7 +342,7 @@ async function _createShareLink(chartUuid, acceptingEdits) {
     if (!chart) throw new Error('Chart not found in local storage');
     if (!chart.chartKey) throw new Error('Chart has no encryption key - reload the chart first');
 
-    const chartKeyBytes = new Uint8Array(chart.chartKey.match(/.{1,2}/g).map(b => parseInt(b, 16)));
+    const chartKeyBytes = fromHex(chart.chartKey);
     const chartKey = await crypto.subtle.importKey('raw', chartKeyBytes, { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
 
     // Set sharing policy in chart data (inside encrypted blob)
@@ -464,7 +464,7 @@ export async function syncChart(chartId, updatedAt = null) {
         if (!response.ok) return false;
         const { data, signature: signatureHex } = await response.json();
 
-        const chartKeyBytes = new Uint8Array(chart.chartKey.match(/.{1,2}/g).map(b => parseInt(b, 16)));
+        const chartKeyBytes = fromHex(chart.chartKey);
         const chartKey = await crypto.subtle.importKey('raw', chartKeyBytes, { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
         const chartData = await decrypt(chartKey, data);
 

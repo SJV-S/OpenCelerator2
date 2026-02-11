@@ -1,8 +1,14 @@
 /**
  * Plotly Wrapper
  *
- * Wraps Plotly operations to emit events through the eventBus after completion.
- * Guarantees events fire reliably, regardless of Plotly's native event quirks.
+ * Centralizes all Plotly calls through a single module.
+ * Emits events through the eventBus after completion so other modules can react.
+ * Provides name-based shape removal via relayout(chartDiv, shapeName, true).
+ *
+ * Justified direct calls (unsupported methods):
+ * - ui/share.js              — Plotly.downloadImage() (not wrapped)
+ * - lines/lineClickHandler.js — Plotly.moveTraces() (not wrapped)
+ * - debug.js                 — Plotly.relayout() (intentionally outside normal flow)
  */
 
 import { eventBus, EVENTS } from '../eventBus.js';
@@ -21,46 +27,31 @@ export async function relayout(chartDiv, updates, name = false) {
     eventBus.emit(EVENTS.PLOTLY_RELAYOUT_COMPLETE, { updates });
 }
 
-/**
- * Wrapper for Plotly.react
- * Emits PLOTLY_REACT_COMPLETE after the operation finishes
- */
+/** Wrapper for Plotly.react */
 export async function react(chartDiv, data, layout, config) {
     await Plotly.react(chartDiv, data, layout, config);
     eventBus.emit(EVENTS.PLOTLY_REACT_COMPLETE);
 }
 
-/**
- * Wrapper for Plotly.restyle
- * Emits PLOTLY_RESTYLE_COMPLETE after the operation finishes
- */
+/** Wrapper for Plotly.restyle */
 export async function restyle(chartDiv, updates, traceIndices) {
     await Plotly.restyle(chartDiv, updates, traceIndices);
     eventBus.emit(EVENTS.PLOTLY_RESTYLE_COMPLETE, { updates, traceIndices });
 }
 
-/**
- * Wrapper for Plotly.newPlot
- * Emits PLOTLY_NEWPLOT_COMPLETE after the operation finishes
- */
+/** Wrapper for Plotly.newPlot */
 export async function newPlot(chartDiv, data, layout, config) {
     await Plotly.newPlot(chartDiv, data, layout, config);
     eventBus.emit(EVENTS.PLOTLY_NEWPLOT_COMPLETE);
 }
 
-/**
- * Wrapper for Plotly.addTraces
- * Emits PLOTLY_ADDTRACES_COMPLETE after the operation finishes
- */
+/** Wrapper for Plotly.addTraces */
 export async function addTraces(chartDiv, traces, indices) {
     await Plotly.addTraces(chartDiv, traces, indices);
     eventBus.emit(EVENTS.PLOTLY_ADDTRACES_COMPLETE, { traces, indices });
 }
 
-/**
- * Wrapper for Plotly.deleteTraces
- * Emits PLOTLY_DELETETRACES_COMPLETE after the operation finishes
- */
+/** Wrapper for Plotly.deleteTraces */
 export async function deleteTraces(chartDiv, indices) {
     await Plotly.deleteTraces(chartDiv, indices);
     eventBus.emit(EVENTS.PLOTLY_DELETETRACES_COMPLETE, { indices });

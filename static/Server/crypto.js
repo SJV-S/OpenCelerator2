@@ -6,7 +6,7 @@ const PBKDF2_ITERATIONS = 100000;
 
 // Hex encode/decode helpers
 const toHex = bytes => Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
-const fromHex = hex => new Uint8Array(hex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+export const fromHex = hex => new Uint8Array(hex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
 
 // Base64 encode/decode helpers (for ECDSA key serialization)
 const toBase64 = buffer => btoa(String.fromCharCode(...new Uint8Array(buffer)));

@@ -14,6 +14,8 @@ import { chartState } from './chartState.js';
 import { CORRECTS, ERRORS, TIMING, TIMING_MS, CHART_MATH, LAYOUT, CHART_TYPE_CONFIG } from './config.js';
 import './debug.js';
 import { eventBus, EVENTS } from './eventBus.js';
+import { getChartDiv } from './util/dom.js';
+import { newPlot, relayout } from './util/plotlyWrapper.js';
 import {
     submitEntry,
     setStartDate,
@@ -50,21 +52,19 @@ import { init as aimLinesInit } from './lines/aimLines.js';
 import { init as cutLinesInit } from './lines/cutLines.js';
 import { init as celLineInit } from './lines/celLine.js';
 import { init as lineHoverInit } from './lines/lineHover.js';
-import { initGridToggle, toggleDateLines, toggleCountLines, toggleMinorGrid } from './misc/grid.js';
-import { injectCelerationFan, initFanDrag, toggleCelerationFan, init as celerationFanInit } from './misc/celerationFan.js';
-import { injectCredits, initCreditClick, regenerateCredits, init as creditInit } from './misc/credit.js';
-import { toggleLegend, renderCustomLegend, init as customLegendInit } from './misc/customLegend.js';
+import { initGridToggle, toggleDateLines, toggleCountLines, toggleMinorGrid } from './series/grid.js';
+import { injectCelerationFan, initFanDrag, toggleCelerationFan, init as celerationFanInit } from './ui/celerationFan.js';
+import { injectCredits, initCreditClick, regenerateCredits, init as creditInit } from './ui/credit.js';
+import { toggleLegend, renderCustomLegend, init as customLegendInit } from './ui/customLegend.js';
 import { setupPanConstraints } from './util/panning_controls.js';
 import { resizeChartByHeight, emitFanReposition, rescaleChartElements } from './util/resize-chart.js';
 import { getTemplate } from './util/chartLayouts.js';
 import { showInitialMenuHint } from './ui/tooltip.js';
 import { icons } from './ui/icons.js';
-import { initializeShareTab } from './misc/share.js';
+import { initializeShareTab } from './ui/share.js';
 import { init as crosshairInit } from './ui/crosshair.js';
 import { init as panSliderInit, setupChartListener as panSliderSetupChart } from './ui/panSlider.js';
-import { initStorage } from './storage/chartStorage.js';
 import { initImportUI } from './import/importUI.js';
-import { initServerSync } from '../Server/init.js';
 
 /**
  * Initialize the chart using client-side templates
@@ -78,7 +78,7 @@ export function initializeChart() {
         return;
     }
 
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
 
     // Get container dimensions: use explicit chartState height, else flex default
     const chartContainer = document.getElementById('chart-container');
@@ -103,7 +103,7 @@ export function initializeChart() {
     plotData.layout.xaxis.fixedrange = true;
     plotData.layout.hovermode = 'closest';
 
-    Plotly.newPlot(chartDiv, plotData.data, plotData.layout, {
+    newPlot(chartDiv, plotData.data, plotData.layout, {
         displayModeBar: false,
         scrollZoom: false,
         doubleClick: false
@@ -215,18 +215,6 @@ document.addEventListener('DOMContentLoaded', () => {
     creditInit();
     panSliderInit();
     console.log('Main.js: Event bus subscriptions initialized');
-
-    // Initialize IndexedDB storage
-    initStorage().then(success => {
-        if (success) {
-            console.log('Main.js: Storage initialized');
-        } else {
-            console.warn('Main.js: Storage initialization failed');
-        }
-    });
-
-    // Initialize server sync (generates passphrase if needed)
-    initServerSync().catch(err => console.warn('Main.js: Server sync init failed:', err));
 
     // Initialize icons in buttons with data-icon attributes
     document.querySelectorAll('[data-icon]').forEach(button => {
@@ -462,7 +450,7 @@ export function setupEventListeners() {
     }
 
     // Chart window update handler - subscribes to CHART_WINDOW_CHANGED event
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
 
     const applyChartWindow = (newValue) => {
         const config = CHART_TYPE_CONFIG[chartState.chartType];
@@ -485,7 +473,7 @@ export function setupEventListeners() {
         const xaxis_px = delta_y_px / Math.tan((deg * Math.PI) / 180);
         const newWidth = xaxis_px + (margin.l + margin.r);
 
-        Plotly.relayout(chartDiv, {
+        relayout(chartDiv, {
             'xaxis.range': [-LAYOUT.X_AXIS_MARGIN_OFFSET, newValue + LAYOUT.X_AXIS_MARGIN_OFFSET],
             width: newWidth
         }).then(async () => {

@@ -22,6 +22,9 @@ import { xPositionToDate, timestampsToXPositions, dateToXPosition } from '../uti
 import { icons, applySvgCursor, restoreCursor } from '../ui/icons.js';
 import { phaseLineMetadata } from './allLines.js';
 import { eventBus, EVENTS } from '../eventBus.js';
+import { getDataCoordinates } from '../util/plotCoordinates.js';
+import { getChartDiv } from '../util/dom.js';
+import { relayout } from '../util/plotlyWrapper.js';
 
 var phaseLineState = {
     active: false,
@@ -135,7 +138,7 @@ function buildPhaseLineElements(metadata, chartDiv) {
 function activatePhaseLineMode(direction) {
     console.log(`%c[PHASE LINE] Activating phase line mode: ${direction}`, 'color: purple; font-weight: bold');
 
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
 
     if (!chartDiv) {
         console.error('[PHASE LINE] Chart div not found!');
@@ -314,7 +317,7 @@ function redrawVerticalLine(chartDiv) {
     const verticalLineIndex = phaseLineState.tempShapes[0];
     currentShapes[verticalLineIndex] = verticalLine;
 
-    Plotly.relayout(chartDiv, {
+    relayout(chartDiv, {
         shapes: currentShapes
     });
 }
@@ -344,7 +347,7 @@ function redrawHorizontalLine(chartDiv) {
     const horizontalLineIndex = phaseLineState.tempShapes[1];
     currentShapes[horizontalLineIndex] = horizontalLine;
 
-    Plotly.relayout(chartDiv, {
+    relayout(chartDiv, {
         shapes: currentShapes
     });
 }
@@ -355,7 +358,7 @@ function redrawHorizontalLine(chartDiv) {
 function deactivatePhaseLineMode() {
     console.log('Deactivating phase line mode');
 
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
 
     // Remove click listener
     if (phaseLineState.clickHandler) {
@@ -421,7 +424,7 @@ function deactivatePhaseLineMode() {
  */
 function handlePhaseLineDrawClick(event, chartDiv) {
     // Get click coordinates relative to the plot area
-    const coords = getPlotCoordinates(event, chartDiv);
+    const coords = getDataCoordinates(event, chartDiv, { roundY: roundYValue });
 
     if (!coords) {
         console.warn('Could not get plot coordinates');
@@ -493,73 +496,6 @@ function roundHorizontalX(x2Raw, x1) {
     }
 
     return x2Rounded;
-}
-
-/**
- * Converts pixel coordinates to plot data coordinates
- * @param {MouseEvent} event - Mouse event
- * @param {HTMLElement} chartDiv - Chart container element
- * @returns {Object|null} Object with x and y data coordinates, or null
- */
-function getPlotCoordinates(event, chartDiv) {
-    if (!chartDiv._fullLayout) {
-        console.warn('Chart not fully initialized');
-        return null;
-    }
-
-    const xaxis = chartDiv._fullLayout.xaxis;
-    const yaxis = chartDiv._fullLayout.yaxis;
-
-    if (!xaxis || !yaxis) {
-        console.warn('Axes not found');
-        return null;
-    }
-
-    // Get the chart bounding box
-    const bbox = chartDiv.getBoundingClientRect();
-
-    // Get plot area dimensions using Plotly's internal properties
-    const plotAreaLeft = xaxis._offset;
-    const plotAreaWidth = xaxis._length;
-    const plotAreaTop = yaxis._offset;
-    const plotAreaHeight = yaxis._length;
-
-    // Calculate pixel position within plot area
-    const xPixelInPlotArea = event.clientX - bbox.left - plotAreaLeft;
-    const yPixelInPlotArea = event.clientY - bbox.top - plotAreaTop;
-
-    // Get current visible range
-    const visibleXMin = xaxis.range[0];
-    const visibleXMax = xaxis.range[1];
-    const visibleYMin = yaxis.range[0];
-    const visibleYMax = yaxis.range[1];
-
-    // Check if y-axis is logarithmic
-    const isLogY = yaxis.type === 'log';
-
-    // Calculate data coordinates (note: y is inverted for screen coordinates)
-    let xValue = visibleXMin + (xPixelInPlotArea / plotAreaWidth) * (visibleXMax - visibleXMin);
-
-    // Round x-value to nearest integer
-    xValue = Math.round(xValue);
-
-    // Reject clicks outside the valid chart range
-    if (xValue < 0 || xValue > chartState.chartCapacity) return null;
-
-    // For log scale, the range is in log10 space, so we need to convert back
-    let yValue;
-    if (isLogY) {
-        // Y-axis range is in log10 space (e.g., -3 to 3 for 0.001 to 1000)
-        const logYValue = visibleYMax - (yPixelInPlotArea / plotAreaHeight) * (visibleYMax - visibleYMin);
-        yValue = Math.pow(10, logYValue);
-    } else {
-        yValue = visibleYMax - (yPixelInPlotArea / plotAreaHeight) * (visibleYMax - visibleYMin);
-    }
-
-    // Round y-value to nearest allowed value
-    yValue = roundYValue(yValue);
-
-    return { x: xValue, y: yValue };
 }
 
 /**
@@ -637,7 +573,7 @@ function drawVerticalLine(chartDiv, coords) {
     const shapeIndex = currentShapes.length;
     phaseLineState.tempShapes.push(shapeIndex);
 
-    Plotly.relayout(chartDiv, {
+    relayout(chartDiv, {
         shapes: [...currentShapes, verticalLine]
     });
 
@@ -698,7 +634,7 @@ function drawHorizontalLine(chartDiv, coords) {
     const shapeIndex = currentShapes.length;
     phaseLineState.tempShapes.push(shapeIndex);
 
-    Plotly.relayout(chartDiv, {
+    relayout(chartDiv, {
         shapes: [...currentShapes, horizontalLine]
     });
 
@@ -780,7 +716,7 @@ function addPhaseTextLabel(chartDiv, text) {
     const currentAnnotations = chartDiv.layout.annotations || [];
 
     // Add the annotation
-    Plotly.relayout(chartDiv, {
+    relayout(chartDiv, {
         annotations: [...currentAnnotations, annotation]
     });
 
@@ -877,7 +813,7 @@ function finalizePhaseLine(chartDiv) {
     annotations.push(elements.annotation);
     metadata.annotationIndex = annotations.length - 1;
 
-    Plotly.relayout(chartDiv, { shapes, annotations });
+    relayout(chartDiv, { shapes, annotations });
 
     chartState.PhaseLines[lineId] = metadata;
     console.log('[LINE SAVE] 1. Phase line added to chartState:', lineId);
@@ -906,7 +842,7 @@ function removePhaseAnnotation(chartDiv) {
     annotations.splice(phaseLineState.tempAnnotationIndex, 1);
 
     // Update layout
-    Plotly.relayout(chartDiv, {
+    relayout(chartDiv, {
         annotations: annotations
     });
 }
@@ -933,7 +869,7 @@ function removePhaseShapes(chartDiv) {
     }
 
     // Update layout
-    Plotly.relayout(chartDiv, {
+    relayout(chartDiv, {
         shapes: currentShapes
     });
 }
@@ -999,7 +935,7 @@ function getPhaseStepText(phase) {
  * @param {boolean} visible - Whether phase lines should be visible
  */
 function setPhaseLineVisibility(visible) {
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv) return;
 
     const shapes = chartDiv.layout.shapes || [];
@@ -1025,7 +961,7 @@ function setPhaseLineVisibility(visible) {
     });
 
     if (updated) {
-        Plotly.relayout(chartDiv, { shapes: updatedShapes, annotations: updatedAnnotations });
+        relayout(chartDiv, { shapes: updatedShapes, annotations: updatedAnnotations });
     }
 }
 
@@ -1034,7 +970,7 @@ function setPhaseLineVisibility(visible) {
  * Called after chart replot to restore saved lines
  */
 function redrawPhaseLines() {
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv) return;
 
     // Filter out existing phase shapes/annotations
@@ -1059,7 +995,7 @@ function redrawPhaseLines() {
         annotations.push(elements.annotation);
     });
 
-    Plotly.relayout(chartDiv, { shapes, annotations });
+    relayout(chartDiv, { shapes, annotations });
 }
 
 /**

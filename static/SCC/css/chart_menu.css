@@ -140,28 +140,6 @@
     opacity: 0.9;
 }
 
-.chart-menu-btn-primary {
-    width: 100%;
-    padding: 0.625rem;
-    font-size: 0.875rem;
-    font-weight: 700;
-    color: white;
-    background-color: #6ad1e3;
-    border: none;
-    border-radius: 0.25rem;
-}
-
-.chart-menu-btn-danger {
-    width: 100%;
-    padding: 0.625rem;
-    font-size: 0.875rem;
-    font-weight: 700;
-    color: white;
-    background-color: #ef4444;
-    border: none;
-    border-radius: 0.25rem;
-}
-
 /* ===== ICON BUTTONS (Lines Tab) ===== */
 .chart-menu-icon-btn {
     display: flex;
@@ -202,56 +180,11 @@
     }
 }
 
-/* ===== GRID LAYOUTS ===== */
-.chart-menu-grid-2 {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.5rem;
-    width: 100%;
-}
-
-.chart-menu-grid-3 {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 0.5rem;
-    width: 100%;
-}
-
-.chart-menu-flex-row {
-    display: flex;
-    flex-direction: row;
-    gap: 0.5rem;
-    justify-content: center;
-    align-items: center;
-}
-
-.chart-menu-flex-col {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    align-items: center;
-}
-
-/* ===== SPACING ===== */
-.chart-menu-section {
-    margin-bottom: 1rem;
-}
-
-.chart-menu-section:last-child {
-    margin-bottom: 0;
-}
-
 /* ===== TAB INNER WRAPPER ===== */
 .chart-menu-tab-inner {
     width: 100%;
     padding: 5%;
     box-sizing: border-box;
-}
-
-@media (min-width: 1024px) {
-    .chart-menu-tab-inner {
-        padding: 5%;
-    }
 }
 
 /* ===== MOBILE CREDIT DISPLAY ===== */
@@ -304,12 +237,6 @@
     flex-direction: row;
     gap: 1rem;
     justify-content: center;
-}
-
-@media (min-width: 1024px) {
-    .chart-menu-icon-group-row {
-        gap: 1rem;
-    }
 }
 
 .chart-menu-icon-category {
@@ -397,39 +324,6 @@
     display: block;
 }
 
-/* ===== DATE INPUT WITH ARROWS ===== */
-.chart-menu-date-row {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    width: 100%;
-}
-
-.chart-menu-date-row input {
-    flex: 1;
-    text-align: center;
-}
-
-.chart-menu-date-btn {
-    padding: 0.5rem;
-    background-color: white;
-    border: 2px solid #d1d5db;
-    border-radius: 0.25rem;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.chart-menu-date-btn:hover {
-    background-color: #f3f4f6;
-}
-
-.chart-menu-date-btn svg {
-    width: 1rem;
-    height: 1rem;
-}
-
 /* ===== CHART AREA OFFSET ===== */
 @media (min-width: 1024px) {
     #chart-area {
@@ -450,10 +344,6 @@
         align-items: center;
     }
 
-    /* Credit container hidden on desktop - credits now rendered as Plotly annotations */
-    #credit-container {
-        display: none;
-    }
 }
 
 @media (max-width: 1023px) {
@@ -469,9 +359,6 @@
         align-items: center;
     }
 
-    #credit-container {
-        display: none;
-    }
 }
 
 /* ===== CROSSHAIR INFO PANEL ===== */
@@ -528,25 +415,6 @@
 
 .crosshair-value {
     color: #555;
-}
-
-.crosshair-data {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.crosshair-data-item {
-    display: flex;
-    flex-direction: column;
-}
-
-.crosshair-data-header {
-    font-weight: 700;
-}
-
-.crosshair-data-agg {
-    font-size: 11px;
 }
 
 /* ===== SERIES TAB SUB-MENU ===== */

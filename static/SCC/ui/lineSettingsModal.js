@@ -8,6 +8,7 @@
  */
 
 import { showCelSettingsModal } from './celSettingsModal.js';
+import { setupModalClose } from './modalHelpers.js';
 
 let modalOverlay = null;
 let modalTitle = null;
@@ -49,17 +50,7 @@ function createModal() {
     content.appendChild(closeBtn);
     modalOverlay.appendChild(content);
 
-    // Close on overlay click
-    modalOverlay.addEventListener('click', (e) => {
-        if (e.target === modalOverlay) hideModal();
-    });
-
-    // Close on Escape
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && modalOverlay.style.display !== 'none') {
-            hideModal();
-        }
-    });
+    setupModalClose(modalOverlay, hideModal);
 
     document.body.appendChild(modalOverlay);
 }

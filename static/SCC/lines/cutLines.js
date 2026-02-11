@@ -14,6 +14,9 @@ import { createToast, createConfirmToast, createInfoToast, updateToastMessage } 
 import { xPositionToDate, timestampsToXPositions } from '../util/dates.js';
 import { icons, applySvgCursor, restoreCursor } from '../ui/icons.js';
 import { eventBus, EVENTS } from '../eventBus.js';
+import { relayout } from '../util/plotlyWrapper.js';
+import { getPixelCoordinates } from '../util/plotCoordinates.js';
+import { getChartDiv } from '../util/dom.js';
 
 // Cut lines mode state (ephemeral UI state)
 var cutLinesState = {
@@ -35,7 +38,7 @@ var cutLinesState = {
 function activateCutLinesMode() {
     console.log('Activating cut lines mode');
 
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv) {
         console.error('Chart div not found');
         return;
@@ -52,7 +55,7 @@ function activateCutLinesMode() {
     cutLinesState.active = true;
 
     cutLinesState.previousDragMode = chartDiv.layout.dragmode;
-    Plotly.relayout(chartDiv, { dragmode: false });
+    relayout(chartDiv, { dragmode: false });
 
     applySvgCursor(chartDiv, icons.otherScissors, {size: 32, hotspotX: 16, hotspotY: 16});
 
@@ -93,13 +96,13 @@ function activateCutLinesMode() {
 function deactivateCutLinesMode() {
     console.log('Deactivating cut lines mode');
 
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv) return;
 
     cutLinesState.active = false;
 
     if (cutLinesState.previousDragMode !== null) {
-        Plotly.relayout(chartDiv, { dragmode: cutLinesState.previousDragMode });
+        relayout(chartDiv, { dragmode: cutLinesState.previousDragMode });
         cutLinesState.previousDragMode = null;
     }
 
@@ -138,7 +141,7 @@ function deactivateCutLinesMode() {
 }
 
 function handleCutLineMouseMove(event, chartDiv) {
-    const coords = getPlotCoordinatesForCutLine(event, chartDiv);
+    const coords = getPixelCoordinates(event, chartDiv, { halfStep: true });
     if (!coords) return;
 
     // Store current x for click handler
@@ -168,7 +171,7 @@ function handleCutLineTouchStart(event, chartDiv) {
         updateCutLineToastMessage();
 
         const touch = event.touches[0];
-        const coords = getPlotCoordinatesForCutLineTouch(touch, chartDiv);
+        const coords = getPixelCoordinates(touch, chartDiv, { halfStep: true });
         if (coords) {
             cutLinesState.currentX = coords.x;
             updateGuideLineOverlay(coords.xPixel);
@@ -181,7 +184,7 @@ function handleCutLineTouchMove(event, chartDiv) {
 
     if (event.touches.length === 1) {
         const touch = event.touches[0];
-        const coords = getPlotCoordinatesForCutLineTouch(touch, chartDiv);
+        const coords = getPixelCoordinates(touch, chartDiv, { halfStep: true });
         if (coords) {
             cutLinesState.currentX = coords.x;
             updateGuideLineOverlay(coords.xPixel);
@@ -207,60 +210,6 @@ function handleCutLineTouchEnd(event, chartDiv) {
     deactivateCutLinesMode();
 }
 
-function getPlotCoordinatesForCutLine(event, chartDiv) {
-    const rect = chartDiv.getBoundingClientRect();
-    const xPixel = event.clientX - rect.left;
-    const yPixel = event.clientY - rect.top;
-    const layout = chartDiv.layout;
-
-    if (!layout || !layout.xaxis || !layout.yaxis) {
-        return null;
-    }
-
-    const plotLeft = layout.margin.l;
-    const plotRight = rect.width - layout.margin.r;
-    const plotTop = layout.margin.t;
-    const plotBottom = rect.height - layout.margin.b;
-
-    if (xPixel < plotLeft || xPixel > plotRight || yPixel < plotTop || yPixel > plotBottom) {
-        return null;
-    }
-
-    const xFraction = (xPixel - plotLeft) / (plotRight - plotLeft);
-    const xRange = layout.xaxis.range;
-    const xValue = xRange[0] + xFraction * (xRange[1] - xRange[0]);
-    const xRounded = Math.floor(xValue) + 0.5;
-
-    return { x: xRounded, xPixel: xPixel, yPixel: yPixel };
-}
-
-function getPlotCoordinatesForCutLineTouch(touch, chartDiv) {
-    const rect = chartDiv.getBoundingClientRect();
-    const xPixel = touch.clientX - rect.left;
-    const yPixel = touch.clientY - rect.top;
-    const layout = chartDiv.layout;
-
-    if (!layout || !layout.xaxis || !layout.yaxis) {
-        return null;
-    }
-
-    const plotLeft = layout.margin.l;
-    const plotRight = rect.width - layout.margin.r;
-    const plotTop = layout.margin.t;
-    const plotBottom = rect.height - layout.margin.b;
-
-    if (xPixel < plotLeft || xPixel > plotRight || yPixel < plotTop || yPixel > plotBottom) {
-        return null;
-    }
-
-    const xFraction = (xPixel - plotLeft) / (plotRight - plotLeft);
-    const xRange = layout.xaxis.range;
-    const xValue = xRange[0] + xFraction * (xRange[1] - xRange[0]);
-    const xRounded = Math.floor(xValue) + 0.5;
-
-    return { x: xRounded, xPixel: xPixel, yPixel: yPixel };
-}
-
 // ============================================
 // DOM Overlay Functions (fast, no Plotly calls)
 // ============================================
@@ -269,7 +218,7 @@ function getPlotCoordinatesForCutLineTouch(touch, chartDiv) {
  * Get or create the overlay container for cut line preview
  */
 function getOrCreateCutLineOverlay() {
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv) return null;
 
     let container = document.getElementById('cutline-overlay');
@@ -310,7 +259,7 @@ function getOrCreateCutLineOverlay() {
  * Update the DOM guide line overlay position (no Plotly calls)
  */
 function updateGuideLineOverlay(xPixel) {
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv?.layout) return;
 
     const overlays = getOrCreateCutLineOverlay();

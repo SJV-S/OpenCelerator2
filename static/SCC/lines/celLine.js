@@ -18,6 +18,10 @@ import { CORRECTS, ERRORS, TIMING, LINE_DEFAULTS, COLORS, CHART_TYPE_CONFIG } fr
 import { xPositionToDate, dateToXPosition } from '../util/dates.js';
 import { fit, FIT_METHODS, BOUNCE_ENVELOPES, DEFAULT_FIT_METHOD, DEFAULT_BOUNCE_ENVELOPE, calculateBounceBounds, calculateBounceLines, formatCelerationLabel } from '../util/fit_lines.js';
 import { eventBus, EVENTS } from '../eventBus.js';
+import { getFirstConfig, isSeriesVisible } from '../series/traceStyles.js';
+import { getPixelCoordinates } from '../util/plotCoordinates.js';
+import { getChartDiv } from '../util/dom.js';
+import { relayout } from '../util/plotlyWrapper.js';
 
 /**
  * Get the cel line color for a data series.
@@ -173,7 +177,7 @@ function buildCelLineElements(metadata, chartDiv) {
  */
 function activateCelLineMode() {
 
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv) {
         console.error('Chart div not found');
         return;
@@ -218,41 +222,6 @@ function activateCelLineMode() {
         layout: 'vertical-buttons'
     });
 
-}
-
-/**
- * Get the first aggregation config for a series (handles cases where 'raw' may not exist)
- */
-function getFirstConfig(seriesId) {
-    let configs;
-
-    if (seriesId && seriesId.startsWith('misc')) {
-        configs = chartState.traceStyles.misc?.[seriesId];
-    } else if (seriesId) {
-        configs = chartState.traceStyles?.[seriesId];
-    }
-
-    if (!configs) return null;
-    const firstAggType = Object.keys(configs)[0];
-    return firstAggType ? configs[firstAggType] : null;
-}
-
-/**
- * Check if a series has any visible aggregation type.
- * Returns false if ALL visibility entries for this series are explicitly false.
- * @param {string} seriesKey - Base series key (corrects, errors, timing, misc1, etc.)
- * @returns {boolean} True if at least one aggregation type is visible
- */
-function isSeriesVisible(seriesKey) {
-    const visibility = chartState.seriesVisibility;
-    const prefix = seriesKey + '_';
-    const entries = Object.entries(visibility).filter(([key]) => key.startsWith(prefix));
-
-    // If no visibility entries exist yet, treat as visible
-    if (entries.length === 0) return true;
-
-    // Visible if any aggregation type is not explicitly false
-    return entries.some(([, visible]) => visible !== false);
 }
 
 /**
@@ -326,11 +295,11 @@ function selectSeriesAndEnableDrag(seriesKey) {
  * Called after user selects a series - enables drag mode
  */
 function enableDragMode() {
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv) return;
 
     celLineState.previousDragMode = chartDiv.layout.dragmode;
-    Plotly.relayout(chartDiv, { dragmode: false });
+    relayout(chartDiv, { dragmode: false });
 
     applySvgCursor(chartDiv, icons.scatterLine, {size: 32, hotspotX: 16, hotspotY: 16});
 
@@ -361,7 +330,7 @@ function enableDragMode() {
     // Guide line follows cursor before dragging starts
     celLineState.guideHandler = function(event) {
         if (!celLineState.isDragging) {
-            const coords = getPlotCoordinatesForCelLine(event, chartDiv);
+            const coords = getPixelCoordinates(event, chartDiv, { snapPixel: true });
             if (coords) {
                 // Use fast DOM overlay instead of Plotly
                 updateGuideLineOverlay(coords.xPixel);
@@ -396,7 +365,7 @@ function enableDragMode() {
  */
 function deactivateCelLineMode() {
 
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv) return;
 
     celLineState.active = false;
@@ -404,7 +373,7 @@ function deactivateCelLineMode() {
     celLineState.selectedSeriesKey = null;
 
     if (celLineState.previousDragMode !== null) {
-        Plotly.relayout(chartDiv, { dragmode: celLineState.previousDragMode });
+        relayout(chartDiv, { dragmode: celLineState.previousDragMode });
         celLineState.previousDragMode = null;
     }
 
@@ -460,7 +429,7 @@ function handleCelLineMouseDown(event, chartDiv) {
         return;
     }
 
-    const coords = getPlotCoordinatesForCelLine(event, chartDiv);
+    const coords = getPixelCoordinates(event, chartDiv, { snapPixel: true });
     if (!coords) return;
 
     celLineState.isDragging = true;
@@ -476,7 +445,7 @@ function handleCelLineMouseDown(event, chartDiv) {
 function handleCelLineMouseMove(event, chartDiv) {
     if (!celLineState.isDragging) return;
 
-    const coords = getPlotCoordinatesForCelLine(event, chartDiv);
+    const coords = getPixelCoordinates(event, chartDiv, { snapPixel: true });
     if (!coords) return;
 
     if (coords.x > celLineState.x1) {
@@ -517,7 +486,7 @@ function handleCelLineTouchStart(event, chartDiv) {
 
     if (event.touches.length === 1) {
         const touch = event.touches[0];
-        const coords = getPlotCoordinatesForCelLineTouch(touch, chartDiv);
+        const coords = getPixelCoordinates(touch, chartDiv, { snapPixel: true });
         if (!coords) return;
 
         celLineState.isDragging = true;
@@ -537,7 +506,7 @@ function handleCelLineTouchMove(event, chartDiv) {
 
     if (event.touches.length === 1) {
         const touch = event.touches[0];
-        const coords = getPlotCoordinatesForCelLineTouch(touch, chartDiv);
+        const coords = getPixelCoordinates(touch, chartDiv, { snapPixel: true });
         if (!coords) return;
 
         if (coords.x > celLineState.x1) {
@@ -599,68 +568,6 @@ function finalizeCelLine() {
     handleCelLineConfirm(data, baseKey);
 }
 
-function getPlotCoordinatesForCelLine(event, chartDiv) {
-    const rect = chartDiv.getBoundingClientRect();
-    const xPixel = event.clientX - rect.left;
-    const yPixel = event.clientY - rect.top;
-    const layout = chartDiv.layout;
-
-    if (!layout || !layout.xaxis || !layout.yaxis) {
-        return null;
-    }
-
-    const plotLeft = layout.margin.l;
-    const plotRight = rect.width - layout.margin.r;
-    const plotTop = layout.margin.t;
-    const plotBottom = rect.height - layout.margin.b;
-
-    if (xPixel < plotLeft || xPixel > plotRight || yPixel < plotTop || yPixel > plotBottom) {
-        return null;
-    }
-
-    const xFraction = (xPixel - plotLeft) / (plotRight - plotLeft);
-    const xRange = layout.xaxis.range;
-    const xValue = xRange[0] + xFraction * (xRange[1] - xRange[0]);
-    const xRounded = Math.round(xValue);
-
-    // Snap pixel to integer x using Plotly's axis mapping (matches crosshair behavior)
-    const xaxis = chartDiv._fullLayout.xaxis;
-    const xSnappedPixel = xaxis._offset + xaxis.l2p(xRounded);
-
-    return { x: xRounded, xPixel: xSnappedPixel, yPixel: yPixel };
-}
-
-function getPlotCoordinatesForCelLineTouch(touch, chartDiv) {
-    const rect = chartDiv.getBoundingClientRect();
-    const xPixel = touch.clientX - rect.left;
-    const yPixel = touch.clientY - rect.top;
-    const layout = chartDiv.layout;
-
-    if (!layout || !layout.xaxis || !layout.yaxis) {
-        return null;
-    }
-
-    const plotLeft = layout.margin.l;
-    const plotRight = rect.width - layout.margin.r;
-    const plotTop = layout.margin.t;
-    const plotBottom = rect.height - layout.margin.b;
-
-    if (xPixel < plotLeft || xPixel > plotRight || yPixel < plotTop || yPixel > plotBottom) {
-        return null;
-    }
-
-    const xFraction = (xPixel - plotLeft) / (plotRight - plotLeft);
-    const xRange = layout.xaxis.range;
-    const xValue = xRange[0] + xFraction * (xRange[1] - xRange[0]);
-    const xRounded = Math.round(xValue);
-
-    // Snap pixel to integer x using Plotly's axis mapping (matches crosshair behavior)
-    const xaxis = chartDiv._fullLayout.xaxis;
-    const xSnappedPixel = xaxis._offset + xaxis.l2p(xRounded);
-
-    return { x: xRounded, xPixel: xSnappedPixel, yPixel: yPixel };
-}
-
 // ============================================
 // DOM Overlay Functions (fast, no Plotly calls)
 // ============================================
@@ -669,7 +576,7 @@ function getPlotCoordinatesForCelLineTouch(touch, chartDiv) {
  * Get or create the overlay container for cel line preview elements
  */
 function getOrCreateOverlayContainer() {
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv) return null;
 
     let container = document.getElementById('celline-overlay');
@@ -721,7 +628,7 @@ function getOrCreateOverlayContainer() {
  * Update the DOM shade overlay position (no Plotly calls)
  */
 function updateShadeOverlay(x1Pixel, x2Pixel) {
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv?.layout) return;
 
     const overlays = getOrCreateOverlayContainer();
@@ -747,7 +654,7 @@ function updateShadeOverlay(x1Pixel, x2Pixel) {
  * Update the DOM guide line overlay position (no Plotly calls)
  */
 function updateGuideLineOverlay(xPixel) {
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv?.layout) return;
 
     const overlays = getOrCreateOverlayContainer();
@@ -788,7 +695,7 @@ function cleanupSeriesSelectionMode() {
 }
 
 function getDataInRangeForSeries(x1, x2, baseKey) {
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
 
     if (!chartDiv || !chartDiv.data) {
         return null;
@@ -845,7 +752,7 @@ function getDataInRangeForSeries(x1, x2, baseKey) {
 }
 
 function handleCelLineConfirm(data, baseKey) {
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv) {
         return;
     }
@@ -958,7 +865,7 @@ function handleCelLineConfirm(data, baseKey) {
     const shapeIndex = currentShapes.length;
     const annotationIndex = currentAnnotations.length;
 
-    Plotly.relayout(chartDiv, {
+    relayout(chartDiv, {
         shapes: [...currentShapes, ...elements.shapes],
         annotations: [...currentAnnotations, elements.annotation]
     }).catch(err => {
@@ -990,7 +897,7 @@ function handleCelLineCancel() {
 }
 
 function redrawCelLines() {
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv) return;
 
     const currentShapes = chartDiv.layout.shapes || [];
@@ -1029,7 +936,7 @@ function redrawCelLines() {
         celAnnotations.push(elements.annotation);
     });
 
-    Plotly.relayout(chartDiv, {
+    relayout(chartDiv, {
         shapes: [...nonCelShapes, ...celShapes],
         annotations: [...nonCelAnnotations, ...celAnnotations]
     });
@@ -1041,7 +948,7 @@ function redrawCelLines() {
  * @param {boolean} visible - Whether cel lines should be globally visible
  */
 function setCelLineVisibility(visible) {
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv) return;
 
     const shapes = chartDiv.layout.shapes || [];
@@ -1080,7 +987,7 @@ function setCelLineVisibility(visible) {
     });
 
     if (updated) {
-        Plotly.relayout(chartDiv, { shapes: updatedShapes, annotations: updatedAnnotations });
+        relayout(chartDiv, { shapes: updatedShapes, annotations: updatedAnnotations });
     }
 }
 
@@ -1092,7 +999,7 @@ function setCelLineVisibility(visible) {
 function updateCelLineSeriesVisibility(seriesKey, seriesVisible) {
     if (!chartState.lineVisibility.change) return; // global is off, nothing to toggle
 
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv) return;
 
     // Find cel line IDs that belong to this series
@@ -1130,7 +1037,7 @@ function updateCelLineSeriesVisibility(seriesKey, seriesVisible) {
     });
 
     if (updated) {
-        Plotly.relayout(chartDiv, { shapes: updatedShapes, annotations: updatedAnnotations });
+        relayout(chartDiv, { shapes: updatedShapes, annotations: updatedAnnotations });
     }
 }
 

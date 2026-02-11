@@ -2,8 +2,8 @@
 // Handles chart screenshot, data export, and share link generation
 
 import { chartState } from '../chartState.js';
-import { createToast, createConfirmToast } from '../ui/toaster.js';
-import { icons } from '../ui/icons.js';
+import { createToast, createConfirmToast } from './toaster.js';
+import { icons } from './icons.js';
 import { createViewLink, createEditLink, isInitialized, isChartOwner, startSyncWatch, stopSyncWatch } from '../../Server/syncClient.js';
 import { importChart, deleteChart } from '../storage/chartStorage.js';
 import { getFirstConfig } from '../series/traceStyles.js';
@@ -12,6 +12,8 @@ import { eventBus, EVENTS } from '../eventBus.js';
 import { serializeDate } from '../util/dates.js';
 import { DEVELOPER_MODE } from '../config.js';
 import { compactChart } from '../storage/compactJson.js';
+import { downloadFile } from '../util/download.js';
+import { getChartDiv } from '../util/dom.js';
 
 /**
  * Takes a screenshot of the Plotly chart and downloads it as PNG
@@ -23,7 +25,7 @@ import { compactChart } from '../storage/compactJson.js';
  */
 function takeChartScreenshot() {
     // Get the Plotly chart element
-    const chartElement = document.getElementById('chart');
+    const chartElement = getChartDiv();
 
     if (!chartElement) {
         createToast({
@@ -167,23 +169,8 @@ function exportDataToCSV() {
             csvContent += row + '\n';
         }
 
-        // Create a blob from the CSV content
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-
-        // Create a download link and trigger download
-        const link = document.createElement('a');
-        const url = URL.createObjectURL(blob);
-
-        // Use chartName from metadata if available, otherwise default to 'chart-data'
         const fileName = chartState.chartName ? `${chartState.chartName}.csv` : 'chart-data.csv';
-
-        link.setAttribute('href', url);
-        link.setAttribute('download', fileName);
-        link.style.visibility = 'hidden';
-
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        downloadFile(csvContent, fileName, 'text/csv;charset=utf-8;');
 
         createToast({
             message: 'Data exported successfully',
@@ -291,25 +278,8 @@ function exportChartStateToJSON() {
         console.log('[IMPORT DEBUG] === exportChartStateToJSON END ===');
 
         // Create a blob from the JSON content
-        const blob = new Blob([jsonContent], { type: 'application/json;charset=utf-8;' });
-
-        // Create a download link and trigger download
-        const link = document.createElement('a');
-        const url = URL.createObjectURL(blob);
-
-        // Use chartName from metadata if available, otherwise default to 'chart-data'
         const fileName = chartState.chartName ? `${chartState.chartName}.json` : 'chart-data.json';
-
-        link.setAttribute('href', url);
-        link.setAttribute('download', fileName);
-        link.style.visibility = 'hidden';
-
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-
-        // Clean up the URL object
-        URL.revokeObjectURL(url);
+        downloadFile(jsonContent, fileName, 'application/json;charset=utf-8;');
 
         createToast({
             message: 'Chart exported successfully',

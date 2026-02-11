@@ -15,6 +15,7 @@ import { eventBus, EVENTS } from '../eventBus.js';
 import { snapToChartBoundary, formatDateInputValue, xPositionToDate, dateToXPosition } from '../util/dates.js';
 import { relayout } from '../util/plotlyWrapper.js';
 import { getFirstConfig } from './traceStyles.js';
+import { getChartDiv } from '../util/dom.js';
 
 // Shape name for the entry date indicator line
 const ENTRY_DATE_INDICATOR_NAME = 'entry-date-indicator';
@@ -176,7 +177,7 @@ function updateTimingVisibility() {
  */
 async function updateEntryDateIndicator(dateString) {
     return;  // Disabled
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv || !chartDiv.layout) return;
 
     const xPos = dateToXPosition(dateString);
@@ -225,7 +226,7 @@ async function removeEntryDateIndicator() {
         indicatorTimer = null;
     }
 
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv || !chartDiv.layout) return;
 
     await relayout(chartDiv, ENTRY_DATE_INDICATOR_NAME, true);

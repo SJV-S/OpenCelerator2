@@ -5,9 +5,9 @@
  */
 
 import { openDB } from '../lib/idb.js';
-import { generatePassphrase } from './passphrase.js';
+import { generatePassphrase } from '../SCC/storage/passphrase.js';
 import { initSync, setSigningDisplayName } from './syncClient.js';
-import { deriveSigningKeyPair } from './crypto.js';
+import { deriveSigningKeyPair, exportPublicKey } from './crypto.js';
 
 const DB_NAME = 'SCC_Identity';
 const STORE_NAME = 'credentials';
@@ -53,8 +53,12 @@ export async function initServerSync() {
     // Derive ECDSA signing key pair (need private key for signing)
     const keyPair = await deriveSigningKeyPair(passphrase);
 
-    // Read publicKey from IDB — base.html derives and persists it before modules run
+    // Ensure publicKey is derived and persisted
     publicKeyB64Cache = await db.get(STORE_NAME, 'publicKey');
+    if (!publicKeyB64Cache) {
+        publicKeyB64Cache = await exportPublicKey(keyPair.publicKey);
+        await db.put(STORE_NAME, publicKeyB64Cache, 'publicKey');
+    }
 
     await initSync(passphrase, keyPair.privateKey, publicKeyB64Cache, displayName);
     initialized = true;

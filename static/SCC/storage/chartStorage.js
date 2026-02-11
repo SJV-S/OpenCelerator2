@@ -97,6 +97,8 @@ function deserializeChart(data) {
  * Call this once at app startup
  */
 export async function initStorage() {
+    if (db) return true;
+
     try {
         db = await openDB(DB_NAME, DB_VERSION, {
             upgrade(db) {

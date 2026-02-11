@@ -20,6 +20,9 @@ import { removeLine } from './allLines.js';
 import { showCelLineEditor } from '../ui/celLineEditor.js';
 import { showPhaseLineEditor } from '../ui/phaseLineEditor.js';
 import { showAimLineEditor } from '../ui/aimLineEditor.js';
+import { interpolateLinePoints } from '../util/lineInterpolation.js';
+import { getChartDiv } from '../util/dom.js';
+import { relayout, addTraces, deleteTraces } from '../util/plotlyWrapper.js';
 
 // Module-level state
 let clickHandlerAttached = false;
@@ -42,7 +45,7 @@ const TRACE_DRAW_DELAY = 16; // ~1 frame at 60fps
 function setupClickHandler() {
     if (clickHandlerAttached) return;
 
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
 
     // Handle CHART_CLICKED for non-line clicks
     chartDiv.addEventListener('click', function(e) {
@@ -174,7 +177,7 @@ function handleLineClick(lineName) {
  */
 function makeLineClickable(lineData) {
     setupClickHandler();
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     const traces = lineData.points.map(segment => ({
         x: segment.x,
         y: segment.y,
@@ -184,7 +187,7 @@ function makeLineClickable(lineData) {
         showlegend: false,
         meta: { type: 'clickableLine', lineName: lineData.lineName }
     }));
-    return Plotly.addTraces(chartDiv, traces);
+    return addTraces(chartDiv, traces);
 }
 
 /**
@@ -192,7 +195,7 @@ function makeLineClickable(lineData) {
  * @param {string} lineName - Name of the line to remove
  */
 function removeLineClickable(lineName) {
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     const indices = [];
     const allClickable = [];
     chartDiv.data.forEach((trace, i) => {
@@ -205,42 +208,8 @@ function removeLineClickable(lineName) {
     console.log(`All clickable traces:`, allClickable);
     console.log(`Found ${indices.length} traces to remove`);
     if (indices.length > 0) {
-        Plotly.deleteTraces(chartDiv, indices.sort((a, b) => b - a));
+        deleteTraces(chartDiv, indices.sort((a, b) => b - a));
     }
-}
-
-/**
- * Interpolates points along a line segment for clickability
- */
-function interpolateLinePoints(x1, y1, x2, y2, isLogY = false) {
-    const xArray = [];
-    const yArray = [];
-    const xLength = Math.abs(x2 - x1);
-
-    let numPoints;
-    if (xLength === 0) {
-        if (isLogY && y1 > 0 && y2 > 0) {
-            const logSpan = Math.abs(Math.log10(y2) - Math.log10(y1));
-            numPoints = Math.max(50, Math.ceil(logSpan * 30));
-        } else {
-            numPoints = 100;
-        }
-    } else {
-        numPoints = Math.ceil(xLength) + 1;
-    }
-
-    for (let i = 0; i < numPoints; i++) {
-        const t = i / (numPoints - 1);
-        xArray.push(x1 + t * (x2 - x1));
-
-        if (isLogY && y1 > 0 && y2 > 0) {
-            yArray.push(y1 * Math.pow(y2 / y1, t));
-        } else {
-            yArray.push(y1 + t * (y2 - y1));
-        }
-    }
-
-    return { x: xArray, y: yArray };
 }
 
 /**
@@ -257,7 +226,7 @@ function delay(ms) {
  * @param {boolean} makeClickable - If true, make lines clickable; if false, remove
  */
 function setLineCategoryClickability(category, makeClickable) {
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv || !chartDiv._fullLayout) {
         console.warn('Chart not initialized');
         return;
@@ -376,7 +345,7 @@ function setLineCategoryClickability(category, makeClickable) {
                     const shapesWithoutCutMarkers = currentShapes.filter(shape =>
                         !shape.name || !shape.name.startsWith('cut-')
                     );
-                    return Plotly.relayout(chartDiv, {
+                    return relayout(chartDiv, {
                         shapes: [...shapesWithoutCutMarkers, ...cutLineShapes]
                     }).then(() => {
                         let cutPromise = Promise.resolve();
@@ -423,7 +392,7 @@ function setLineCategoryClickability(category, makeClickable) {
             }
         });
         if (indices.length > 0) {
-            Plotly.deleteTraces(chartDiv, indices.sort((a, b) => b - a));
+            deleteTraces(chartDiv, indices.sort((a, b) => b - a));
         }
 
         // For cut lines, also remove the marker shapes
@@ -431,7 +400,7 @@ function setLineCategoryClickability(category, makeClickable) {
             const shapes = chartDiv.layout.shapes || [];
             const filtered = shapes.filter(s => !s.name?.startsWith('cut-'));
             if (filtered.length !== shapes.length) {
-                Plotly.relayout(chartDiv, { shapes: filtered });
+                relayout(chartDiv, { shapes: filtered });
             }
         }
     }
@@ -442,7 +411,7 @@ function setLineCategoryClickability(category, makeClickable) {
  * @returns {Array} Array of shape objects for cut line markers
  */
 function drawCutLineMarkers() {
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv || !chartDiv._fullLayout) {
         return [];
     }

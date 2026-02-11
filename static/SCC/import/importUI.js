@@ -17,6 +17,7 @@ import {
     importToChartState
 } from './dataImport.js';
 import { createToast } from '../ui/toaster.js';
+import { downloadFile } from '../util/download.js';
 import { timestampsToXPositions } from '../util/dates.js';
 
 // ============================================================================
@@ -160,14 +161,7 @@ function downloadTemplate() {
         ];
 
     const csv = [headers, ...rows].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'scc-import-template.csv';
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadFile(csv, 'scc-import-template.csv', 'text/csv');
 }
 
 function buildAiPrompt() {

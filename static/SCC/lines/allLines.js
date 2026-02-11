@@ -12,6 +12,8 @@
 import { chartState } from '../chartState.js';
 import { COLORS, LINE_DEFAULTS } from '../config.js';
 import { eventBus, EVENTS } from '../eventBus.js';
+import { relayout } from '../util/plotlyWrapper.js';
+import { getChartDiv } from '../util/dom.js';
 
 /**
  * Creates a phase line metadata object
@@ -87,7 +89,7 @@ function aimLineMetadata(direction, date1, y1, date2, y2, text, shapeIndices, an
  * @returns {boolean} True if successful, false otherwise
  */
 function removeLine(lineType, lineId) {
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv || !chartState[lineType] || !chartState[lineType][lineId]) return false;
 
     // Map line type to category name for line naming
@@ -119,7 +121,7 @@ function removeLine(lineType, lineId) {
     const shapes = (chartDiv.layout.shapes || []).filter(s => !s.name?.startsWith(lineIdStr));
     const annotations = (chartDiv.layout.annotations || []).filter(a => !a.name?.startsWith(lineIdStr));
 
-    Plotly.relayout(chartDiv, { shapes, annotations });
+    relayout(chartDiv, { shapes, annotations });
     delete chartState[lineType][lineId];
     eventBus.emit(EVENTS.LINE_REMOVED, { lineType, lineId });
     return true;

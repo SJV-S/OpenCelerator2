@@ -11,50 +11,19 @@ import { eventBus, EVENTS } from '../eventBus.js';
 import { dateToXPosition } from '../util/dates.js';
 import { CHART_TYPE_CONFIG } from '../config.js';
 import { formatCelerationLabel } from '../util/fit_lines.js';
+import { interpolateLinePoints } from '../util/lineInterpolation.js';
+import { deleteTraces, addTraces } from '../util/plotlyWrapper.js';
+import { isSeriesVisible } from '../series/traceStyles.js';
+import { getChartDiv } from '../util/dom.js';
 
 // Meta type for hover traces (distinct from clickableLine)
 const HOVER_TRACE_TYPE = 'hoverLine';
 
 /**
- * Interpolates points along a line segment
- * (Same logic as lineClickHandler)
- */
-function interpolateLinePoints(x1, y1, x2, y2, isLogY = false) {
-    const xArray = [];
-    const yArray = [];
-    const xLength = Math.abs(x2 - x1);
-
-    let numPoints;
-    if (xLength === 0) {
-        if (isLogY && y1 > 0 && y2 > 0) {
-            const logSpan = Math.abs(Math.log10(y2) - Math.log10(y1));
-            numPoints = Math.max(50, Math.ceil(logSpan * 30));
-        } else {
-            numPoints = 100;
-        }
-    } else {
-        numPoints = Math.ceil(xLength) + 1;
-    }
-
-    for (let i = 0; i < numPoints; i++) {
-        const t = i / (numPoints - 1);
-        xArray.push(x1 + t * (x2 - x1));
-
-        if (isLogY && y1 > 0 && y2 > 0) {
-            yArray.push(y1 * Math.pow(y2 / y1, t));
-        } else {
-            yArray.push(y1 + t * (y2 - y1));
-        }
-    }
-
-    return { x: xArray, y: yArray };
-}
-
-/**
  * Removes all hover traces from the chart
  */
 function removeAllHoverTraces() {
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv?.data) return;
 
     const indices = [];
@@ -65,7 +34,7 @@ function removeAllHoverTraces() {
     });
 
     if (indices.length > 0) {
-        Plotly.deleteTraces(chartDiv, indices.sort((a, b) => b - a));
+        deleteTraces(chartDiv, indices.sort((a, b) => b - a));
     }
 }
 
@@ -123,18 +92,6 @@ function buildCelHoverLabel(celLine) {
 }
 
 /**
- * Check if a data series has any visible aggregation type.
- * Mirrors isSeriesVisible() in celLine.js.
- */
-function isSeriesVisible(seriesKey) {
-    const visibility = chartState.seriesVisibility;
-    const prefix = seriesKey + '_';
-    const entries = Object.entries(visibility).filter(([key]) => key.startsWith(prefix));
-    if (entries.length === 0) return true;
-    return entries.some(([, visible]) => visible !== false);
-}
-
-/**
  * Builds the hover label for an aim line (user text + celeration for diagonal).
  */
 function buildAimHoverLabel(aimLine) {
@@ -166,7 +123,7 @@ function buildAimHoverLabel(aimLine) {
  * or underlying data series hidden).
  */
 function buildAllHoverTraces() {
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv?._fullLayout) return [];
 
     const yaxis = chartDiv._fullLayout.yaxis;
@@ -234,14 +191,14 @@ function buildAllHoverTraces() {
  * Refreshes all hover traces - removes old ones and adds new ones
  */
 function refreshHoverTraces() {
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv?._fullLayout) return;
 
     removeAllHoverTraces();
 
     const traces = buildAllHoverTraces();
     if (traces.length > 0) {
-        Plotly.addTraces(chartDiv, traces);
+        addTraces(chartDiv, traces);
     }
 }
 

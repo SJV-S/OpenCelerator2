@@ -1,5 +1,7 @@
 import { chartState } from '../chartState.js';
 import { eventBus, EVENTS } from '../eventBus.js';
+import { restyle } from '../util/plotlyWrapper.js';
+import { getChartDiv } from '../util/dom.js';
 
 // Track grid visibility state
 let gridVisible = true;
@@ -42,7 +44,7 @@ function getTraceIndicesByNames(chartDiv, names) {
  * @param {boolean} show - If true, show grid; if false, hide grid
  */
 export function toggleGrid(show) {
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv || !chartDiv.data) {
         console.log('Chart not found');
         return;
@@ -55,7 +57,7 @@ export function toggleGrid(show) {
         return;
     }
 
-    Plotly.restyle(chartDiv, { visible: show }, gridIndices);
+    restyle(chartDiv, { visible: show }, gridIndices);
     gridVisible = show;
     console.log(show ? 'Grid shown' : 'Grid hidden');
 }
@@ -64,13 +66,13 @@ export function toggleGrid(show) {
  * Toggle thick vertical lines (date lines)
  */
 export function toggleDateLines(show) {
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv || !chartDiv.data) return;
 
     const indices = getTraceIndicesByNames(chartDiv, ['grid-major-vertical']);
     if (indices.length === 0) return;
 
-    Plotly.restyle(chartDiv, { visible: show }, indices);
+    restyle(chartDiv, { visible: show }, indices);
     dateLinesVisible = show;
 }
 
@@ -78,13 +80,13 @@ export function toggleDateLines(show) {
  * Toggle thick horizontal lines (count lines)
  */
 export function toggleCountLines(show) {
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv || !chartDiv.data) return;
 
     const indices = getTraceIndicesByNames(chartDiv, ['grid-major-horizontal', 'grid-sub-horizontal']);
     if (indices.length === 0) return;
 
-    Plotly.restyle(chartDiv, { visible: show }, indices);
+    restyle(chartDiv, { visible: show }, indices);
     countLinesVisible = show;
 }
 
@@ -92,13 +94,13 @@ export function toggleCountLines(show) {
  * Toggle thin lines (minor grid)
  */
 export function toggleMinorGrid(show) {
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv || !chartDiv.data) return;
 
     const indices = getTraceIndicesByNames(chartDiv, ['grid-minor-vertical', 'grid-minor-horizontal']);
     if (indices.length === 0) return;
 
-    Plotly.restyle(chartDiv, { visible: show }, indices);
+    restyle(chartDiv, { visible: show }, indices);
     minorGridVisible = show;
 }
 
@@ -106,7 +108,7 @@ export function toggleMinorGrid(show) {
  * Initialize the grid toggle
  */
 export function initGridToggle() {
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (chartDiv && chartDiv.data) {
         const gridIndices = getGridTraceIndices(chartDiv);
         const g = chartState.lineVisibility.grid;

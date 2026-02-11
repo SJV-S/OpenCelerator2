@@ -16,6 +16,8 @@ import { chartState } from './chartState.js';
 import { initializeChart } from './main.js';
 import { createToast, createInfoToast, createConfirmToast } from './ui/toaster.js';
 import { eventBus, EVENTS } from './eventBus.js';
+import { downloadFile } from './util/download.js';
+import { getChartDiv } from './util/dom.js';
 
 window.chartState = chartState;
 
@@ -85,16 +87,8 @@ window.downloadDebugLog = function() {
     }
 
     const content = debugLog.join('\n\n');
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `debug-log-${new Date().toISOString().replace(/[:.]/g, '-')}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    const filename = `debug-log-${new Date().toISOString().replace(/[:.]/g, '-')}.txt`;
+    downloadFile(content, filename, 'text/plain');
 
     console.log(`Downloaded ${debugLog.length} log entries`);
 };
@@ -175,7 +169,7 @@ window.testToaster = function() {
  * Useful for testing cel line creation without reloading the page
  */
 window.clearCelLines = function() {
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv) {
         console.log('No chart found');
         return;
@@ -220,7 +214,7 @@ window.resizeContainer = function(height) {
 };
 
 window.debugLegend = function() {
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     const container = document.getElementById('custom-legend');
 
     console.log('=== LEGEND DEBUG ===');

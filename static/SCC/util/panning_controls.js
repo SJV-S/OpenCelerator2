@@ -1,6 +1,7 @@
 import { eventBus, EVENTS } from '../eventBus.js';
 import { chartState } from '../chartState.js';
 import { COLORS, CHART_TYPE_CONFIG } from '../config.js';
+import { relayout } from './plotlyWrapper.js';
 
 // Dynamic spine configuration
 const LEFT_SPINE_NAME = 'dynamic-left-spine';
@@ -30,7 +31,7 @@ function setupPanConstraints(plotDiv, chartType) {
 
     // Subscribe to panning enabled/disabled changes
     eventBus.subscribe(EVENTS.CHART_PANNING_ENABLED_CHANGED, (enabled) => {
-        Plotly.relayout(plotDiv, { 'xaxis.fixedrange': !enabled });
+        relayout(plotDiv, { 'xaxis.fixedrange': !enabled });
     }, true);
 
     // Dynamic spines helper
@@ -53,14 +54,14 @@ function setupPanConstraints(plotDiv, chartType) {
             yref: 'y', line: { color: SPINE_COLOR, width: SPINE_WIDTH },
             layer: 'below', name: RIGHT_SPINE_NAME
         };
-        Plotly.relayout(plotDiv, { shapes: [...otherShapes, leftSpine, rightSpine] });
+        relayout(plotDiv, { shapes: [...otherShapes, leftSpine, rightSpine] });
     }
 
     function removeDynamicSpines() {
         const shapes = plotDiv.layout.shapes || [];
         const filtered = shapes.filter(s => s.name !== LEFT_SPINE_NAME && s.name !== RIGHT_SPINE_NAME);
         if (filtered.length !== shapes.length) {
-            Plotly.relayout(plotDiv, { shapes: filtered });
+            relayout(plotDiv, { shapes: filtered });
         }
     }
 
@@ -95,7 +96,7 @@ function setupPanConstraints(plotDiv, chartType) {
         // Handle autoscale button click
         if (eventData['xaxis.autorange'] === true) {
             isProgrammaticUpdate = true;
-            Plotly.relayout(plotDiv, {
+            relayout(plotDiv, {
                 'xaxis.autorange': false,
                 'xaxis.range': [CHART_X_MIN, CHART_X_MIN + chartState.chartWindow + CHART_MARGIN]
             });
@@ -139,7 +140,7 @@ function setupPanConstraints(plotDiv, chartType) {
             // Apply snapping and constraints
             if (newXMin !== xMin || newXMax !== xMax) {
                 isProgrammaticUpdate = true;
-                Plotly.relayout(plotDiv, {
+                relayout(plotDiv, {
                     'xaxis.range': [newXMin, newXMax]
                 });
             }

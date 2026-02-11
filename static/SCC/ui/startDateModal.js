@@ -9,6 +9,7 @@ import { chartState } from '../chartState.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 import { createToast, createConfirmToast } from './toaster.js';
 import { CHART_TYPE_CONFIG, CHART_MATH, LAYOUT } from '../config.js';
+import { getChartDiv } from '../util/dom.js';
 import {
     getMondaysInMonth,
     formatYearDisplay,
@@ -16,6 +17,7 @@ import {
     internalToUserDate,
     userToInternalDate
 } from '../util/dates.js';
+import { setupModalClose } from './modalHelpers.js';
 
 // Current values stored here for easy access
 let currentValues = {
@@ -357,19 +359,7 @@ function createModal() {
     modalContent.appendChild(buttonContainer);
     modalOverlay.appendChild(modalContent);
 
-    // Close on overlay click (but not modal content)
-    modalOverlay.addEventListener('click', (e) => {
-        if (e.target === modalOverlay) {
-            hideModal();
-        }
-    });
-
-    // Close on Escape
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && modalOverlay.style.display !== 'none') {
-            hideModal();
-        }
-    });
+    setupModalClose(modalOverlay, hideModal);
 
     document.body.appendChild(modalOverlay);
 }
@@ -572,7 +562,7 @@ function updateChartHeightDisplay(value) {
  * Mirrors the core math in resizeChartByHeight without rendering.
  */
 function predictChartDimensions(containerHeight) {
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv?.layout) return null;
 
     const config = CHART_TYPE_CONFIG[chartState.chartType];
@@ -600,7 +590,7 @@ function predictChartDimensions(containerHeight) {
 }
 
 function showPreviewRect(containerHeight) {
-    const chart = document.getElementById('chart');
+    const chart = getChartDiv();
     if (!chart) return;
 
     const dims = predictChartDimensions(containerHeight);

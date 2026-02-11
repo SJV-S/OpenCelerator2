@@ -19,6 +19,8 @@ import { chartState } from '../chartState.js';
 import { CORRECTS, ERRORS } from '../config.js';
 import { xPositionToDate } from '../util/dates.js';
 import { formatValue } from '../util/format.js';
+import { getFirstConfig } from '../series/traceStyles.js';
+import { getChartDiv } from '../util/dom.js';
 
 // =============================================================================
 // State
@@ -140,7 +142,7 @@ function rebuildCache(force = false) {
  * Called lazily on first activation when chart div exists
  */
 function buildDOMElements() {
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv) return false;
 
     state.elements = {
@@ -797,23 +799,6 @@ function updateInfoPanel(xRounded, yLogValue, traceData) {
             rowRefs.row.style.display = '';
         }
     }
-}
-
-/**
- * Get the first aggregation config for a series (handles cases where 'raw' may not exist)
- */
-function getFirstConfig(seriesId) {
-    let configs;
-
-    if (seriesId && seriesId.startsWith('misc')) {
-        configs = chartState.traceStyles.misc?.[seriesId];
-    } else if (seriesId) {
-        configs = chartState.traceStyles?.[seriesId];
-    }
-
-    if (!configs) return null;
-    const firstAggType = Object.keys(configs)[0];
-    return firstAggType ? configs[firstAggType] : null;
 }
 
 /**

@@ -45,15 +45,15 @@
  *
  * 3. DRAGGABLE FAN (Performance-Optimized)
  * ----------------------------------------
- * Problem: Calling Plotly.relayout() on every mouse move causes severe CPU load,
+ * Problem: Calling relayout() on every mouse move causes severe CPU load,
  * even with throttling. The chart becomes unusable.
  *
  * Solution: Use CSS transforms on Plotly's actual SVG elements during drag, then
- * call Plotly.relayout() ONCE on mouseup to sync the data model.
+ * call relayout() ONCE on mouseup to sync the data model.
  *
  *   - On mousedown: Cache references to the fan's SVG elements
  *   - On mousemove: Apply CSS transform: translate(dx, dy) to cached elements
- *   - On mouseup: Clear transforms, call Plotly.relayout() once with new positions
+ *   - On mouseup: Clear transforms, call relayout() once with new positions
  *
  * This approach moves the actual rendered elements (not a preview/ghost), giving
  * smooth visual feedback with zero Plotly overhead during drag.
@@ -78,19 +78,14 @@
  */
 
 import { chartState } from '../chartState.js';
-import { MOBILE_BREAKPOINT, COLORS, CHART_MATH, CHART_TYPE_CONFIG } from '../config.js';
+import { isMobile, COLORS, CHART_MATH, CHART_TYPE_CONFIG } from '../config.js';
 import { eventBus, EVENTS } from '../eventBus.js';
+import { getChartDiv } from '../util/dom.js';
+import { relayout } from '../util/plotlyWrapper.js';
 
 const CEL_VALUES = [16, 4, 2, 1.4, 1, 1/1.4, 1/2, 1/4, 1/16];
 const LABELS = ['×16', '×4', '×2', '×1.4', '×1', '÷1.4', '÷2', '÷4', '÷16'];
 const PERIOD_LABELS = { Daily: 'per week', Weekly: 'per month', Monthly: 'per 6 months', Yearly: 'per 5 years' };
-
-/**
- * Check if current viewport is mobile-sized
- */
-function isMobile() {
-    return window.innerWidth < MOBILE_BREAKPOINT;
-}
 
 /**
  * Step 1: Calculate angle (same formula for line AND text)
@@ -271,10 +266,10 @@ export function injectCelerationFan(plotData, isMinuteChart, chartType) {
 }
 
 export function removeCelerationFan() {
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv?.layout) return;
 
-    Plotly.relayout(chartDiv, {
+    relayout(chartDiv, {
         shapes: (chartDiv.layout.shapes || []).filter(s => !s.name?.startsWith('fan-')),
         annotations: (chartDiv.layout.annotations || []).filter(a => !a.name?.startsWith('fan-'))
     });
@@ -285,12 +280,12 @@ export function addCelerationFan() {
     // Skip fan on mobile - screen too small
     if (isMobile()) return;
 
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv?.layout) return;
 
     const { shapes, annotations } = generateFanElements(chartDiv.layout, chartState.minuteChart, chartState.chartType);
 
-    Plotly.relayout(chartDiv, {
+    relayout(chartDiv, {
         shapes: [...(chartDiv.layout.shapes || []), ...shapes],
         annotations: [...(chartDiv.layout.annotations || []), ...annotations]
     });
@@ -299,7 +294,7 @@ export function addCelerationFan() {
 
 export function toggleCelerationFan(visible) {
     console.log('[toggleCelerationFan] called with visible:', visible);
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv) {
         console.log('[toggleCelerationFan] No chartDiv found');
         return;
@@ -329,7 +324,7 @@ export function regenerateFan() {
 
     if (!chartState.fanVisible) return;
 
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv?.layout) return;
 
     // Remove existing fan shapes and annotations
@@ -340,7 +335,7 @@ export function regenerateFan() {
     const { shapes, annotations } = generateFanElements(chartDiv.layout, chartState.minuteChart, chartState.chartType);
 
     // Update in single relayout call
-    Plotly.relayout(chartDiv, {
+    relayout(chartDiv, {
         shapes: [...existingShapes, ...shapes],
         annotations: [...existingAnnotations, ...annotations]
     });
@@ -361,7 +356,7 @@ function handleFanReposition() {
 
     if (!chartState.fanVisible) return;
 
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv?.layout) return;
 
     // Remove existing fan shapes and annotations
@@ -376,7 +371,7 @@ function handleFanReposition() {
     );
 
     // Update in single relayout call
-    Plotly.relayout(chartDiv, {
+    relayout(chartDiv, {
         shapes: [...existingShapes, ...shapes],
         annotations: [...existingAnnotations, ...annotations]
     });
@@ -443,7 +438,7 @@ function updateFanHighlight(chartDiv, isHovered) {
     });
 
     if (Object.keys(updates).length > 0) {
-        Plotly.relayout(chartDiv, updates);
+        relayout(chartDiv, updates);
     }
 }
 
@@ -552,11 +547,11 @@ function updateFanPosition(chartDiv, dx, dy) {
         }
     });
 
-    Plotly.relayout(chartDiv, updates);
+    relayout(chartDiv, updates);
 }
 
 function handleMouseDown(e) {
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv?.layout || !chartState.fanVisible) return;
 
     const paper = pixelToPaper(chartDiv, e.clientX, e.clientY);
@@ -594,7 +589,7 @@ function handleMouseMove(e) {
     }
 
     // Hover detection when not dragging
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv?.layout || !chartState.fanVisible) return;
 
     const paper = pixelToPaper(chartDiv, e.clientX, e.clientY);
@@ -620,7 +615,7 @@ function handleMouseUp(e) {
     if (dragState.isDragging) {
         dragState.isDragging = false;
 
-        const chartDiv = document.getElementById('chart');
+        const chartDiv = getChartDiv();
 
         // Clear CSS transforms
         if (dragState.fanElements) {
@@ -654,7 +649,7 @@ function handleMouseUp(e) {
  * Initialize fan drag functionality - call after chart is created
  */
 export function initFanDrag() {
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv) return;
 
     // Remove existing listeners (in case of re-init)

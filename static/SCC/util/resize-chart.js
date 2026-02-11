@@ -4,16 +4,10 @@
  * Also handles margin expansion for celeration fan
  */
 
-import { MOBILE_BREAKPOINT, CHART_MATH, LAYOUT, CHART_TYPE_CONFIG, RESIZE } from '../config.js';
+import { isMobile, CHART_MATH, LAYOUT, CHART_TYPE_CONFIG, RESIZE } from '../config.js';
 import { chartState } from '../chartState.js';
 import { eventBus, EVENTS } from '../eventBus.js';
-
-/**
- * Check if current viewport is mobile-sized
- */
-function isMobile() {
-    return window.innerWidth < MOBILE_BREAKPOINT;
-}
+import { relayout } from './plotlyWrapper.js';
 
 /**
  * Resize chart based on container dimensions
@@ -409,7 +403,7 @@ function rescaleChartElements(chartDiv) {
     });
 
     if (Object.keys(updates).length) {
-        return Plotly.relayout(chartDiv, updates);
+        return relayout(chartDiv, updates);
     }
 }
 

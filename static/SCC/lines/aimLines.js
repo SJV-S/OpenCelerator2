@@ -19,6 +19,9 @@ import { xPositionToDate, dateToXPosition } from '../util/dates.js';
 import { aimLineMetadata } from './allLines.js';
 import { icons, applySvgCursor, restoreCursor } from '../ui/icons.js';
 import { eventBus, EVENTS } from '../eventBus.js';
+import { getDataCoordinates } from '../util/plotCoordinates.js';
+import { getChartDiv } from '../util/dom.js';
+import { relayout } from '../util/plotlyWrapper.js';
 
 var aimLineState = {
     active: false,
@@ -161,7 +164,7 @@ function buildAimLineElements(metadata, chartDiv) {
 function activateAimLineMode(direction) {
     console.log(`%c[AIM LINE] Activating aim line mode: ${direction}`, 'color: blue; font-weight: bold');
 
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
 
     if (!chartDiv) {
         console.error('[AIM LINE] Chart div not found!');
@@ -187,7 +190,7 @@ function activateAimLineMode(direction) {
 
     // Store current dragmode and disable panning
     aimLineState.previousDragMode = chartDiv.layout.dragmode;
-    Plotly.relayout(chartDiv, {
+    relayout(chartDiv, {
         dragmode: false
     });
 
@@ -234,7 +237,7 @@ function activateAimLineMode(direction) {
 function deactivateAimLineMode() {
     console.log('Deactivating aim line mode');
 
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
 
     // Remove click listener
     if (aimLineState.clickHandler) {
@@ -276,7 +279,7 @@ function deactivateAimLineMode() {
 
     // Restore previous dragmode (re-enable panning)
     if (aimLineState.previousDragMode !== null) {
-        Plotly.relayout(chartDiv, {
+        relayout(chartDiv, {
             dragmode: aimLineState.previousDragMode
         });
         aimLineState.previousDragMode = null;
@@ -309,7 +312,7 @@ function deactivateAimLineMode() {
  */
 function handleAimLineDrawClick(event, chartDiv) {
     // Get click coordinates relative to the plot area
-    const coords = getPlotCoordinatesForAimLine(event, chartDiv);
+    const coords = getDataCoordinates(event, chartDiv);
 
     if (!coords) {
         console.warn('Could not get plot coordinates');
@@ -346,72 +349,6 @@ function roundYValue(yValue) {
     }
 
     return closest;
-}
-
-/**
- * Converts pixel coordinates to plot data coordinates
- * @param {MouseEvent} event - Mouse event
- * @param {HTMLElement} chartDiv - Chart container element
- * @returns {Object|null} Object with x and y data coordinates, or null
- */
-function getPlotCoordinatesForAimLine(event, chartDiv) {
-    if (!chartDiv._fullLayout) {
-        console.warn('Chart not fully initialized');
-        return null;
-    }
-
-    const xaxis = chartDiv._fullLayout.xaxis;
-    const yaxis = chartDiv._fullLayout.yaxis;
-
-    if (!xaxis || !yaxis) {
-        console.warn('Axes not found');
-        return null;
-    }
-
-    // Get the chart bounding box
-    const bbox = chartDiv.getBoundingClientRect();
-
-    // Get plot area dimensions using Plotly's internal properties
-    const plotAreaLeft = xaxis._offset;
-    const plotAreaWidth = xaxis._length;
-    const plotAreaTop = yaxis._offset;
-    const plotAreaHeight = yaxis._length;
-
-    // Calculate pixel position within plot area
-    const xPixelInPlotArea = event.clientX - bbox.left - plotAreaLeft;
-    const yPixelInPlotArea = event.clientY - bbox.top - plotAreaTop;
-
-    // Get current visible range
-    const visibleXMin = xaxis.range[0];
-    const visibleXMax = xaxis.range[1];
-    const visibleYMin = yaxis.range[0];
-    const visibleYMax = yaxis.range[1];
-
-    // Check if y-axis is logarithmic
-    const isLogY = yaxis.type === 'log';
-
-    // Calculate data coordinates (note: y is inverted for screen coordinates)
-    let xValue = visibleXMin + (xPixelInPlotArea / plotAreaWidth) * (visibleXMax - visibleXMin);
-
-    // Round to nearest integer (day boundary) so temp line matches finalized position
-    xValue = Math.round(xValue);
-
-    // Reject clicks outside the valid chart range
-    if (xValue < 0 || xValue > chartState.chartCapacity) return null;
-
-    // For log scale, the range is in log10 space, so we need to convert back
-    let yValue;
-    if (isLogY) {
-        // Y-axis range is in log10 space (e.g., -3 to 3 for 0.001 to 1000)
-        const logYValue = visibleYMax - (yPixelInPlotArea / plotAreaHeight) * (visibleYMax - visibleYMin);
-        yValue = Math.pow(10, logYValue);
-    } else {
-        yValue = visibleYMax - (yPixelInPlotArea / plotAreaHeight) * (visibleYMax - visibleYMin);
-    }
-
-    // NO rounding for y-value - aim lines should allow precise placement
-
-    return { x: xValue, y: yValue };
 }
 
 /**
@@ -516,7 +453,7 @@ function drawHorizontalAimLine(chartDiv, coords) {
     const shapeIndex = currentShapes.length;
     aimLineState.tempShapes.push(shapeIndex);
 
-    Plotly.relayout(chartDiv, {
+    relayout(chartDiv, {
         shapes: [...currentShapes, lineShape]
     });
 
@@ -570,7 +507,7 @@ function drawDiagonalAimLine(chartDiv, coords) {
     const shapeIndex = currentShapes.length;
     aimLineState.tempShapes.push(shapeIndex);
 
-    Plotly.relayout(chartDiv, {
+    relayout(chartDiv, {
         shapes: [...currentShapes, lineShape]
     });
 
@@ -718,7 +655,7 @@ function addAimTextLabel(chartDiv, text) {
     const currentAnnotations = chartDiv.layout.annotations || [];
 
     // Add the annotation
-    Plotly.relayout(chartDiv, {
+    relayout(chartDiv, {
         annotations: [...currentAnnotations, annotation]
     });
 
@@ -813,7 +750,7 @@ function finalizeAimLine(chartDiv) {
         metadata.annotationIndex = null;
     }
 
-    Plotly.relayout(chartDiv, { shapes, annotations });
+    relayout(chartDiv, { shapes, annotations });
 
     chartState.AimLines[lineId] = metadata;
     eventBus.emit(EVENTS.LINE_AIM_SAVED, { lineId, metadata });
@@ -840,7 +777,7 @@ function removeAimAnnotation(chartDiv) {
     annotations.splice(aimLineState.tempAnnotationIndex, 1);
 
     // Update layout
-    Plotly.relayout(chartDiv, {
+    relayout(chartDiv, {
         annotations: annotations
     });
 }
@@ -867,7 +804,7 @@ function removeAimShapes(chartDiv) {
     }
 
     // Update layout
-    Plotly.relayout(chartDiv, {
+    relayout(chartDiv, {
         shapes: currentShapes
     });
 }
@@ -996,7 +933,7 @@ function removeTempDot(chartDiv) {
  * @param {boolean} visible - Whether aim lines should be visible
  */
 function setAimLineVisibility(visible) {
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv) return;
 
     const shapes = chartDiv.layout.shapes || [];
@@ -1022,7 +959,7 @@ function setAimLineVisibility(visible) {
     });
 
     if (updated) {
-        Plotly.relayout(chartDiv, { shapes: updatedShapes, annotations: updatedAnnotations });
+        relayout(chartDiv, { shapes: updatedShapes, annotations: updatedAnnotations });
     }
 }
 
@@ -1031,7 +968,7 @@ function setAimLineVisibility(visible) {
  * Called after chart replot to restore saved lines
  */
 function redrawAimLines() {
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv) return;
 
     // Filter out existing aim shapes/annotations
@@ -1058,7 +995,7 @@ function redrawAimLines() {
         }
     });
 
-    Plotly.relayout(chartDiv, { shapes, annotations });
+    relayout(chartDiv, { shapes, annotations });
 }
 
 /**

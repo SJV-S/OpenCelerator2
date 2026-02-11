@@ -10,10 +10,12 @@
 
 import { chartState } from '../chartState.js';
 import { CORRECTS, ERRORS, TIMING } from '../config.js';
-import { icons } from '../ui/icons.js';
-import { createToast } from '../ui/toaster.js';
+import { icons } from './icons.js';
+import { createToast } from './toaster.js';
 import { eventBus, EVENTS } from '../eventBus.js';
-import { toggleGrid } from './grid.js';
+import { toggleGrid } from '../series/grid.js';
+import { restyle } from '../util/plotlyWrapper.js';
+import { getChartDiv } from '../util/dom.js';
 
 // Series visibility is stored in chartState.seriesVisibility (persisted via IndexedDB)
 
@@ -252,7 +254,7 @@ function toggleLineVisibility(lineType) {
  * @returns {number} Scale factor (1.0 = baseline at ~900px height)
  */
 function getScaleFactor() {
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv?._fullLayout) return 1;
 
     const height = chartDiv._fullLayout.height;
@@ -268,7 +270,7 @@ function getScaleFactor() {
  */
 function renderCustomLegend() {
     const container = document.getElementById('custom-legend');
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!container || !chartDiv) return;
 
     const items = getLegendItems();
@@ -387,7 +389,7 @@ function toggleSeriesVisibility(seriesKey) {
  * @param {boolean} visible - Whether the series should be visible
  */
 function updatePlotlyTraceVisibility(seriesKey, visible) {
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv) return;
 
     // Parse the unique key (e.g., "corrects_mean" -> baseKey="corrects", aggType="mean")
@@ -410,7 +412,7 @@ function updatePlotlyTraceVisibility(seriesKey, visible) {
 
     // Command Plotly to update visibility
     if (traceIndices.length > 0) {
-        Plotly.restyle(chartDiv, { visible: visible }, traceIndices);
+        restyle(chartDiv, { visible: visible }, traceIndices);
     }
 }
 

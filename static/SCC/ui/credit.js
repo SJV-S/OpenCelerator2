@@ -2,15 +2,13 @@
 // Renders credit lines in the chart's bottom margin and handles editing
 
 import { chartState } from '../chartState.js';
-import { MOBILE_BREAKPOINT, COLORS, FONTS, RESIZE, CHART_TYPE_CONFIG } from '../config.js';
+import { isMobile, COLORS, FONTS, RESIZE, CHART_TYPE_CONFIG } from '../config.js';
 import { eventBus, EVENTS } from '../eventBus.js';
+import { relayout } from '../util/plotlyWrapper.js';
+import { getChartDiv } from '../util/dom.js';
 
 const CREDIT_COLOR = COLORS.FAN; // Using same color as fan
 const MAX_CREDIT_LENGTH = 160;
-
-function isMobile() {
-    return window.innerWidth < MOBILE_BREAKPOINT;
-}
 
 /**
  * Generate credit annotations for Plotly
@@ -78,7 +76,7 @@ export function injectCredits(plotData) {
  * Update credit annotations via Plotly.relayout
  */
 export function renderCredits() {
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv?.layout) return;
 
     const updates = {};
@@ -91,7 +89,7 @@ export function renderCredits() {
     });
 
     if (Object.keys(updates).length > 0) {
-        Plotly.relayout(chartDiv, updates);
+        relayout(chartDiv, updates);
     }
 }
 
@@ -101,13 +99,13 @@ export function renderCredits() {
 export function regenerateCredits() {
     if (isMobile()) return;
 
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv?.layout) return;
 
     const existingAnnotations = (chartDiv.layout.annotations || []).filter(a => !a.name?.startsWith('credit-'));
     const newAnnotations = generateCreditAnnotations(chartDiv.layout);
 
-    Plotly.relayout(chartDiv, {
+    relayout(chartDiv, {
         annotations: [...existingAnnotations, ...newAnnotations]
     });
 }
@@ -211,7 +209,7 @@ function openCreditEditDialog() {
 function handleChartClick(e) {
     if (isMobile()) return;
 
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv?.layout) return;
 
     const creditIndex = getCreditAtPoint(chartDiv, e.clientX, e.clientY);
@@ -250,7 +248,7 @@ function updateCreditTooltip(show, x, y) {
 function handleChartMouseMove(e) {
     if (isMobile()) return;
 
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv?.layout) return;
 
     const creditIndex = getCreditAtPoint(chartDiv, e.clientX, e.clientY);
@@ -285,7 +283,7 @@ function updateCreditHighlight(chartDiv, hoveredIndex) {
     });
 
     if (Object.keys(updates).length > 0) {
-        Plotly.relayout(chartDiv, updates);
+        relayout(chartDiv, updates);
     }
 }
 
@@ -293,7 +291,7 @@ function updateCreditHighlight(chartDiv, hoveredIndex) {
  * Initialize click handler for credit editing
  */
 export function initCreditClick() {
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv) return;
 
     chartDiv.removeEventListener('click', handleChartClick);

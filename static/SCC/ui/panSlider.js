@@ -8,6 +8,8 @@
 import { chartState } from '../chartState.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 import { LAYOUT, CHART_TYPE_CONFIG } from '../config.js';
+import { relayout } from '../util/plotlyWrapper.js';
+import { getChartDiv } from '../util/dom.js';
 
 /**
  * Initialize slider when chart is ready
@@ -47,7 +49,7 @@ function initSlider() {
  * Handle slider input - pan chart by (position * snapTo)
  */
 function onSliderInput(e) {
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     if (!chartDiv?.layout?.xaxis?.range) return;
 
     const config = CHART_TYPE_CONFIG[chartState.chartType];
@@ -57,7 +59,7 @@ function onSliderInput(e) {
     const panPosition = position * config.snapTo;
     const rangeWidth = chartDiv.layout.xaxis.range[1] - chartDiv.layout.xaxis.range[0];
 
-    Plotly.relayout(chartDiv, {
+    relayout(chartDiv, {
         'xaxis.range[0]': panPosition - LAYOUT.X_AXIS_MARGIN_OFFSET,
         'xaxis.range[1]': panPosition - LAYOUT.X_AXIS_MARGIN_OFFSET + rangeWidth
     });
@@ -70,7 +72,7 @@ function syncFromChart() {
     const panSlider = document.getElementById('pan-slider');
     if (!panSlider) return;
 
-    const chartDiv = document.getElementById('chart');
+    const chartDiv = getChartDiv();
     const config = CHART_TYPE_CONFIG[chartState.chartType];
     if (!chartDiv?.layout?.xaxis?.range || !config) return;
 

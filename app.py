@@ -46,7 +46,7 @@ def service_worker():
 
 @app.route('/')
 def index():
-    return render_template('SCC/menu_page.html')
+    return render_template('SCC/chart_explorer.html')
 
 
 @app.route('/new')
@@ -57,7 +57,7 @@ def new_chart():
 @app.route('/chart/<chart_id>')
 @app.route('/chart/<chart_id>/<share_secret>')
 def chart(chart_id, share_secret=None):
-    return render_template('SCC/chart.html', chart_id=chart_id)
+    return render_template('SCC/view_chart.html', chart_id=chart_id)
 
 
 # =============================================================================

@@ -217,7 +217,7 @@ Two sync mechanisms for server communication, both user-action-triggered (no bac
 | `static/Server/init.js` | `syncEnabled` flag (IndexedDB-backed), `isSyncEnabled()` / `setSyncEnabled()` |
 | `static/Server/syncClient.js` | `pushChart()`, `checkForUpdates()`, `startSyncWatch()` (shared only) |
 | `static/SCC/storage/chartStorage.js` | Push after save, push queue (`queuePush` / `drainPushQueue`) |
-| `templates/SCC/menu_page.html` | Sync checkbox UI, pull + drain queue on page load |
+| `templates/SCC/chart_explorer.html` | Sync checkbox UI, pull + drain queue on page load |
 | `templates/SCC/chart.html` | Pull on load (non-shared), `startSyncWatch` (shared) |
 | `app.py` | `/api/sync` — manifest comparison, upload/download |
 

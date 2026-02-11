@@ -2,8 +2,8 @@
  * BIP39 passphrase generation and user identity
  */
 
-import { BIP39_WORDLIST } from './BIP39Words.js';
-import { sha256, deriveKey } from './crypto.js';
+import { BIP39_WORDLIST } from '../util/BIP39Words.js';
+import { sha256, deriveKey } from '../../Server/crypto.js';
 
 const WORD_COUNT = 10;
 const VALID_WORD_COUNTS = [8, 10];

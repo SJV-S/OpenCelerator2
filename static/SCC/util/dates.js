@@ -85,6 +85,7 @@
 import { chartState } from '../chartState.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 import { createToast } from '../ui/toaster.js';
+import { relayout } from './plotlyWrapper.js';
 
 /**
  * Find the nearest Monday before (or at) a given date.
@@ -434,7 +435,7 @@ function updateChartDateLabels(chartElement, startDate) {
         }
     });
 
-    Plotly.relayout(chartElement, {
+    relayout(chartElement, {
         'annotations': chartElement.layout.annotations
     });
 }
