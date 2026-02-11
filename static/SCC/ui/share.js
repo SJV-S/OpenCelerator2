@@ -214,7 +214,7 @@ async function handleShareLinkClick(type) {
     }
 
     if (!isOnline()) {
-        createToast({ message: 'No internet connection', duration: 2000, position: 'top-right' });
+        createToast({ message: 'No internet or server down', duration: 2000, position: 'top-right' });
         return;
     }
 
