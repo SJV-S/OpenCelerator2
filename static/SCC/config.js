@@ -105,6 +105,15 @@ export const CHART_MATH = Object.freeze({
 // ============================================================================
 // Single source of truth for chart-type-specific values.
 // snapTo: pan increment (also used for snapping chartWindow)
+// Window unit labels per chart type (for rolling window display)
+export const WINDOW_UNITS = Object.freeze({
+    Daily:                { abbrev: 'd', name: 'Day',      defaultWindow: 7 },
+    Weekly:               { abbrev: 'w', name: 'Week',     defaultWindow: 5 },
+    Monthly:              { abbrev: 'm', name: 'Month',    defaultWindow: 6 },
+    Yearly:               { abbrev: 'y', name: 'Year',     defaultWindow: 5 },
+    FrequencyCollections: { abbrev: 'x', name: 'Position', defaultWindow: 7 },
+});
+
 // snapInterval: snapping granularity during drag operations
 // capacity: total x-axis range
 // minXmax: minimum allowed window size
@@ -371,7 +380,9 @@ export const defaultCorrectTraceConfig = Object.freeze({
     markerSize: 8,
     markerSymbol: 'circle',
     markerColor: 'black',
-    markerEdgeColor: 'black'
+    markerEdgeColor: 'black',
+    onXAgg: 'raw',
+    acrossXAgg: null
 });
 
 export const defaultErrorTraceConfig = Object.freeze({
@@ -383,7 +394,9 @@ export const defaultErrorTraceConfig = Object.freeze({
     markerSize: 20,
     markerSymbol: 'x',
     markerColor: 'black',
-    markerEdgeColor: 'black'
+    markerEdgeColor: 'black',
+    onXAgg: 'raw',
+    acrossXAgg: null
 });
 
 export const defaultTimingTraceConfig = Object.freeze({
@@ -395,7 +408,9 @@ export const defaultTimingTraceConfig = Object.freeze({
     markerSize: 30,
     markerSymbol: '-',
     markerColor: 'black',
-    markerEdgeColor: 'black'
+    markerEdgeColor: 'black',
+    onXAgg: 'raw',
+    acrossXAgg: null
 });
 
 // ============================================================================
@@ -443,7 +458,9 @@ export function createMiscTraceConfig(index) {
         markerSize: 8,
         markerSymbol: MISC_SYMBOLS[index % MISC_SYMBOLS.length],
         markerColor: MISC_COLORS[index % MISC_COLORS.length],
-        markerEdgeColor: 'black'
+        markerEdgeColor: 'black',
+        onXAgg: 'raw',
+        acrossXAgg: null
     };
 }
 

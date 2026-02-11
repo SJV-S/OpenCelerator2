@@ -70,11 +70,14 @@ function refreshChart() {
             const styles = isMisc
                 ? chartState.traceStyles.misc[seriesName]
                 : chartState.traceStyles[seriesName];
-            if (styles?.raw) {
-                displayNames.push(styles.raw.seriesName);
-                styles.median = styles.raw;
-                delete styles.raw;
-            }
+            if (!styles) return;
+            // Mutate onXAgg on configs that are still "raw" (counter key stays the same)
+            Object.values(styles).forEach(config => {
+                if (config.onXAgg === 'raw') {
+                    displayNames.push(config.seriesName);
+                    config.onXAgg = 'median';
+                }
+            });
         });
 
         if (displayNames.length > 0) {

@@ -693,12 +693,15 @@ function autoAggregateImport() {
 
     if (maxPerX <= 1) return;
 
-    // Multiple points per position — switch all series from raw to median
+    // Multiple points per position — switch onXAgg from "raw" to "median"
+    // (counter keys stay the same — no key renaming needed)
     const promote = (styles) => {
-        if (styles?.raw) {
-            styles.median = styles.raw;
-            delete styles.raw;
-        }
+        if (!styles) return;
+        Object.values(styles).forEach(config => {
+            if (config.onXAgg === 'raw') {
+                config.onXAgg = 'median';
+            }
+        });
     };
 
     promote(chartState.traceStyles[CORRECTS]);

@@ -9,13 +9,14 @@
  */
 
 import { chartState } from '../chartState.js';
-import { CORRECTS, ERRORS, TIMING } from '../config.js';
+import { CORRECTS, ERRORS, TIMING, WINDOW_UNITS } from '../config.js';
 import { icons } from './icons.js';
 import { createToast } from './toaster.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 import { toggleGrid } from '../series/grid.js';
 import { restyle } from '../util/plotlyWrapper.js';
 import { getChartDiv } from '../util/dom.js';
+import { getAggLabel } from '../series/traceStyles.js';
 
 // Series visibility is stored in chartState.seriesVisibility (persisted via IndexedDB)
 
@@ -39,8 +40,8 @@ function getLegendItems() {
         const aggConfigs = chartState.traceStyles[seriesKey];
         if (!aggConfigs) return;
 
-        Object.entries(aggConfigs).forEach(([aggType, config]) => {
-            const uniqueKey = `${seriesKey}_${aggType}`;
+        Object.entries(aggConfigs).forEach(([aggId, config]) => {
+            const uniqueKey = `${seriesKey}_${aggId}`;
 
             if (chartState.seriesVisibility[uniqueKey] === undefined) {
                 chartState.seriesVisibility[uniqueKey] = true;
@@ -52,7 +53,9 @@ function getLegendItems() {
                 visible: chartState.seriesVisibility[uniqueKey],
                 config: config,
                 baseSeriesKey: seriesKey,
-                aggType: aggType
+                aggId: aggId,
+                onXAgg: config.onXAgg || 'raw',
+                acrossXAgg: config.acrossXAgg || null
             });
         });
     });
@@ -64,8 +67,8 @@ function getLegendItems() {
         const hasIntegerData = dataArray && dataArray.some(val => Number.isFinite(val));
         if (!hasIntegerData) return;
 
-        Object.entries(aggConfigs).forEach(([aggType, config]) => {
-            const uniqueKey = `${miscId}_${aggType}`;
+        Object.entries(aggConfigs).forEach(([aggId, config]) => {
+            const uniqueKey = `${miscId}_${aggId}`;
 
             if (chartState.seriesVisibility[uniqueKey] === undefined) {
                 chartState.seriesVisibility[uniqueKey] = true;
@@ -77,7 +80,9 @@ function getLegendItems() {
                 visible: chartState.seriesVisibility[uniqueKey],
                 config: config,
                 baseSeriesKey: miscId,
-                aggType: aggType
+                aggId: aggId,
+                onXAgg: config.onXAgg || 'raw',
+                acrossXAgg: config.acrossXAgg || null
             });
         });
     });
@@ -134,9 +139,20 @@ function createLegendItem(item, scale = 1) {
     markerContainer.className = 'legend-marker';
     markerContainer.innerHTML = getMarkerSVG(item.baseSeriesKey, item.config, scale);
 
-    // Create label
+    // Create label with aggregation suffix
     const label = document.createElement('span');
-    const aggSuffix = item.aggType && item.aggType !== 'raw' ? ` (${item.aggType})` : '';
+    let aggSuffix = '';
+    const onX = item.onXAgg || 'raw';
+    const acrossX = item.acrossXAgg;
+    if (onX !== 'raw' || acrossX) {
+        const parts = [];
+        if (onX !== 'raw') parts.push(onX.charAt(0).toUpperCase() + onX.slice(1));
+        if (acrossX) {
+            const unit = WINDOW_UNITS[chartState.chartType]?.abbrev || 'x';
+            parts.push(`${acrossX.fn.charAt(0).toUpperCase() + acrossX.fn.slice(1)} ${unit}${acrossX.window}`);
+        }
+        aggSuffix = ` (${parts.join(', ')})`;
+    }
     label.textContent = item.displayName + aggSuffix;
     label.className = 'legend-label';
     label.style.fontSize = `${Math.round(14 * scale)}px`;
@@ -360,10 +376,10 @@ function renderCustomLegend() {
 
 /**
  * Toggle visibility for a series
- * @param {string} seriesKey - Unique series identifier (series_aggType)
+ * @param {string} seriesKey - Unique series identifier (series_aggId)
  */
 function toggleSeriesVisibility(seriesKey) {
-    // Toggle visibility state for THIS specific series_aggType combination
+    // Toggle visibility state for THIS specific series_aggId combination
     chartState.seriesVisibility[seriesKey] = !chartState.seriesVisibility[seriesKey];
 
     // Update legend item styling for this specific item only
@@ -376,7 +392,7 @@ function toggleSeriesVisibility(seriesKey) {
         }
     }
 
-    // Tell Plotly to hide/show traces for this specific series_aggType
+    // Tell Plotly to hide/show traces for this specific series_aggId
     updatePlotlyTraceVisibility(seriesKey, chartState.seriesVisibility[seriesKey]);
 
     // Emit event so state is persisted
@@ -385,27 +401,27 @@ function toggleSeriesVisibility(seriesKey) {
 
 /**
  * Update Plotly trace visibility (one-way command to Plotly)
- * @param {string} seriesKey - Unique series identifier (series_aggType)
+ * @param {string} seriesKey - Unique series identifier (series_aggId)
  * @param {boolean} visible - Whether the series should be visible
  */
 function updatePlotlyTraceVisibility(seriesKey, visible) {
     const chartDiv = getChartDiv();
     if (!chartDiv) return;
 
-    // Parse the unique key (e.g., "corrects_mean" -> baseKey="corrects", aggType="mean")
-    const parts = seriesKey.split('_');
-    const baseKey = parts[0];
-    const aggType = parts[1];
+    // Parse the unique key (e.g., "corrects_0" -> baseKey="corrects", aggId="0")
+    const underscoreIdx = seriesKey.lastIndexOf('_');
+    const baseKey = seriesKey.slice(0, underscoreIdx);
+    const aggId = seriesKey.slice(underscoreIdx + 1);
 
-    // baseKey is now consistent: 'corrects', 'errors', 'timing', or misc ID
+    // baseKey is: 'corrects', 'errors', 'timing', or misc ID
     const targetSeriesName = baseKey;
     const traceIndices = [];
 
-    // Find all traces for this specific series AND aggregation type
+    // Find all traces for this specific series AND aggregation ID
     chartDiv.data.forEach((trace, idx) => {
         if (trace.meta &&
             trace.meta.seriesName === targetSeriesName &&
-            trace.meta.aggType === aggType) {
+            trace.meta.aggId === aggId) {
             traceIndices.push(idx);
         }
     });

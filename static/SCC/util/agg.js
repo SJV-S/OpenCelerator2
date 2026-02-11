@@ -216,3 +216,57 @@ export function aggregateByX(xArr, yArr, aggFn) {
 
     return { x: aggX, y: aggY };
 }
+
+/**
+ * Apply a rolling (trailing) window aggregation across consecutive X-positions.
+ *
+ * At position i, collects values from index (i - windowSize + 1) through i,
+ * applies aggFn to that window.  The first (windowSize - 1) positions produce null.
+ * If any value in the window is null / NaN / undefined, the result is null.
+ *
+ * @param {Array<number>} xArr  - X positions (already sorted & aggregated per-position)
+ * @param {Array<number>} yArr  - Y values (same length as xArr)
+ * @param {function}      aggFn - Aggregation function (e.g. mean, median)
+ * @param {number}        windowSize - Window width (≥ 2)
+ * @returns {{x: Array<number>, y: Array<number|null>}}
+ */
+export function rollingWindow(xArr, yArr, aggFn, windowSize) {
+    if (!xArr || !yArr || xArr.length === 0) {
+        return { x: [], y: [] };
+    }
+    if (windowSize < 2) {
+        return { x: [...xArr], y: [...yArr] };
+    }
+
+    const outX = [];
+    const outY = [];
+
+    for (let i = 0; i < xArr.length; i++) {
+        outX.push(xArr[i]);
+
+        if (i < windowSize - 1) {
+            outY.push(null);
+            continue;
+        }
+
+        // Collect window values
+        const windowValues = [];
+        let hasInvalid = false;
+        for (let j = i - windowSize + 1; j <= i; j++) {
+            const v = yArr[j];
+            if (v === null || v === undefined || (typeof v === 'number' && isNaN(v))) {
+                hasInvalid = true;
+                break;
+            }
+            windowValues.push(v);
+        }
+
+        if (hasInvalid) {
+            outY.push(null);
+        } else {
+            outY.push(aggFn(windowValues));
+        }
+    }
+
+    return { x: outX, y: outY };
+}

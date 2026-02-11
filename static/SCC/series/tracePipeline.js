@@ -13,7 +13,7 @@
 import { chartState } from '../chartState.js';
 import { CORRECTS, ERRORS, LIMITS, CHART_MATH, MISSING } from '../config.js';
 import { isMissing } from '../util/format.js';
-import { median, mean, min, max, first, last, sum, aggregateByX } from '../util/agg.js';
+import { median, mean, min, max, first, last, sum, aggregateByX, rollingWindow } from '../util/agg.js';
 
 const AUTO_AGG_THRESHOLD = LIMITS.AUTO_AGG_THRESHOLD;
 
@@ -22,22 +22,27 @@ const AUTO_AGG_THRESHOLD = LIMITS.AUTO_AGG_THRESHOLD;
 // ============================================================================
 
 function correctsTrace(xValues, yValues, config) {
+    const hasLine = config.showLine;
+    const hasMarkers = config.markerSymbol !== 'none';
+    const mode = hasLine && hasMarkers ? 'lines+markers'
+        : hasLine ? 'lines'
+        : 'markers';
     return {
         x: xValues,
         y: yValues,
-        mode: config.showLine ? 'lines+markers' : 'markers',
+        mode,
         line: {
             color: config.lineColor,
             width: config.lineWidth,
             dash: config.lineDash || 'solid'
         },
         marker: {
-            symbol: config.markerSymbol,
-            size: config.markerSize,
+            symbol: hasMarkers ? config.markerSymbol : 'circle',
+            size: hasMarkers ? config.markerSize : 0,
             color: config.markerColor,
             line: {
                 color: config.markerEdgeColor,
-                width: 1
+                width: hasMarkers ? 1 : 0
             }
         },
         name: config.seriesName,
@@ -91,22 +96,27 @@ function timingFloorTrace(xValues, yValues, config) {
 }
 
 function miscTrace(xValues, yValues, config) {
+    const hasLine = config.showLine;
+    const hasMarkers = config.markerSymbol !== 'none';
+    const mode = hasLine && hasMarkers ? 'lines+markers'
+        : hasLine ? 'lines'
+        : 'markers';
     return {
         x: xValues,
         y: yValues,
-        mode: config.showLine ? 'lines+markers' : 'markers',
+        mode,
         line: {
             color: config.lineColor,
             width: config.lineWidth,
             dash: config.lineDash || 'solid'
         },
         marker: {
-            symbol: config.markerSymbol,
-            size: config.markerSize,
+            symbol: hasMarkers ? config.markerSymbol : 'circle',
+            size: hasMarkers ? config.markerSize : 0,
             color: config.markerColor,
             line: {
                 color: config.markerEdgeColor,
-                width: 1
+                width: hasMarkers ? 1 : 0
             }
         },
         name: config.seriesName,
@@ -140,8 +150,13 @@ function hasValidData(arr) {
     return arr.some(v => Number.isFinite(v));
 }
 
+// Module-level map of aggregation name → function (shared by per-position and rolling window)
+const AGG_FUNCTIONS = {
+    median, mean, min, max, first, last, sum
+};
+
 /**
- * Apply aggregation to frequency data based on aggregation type.
+ * Apply per-position (onXAgg) aggregation to frequency data.
  * Groups data by X position and applies the aggregation to each group.
  *
  * @param {Array<number>} xPositions - X position array
@@ -167,23 +182,49 @@ function applyAggregation(xPositions, yData, aggType) {
         return { x: xPositions, y: yData, autoAggregated: false };
     }
 
-    // Map aggType to aggregation function
-    const aggFunctions = {
-        median: median,
-        mean: mean,
-        min: min,
-        max: max,
-        first: first,
-        last: last,
-        sum: sum
-    };
-
-    const aggFn = aggFunctions[aggType];
+    const aggFn = AGG_FUNCTIONS[aggType];
     if (!aggFn) {
         return { x: xPositions, y: yData, autoAggregated: false };
     }
 
     return { ...aggregateByX(xPositions, yData, aggFn), autoAggregated: false };
+}
+
+/**
+ * Apply rolling (across-X) window aggregation.
+ * Skips if acrossXAgg is null/undefined or has an invalid fn.
+ * Also skips "sum" on minute charts for consistency with onXAgg guard.
+ *
+ * After rolling, filters out null y-values (and corresponding x) so Plotly
+ * doesn't try to connect through gaps.
+ *
+ * @param {Array<number>} xArr - X positions
+ * @param {Array<number>} yArr - Y values
+ * @param {Object|null} acrossXAgg - { fn: string, window: number } or null
+ * @returns {{x: Array<number>, y: Array<number>}}
+ */
+function applyRollingWindow(xArr, yArr, acrossXAgg) {
+    if (!acrossXAgg?.fn) return { x: xArr, y: yArr };
+
+    // Sum rolling on minute charts: skip (same guard as onXAgg)
+    if (acrossXAgg.fn === 'sum' && chartState.minuteChart) return { x: xArr, y: yArr };
+
+    const aggFn = AGG_FUNCTIONS[acrossXAgg.fn];
+    if (!aggFn) return { x: xArr, y: yArr };
+
+    const rolled = rollingWindow(xArr, yArr, aggFn, acrossXAgg.window);
+
+    // Filter out null y-values so Plotly doesn't draw connecting lines through gaps
+    const filteredX = [];
+    const filteredY = [];
+    for (let i = 0; i < rolled.y.length; i++) {
+        if (rolled.y[i] !== null && rolled.y[i] !== undefined && !isNaN(rolled.y[i])) {
+            filteredX.push(rolled.x[i]);
+            filteredY.push(rolled.y[i]);
+        }
+    }
+
+    return { x: filteredX, y: filteredY };
 }
 
 /**
@@ -354,10 +395,13 @@ function createTimingTraces(xPositions) {
     const timingFrequencies = timingToFrequency(chartState.series.timing);
 
     // Loop through all aggregation keys for timing
-    Object.entries(chartState.traceStyles.timing).forEach(([aggType, config]) => {
-        const { x, y } = applyAggregation(xPositions, timingFrequencies, aggType);
-        const trace = timingFloorTrace(x, y, config);
-        trace.meta = {seriesName: 'timing', aggType: aggType};
+    Object.entries(chartState.traceStyles.timing).forEach(([aggId, config]) => {
+        const onXAgg = config.onXAgg || 'raw';
+        const { x, y } = applyAggregation(xPositions, timingFrequencies, onXAgg);
+        // Rolling window applied to timing too
+        const rolled = applyRollingWindow(x, y, config.acrossXAgg);
+        const trace = timingFloorTrace(rolled.x, rolled.y, config);
+        trace.meta = { seriesName: 'timing', aggId, onXAgg, acrossXAgg: config.acrossXAgg || null };
         timingTraces.push(trace);
     });
 
@@ -372,31 +416,35 @@ function createFloorShadowTraces(xPositions, frequencies) {
     const floorShadowTraces = [];
 
     // CORRECTS FLOOR SHADOW - loop through all agg keys (skip if no valid data)
+    // Floor shadows do NOT apply rolling window — they show per-position floor markers only
     if (hasValidData(frequencies.correctsFloor)) {
-        Object.entries(chartState.traceStyles[CORRECTS]).forEach(([aggType, config]) => {
-            const { x, y } = applyAggregation(xPositions, frequencies.correctsFloor, aggType);
+        Object.entries(chartState.traceStyles[CORRECTS]).forEach(([aggId, config]) => {
+            const onXAgg = config.onXAgg || 'raw';
+            const { x, y } = applyAggregation(xPositions, frequencies.correctsFloor, onXAgg);
             const trace = createFloorShadowTrace(correctsTrace, x, y, config);
-            trace.meta = {seriesName: 'correctsFloorShadow', aggType: aggType};
+            trace.meta = { seriesName: 'correctsFloorShadow', aggId, onXAgg, acrossXAgg: config.acrossXAgg || null };
             floorShadowTraces.push(trace);
         });
     }
 
     // ERRORS FLOOR SHADOW (skip if no valid data)
     if (hasValidData(frequencies.errorsFloor)) {
-        Object.entries(chartState.traceStyles[ERRORS]).forEach(([aggType, config]) => {
-            const { x, y } = applyAggregation(xPositions, frequencies.errorsFloor, aggType);
+        Object.entries(chartState.traceStyles[ERRORS]).forEach(([aggId, config]) => {
+            const onXAgg = config.onXAgg || 'raw';
+            const { x, y } = applyAggregation(xPositions, frequencies.errorsFloor, onXAgg);
             const trace = createFloorShadowTrace(errorTrace, x, y, config);
-            trace.meta = {seriesName: 'errorsFloorShadow', aggType: aggType};
+            trace.meta = { seriesName: 'errorsFloorShadow', aggId, onXAgg, acrossXAgg: config.acrossXAgg || null };
             floorShadowTraces.push(trace);
         });
     }
 
     // MISC FLOOR SHADOWS (dynamic)
     Object.entries(chartState.traceStyles.misc).forEach(([miscId, aggConfigs]) => {
-        Object.entries(aggConfigs).forEach(([aggType, config]) => {
-            const { x, y } = applyAggregation(xPositions, frequencies.miscFloor[miscId], aggType);
+        Object.entries(aggConfigs).forEach(([aggId, config]) => {
+            const onXAgg = config.onXAgg || 'raw';
+            const { x, y } = applyAggregation(xPositions, frequencies.miscFloor[miscId], onXAgg);
             const trace = createFloorShadowTrace(miscTrace, x, y, config);
-            trace.meta = {seriesName: `${miscId}FloorShadow`, aggType: aggType};
+            trace.meta = { seriesName: `${miscId}FloorShadow`, aggId, onXAgg, acrossXAgg: config.acrossXAgg || null };
             floorShadowTraces.push(trace);
         });
     });
@@ -428,14 +476,16 @@ function createFrequencyTraces(xPositions, frequencies, timestampsToXPositions) 
     // For each series type, loop through all aggregation keys
     // CORRECTS (skip if no valid data)
     if (hasValidData(frequencies.corrects)) {
-        Object.entries(chartState.traceStyles[CORRECTS]).forEach(([aggType, config]) => {
-            const { x, y, autoAggregated: aa } = applyAggregation(xPositions, frequencies.corrects, aggType);
+        Object.entries(chartState.traceStyles[CORRECTS]).forEach(([aggId, config]) => {
+            const onXAgg = config.onXAgg || 'raw';
+            const { x, y, autoAggregated: aa } = applyAggregation(xPositions, frequencies.corrects, onXAgg);
             if (aa) autoAggregatedSeries.add(CORRECTS);
-            const segments = createSegments(x, y, cutXPositions, 'corrects');
+            const rolled = applyRollingWindow(x, y, config.acrossXAgg);
+            const segments = createSegments(rolled.x, rolled.y, cutXPositions, 'corrects');
 
             segments.forEach(seg => {
                 const trace = correctsTrace(seg.x, seg.y, config);
-                trace.meta = {seriesName: seg.seriesName, aggType: aggType};
+                trace.meta = { seriesName: seg.seriesName, aggId, onXAgg, acrossXAgg: config.acrossXAgg || null };
                 dataTraces.push(trace);
             });
         });
@@ -443,14 +493,16 @@ function createFrequencyTraces(xPositions, frequencies, timestampsToXPositions) 
 
     // ERRORS/INCORRECTS (skip if no valid data)
     if (hasValidData(frequencies.errors)) {
-        Object.entries(chartState.traceStyles[ERRORS]).forEach(([aggType, config]) => {
-            const { x, y, autoAggregated: aa } = applyAggregation(xPositions, frequencies.errors, aggType);
+        Object.entries(chartState.traceStyles[ERRORS]).forEach(([aggId, config]) => {
+            const onXAgg = config.onXAgg || 'raw';
+            const { x, y, autoAggregated: aa } = applyAggregation(xPositions, frequencies.errors, onXAgg);
             if (aa) autoAggregatedSeries.add(ERRORS);
-            const segments = createSegments(x, y, cutXPositions, 'errors');
+            const rolled = applyRollingWindow(x, y, config.acrossXAgg);
+            const segments = createSegments(rolled.x, rolled.y, cutXPositions, 'errors');
 
             segments.forEach(seg => {
                 const trace = errorTrace(seg.x, seg.y, config);
-                trace.meta = {seriesName: seg.seriesName, aggType: aggType};
+                trace.meta = { seriesName: seg.seriesName, aggId, onXAgg, acrossXAgg: config.acrossXAgg || null };
                 dataTraces.push(trace);
             });
         });
@@ -458,15 +510,16 @@ function createFrequencyTraces(xPositions, frequencies, timestampsToXPositions) 
 
     // MISC (dynamic)
     Object.entries(chartState.traceStyles.misc).forEach(([miscId, aggConfigs]) => {
-        Object.entries(aggConfigs).forEach(([aggType, config]) => {
-            const { x, y, autoAggregated: aa } = applyAggregation(xPositions, frequencies.misc[miscId], aggType);
-
+        Object.entries(aggConfigs).forEach(([aggId, config]) => {
+            const onXAgg = config.onXAgg || 'raw';
+            const { x, y, autoAggregated: aa } = applyAggregation(xPositions, frequencies.misc[miscId], onXAgg);
             if (aa) autoAggregatedSeries.add(miscId);
-            const segments = createSegments(x, y, cutXPositions, miscId);
+            const rolled = applyRollingWindow(x, y, config.acrossXAgg);
+            const segments = createSegments(rolled.x, rolled.y, cutXPositions, miscId);
 
             segments.forEach(seg => {
                 const trace = miscTrace(seg.x, seg.y, config);
-                trace.meta = {seriesName: seg.seriesName, aggType: aggType};
+                trace.meta = { seriesName: seg.seriesName, aggId, onXAgg, acrossXAgg: config.acrossXAgg || null };
                 dataTraces.push(trace);
             });
         });

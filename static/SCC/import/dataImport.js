@@ -513,7 +513,7 @@ export function importToChartState(cleanedRows, options = { replace: true }) {
                 const num = parseInt(miscId.slice(4));
                 const index = num - 1;
                 chartState.traceStyles.misc[miscId] = {
-                    raw: createMiscTraceConfig(index)
+                    "0": createMiscTraceConfig(index)
                 };
                 chartState.lineStyles.trend.misc[miscId] = {
                     color: MISC_COLORS[index % MISC_COLORS.length],

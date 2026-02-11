@@ -30,12 +30,20 @@
 
             <div class="space-y-3">
                 <div>
-                    <label class="block text-sm font-semibold text-gray-600 mb-1">Aggregation Type</label>
-                    <select id="agg-type-select" class="w-full px-3 py-2 border-2 border-gray-300 rounded focus:outline-none"></select>
+                    <label class="block text-sm font-semibold text-gray-600 mb-1">Per-Position (on X)</label>
+                    <select id="on-x-agg-select" class="w-full px-3 py-2 border-2 border-gray-300 rounded focus:outline-none"></select>
+                </div>
+                <div id="across-x-agg-row">
+                    <label class="block text-sm font-semibold text-gray-600 mb-1">Rolling Window (across X)</label>
+                    <select id="across-x-agg-select" class="w-full px-3 py-2 border-2 border-gray-300 rounded focus:outline-none"></select>
+                </div>
+                <div id="window-size-row" style="display: none;">
+                    <label class="block text-sm font-semibold text-gray-600 mb-1">Window Size</label>
+                    <input type="number" id="window-size-input" class="w-full px-3 py-2 border-2 border-gray-300 rounded focus:outline-none" min="2" value="7">
                 </div>
                 <button id="confirm-add-agg-btn" class="w-full px-6 py-2 bg-gray-700 text-white font-semibold rounded hover:opacity-90 active:opacity-80 transition-colors">Add</button>
             </div>
-            <p id="add-agg-empty-msg" class="text-sm text-gray-500 mt-3" style="display: none;">All aggregation types are in use for this series.</p>
+            <p id="add-agg-empty-msg" class="text-sm text-gray-500 mt-3" style="display: none;"></p>
             <button id="delete-series-btn" class="w-full px-6 py-2 mt-6 bg-red-500 text-white font-semibold rounded hover:opacity-90 active:opacity-80 transition-colors" style="display: none;">Delete Series</button>
         </div>
 
@@ -45,15 +53,9 @@
                 <!-- Line Section -->
                 <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide pt-2 pb-1 border-b border-gray-300">Line</div>
                 <div>
-                    <label class="block text-sm font-semibold text-gray-600 mb-1">Connecting</label>
-                    <label class="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" id="config-show-line" class="sr-only peer">
-                        <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#6ad1e3]"></div>
-                    </label>
-                </div>
-                <div>
                     <label class="block text-sm font-semibold text-gray-600 mb-1">Style</label>
                     <select id="config-line-dash" class="w-full px-3 py-2 border-2 border-gray-300 rounded focus:outline-none">
+                        <option value="none">None</option>
                         <option value="solid">Solid</option>
                         <option value="dash">Dash</option>
                         <option value="dot">Dot</option>
@@ -76,6 +78,7 @@
                 <div id="marker-symbol-row">
                     <label class="block text-sm font-semibold text-gray-600 mb-1">Symbol</label>
                     <select id="config-marker-symbol" class="w-full px-3 py-2 border-2 border-gray-300 rounded focus:outline-none">
+                        <option value="none">None</option>
                         <option value="circle">Circle</option>
                         <option value="square">Square</option>
                         <option value="diamond">Diamond</option>
@@ -100,10 +103,12 @@
                     <label class="block text-sm font-semibold text-gray-600 mb-1">Edge Color</label>
                     <input type="color" id="config-marker-edge-color" class="w-full h-10 px-1 py-1 border-2 border-gray-300 rounded focus:outline-none cursor-pointer">
                 </div>
+
+                <div class="border-b border-gray-300 mt-4 mb-2"></div>
             </div>
 
             <!-- Action buttons -->
-            <div class="flex flex-col gap-3 mt-6">
+            <div class="flex flex-col gap-3 mt-4">
                 <button id="apply-config-btn" class="w-full px-6 py-2 bg-[#6ad1e3] text-white font-semibold rounded hover:opacity-90 active:opacity-80 transition-colors">Apply</button>
                 <button id="reset-config-btn" class="w-full px-6 py-2 bg-gray-400 text-white font-semibold rounded hover:opacity-90 active:opacity-80 transition-colors">Reset</button>
                 <button id="remove-series-btn" class="w-full px-6 py-2 text-white font-semibold rounded hover:opacity-90 active:opacity-80 transition-colors" style="display: none;">Remove</button>

@@ -272,14 +272,16 @@ window.debugLegend = function() {
     // lineVisibility
     console.log('lineVisibility:', JSON.parse(JSON.stringify(chartState.lineVisibility)));
 
-    // Plotly trace meta (seriesName + aggType)
+    // Plotly trace meta (seriesName + aggId + onXAgg + acrossXAgg)
     if (chartDiv?.data) {
         const traceMeta = chartDiv.data.map((t, i) => ({
             index: i,
             name: t.name,
             visible: t.visible,
             seriesName: t.meta?.seriesName,
-            aggType: t.meta?.aggType
+            aggId: t.meta?.aggId,
+            onXAgg: t.meta?.onXAgg,
+            acrossXAgg: t.meta?.acrossXAgg
         }));
         console.log('Plotly traces:', JSON.parse(JSON.stringify(traceMeta)));
     } else {

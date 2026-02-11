@@ -16,7 +16,7 @@
  */
 
 import { chartState } from '../chartState.js';
-import { CORRECTS, ERRORS } from '../config.js';
+import { CORRECTS, ERRORS, WINDOW_UNITS } from '../config.js';
 import { xPositionToDate } from '../util/dates.js';
 import { formatValue } from '../util/format.js';
 import { getFirstConfig } from '../series/traceStyles.js';
@@ -260,29 +260,31 @@ function buildSeriesConfigs() {
 
     state.elements.seriesConfigs.clear();
 
-    // Collect unique series from traces
-    const seriesSeen = new Set();
+    // Collect unique series+aggId combinations from traces
+    const keysSeen = new Set();
 
     for (const trace of chartDiv.data) {
         if (!trace.meta) continue;
-        const { seriesName } = trace.meta;
+        const { seriesName, aggId } = trace.meta;
         if (!seriesName || seriesName.includes('FloorShadow')) continue;
-        if (seriesSeen.has(seriesName)) continue;
-        seriesSeen.add(seriesName);
 
-        // Store marker config for this series
+        const compoundKey = `${seriesName}_${aggId}`;
+        if (keysSeen.has(compoundKey)) continue;
+        keysSeen.add(compoundKey);
+
+        // Store marker config keyed by compound key (style from base series name)
         const styleKey = seriesName.startsWith('misc') ? 'misc' : seriesName;
         const style = MARKER_STYLES[styleKey] || MARKER_STYLES.misc;
         const size = getMarkerSize(seriesName);
 
-        state.elements.seriesConfigs.set(seriesName, {
+        state.elements.seriesConfigs.set(compoundKey, {
             color: style.color,
             shape: style.shape,
             size: size
         });
     }
 
-    // Also create rows in series section for each series
+    // Also create rows in series section for each series+aggId
     const refs = state.elements.infoPanelRefs;
     if (refs.seriesContainer) {
         // Remove existing rows (keep heading)
@@ -291,7 +293,7 @@ function buildSeriesConfigs() {
         if (heading) refs.seriesContainer.appendChild(heading);
         refs.seriesRows.clear();
 
-        for (const seriesName of seriesSeen) {
+        for (const compoundKey of keysSeen) {
             const row = document.createElement('div');
             row.className = 'crosshair-row';
             row.style.display = 'none';
@@ -305,7 +307,7 @@ function buildSeriesConfigs() {
             row.appendChild(valueSpan);
 
             refs.seriesContainer.appendChild(row);
-            refs.seriesRows.set(seriesName, { row, labelSpan, valueSpan });
+            refs.seriesRows.set(compoundKey, { row, labelSpan, valueSpan });
         }
     }
 }
@@ -603,10 +605,10 @@ function drawCanvas() {
         const fullLayout = state.elements.chart._fullLayout;
         const xMarkerPixel = fullLayout.xaxis._offset + fullLayout.xaxis.l2p(state.lastXRounded);
 
-        for (const [seriesName, data] of state.currentTraceData) {
+        for (const [key, data] of state.currentTraceData) {
             if (!data || data.value <= 0) continue;
 
-            const config = state.elements.seriesConfigs.get(seriesName);
+            const config = state.elements.seriesConfigs.get(key);
             if (!config) continue;
 
             // Calculate y pixel position using Plotly's axis mapping (log scale)
@@ -647,7 +649,7 @@ function drawCanvas() {
 /**
  * Find data values for all traces at a given x position
  * Uses binary search for O(log n) per trace
- * @returns {Map} Map of seriesName -> { seriesName, aggType, value }
+ * @returns {Map} Map of seriesName -> { seriesName, aggId, onXAgg, acrossXAgg, value }
  */
 function findTraceDataAtX(xRounded) {
     const chartDiv = state.elements?.chart;
@@ -659,11 +661,11 @@ function findTraceDataAtX(xRounded) {
     for (const trace of traces) {
         if (!trace.meta) continue;
 
-        const { seriesName, aggType } = trace.meta;
+        const { seriesName, aggId, onXAgg, acrossXAgg } = trace.meta;
         if (!seriesName || seriesName.includes('FloorShadow')) continue;
 
         // Skip series the user has hidden via the legend
-        const visKey = `${seriesName}_${aggType}`;
+        const visKey = `${seriesName}_${aggId}`;
         if (chartState.seriesVisibility[visKey] === false) continue;
 
         const xArray = trace.x;
@@ -676,10 +678,10 @@ function findTraceDataAtX(xRounded) {
         if (index >= 0 && dist <= 0.5) {
             const value = yArray[index];
             if (value !== null && value !== undefined && !isNaN(value)) {
-                // Use first match for each series (raw preferred over aggregated)
-                const key = seriesName;
+                // Key by series+aggId so each aggregation is tracked independently
+                const key = `${seriesName}_${aggId}`;
                 if (!result.has(key)) {
-                    result.set(key, { seriesName, aggType, value });
+                    result.set(key, { seriesName, aggId, onXAgg, acrossXAgg, value });
                 }
             }
         }
@@ -768,15 +770,15 @@ function updateInfoPanel(xRounded, yLogValue, traceData) {
 
     // Series section - show/hide rows and update values
     if (refs.seriesRows) {
-        for (const [seriesName, rowRefs] of refs.seriesRows) {
-            const data = traceData.get(seriesName);
+        for (const [key, rowRefs] of refs.seriesRows) {
+            const data = traceData.get(key);
 
             if (!data) {
                 rowRefs.row.style.display = 'none';
                 continue;
             }
 
-            let displayName = formatSeriesName(seriesName);
+            let displayName = formatSeriesName(data.seriesName);
             if (displayName.length > 30) {
                 displayName = displayName.slice(0, 30) + '...';
             }
@@ -784,15 +786,23 @@ function updateInfoPanel(xRounded, yLogValue, traceData) {
 
             // Format value - timing shows reciprocal
             let displayValue;
-            if (seriesName === 'timing') {
+            if (data.seriesName === 'timing') {
                 displayValue = formatValue(1 / data.value);
             } else {
                 displayValue = formatValue(data.value);
             }
 
-            // Append aggregation type if not raw
-            if (data.aggType && data.aggType !== 'raw') {
-                displayValue += ` (${data.aggType})`;
+            // Append aggregation info if not plain raw
+            const onX = data.onXAgg || 'raw';
+            const acrossX = data.acrossXAgg;
+            if (onX !== 'raw' || acrossX) {
+                const parts = [];
+                if (onX !== 'raw') parts.push(onX);
+                if (acrossX) {
+                    const unit = WINDOW_UNITS[chartState.chartType]?.abbrev || 'x';
+                    parts.push(`${acrossX.fn} ${unit}${acrossX.window}`);
+                }
+                displayValue += ` (${parts.join(', ')})`;
             }
 
             rowRefs.valueSpan.textContent = displayValue;

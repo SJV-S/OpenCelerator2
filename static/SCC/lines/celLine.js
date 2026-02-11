@@ -1074,7 +1074,7 @@ function init() {
     }, true);
 
     // Subscribe to series visibility changes - show/hide cel lines per series
-    // Emitted seriesKey is like "corrects_raw"; extract base to match cel metadata
+    // Emitted seriesKey is like "corrects_0"; extract base to match cel metadata
     eventBus.subscribe(EVENTS.SERIES_VISIBILITY_CHANGED, (data) => {
         const baseKey = data.seriesKey.substring(0, data.seriesKey.lastIndexOf('_'));
         updateCelLineSeriesVisibility(baseKey, isSeriesVisible(baseKey));

@@ -5,10 +5,13 @@
  * - Flat series navigation (one row per series+aggregation combo)
  * - Single aggregation config panel
  * - Adding/removing aggregation methods per series
+ *
+ * Keys in traceStyles are counter-based IDs ("0", "1", ...), not aggregation
+ * type names. Each config carries onXAgg and acrossXAgg explicitly.
  */
 
 import { chartState } from '../chartState.js';
-import { CORRECTS, ERRORS, TIMING, LIMITS, LINE_DEFAULTS, defaultCorrectTraceConfig, defaultErrorTraceConfig, defaultTimingTraceConfig, createMiscTraceConfig } from '../config.js';
+import { CORRECTS, ERRORS, TIMING, LIMITS, LINE_DEFAULTS, WINDOW_UNITS, defaultCorrectTraceConfig, defaultErrorTraceConfig, defaultTimingTraceConfig, createMiscTraceConfig } from '../config.js';
 import { getMiscSeriesIds, addMiscSeries, canAddMiscSeries, removeMiscSeries } from './miscSeries.js';
 import { createToast, createConfirmToast } from '../ui/toaster.js';
 import { eventBus, EVENTS } from '../eventBus.js';
@@ -17,9 +20,9 @@ import { eventBus, EVENTS } from '../eventBus.js';
 // STATE
 // ============================================================================
 
-// Currently selected series and aggregation
+// Currently selected series and aggregation counter ID
 let currentSeries = CORRECTS;
-let currentAggType = 'raw';
+let currentAggId = '0';
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -60,21 +63,21 @@ function setSeriesConfigs(seriesName, configs) {
     }
 }
 
-function getConfig(seriesName, aggType) {
+function getConfig(seriesName, aggId) {
     const configs = getSeriesConfigs(seriesName);
-    return configs ? configs[aggType] : null;
+    return configs ? configs[aggId] : null;
 }
 
-function setConfig(seriesName, aggType, config) {
+function setConfig(seriesName, aggId, config) {
     const configs = getSeriesConfigs(seriesName) || {};
-    configs[aggType] = config;
+    configs[aggId] = config;
     setSeriesConfigs(seriesName, configs);
 }
 
-function deleteConfig(seriesName, aggType) {
+function deleteConfig(seriesName, aggId) {
     const configs = getSeriesConfigs(seriesName);
-    if (configs && configs[aggType]) {
-        delete configs[aggType];
+    if (configs && configs[aggId]) {
+        delete configs[aggId];
     }
 }
 
@@ -84,8 +87,8 @@ function getFirstConfig(seriesName, isMisc) {
         ? chartState.traceStyles.misc?.[seriesName]
         : chartState.traceStyles?.[seriesName];
     if (!configs) return null;
-    const firstAggType = Object.keys(configs)[0];
-    return firstAggType ? configs[firstAggType] : null;
+    const firstKey = Object.keys(configs)[0];
+    return firstKey ? configs[firstKey] : null;
 }
 
 /**
@@ -106,9 +109,47 @@ function getAggCount(seriesName) {
     return configs ? Object.keys(configs).length : 0;
 }
 
-function getAggTypes(seriesName) {
+function getAggIds(seriesName) {
     const configs = getSeriesConfigs(seriesName);
     return configs ? Object.keys(configs) : [];
+}
+
+function getNextAggId(seriesName) {
+    const configs = getSeriesConfigs(seriesName);
+    if (!configs || Object.keys(configs).length === 0) return '0';
+    return String(Math.max(...Object.keys(configs).map(Number)) + 1);
+}
+
+function getFirstAggId(seriesName) {
+    const configs = getSeriesConfigs(seriesName);
+    const keys = configs ? Object.keys(configs) : [];
+    return keys.length > 0 ? keys[0] : '0';
+}
+
+/**
+ * Generate a human-readable label for an aggregation config
+ */
+function getAggLabel(config) {
+    const onX = config.onXAgg || 'raw';
+    const onXLabel = onX.charAt(0).toUpperCase() + onX.slice(1);
+    if (!config.acrossXAgg) return onXLabel;
+    const acrossXLabel = config.acrossXAgg.fn.charAt(0).toUpperCase() + config.acrossXAgg.fn.slice(1);
+    const unit = WINDOW_UNITS[chartState.chartType]?.abbrev || 'x';
+    return `${onXLabel} (${acrossXLabel} ${unit}${config.acrossXAgg.window})`;
+}
+
+/**
+ * Check if a given onXAgg + acrossXAgg combination already exists for a series
+ */
+function isDuplicateAgg(seriesName, onXAgg, acrossXAgg) {
+    const configs = getSeriesConfigs(seriesName);
+    if (!configs) return false;
+    return Object.values(configs).some(cfg => {
+        if (cfg.onXAgg !== onXAgg) return false;
+        if (!acrossXAgg && !cfg.acrossXAgg) return true;
+        if (!acrossXAgg || !cfg.acrossXAgg) return false;
+        return cfg.acrossXAgg.fn === acrossXAgg.fn && cfg.acrossXAgg.window === acrossXAgg.window;
+    });
 }
 
 // ============================================================================
@@ -126,7 +167,8 @@ function renderSeriesNav() {
     const allSeries = [...fixedSeries, ...miscIds];
 
     allSeries.forEach(seriesName => {
-        const aggTypes = getAggTypes(seriesName);
+        const configs = getSeriesConfigs(seriesName);
+        const aggIds = configs ? Object.keys(configs) : [];
         const isMisc = isMiscSeries(seriesName);
         const config = getFirstConfig(seriesName, isMisc);
         const displayName = config?.seriesName || seriesName;
@@ -140,22 +182,21 @@ function renderSeriesNav() {
             heading.dataset.seriesType = 'timing';
             heading.style.display = chartState.minuteChart ? '' : 'none';
         }
-        if (seriesName === currentSeries && currentAggType === null) {
+        if (seriesName === currentSeries && currentAggId === null) {
             heading.classList.add('active');
         }
         heading.addEventListener('click', () => selectSeriesHeading(seriesName));
         flatList.appendChild(heading);
 
         // Indented clickable rows for each aggregation
-        aggTypes.forEach(aggType => {
-            const label = aggType === 'raw'
-                ? 'Raw'
-                : aggType.charAt(0).toUpperCase() + aggType.slice(1);
+        aggIds.forEach(aggId => {
+            const aggConfig = configs[aggId];
+            const label = getAggLabel(aggConfig);
 
             const btn = document.createElement('button');
             btn.className = 'series-row series-agg-row';
             btn.dataset.series = seriesName;
-            btn.dataset.agg = aggType;
+            btn.dataset.agg = aggId;
 
             if (seriesName === TIMING) {
                 btn.dataset.seriesType = 'timing';
@@ -167,11 +208,11 @@ function renderSeriesNav() {
             nameSpan.textContent = truncateTabName(label);
             btn.appendChild(nameSpan);
 
-            if (seriesName === currentSeries && aggType === currentAggType) {
+            if (seriesName === currentSeries && aggId === currentAggId) {
                 btn.classList.add('active');
             }
 
-            btn.addEventListener('click', () => selectAggregation(seriesName, aggType));
+            btn.addEventListener('click', () => selectAggregation(seriesName, aggId));
             flatList.appendChild(btn);
         });
     });
@@ -181,9 +222,9 @@ function renderSeriesNav() {
 // INTERACTION HANDLERS
 // ============================================================================
 
-function selectAggregation(seriesName, aggType) {
+function selectAggregation(seriesName, aggId) {
     currentSeries = seriesName;
-    currentAggType = aggType;
+    currentAggId = aggId;
 
     // Clear active from all headings and agg rows
     document.querySelectorAll('#series-flat-list .series-heading').forEach(h => {
@@ -191,7 +232,7 @@ function selectAggregation(seriesName, aggType) {
     });
     document.querySelectorAll('#series-flat-list .series-row').forEach(row => {
         row.classList.remove('active');
-        if (row.dataset.series === seriesName && row.dataset.agg === aggType) {
+        if (row.dataset.series === seriesName && row.dataset.agg === aggId) {
             row.classList.add('active');
         }
     });
@@ -203,12 +244,12 @@ function selectAggregation(seriesName, aggType) {
     if (configPanel) configPanel.style.display = '';
 
     // Load config into panel
-    loadConfigPanel(seriesName, aggType);
+    loadConfigPanel(seriesName, aggId);
 }
 
 function selectSeriesHeading(seriesName) {
     currentSeries = seriesName;
-    currentAggType = null;
+    currentAggId = null;
 
     // Clear active from all agg rows, set active on clicked heading
     document.querySelectorAll('#series-flat-list .series-row').forEach(row => {
@@ -241,27 +282,75 @@ function loadAddAggPanel(seriesName) {
     const nameInput = document.getElementById('heading-series-name');
     if (nameInput) nameInput.value = getSeriesDisplayName(seriesName);
 
-    // Populate unused agg types
-    const unused = getUnusedAggs(seriesName);
-    const select = document.getElementById('agg-type-select');
-    const addBtn = document.getElementById('confirm-add-agg-btn');
-    const emptyMsg = document.getElementById('add-agg-empty-msg');
+    // Populate on-x agg dropdown
+    const onXSelect = document.getElementById('on-x-agg-select');
+    const acrossXSelect = document.getElementById('across-x-agg-select');
+    const windowSizeRow = document.getElementById('window-size-row');
 
-    if (select) {
-        select.innerHTML = unused.map(a =>
+    const aggTypes = getAvailableAggTypes();
+
+    if (onXSelect) {
+        onXSelect.innerHTML = aggTypes.map(a =>
             `<option value="${a}">${a.charAt(0).toUpperCase() + a.slice(1)}</option>`
         ).join('');
     }
 
-    if (unused.length === 0) {
-        if (select) select.style.display = 'none';
-        if (addBtn) addBtn.style.display = 'none';
-        if (emptyMsg) emptyMsg.style.display = '';
-    } else {
-        if (select) select.style.display = '';
-        if (addBtn) addBtn.style.display = '';
-        if (emptyMsg) emptyMsg.style.display = 'none';
+    if (acrossXSelect) {
+        acrossXSelect.innerHTML =
+            `<option value="none">None</option>` +
+            aggTypes.map(a =>
+                `<option value="${a}">${a.charAt(0).toUpperCase() + a.slice(1)}</option>`
+            ).join('');
     }
+
+    // Hide window size row initially; set label and default value to match chart type
+    const unitConfig = WINDOW_UNITS[chartState.chartType];
+    if (windowSizeRow) {
+        windowSizeRow.style.display = 'none';
+        const windowLabel = windowSizeRow.querySelector('label');
+        if (windowLabel) windowLabel.textContent = `${unitConfig?.name || 'Position'} Window`;
+        const windowInput = document.getElementById('window-size-input');
+        if (windowInput) windowInput.value = unitConfig?.defaultWindow || 7;
+    }
+
+    // Rolling window rows: hidden entirely when on-x is "raw"
+    const acrossXRow = document.getElementById('across-x-agg-row');
+
+    // Wire across-x change to show/hide window size
+    let liveAcrossXSelect = acrossXSelect;
+    if (acrossXSelect) {
+        const newSelect = acrossXSelect.cloneNode(true);
+        acrossXSelect.parentNode.replaceChild(newSelect, acrossXSelect);
+        liveAcrossXSelect = newSelect;
+        newSelect.addEventListener('change', () => {
+            if (windowSizeRow) {
+                windowSizeRow.style.display = newSelect.value === 'none' ? 'none' : '';
+            }
+        });
+    }
+
+    // Wire on-x change to hide rolling window controls when "raw" is selected
+    if (onXSelect) {
+        const newOnX = onXSelect.cloneNode(true);
+        onXSelect.parentNode.replaceChild(newOnX, onXSelect);
+        newOnX.addEventListener('change', () => {
+            if (newOnX.value === 'raw') {
+                if (liveAcrossXSelect) liveAcrossXSelect.value = 'none';
+                if (acrossXRow) acrossXRow.style.display = 'none';
+                if (windowSizeRow) windowSizeRow.style.display = 'none';
+            } else {
+                if (acrossXRow) acrossXRow.style.display = '';
+            }
+        });
+        // Initial state: raw is selected by default → hide rolling window controls
+        if (acrossXRow) acrossXRow.style.display = 'none';
+    }
+
+    // Always show add button and hide empty message (duplicates are checked on click)
+    const addBtn = document.getElementById('confirm-add-agg-btn');
+    const emptyMsg = document.getElementById('add-agg-empty-msg');
+    if (addBtn) addBtn.style.display = '';
+    if (emptyMsg) emptyMsg.style.display = 'none';
 
     // Show delete button only for misc series
     const deleteBtn = document.getElementById('delete-series-btn');
@@ -274,8 +363,8 @@ function loadAddAggPanel(seriesName) {
 // CONFIG PANEL
 // ============================================================================
 
-function loadConfigPanel(seriesName, aggType) {
-    const config = getConfig(seriesName, aggType);
+function loadConfigPanel(seriesName, aggId) {
+    const config = getConfig(seriesName, aggId);
     if (!config) return;
 
     const isMisc = isMiscSeries(seriesName);
@@ -301,32 +390,39 @@ function loadConfigPanel(seriesName, aggType) {
     // Populate form fields
     document.getElementById('config-marker-size').value = config.markerSize || 8;
     document.getElementById('config-line-width').value = config.lineWidth || 0.7;
-    document.getElementById('config-show-line').checked = config.showLine ?? true;
     document.getElementById('config-line-color').value = config.lineColor || '#000000';
     document.getElementById('config-marker-color').value = config.markerColor || '#000000';
     document.getElementById('config-marker-edge-color').value = config.markerEdgeColor || '#000000';
     document.getElementById('config-marker-symbol').value = config.markerSymbol || 'circle';
-    document.getElementById('config-line-dash').value = config.lineDash || 'solid';
+
+    // Line style: "none" if showLine is false, otherwise the actual dash value
+    const showLine = config.showLine ?? true;
+    document.getElementById('config-line-dash').value = showLine ? (config.lineDash || 'solid') : 'none';
 }
 
 function applyConfig() {
     const seriesName = currentSeries;
-    const aggType = currentAggType;
+    const aggId = currentAggId;
 
-    const existingConfig = getConfig(seriesName, aggType);
+    const existingConfig = getConfig(seriesName, aggId);
+    const lineDashRaw = document.getElementById('config-line-dash').value || 'solid';
+    const showLine = lineDashRaw !== 'none';
     const config = {
         seriesName: existingConfig?.seriesName || seriesName,
-        showLine: document.getElementById('config-show-line').checked,
-        lineDash: document.getElementById('config-line-dash').value || 'solid',
+        showLine,
+        lineDash: showLine ? lineDashRaw : 'solid',
         lineWidth: parseFloat(document.getElementById('config-line-width').value) || LINE_DEFAULTS.TRACE_LINE_WIDTH,
         lineColor: document.getElementById('config-line-color').value || '#000000',
         markerSize: parseInt(document.getElementById('config-marker-size').value) || 8,
         markerColor: document.getElementById('config-marker-color').value || '#000000',
         markerEdgeColor: document.getElementById('config-marker-edge-color').value || '#000000',
-        markerSymbol: document.getElementById('config-marker-symbol').value || 'circle'
+        markerSymbol: document.getElementById('config-marker-symbol').value || 'circle',
+        // Preserve aggregation properties from existing config
+        onXAgg: existingConfig?.onXAgg || 'raw',
+        acrossXAgg: existingConfig?.acrossXAgg || null
     };
 
-    setConfig(seriesName, aggType, config);
+    setConfig(seriesName, aggId, config);
 
     // Re-render flat nav and refresh
     renderSeriesNav();
@@ -337,7 +433,7 @@ function applyConfig() {
     createToast({ message: `${config.seriesName} updated.`, duration: 2000 });
 
     // Re-select to update active states
-    selectAggregation(seriesName, aggType);
+    selectAggregation(seriesName, aggId);
 }
 
 function resetConfig() {
@@ -353,16 +449,16 @@ function resetConfig() {
     if (isMisc) {
         const num = parseInt(seriesName.slice(4));
         const index = num - 1;
-        setSeriesConfigs(seriesName, { raw: createMiscTraceConfig(index) });
+        setSeriesConfigs(seriesName, { "0": createMiscTraceConfig(index) });
     } else {
-        setSeriesConfigs(seriesName, { raw: { ...defaultsMap[seriesName] } });
+        setSeriesConfigs(seriesName, { "0": { ...defaultsMap[seriesName] } });
     }
 
-    currentAggType = 'raw';
+    currentAggId = '0';
 
     // Re-render flat nav and select
     renderSeriesNav();
-    selectAggregation(seriesName, 'raw');
+    selectAggregation(seriesName, '0');
     updateCounterLabels();
 
     eventBus.emit(EVENTS.DATA_CHART_REFRESH);
@@ -403,11 +499,6 @@ function applyHeadingName() {
 // ============================================================================
 // AGGREGATION MANAGEMENT
 // ============================================================================
-
-function getUnusedAggs(seriesName) {
-    const usedAggs = getAggTypes(seriesName);
-    return getAvailableAggTypes().filter(a => !usedAggs.includes(a));
-}
 
 function getSeriesDisplayName(seriesName) {
     const isMisc = isMiscSeries(seriesName);
@@ -463,7 +554,7 @@ function showNameSeriesModal() {
             }
             // Re-render so the name shows immediately
             renderSeriesNav();
-            selectAggregation(id, 'raw');
+            selectAggregation(id, getFirstAggId(id));
             updateCounterLabels();
         }
         closeModal();
@@ -498,33 +589,49 @@ function showNameSeriesModal() {
     nameInput.focus();
 }
 
-function addAggregationOfType(seriesName, aggType) {
-    // Get base config from first aggregation
-    const firstConfig = getFirstConfig(seriesName, isMiscSeries(seriesName));
-    const newConfig = { ...firstConfig };
+/**
+ * Add a new aggregation configuration for a series.
+ * @param {string} seriesName - Series key
+ * @param {string} onXAgg - Per-position aggregation type
+ * @param {Object|null} acrossXAgg - Rolling window config { fn, window } or null
+ */
+function addAggregation(seriesName, onXAgg, acrossXAgg) {
+    if (isDuplicateAgg(seriesName, onXAgg, acrossXAgg)) {
+        createToast({ message: 'This aggregation combination already exists.', duration: 3000 });
+        return;
+    }
 
-    setConfig(seriesName, aggType, newConfig);
+    // Clone style properties from the first existing config
+    const firstConfig = getFirstConfig(seriesName, isMiscSeries(seriesName));
+    const newConfig = {
+        ...(firstConfig || {}),
+        onXAgg,
+        acrossXAgg
+    };
+
+    const newId = getNextAggId(seriesName);
+    setConfig(seriesName, newId, newConfig);
 
     // Re-render flat nav and select the new aggregation
     renderSeriesNav();
-    selectAggregation(seriesName, aggType);
+    selectAggregation(seriesName, newId);
 
     eventBus.emit(EVENTS.DATA_CHART_REFRESH);
     eventBus.emit(EVENTS.UI_LEGEND_RENDER);
 }
 
-function removeAggregationByType(seriesName, aggType) {
-    deleteConfig(seriesName, aggType);
+function removeAggregation(seriesName, aggId) {
+    deleteConfig(seriesName, aggId);
 
-    const remainingAggs = getAggTypes(seriesName);
+    const remainingIds = getAggIds(seriesName);
 
     // Re-render flat nav
     renderSeriesNav();
 
     // If removed the currently selected agg, select another or fall back to heading
-    if (currentSeries === seriesName && currentAggType === aggType) {
-        if (remainingAggs.length > 0) {
-            selectAggregation(seriesName, remainingAggs[0]);
+    if (currentSeries === seriesName && currentAggId === aggId) {
+        if (remainingIds.length > 0) {
+            selectAggregation(seriesName, remainingIds[0]);
         } else {
             selectSeriesHeading(seriesName);
         }
@@ -541,17 +648,18 @@ function removeAggregationByType(seriesName, aggType) {
 
 function removeCurrentSelection() {
     const seriesName = currentSeries;
-    const aggType = currentAggType;
+    const aggId = currentAggId;
     const isMisc = isMiscSeries(seriesName);
-    const config = getFirstConfig(seriesName, isMisc);
-    const displayName = config?.seriesName || seriesName;
+    const config = getConfig(seriesName, aggId);
+    const firstCfg = getFirstConfig(seriesName, isMisc);
+    const displayName = firstCfg?.seriesName || seriesName;
     const aggCount = getAggCount(seriesName);
     const isLastAgg = aggCount <= 1;
 
     // Last agg of a misc series → delete entire series; otherwise just remove the agg
     const isFullMiscDelete = isMisc && isLastAgg;
 
-    const aggLabel = aggType.charAt(0).toUpperCase() + aggType.slice(1);
+    const aggLabel = config ? getAggLabel(config) : aggId;
     const message = isFullMiscDelete
         ? `Delete "${displayName}" series?`
         : `Remove ${displayName} (${aggLabel})?`;
@@ -564,7 +672,7 @@ function removeCurrentSelection() {
             if (isFullMiscDelete) {
                 removeMiscSeries(seriesName);
             } else {
-                removeAggregationByType(seriesName, aggType);
+                removeAggregation(seriesName, aggId);
             }
         },
         onNo: () => {},
@@ -588,7 +696,7 @@ function updateTimingSeriesVisibility() {
 
     // If timing was selected and now hidden, switch to corrects
     if (!shouldShow && currentSeries === TIMING) {
-        selectAggregation(CORRECTS, 'raw');
+        selectAggregation(CORRECTS, getFirstAggId(CORRECTS));
     }
 }
 
@@ -639,10 +747,17 @@ function initializeSeriesNav() {
 
     // Set up add-agg panel confirm button
     document.getElementById('confirm-add-agg-btn')?.addEventListener('click', () => {
-        const aggType = document.getElementById('agg-type-select')?.value;
-        if (currentSeries && aggType) {
-            addAggregationOfType(currentSeries, aggType);
-        }
+        const onXAgg = document.getElementById('on-x-agg-select')?.value;
+        const acrossXVal = document.getElementById('across-x-agg-select')?.value;
+        const windowSize = parseInt(document.getElementById('window-size-input')?.value) || 7;
+
+        if (!currentSeries || !onXAgg) return;
+
+        const acrossXAgg = (acrossXVal && acrossXVal !== 'none')
+            ? { fn: acrossXVal, window: Math.max(2, windowSize) }
+            : null;
+
+        addAggregation(currentSeries, onXAgg, acrossXAgg);
     });
 
     // Set up heading name apply button
@@ -677,19 +792,19 @@ function initializeSeriesNav() {
     // Initial render
     renderSeriesNav();
 
-    // Select corrects/raw by default
-    selectAggregation(CORRECTS, 'raw');
+    // Select corrects first agg by default
+    selectAggregation(CORRECTS, getFirstAggId(CORRECTS));
 }
 
 function initializeAllSeriesInputs() {
     renderSeriesNav();
 
-    // Re-select current if valid, otherwise default to corrects/raw
+    // Re-select current if valid, otherwise default to corrects first agg
     const configs = getSeriesConfigs(currentSeries);
-    if (configs && configs[currentAggType]) {
-        selectAggregation(currentSeries, currentAggType);
+    if (configs && configs[currentAggId]) {
+        selectAggregation(currentSeries, currentAggId);
     } else {
-        selectAggregation(CORRECTS, 'raw');
+        selectAggregation(CORRECTS, getFirstAggId(CORRECTS));
     }
 }
 
@@ -699,7 +814,7 @@ function initializeAllSeriesInputs() {
 
 eventBus.subscribe(EVENTS.MISC_SERIES_ADDED, ({ id }) => {
     renderSeriesNav();
-    selectAggregation(id, 'raw');
+    selectAggregation(id, getFirstAggId(id));
     eventBus.emit(EVENTS.DATA_CHART_REFRESH);
     eventBus.emit(EVENTS.UI_LEGEND_RENDER);
 }, true);
@@ -707,7 +822,7 @@ eventBus.subscribe(EVENTS.MISC_SERIES_ADDED, ({ id }) => {
 eventBus.subscribe(EVENTS.MISC_SERIES_REMOVED, ({ id }) => {
     renderSeriesNav();
     if (currentSeries === id) {
-        selectAggregation(CORRECTS, 'raw');
+        selectAggregation(CORRECTS, getFirstAggId(CORRECTS));
     }
     eventBus.emit(EVENTS.DATA_CHART_REFRESH);
     eventBus.emit(EVENTS.UI_LEGEND_RENDER);
@@ -731,7 +846,8 @@ export {
     getAvailableAggTypes,
     updateTimingSeriesVisibility,
     getFirstConfig,
-    isSeriesVisible
+    isSeriesVisible,
+    getAggLabel
 };
 
 console.log('traceStyles.js loaded');

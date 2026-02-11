@@ -48,9 +48,9 @@ export function addMiscSeries() {
     const dataLength = chartState.series.xValues.length;
     chartState.series.misc[id] = new Array(dataLength).fill(MISSING);
 
-    // Initialize trace styles
+    // Initialize trace styles (counter-based key)
     chartState.traceStyles.misc[id] = {
-        raw: createMiscTraceConfig(index)
+        "0": createMiscTraceConfig(index)
     };
 
     // Initialize trend line styles

@@ -85,7 +85,7 @@ export const chartState = {
         grid: { dateLines: false, countLines: false, minorGrid: false }
     },
 
-    // Series visibility (by unique key, e.g. "corrects_raw": true/false)
+    // Series visibility (by unique key, e.g. "corrects_0": true/false)
     seriesVisibility: {},
 
     // Celeration fan visibility
@@ -121,16 +121,16 @@ export const chartState = {
         }
     },
 
-    // Trace styling per series/aggregation
+    // Trace styling per series/aggregation (keys are counter IDs: "0", "1", ...)
     traceStyles: {
         [CORRECTS]: {
-            "raw": { ...defaultCorrectTraceConfig }
+            "0": { ...defaultCorrectTraceConfig }
         },
         [ERRORS]: {
-            "raw": { ...defaultErrorTraceConfig }
+            "0": { ...defaultErrorTraceConfig }
         },
         [TIMING]: {
-            "raw": { ...defaultTimingTraceConfig }
+            "0": { ...defaultTimingTraceConfig }
         },
         misc: {}    // Dynamic misc series trace styles, keyed by ID
     },

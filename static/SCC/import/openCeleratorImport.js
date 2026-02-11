@@ -394,9 +394,9 @@ export function buildChartFromOpenCelerator(json, fileName) {
     }
 
     const traceStyles = {
-        [CORRECTS]: { raw: correctsRaw },
-        [ERRORS]:   { raw: errorsRaw },
-        [TIMING]:   { raw: { ...defaultTimingTraceConfig } },
+        [CORRECTS]: { "0": { ...correctsRaw, onXAgg: 'raw', acrossXAgg: null } },
+        [ERRORS]:   { "0": { ...errorsRaw, onXAgg: 'raw', acrossXAgg: null } },
+        [TIMING]:   { "0": { ...defaultTimingTraceConfig } },
         misc: {}
     };
 
@@ -419,7 +419,7 @@ export function buildChartFromOpenCelerator(json, fileName) {
         if (columnNames.misc[miscId]) miscRaw.seriesName = columnNames.misc[miscId];
         if (columnStyles.misc[miscId]) Object.assign(miscRaw, columnStyles.misc[miscId]);
 
-        traceStyles.misc[miscId] = { raw: miscRaw };
+        traceStyles.misc[miscId] = { "0": { ...miscRaw, onXAgg: 'raw', acrossXAgg: null } };
         lineStyles.trend.misc[miscId] = {
             color: MISC_COLORS[index % MISC_COLORS.length],
             width: LINE_DEFAULTS.TREND_WIDTH
