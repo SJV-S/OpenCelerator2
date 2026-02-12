@@ -483,8 +483,6 @@ export function initStartDateModal() {
     if (btn) {
         btn.addEventListener('click', showStartDateModal);
     }
-
-    console.log('startDateModal.js initialized');
 }
 
 /**
@@ -669,5 +667,3 @@ export function initChartHeightControl() {
     if (decBtn) decBtn.addEventListener('click', () => adjustChartHeight(-1));
     if (incBtn) incBtn.addEventListener('click', () => adjustChartHeight(1));
 }
-
-console.log('startDateModal.js loaded');

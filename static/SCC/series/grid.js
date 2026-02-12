@@ -46,20 +46,17 @@ function getTraceIndicesByNames(chartDiv, names) {
 export function toggleGrid(show) {
     const chartDiv = getChartDiv();
     if (!chartDiv || !chartDiv.data) {
-        console.log('Chart not found');
         return;
     }
 
     const gridIndices = getGridTraceIndices(chartDiv);
 
     if (gridIndices.length === 0) {
-        console.log('No grid traces found');
         return;
     }
 
     restyle(chartDiv, { visible: show }, gridIndices);
     gridVisible = show;
-    console.log(show ? 'Grid shown' : 'Grid hidden');
 }
 
 /**
@@ -105,24 +102,37 @@ export function toggleMinorGrid(show) {
 }
 
 /**
+ * Apply per-component grid visibility from chartState
+ */
+function applyGridVisibility() {
+    const g = chartState.lineVisibility.grid;
+    toggleDateLines(g.dateLines);
+    toggleCountLines(g.countLines);
+    toggleMinorGrid(g.minorGrid);
+    gridVisible = g.dateLines || g.countLines || g.minorGrid;
+}
+
+/**
  * Initialize the grid toggle
  */
 export function initGridToggle() {
     const chartDiv = getChartDiv();
     if (chartDiv && chartDiv.data) {
-        const gridIndices = getGridTraceIndices(chartDiv);
         const g = chartState.lineVisibility.grid;
         gridVisible = g.dateLines || g.countLines || g.minorGrid;
-        console.log(`Grid toggle initialized (${gridIndices.length} grid traces, visible: ${gridVisible})`);
     }
 
     // Re-apply per-component grid visibility after each replot (replot recreates grid traces as visible)
     eventBus.subscribe(EVENTS.DATA_CHART_REPLOT_COMPLETE, () => {
-        const g = chartState.lineVisibility.grid;
-        if (!g.dateLines) toggleDateLines(false);
-        if (!g.countLines) toggleCountLines(false);
-        if (!g.minorGrid) toggleMinorGrid(false);
+        applyGridVisibility();
         // Notify panning_controls so it can manage dynamic spines
         eventBus.emit(EVENTS.CHART_GRID_VISIBILITY_CHANGED, { save: false });
     });
+
+    // Handle user-initiated grid toggles from main.js and customLegend.js
+    eventBus.subscribe(EVENTS.CHART_GRID_VISIBILITY_CHANGED, (data) => {
+        // Skip render-only emits from the replot subscriber above (already applied)
+        if (data?.save === false) return;
+        applyGridVisibility();
+    }, true);
 }

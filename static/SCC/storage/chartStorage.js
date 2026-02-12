@@ -111,7 +111,6 @@ export async function initStorage() {
         });
 
         subscribeToEvents();
-        console.log('[Storage] Initialized');
         return true;
     } catch (error) {
         console.error('[Storage] Init failed:', error);
@@ -134,16 +133,10 @@ export async function saveChart(id = null) {
     try {
         const chartId = id || chartState.id || uuid();
         chartState.id = chartId;
-        console.log('[Storage] saveChart - chartState.chartKey:', chartState.chartKey?.slice(0, 16) + '...');
         const data = serializeChart(chartId, chartState);
-        console.log('[Storage] saveChart - serialized chartKey:', data.chartKey?.slice(0, 16) + '...');
-
-        const saveSize = JSON.stringify(data).length;
-        console.log(`[IMPORT DEBUG] saveChart — size: ${saveSize} chars (${(saveSize / 1024).toFixed(1)} KB)`);
 
         await db.put(STORE_NAME, data);
 
-        console.log(`[Storage] Saved chart: ${chartId}`);
         eventBus.emit(EVENTS.STORAGE_CHART_SAVED, { id: chartId, name: data.chartName });
         return chartId;
     } catch (error) {
@@ -159,7 +152,6 @@ export async function saveChart(id = null) {
  * @returns {Promise<boolean>} Success status
  */
 export async function loadChart(id) {
-    console.log('[LINE SAVE] LOAD 1. loadChart called:', id);
     if (!db) {
         console.warn('[Storage] Database not initialized');
         return false;
@@ -167,39 +159,22 @@ export async function loadChart(id) {
 
     try {
         const data = await db.get(STORE_NAME, id);
-        console.log('[LINE SAVE] LOAD 2. IndexedDB PhaseLines count:', Object.keys(data?.PhaseLines || {}).length);
-        console.log('[LINE SAVE] LOAD 2b. PhaseLines keys:', Object.keys(data?.PhaseLines || {}));
 
         if (!data) {
             console.warn(`[Storage] Chart not found: ${id}`);
             return false;
         }
 
-        const idbSize = JSON.stringify(data).length;
-        console.log('[IMPORT DEBUG] loadChart — IDB record size:', idbSize, 'chars (' + (idbSize / 1024).toFixed(1) + ' KB)');
-        // Flag large keys in loaded data
-        for (const [key, val] of Object.entries(data)) {
-            try {
-                const keySize = JSON.stringify(val).length;
-                if (keySize > 1000) {
-                    console.log(`[IMPORT DEBUG]   loaded.${key}: ${keySize} chars (${(keySize / 1024).toFixed(1)} KB)`);
-                }
-            } catch { /* skip */ }
-        }
-
         expandChart(data);
         const wasModified = await migrateChart(data);
         deserializeChart(data);
         chartState.id = id;
-        console.log('[LINE SAVE] LOAD 3. After deserialize, chartState.PhaseLines count:', Object.keys(chartState.PhaseLines).length);
 
         // Save if backwards compat made any migrations
         if (wasModified) {
             await db.put(STORE_NAME, data);
-            console.log(`[Storage] Migrated chart: ${id}`);
         }
 
-        console.log(`[Storage] Loaded chart: ${id}`);
         eventBus.emit(EVENTS.STORAGE_CHART_LOADED, { id, name: data.chartName });
         return true;
     } catch (error) {
@@ -276,7 +251,6 @@ export async function deleteChart(id) {
             }
         }
 
-        console.log(`[Storage] Deleted chart: ${id}`);
         eventBus.emit(EVENTS.STORAGE_CHART_DELETED, { id });
         return true;
     } catch (error) {
@@ -316,7 +290,6 @@ export async function updateChartTags(id, tags) {
         data.tags = normalizedTags;
 
         await db.put(STORE_NAME, data);
-        console.log(`[Storage] Updated tags for chart: ${id}`);
         return true;
     } catch (error) {
         console.error('[Storage] Update tags failed:', error);
@@ -382,7 +355,6 @@ export async function createChart(name, chartType, minuteChart) {
 
     try {
         await db.put(STORE_NAME, data);
-        console.log(`[Storage] Created chart: ${chartId} (${name})`);
         eventBus.emit(EVENTS.STORAGE_CHART_SAVED, { id: chartId, name });
         return chartId;
     } catch (error) {
@@ -416,11 +388,6 @@ export async function importChart(chartData) {
         const cryptoKey = await generateChartKey();
         const chartKey = await exportKeyToHex(cryptoKey);
 
-        console.log('[IMPORT DEBUG] === importChart (chartStorage) START ===');
-        console.log('[IMPORT DEBUG] chartData top-level keys:', Object.keys(chartData));
-        const inputSize = JSON.stringify(chartData).length;
-        console.log('[IMPORT DEBUG] chartData input size:', inputSize, 'chars (' + (inputSize / 1024).toFixed(1) + ' KB)');
-
         const data = {
             ...chartData,
             startDate: serializeDate(chartData.startDate),
@@ -433,21 +400,7 @@ export async function importChart(chartData) {
 
         await migrateChart(data);
 
-        const storedSize = JSON.stringify(data).length;
-        console.log('[IMPORT DEBUG] Final IDB data size:', storedSize, 'chars (' + (storedSize / 1024).toFixed(1) + ' KB)');
-        // Flag any large keys
-        for (const [key, val] of Object.entries(data)) {
-            try {
-                const keySize = JSON.stringify(val).length;
-                if (keySize > 1000) {
-                    console.log(`[IMPORT DEBUG]   data.${key}: ${keySize} chars (${(keySize / 1024).toFixed(1)} KB) *** LARGE ***`);
-                }
-            } catch { /* skip */ }
-        }
-        console.log('[IMPORT DEBUG] === importChart (chartStorage) END ===');
-
         await db.put(STORE_NAME, data);
-        console.log(`[STORAGE] Imported chart: ${chartId} (${data.chartName || 'Unnamed'})`);
         eventBus.emit(EVENTS.STORAGE_CHART_SAVED, { id: chartId, name: data.chartName });
         return chartId;
     } catch (error) {
@@ -470,10 +423,8 @@ function debouncedSaveToIndexedDB() {
     }
 
     saveTimeout = setTimeout(async () => {
-        console.log('[LINE SAVE] 4. Debounce fired, PhaseLines count:', Object.keys(chartState.PhaseLines).length);
         if (chartState.id) {
             await saveChart(chartState.id);
-            console.log('[LINE SAVE] 5. saveChart completed for id:', chartState.id);
             if ((chartState.shared || isSyncEnabled()) && isInitialized()) {
                 // Reconnect WebSocket if it dropped (e.g. after sleep/tab freeze)
                 if (chartState.shared && !hasSocket()) {
@@ -499,7 +450,6 @@ function onStateMutation(save = true) {
     if (!save) return;
     // Don't persist mutations on view-only charts we don't own
     if (!isChartOwner(chartState) && !chartState.acceptingEdits) return;
-    console.log('[LINE SAVE] 3. onStateMutation triggered, PhaseLines count:', Object.keys(chartState.PhaseLines).length);
     if (!chartState.id) {
         console.warn('[Storage] No chart ID - chart should be created before mutations');
         return;
@@ -523,7 +473,7 @@ function queuePush(chartId) {
     }
 }
 
-export async function drainPushQueue() {
+async function drainPushQueue() {
     if (!isSyncEnabled() || !isInitialized()) return;
 
     let queue;
@@ -552,5 +502,8 @@ function subscribeToEvents() {
     eventBus.subscribeToCategory(EVENT_CATEGORIES.STATE_MUTATING, ({ data }) => {
         onStateMutation(data?.save);
     }, true);
-    console.log('[Storage] Subscribed to STATE_MUTATING category');
+
+    // Drain push queue on sync initialization (every page load) and server reconnect
+    eventBus.subscribe(EVENTS.SYNC_READY, () => drainPushQueue());
+    eventBus.subscribe(EVENTS.SYNC_SERVER_RECONNECTED, () => drainPushQueue());
 }

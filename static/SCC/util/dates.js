@@ -189,9 +189,6 @@ function parseLocalDate(date) {
     // BUG INVESTIGATION: ISO strings with time component can shift dates across timezone boundaries
     const d = new Date(date);
     const result = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-    if (typeof date === 'string' && date.includes('T')) {
-        console.log('[CEL DEBUG] parseLocalDate ISO fallback: input="' + date + '" -> parsed=' + d.toISOString() + ' -> result=' + result.toISOString());
-    }
     return result;
 }
 

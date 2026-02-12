@@ -882,5 +882,3 @@ export {
     createNumberInputDialog,
     createArrowControls
 };
-
-console.log('toaster.js loaded');

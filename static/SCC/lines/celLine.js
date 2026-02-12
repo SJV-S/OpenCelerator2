@@ -277,8 +277,6 @@ function getAvailableSeriesButtons() {
  * Called when user selects a series from the toast buttons
  */
 function selectSeriesAndEnableDrag(seriesKey) {
-    const displayName = getFirstConfig(seriesKey)?.seriesName || seriesKey;
-    console.log('[CEL DEBUG] SERIES SELECTED: "' + displayName + '" (id=' + seriesKey + ')');
     celLineState.selectedSeriesKey = seriesKey;
 
     // Remove series selection toast using stored reference
@@ -713,14 +711,10 @@ function getDataInRangeForSeries(x1, x2, baseKey) {
             return name + ' (' + id + ')';
         });
 
-    console.log('[CEL DEBUG] TRACE MATCHING: Looking for "' + targetDisplayName + '" (' + baseKey + ')');
-    console.log('[CEL DEBUG] Available series in chart: ' + seriesWithNames.join(', '));
-
     // baseKey is now consistent: 'corrects', 'errors', 'timing', or misc ID
     const targetSeriesName = baseKey;
     const xValues = [];
     const yValues = [];
-    let matchingTraceCount = 0;
 
     for (let traceIdx = 0; traceIdx < chartDiv.data.length; traceIdx++) {
         const trace = chartDiv.data[traceIdx];
@@ -733,8 +727,6 @@ function getDataInRangeForSeries(x1, x2, baseKey) {
             continue;
         }
 
-        matchingTraceCount++;
-
         for (let i = 0; i < trace.x.length; i++) {
             const x = trace.x[i];
             const y = trace.y[i];
@@ -745,8 +737,6 @@ function getDataInRangeForSeries(x1, x2, baseKey) {
             }
         }
     }
-
-    console.log('[CEL DEBUG] RESULT: Found ' + xValues.length + ' points from ' + matchingTraceCount + ' trace(s)');
 
     return { x: xValues, y: yValues };
 }
@@ -876,9 +866,6 @@ function handleCelLineConfirm(data, baseKey) {
     metadata.shapeIndices = elements.shapes.map((_, i) => shapeIndex + i);
     metadata.annotationIndex = annotationIndex;
 
-    const displayName = getFirstConfig(baseKey)?.seriesName || baseKey;
-    console.log('[CEL DEBUG] LINE CREATED: "' + displayName + '" x1=' + firstX + ' x2=' + lastX + ' as ' + date1Str);
-
     chartState.CelLines[lineId] = metadata;
     eventBus.emit(EVENTS.LINE_CEL_SAVED, { lineId, metadata });
 
@@ -916,9 +903,6 @@ function redrawCelLines() {
         if (entry === chartState.CelLines.settings) return;
 
         const metadata = entry;
-
-        const displayName = getFirstConfig(metadata.seriesKey)?.seriesName || metadata.seriesKey;
-        console.log('[CEL DEBUG] REDRAW: "' + displayName + '" date1=' + metadata.date1);
 
         const elements = buildCelLineElements(metadata, chartDiv);
 
@@ -1082,4 +1066,3 @@ function init() {
 }
 
 export { activateCelLineMode, deactivateCelLineMode, init };
-

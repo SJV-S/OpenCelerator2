@@ -233,6 +233,9 @@ async function handleShareLinkClick(type) {
             chartState.chartKey = result.chartKey;
         }
 
+        // Notify bus — sharing is a major state transition (triggers auto-save + sync)
+        eventBus.emit(EVENTS.CHART_SHARED, { shared: true, acceptingEdits: chartState.acceptingEdits });
+
         // Open WebSocket connection now that chart is shared
         startSyncWatch(chartState.id);
 
@@ -256,27 +259,12 @@ async function handleShareLinkClick(type) {
  */
 function exportChartStateToJSON() {
     try {
-        // === IMPORT DEBUG: measure chartState before serialization ===
-        console.log('[IMPORT DEBUG] === exportChartStateToJSON START ===');
-        console.log('[IMPORT DEBUG] chartState top-level keys:', Object.keys(chartState));
-        for (const key of Object.keys(chartState)) {
-            try {
-                const keySize = JSON.stringify(chartState[key]).length;
-                console.log(`[IMPORT DEBUG]   chartState.${key}: ${keySize} chars`);
-            } catch {
-                console.log(`[IMPORT DEBUG]   chartState.${key}: [not serializable]`);
-            }
-        }
-
         // Build exportable object: spread chartState, override startDate to ISO string
         const exportObj = { ...chartState, startDate: serializeDate(chartState.startDate) };
         compactChart(exportObj);
         const jsonContent = DEVELOPER_MODE
             ? JSON.stringify(exportObj, null, 2)
             : JSON.stringify(exportObj);
-
-        console.log('[IMPORT DEBUG] Serialized JSON total size:', jsonContent.length, 'chars (' + (jsonContent.length / 1024).toFixed(1) + ' KB)');
-        console.log('[IMPORT DEBUG] === exportChartStateToJSON END ===');
 
         // Create a blob from the JSON content
         const fileName = chartState.chartName ? `${chartState.chartName}.json` : 'chart-data.json';
@@ -478,7 +466,6 @@ function initializeShareTab() {
         }
     }, true);
 
-    console.log('Share tab initialized');
 }
 
 export { takeChartScreenshot, exportDataToCSV, initializeShareTab };

@@ -323,6 +323,8 @@ export async function pushChart(chartUuid) {
             }]
         })
     });
+
+    if (!response.ok) throw new Error(`Push failed: ${response.status}`);
 }
 
 // ============================================================================

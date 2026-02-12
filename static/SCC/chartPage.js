@@ -15,7 +15,6 @@ import { joinSharedChart, startSyncWatch, checkForUpdates } from '../Server/sync
 import { initServerSync, isSyncEnabled } from '../Server/init.js';
 import { openDB } from '../lib/idb.js';
 import { eventBus, EVENTS } from './eventBus.js';
-import { refreshChart } from './series/replot.js';
 import { chartState } from './chartState.js';
 
 const pathParts = window.location.pathname.split('/'); // /chart/{uuid}/{secret}
@@ -61,7 +60,7 @@ async function init() {
                 eventBus.emit(EVENTS.CHART_WINDOW_CHANGED, chartState.chartWindow);
             }
 
-            refreshChart();
+            eventBus.emit(EVENTS.DATA_CHART_REFRESH);
         }
     }, true);
 

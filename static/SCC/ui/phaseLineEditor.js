@@ -20,5 +20,3 @@ const editor = createLineEditor({
 export function showPhaseLineEditor(lineId) {
     editor.show(lineId);
 }
-
-console.log('phaseLineEditor.js loaded');

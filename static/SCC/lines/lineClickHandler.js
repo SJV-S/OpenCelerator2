@@ -71,7 +71,6 @@ function setupClickHandler() {
         for (const point of points) {
             const meta = point.data.meta;
             if (meta && meta.type === 'clickableLine') {
-                console.log(`Line clicked: ${meta.lineName}`);
                 handleLineClick(meta.lineName);
                 return;
             }
@@ -79,7 +78,6 @@ function setupClickHandler() {
     });
 
     clickHandlerAttached = true;
-    console.log('Click handler initialized');
 }
 
 /**
@@ -156,7 +154,6 @@ function handleLineClick(lineName) {
     buttons.push({
         label: 'Remove',
         onClick: () => {
-            console.log(`Remove clicked for ${lineName}`);
             removeLine(lineType.stateKey, lineId);
         },
         type: 'secondary'
@@ -197,16 +194,11 @@ function makeLineClickable(lineData) {
 function removeLineClickable(lineName) {
     const chartDiv = getChartDiv();
     const indices = [];
-    const allClickable = [];
     chartDiv.data.forEach((trace, i) => {
         if (trace.meta?.type === 'clickableLine') {
-            allClickable.push({ i, lineName: trace.meta.lineName });
             if (trace.meta.lineName === lineName) indices.push(i);
         }
     });
-    console.log(`removeLineClickable: looking for "${lineName}"`);
-    console.log(`All clickable traces:`, allClickable);
-    console.log(`Found ${indices.length} traces to remove`);
     if (indices.length > 0) {
         deleteTraces(chartDiv, indices.sort((a, b) => b - a));
     }
@@ -378,8 +370,6 @@ function setLineCategoryClickability(category, makeClickable) {
             if (clickableIndices.length > 0) {
                 return Plotly.moveTraces(chartDiv, clickableIndices, clickableIndices.map(() => -1));
             }
-        }).then(() => {
-            console.log(`${category} lines made clickable`);
         });
 
     } else {
@@ -476,5 +466,3 @@ export {
     drawCutLineMarkers,
     init
 };
-
-console.log('lineClickHandler.js loaded');

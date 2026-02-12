@@ -241,8 +241,6 @@ function init() {
     eventBus.subscribe(EVENTS.SERIES_VISIBILITY_CHANGED, () => {
         setTimeout(refreshHoverTraces, 50);
     }, true);
-
-    console.log('lineHover.js initialized');
 }
 
 export {
@@ -250,5 +248,3 @@ export {
     refreshHoverTraces,
     removeAllHoverTraces
 };
-
-console.log('lineHover.js loaded');

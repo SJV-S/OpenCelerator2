@@ -281,7 +281,8 @@ export function updateCurrentEntry() {
     currentDataForDate[currentTimestampIndex].errors = errors;
     currentDataForDate[currentTimestampIndex].timing = timingMinutes;
 
-    // Refresh the chart to show updated data
+    // Notify bus of the specific mutation (triggers auto-save) then refresh chart
+    eventBus.emit(EVENTS.DATA_ENTRY_UPDATED, { index: dataIndex });
     eventBus.emit(EVENTS.DATA_CHART_REFRESH);
 
     // Show success toast
@@ -291,7 +292,6 @@ export function updateCurrentEntry() {
         position: 'top-right'
     });
 
-    console.log('Entry updated at index:', dataIndex);
 }
 
 /**
@@ -343,7 +343,8 @@ export function deleteCurrentEntry() {
             // Re-render
             renderCurrentEntry();
 
-            // Refresh the chart to show updated data
+            // Notify bus of the specific mutation (triggers auto-save) then refresh chart
+            eventBus.emit(EVENTS.DATA_ENTRY_DELETED, { index: dataIndex });
             eventBus.emit(EVENTS.DATA_CHART_REFRESH);
 
             // Show success toast
@@ -353,11 +354,9 @@ export function deleteCurrentEntry() {
                 position: 'top-right'
             });
 
-            console.log('Entry deleted at index:', dataIndex);
-        },
+            },
         onNo: () => {
             // User cancelled - do nothing
-            console.log('Delete cancelled');
         }
     });
 }
@@ -381,5 +380,3 @@ export function init() {
         }
     });
 }
-
-console.log('dataUpdate.js loaded');

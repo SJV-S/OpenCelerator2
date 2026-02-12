@@ -1,5 +1,5 @@
-import { initStorage, listCharts, deleteChart, updateChartTags, drainPushQueue } from '/static/SCC/storage/chartStorage.js';
-import { importChartFromJson } from '/static/SCC/import/chartImport.js';
+import { initStorage, listCharts, deleteChart, updateChartTags } from '/static/SCC/storage/chartStorage.js';
+
 import { openDB } from '/static/lib/idb.js';
 import { checkForUpdates } from '/static/Server/syncClient.js';
 import { initServerSync, isSyncEnabled } from '/static/Server/init.js';
@@ -351,7 +351,6 @@ async function loadCharts() {
     await initServerSync();
     if (isSyncEnabled()) {
         try {
-            await drainPushQueue();
             const manifest = charts.map(c => ({ chart_uuid: c.id, updated_at: c.updatedAt || 0 }));
             const { downloads, tombstones } = await checkForUpdates(manifest);
             let changed = false;
@@ -478,53 +477,6 @@ document.getElementById('prev-page').addEventListener('click', () => {
 document.getElementById('next-page').addEventListener('click', () => {
     currentPage++;
     renderCharts();
-});
-
-// Import chart button
-document.getElementById('import-chart-btn').addEventListener('click', () => {
-    document.getElementById('import-chart-input').click();
-});
-
-document.getElementById('import-chart-input').addEventListener('change', async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Reset input so same file can be selected again
-    e.target.value = '';
-
-    try {
-        const text = await file.text();
-        console.log(`[IMPORT DEBUG] === FILE IMPORT START: ${file.name} ===`);
-        console.log(`[IMPORT DEBUG] Raw file size: ${text.length} chars (${(text.length / 1024).toFixed(1)} KB)`);
-
-        let json;
-        try {
-            json = JSON.parse(text);
-        } catch (parseErr) {
-            alert(`Invalid JSON file: ${parseErr.message}`);
-            return;
-        }
-
-        console.log('[IMPORT DEBUG] Parsed JSON top-level keys:', Object.keys(json));
-
-        const result = await importChartFromJson(json, file.name);
-        if (!result.success) {
-            alert(result.error);
-            return;
-        }
-
-        await loadCharts();
-
-        let message = `Imported "${result.chartName}"`;
-        if (result.warnings.length > 0) {
-            message += ` (${result.warnings.length} feature(s) not supported)`;
-        }
-        alert(message);
-
-    } catch (err) {
-        console.error('Import error:', err);
-        alert(`Import failed: ${err.message}`);
-    }
 });
 
 // Show share-link error banner if redirected from an expired/invalid link

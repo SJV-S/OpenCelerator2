@@ -67,13 +67,6 @@ html, body {
                 </svg>
                 Settings
             </button>
-            <button id="import-chart-btn" class="px-5 py-2 rounded-lg border-2 border-[#6ad1e3] text-[#05c3de] font-medium text-sm flex items-center gap-2 hover:bg-[#6ad1e3] hover:text-white transition-colors">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
-                </svg>
-                Import Chart
-            </button>
-            <input type="file" id="import-chart-input" accept=".json" class="hidden">
             <a href="/new" class="new-chart-btn px-5 py-2 rounded-lg text-white font-medium text-sm flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
@@ -209,12 +202,20 @@ html, body {
         <!-- Sync toggle -->
         <label class="flex items-center gap-3 mb-5 cursor-pointer">
             <input type="checkbox" id="settings-sync-checkbox" class="accent-[#6ad1e3] w-4 h-4">
-            <span class="text-sm text-gray-700">Sync charts to server</span>
+            <span class="text-sm text-gray-700">Sync across devices</span>
+            <span class="relative group cursor-help text-gray-400 hover:text-gray-600">
+                <svg xmlns="http://www.w3.org/2000/svg" class="inline w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
+                </svg>
+                <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 text-xs text-white bg-gray-800 rounded shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                    To sync, download the backup file and upload on your other device. Your charts are private through encryption. The server cannot read them.
+                </span>
+            </span>
         </label>
 
-        <!-- Owner name -->
+        <!-- Username -->
         <div class="mb-6">
-            <label for="settings-owner-name" class="block text-sm text-gray-700 mb-1">Owner name</label>
+            <label for="settings-owner-name" class="block text-sm text-gray-700 mb-1">Username</label>
             <input
                 type="text"
                 id="settings-owner-name"
@@ -233,24 +234,6 @@ html, body {
         </button>
 
         <div id="backup-group" class="hidden mb-5">
-            <!-- Passphrase copy -->
-            <div class="mb-4">
-                <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Passphrase</p>
-                <div class="flex items-center gap-2">
-                    <div id="sync-passphrase-display" class="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono text-gray-800 select-all break-words min-h-[40px] flex items-center"></div>
-                    <button id="sync-toggle-visibility" class="p-2 text-gray-400 hover:text-gray-600" title="Show/hide passphrase">
-                        <svg id="sync-eye-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L6.59 6.59m7.532 7.532l3.29 3.29M3 3l18 18"/>
-                        </svg>
-                        <svg id="sync-eye-off-icon" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                        </svg>
-                    </button>
-                    <button id="sync-copy-btn" class="px-3 py-2 text-sm font-medium bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors">Copy</button>
-                </div>
-            </div>
-
             <!-- Backup file download -->
             <div>
                 <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Backup file</p>
@@ -272,16 +255,6 @@ html, body {
         </button>
 
         <div id="sync-group" class="hidden mb-5">
-            <!-- Paste passphrase section -->
-            <div id="sync-paste-section" class="mb-4">
-                <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Passphrase</p>
-                <div class="flex items-center gap-2">
-                    <input type="text" id="sync-paste-input" placeholder="Paste passphrase here..." class="flex-1 px-3 py-2 border-2 border-gray-300 rounded-lg text-sm font-mono" autocomplete="off">
-                    <button id="sync-submit-btn" class="px-3 py-2 text-sm font-medium bg-[#6ad1e3] text-white rounded-lg hover:bg-[#5bc4d6] transition-colors">Sync</button>
-                </div>
-                <p id="sync-status" class="text-sm mt-2 hidden"></p>
-            </div>
-
             <!-- Backup file import -->
             <div id="backup-import-section" class="mb-4">
                 <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Backup file</p>

@@ -887,5 +887,3 @@ export {
     isSeriesVisible,
     getAggLabel
 };
-
-console.log('traceStyles.js loaded');

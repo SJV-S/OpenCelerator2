@@ -1,5 +1,5 @@
 /**
- * Backup Storage - Full backup export/import for TC2 charts and identity
+ * Backup Storage - Full backup export/import for charts and identity
  *
  * Handles creating complete backup data and restoring from backup files.
  * Each function opens its own IDB connections (stateless pattern).
@@ -14,11 +14,21 @@ import { resetSync, initServerSync } from '../../Server/init.js';
  */
 export async function createBackupData() {
     const identityDb = await openDB('SCC_Identity', 1);
+    const tx = identityDb.transaction('credentials', 'readonly');
+    const store = tx.objectStore('credentials');
+    const [passphrase, publicKey, display_name, user_preferences] = await Promise.all([
+        store.get('passphrase'),
+        store.get('publicKey'),
+        store.get('display_name'),
+        store.get('user_preferences'),
+    ]);
+    await tx.done;
+
     const identity = {
-        passphrase: await identityDb.get('credentials', 'passphrase') || null,
-        publicKey: await identityDb.get('credentials', 'publicKey') || null,
-        display_name: await identityDb.get('credentials', 'display_name') || null,
-        user_preferences: await identityDb.get('credentials', 'user_preferences') || null,
+        passphrase: passphrase || null,
+        publicKey: publicKey || null,
+        display_name: display_name || null,
+        user_preferences: user_preferences || null,
     };
 
     const chartsDb = await openDB('SCC_Charts', 1);

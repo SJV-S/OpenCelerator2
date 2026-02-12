@@ -96,5 +96,3 @@ export {
     showDismissMenuHint,
     tooltipEnabled
 };
-
-console.log('tooltip.js loaded - tooltips disabled by default');

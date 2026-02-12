@@ -93,8 +93,4 @@ export function initLineSettingsModal() {
         const target = gear.dataset.settingsTarget;
         if (target) showModal(target);
     });
-
-    console.log('lineSettingsModal.js initialized');
 }
-
-console.log('lineSettingsModal.js loaded');

@@ -156,20 +156,9 @@ function convertOpenCeleratorToTC2(json) {
             };
         }
 
-        console.log('[IMPORT DEBUG] === convertOpenCeleratorToTC2 START ===');
-        console.log('[IMPORT DEBUG] Input JSON top-level keys:', Object.keys(json));
-        console.log('[IMPORT DEBUG] Input JSON approx size:', JSON.stringify(json).length, 'chars');
-
         const rawData = json.raw_data;
         const columnMap = json.column_map;
         const dataPointStyles = json.data_point_styles || {};
-
-        console.log('[IMPORT DEBUG] column_map:', columnMap);
-        console.log('[IMPORT DEBUG] raw_data keys:', Object.keys(rawData));
-        for (const [key, arr] of Object.entries(rawData)) {
-            console.log(`[IMPORT DEBUG] raw_data.${key}: ${Array.isArray(arr) ? arr.length + ' items' : typeof arr}`);
-        }
-        console.log('[IMPORT DEBUG] data_point_styles keys:', Object.keys(dataPointStyles));
 
         // OpenCelerator's place_below_floor setting: when false, zeros mean "no data"
         const placeZerosBelowFloor = json.place_below_floor !== false;
@@ -235,15 +224,6 @@ function convertOpenCeleratorToTC2(json) {
                 const miscVal = rawData[ocCol] ? cleanNumericValue(rawData[ocCol][i]) : MISSING;
                 series.misc[miscId].push(miscVal);
             });
-        }
-
-        console.log('[IMPORT DEBUG] Series built — xValues:', series.xValues.length,
-            'corrects:', series.corrects.length,
-            'errors:', series.errors.length,
-            'timing:', series.timing.length,
-            'misc keys:', Object.keys(series.misc));
-        for (const [miscId, arr] of Object.entries(series.misc)) {
-            console.log(`[IMPORT DEBUG] series.misc.${miscId}: ${arr.length} items, ${arr.filter(v => !isMissing(v)).length} finite`);
         }
 
         if (series.xValues.length === 0) {
@@ -319,10 +299,6 @@ function convertOpenCeleratorToTC2(json) {
             hasErrors,
             placeZerosBelowFloor
         };
-
-        console.log('[IMPORT DEBUG] convertOpenCeleratorToTC2 result size:', JSON.stringify(conversionData).length, 'chars');
-        console.log('[IMPORT DEBUG] columnNames:', columnNames);
-        console.log('[IMPORT DEBUG] === convertOpenCeleratorToTC2 END ===');
 
         return {
             success: true,
@@ -460,23 +436,6 @@ export function buildChartFromOpenCelerator(json, fileName) {
         fanVisible: true,
         placeZerosBelowFloor: placeZerosBelowFloor ?? true
     };
-
-    // === IMPORT DEBUG: measure final chartData ===
-    const chartDataJson = JSON.stringify(chartData);
-    console.log('[IMPORT DEBUG] === buildChartFromOpenCelerator RESULT ===');
-    console.log('[IMPORT DEBUG] chartData total size:', chartDataJson.length, 'chars');
-    console.log('[IMPORT DEBUG] chartData top-level keys:', Object.keys(chartData));
-    // Measure each top-level key's contribution
-    for (const [key, val] of Object.entries(chartData)) {
-        const keySize = JSON.stringify(val).length;
-        console.log(`[IMPORT DEBUG]   chartData.${key}: ${keySize} chars`);
-    }
-    console.log('[IMPORT DEBUG] traceStyles keys:', Object.keys(traceStyles));
-    console.log('[IMPORT DEBUG] traceStyles.misc keys:', Object.keys(traceStyles.misc));
-    for (const [miscId, cfg] of Object.entries(traceStyles.misc)) {
-        console.log(`[IMPORT DEBUG]   traceStyles.misc.${miscId}:`, JSON.stringify(cfg).length, 'chars');
-    }
-    console.log('[IMPORT DEBUG] === buildChartFromOpenCelerator END ===');
 
     return {
         success: true,

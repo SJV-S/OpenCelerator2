@@ -366,5 +366,3 @@ export {
     updateTimingVisibility,
     init
 };
-
-console.log('dataEntry.js loaded');

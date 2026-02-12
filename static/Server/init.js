@@ -8,6 +8,7 @@ import { openDB } from '../lib/idb.js';
 import { generatePassphrase } from '../SCC/storage/passphrase.js';
 import { initSync, setSigningDisplayName } from './syncClient.js';
 import { deriveSigningKeyPair, exportPublicKey } from './crypto.js';
+import { eventBus, EVENTS } from '../SCC/eventBus.js';
 
 const DB_NAME = 'SCC_Identity';
 const STORE_NAME = 'credentials';
@@ -63,6 +64,7 @@ export async function initServerSync() {
     await initSync(passphrase, keyPair.privateKey, publicKeyB64Cache, displayName);
     initialized = true;
     console.log('[Server] Sync initialized');
+    eventBus.emit(EVENTS.SYNC_READY);
 }
 
 export function getPublicKeyB64() {

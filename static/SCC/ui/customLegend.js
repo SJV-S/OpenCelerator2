@@ -13,7 +13,6 @@ import { CORRECTS, ERRORS, TIMING, WINDOW_UNITS } from '../config.js';
 import { icons } from './icons.js';
 import { createToast } from './toaster.js';
 import { eventBus, EVENTS } from '../eventBus.js';
-import { toggleGrid } from '../series/grid.js';
 import { restyle } from '../util/plotlyWrapper.js';
 import { getChartDiv } from '../util/dom.js';
 import { getAggLabel } from '../series/traceStyles.js';
@@ -295,7 +294,6 @@ function toggleLineVisibility(lineType) {
             legendItem.classList.toggle('legend-item-hidden', !newState);
         }
 
-        toggleGrid(newState);
         eventBus.emit(EVENTS.CHART_GRID_VISIBILITY_CHANGED, { visible: newState });
         return;
     }
@@ -505,6 +503,9 @@ function toggleLegend(visible) {
     if (legendPosition) {
         legendPosition.disabled = !visible;
     }
+
+    // Notify bus (triggers auto-save for this preference change)
+    eventBus.emit(EVENTS.UI_LEGEND_VISIBILITY_CHANGED, { visible });
 }
 
 /**

@@ -162,8 +162,6 @@ function buildAimLineElements(metadata, chartDiv) {
  * @param {string} direction - 'horizontal' or 'diagonal'
  */
 function activateAimLineMode(direction) {
-    console.log(`%c[AIM LINE] Activating aim line mode: ${direction}`, 'color: blue; font-weight: bold');
-
     const chartDiv = getChartDiv();
 
     if (!chartDiv) {
@@ -196,12 +194,10 @@ function activateAimLineMode(direction) {
 
     // Create click/tap handler
     aimLineState.clickHandler = function(event) {
-        console.log('[AIM LINE] Click detected!', event);
         handleAimLineDrawClick(event, chartDiv);
     };
 
     aimLineState.touchHandler = function(event) {
-        console.log('[AIM LINE] Touch detected!', event);
         // Prevent default to avoid triggering click as well
         event.preventDefault();
 
@@ -226,17 +222,12 @@ function activateAimLineMode(direction) {
 
     // Show "Aim mode" toaster on the left
     showAimModeToaster(1);
-
-    console.log('%c[AIM LINE] Aim line mode activated - Phase 1: Click to place first point', 'color: green; font-weight: bold');
-    console.log('[AIM LINE] Current state:', aimLineState);
 }
 
 /**
  * Deactivates aim line drawing mode
  */
 function deactivateAimLineMode() {
-    console.log('Deactivating aim line mode');
-
     const chartDiv = getChartDiv();
 
     // Remove click listener
@@ -301,8 +292,6 @@ function deactivateAimLineMode() {
     aimLineState.tempShapes = [];
     aimLineState.tempDotIndex = null;
     aimLineState.tempAnnotationIndex = null;
-
-    console.log('Aim line mode deactivated');
 }
 
 /**
@@ -318,8 +307,6 @@ function handleAimLineDrawClick(event, chartDiv) {
         console.warn('Could not get plot coordinates');
         return;
     }
-
-    console.log(`Phase ${aimLineState.currentPhase} click at data coordinates:`, coords);
 
     if (aimLineState.currentPhase === 1) {
         handleFirstClick(chartDiv, coords);
@@ -357,8 +344,6 @@ function roundYValue(yValue) {
  * @param {Object} coords - Data coordinates {x, y}
  */
 function handleFirstClick(chartDiv, coords) {
-    console.log(`First click at x=${coords.x}, y=${coords.y}`);
-
     // Store the first point
     aimLineState.x1 = coords.x;
     aimLineState.y1 = coords.y;
@@ -371,8 +356,6 @@ function handleFirstClick(chartDiv, coords) {
 
     // Update toaster to show phase 2
     updateAimModeToaster(2);
-
-    console.log(`Phase 2: Click to place endpoint for ${aimLineState.direction} line`);
 }
 
 /**
@@ -381,12 +364,8 @@ function handleFirstClick(chartDiv, coords) {
  * @param {Object} coords - Data coordinates {x, y}
  */
 function handleSecondClick(chartDiv, coords) {
-    console.log(`Second click at x=${coords.x}, y=${coords.y}`);
-
     // Check if x2 <= x1, if so reset to phase 1
     if (coords.x <= aimLineState.x1) {
-        console.log(`Invalid second click: x2 (${coords.x}) <= x1 (${aimLineState.x1}). Resetting to phase 1.`);
-
         // Remove the current dot
         removeTempDot(chartDiv);
 
@@ -400,7 +379,6 @@ function handleSecondClick(chartDiv, coords) {
         // Update toaster back to phase 1
         updateAimModeToaster(1);
 
-        console.log('Reset complete. Click to place first point again.');
         return;
     }
 
@@ -428,8 +406,6 @@ function drawHorizontalAimLine(chartDiv, coords) {
     // Store for later use
     aimLineState.x2 = x2;
     aimLineState.y2 = yValue;
-
-    console.log(`Drawing horizontal line at y=${yValue} from x=${x1} to x=${x2}`);
 
     // Create horizontal line shape
     const lineShape = {
@@ -467,7 +443,6 @@ function drawHorizontalAimLine(chartDiv, coords) {
     }
 
     showAimTextInput(chartDiv);
-    console.log('Phase 3: Enter text label');
 }
 
 /**
@@ -482,8 +457,6 @@ function drawDiagonalAimLine(chartDiv, coords) {
     // Store second point
     aimLineState.x2 = coords.x;
     aimLineState.y2 = coords.y;
-
-    console.log(`Drawing diagonal line from (${aimLineState.x1}, ${aimLineState.y1}) to (${aimLineState.x2}, ${aimLineState.y2})`);
 
     // Create diagonal line shape
     const lineShape = {
@@ -521,7 +494,6 @@ function drawDiagonalAimLine(chartDiv, coords) {
     }
 
     showAimTextInput(chartDiv);
-    console.log('Phase 3: Enter text label');
 }
 
 /**
@@ -557,7 +529,6 @@ function addAimTextLabel(chartDiv, text) {
 
     // If text is empty, skip annotation creation
     if (!text || text.trim() === '') {
-        console.log('No text provided, skipping annotation');
         aimLineState.tempAnnotationIndex = null;
 
         // Remove instruction toaster - the confirm dialog includes the step info
@@ -591,9 +562,6 @@ function addAimTextLabel(chartDiv, text) {
         annotationY = centerY;
     }
 
-    console.log(`Adding aim text label: "${text}" at center (${centerX}, ${centerY})`);
-    console.log(`  Annotation Y (log10 if log scale): ${annotationY}`);
-
     // Calculate angle for diagonal lines (in screen space to match visual slope)
     let textAngle = 0;
     if (aimLineState.direction === 'diagonal') {
@@ -622,10 +590,6 @@ function addAimTextLabel(chartDiv, text) {
 
         // Calculate angle (negate dy because screen y increases downward)
         textAngle = Math.atan2(-dy_pixels, dx_pixels) * (180 / Math.PI);
-
-        console.log(`  Diagonal line angle: ${textAngle} degrees`);
-        console.log(`    Data: dx=${dx_data}, dy=${dy_data}`);
-        console.log(`    Pixels: dx=${dx_pixels}, dy=${dy_pixels}`);
     }
 
     // Create annotation for the text label
@@ -670,8 +634,6 @@ function addAimTextLabel(chartDiv, text) {
 
     // Show save confirmation toast
     showAimSaveConfirmationToast(chartDiv);
-
-    console.log('Aim line drawn, awaiting save confirmation');
 }
 
 /**
@@ -768,8 +730,6 @@ function removeAimAnnotation(chartDiv) {
         return;
     }
 
-    console.log('Removing aim annotation at index:', aimLineState.tempAnnotationIndex);
-
     // Get current annotations
     let annotations = [...(chartDiv.layout.annotations || [])];
 
@@ -790,8 +750,6 @@ function removeAimShapes(chartDiv) {
     if (aimLineState.tempShapes.length === 0) {
         return;
     }
-
-    console.log('Removing aim shapes:', aimLineState.tempShapes);
 
     // Get current shapes
     let currentShapes = chartDiv.layout.shapes || [];
@@ -868,8 +826,6 @@ function getPhaseStepText(phase) {
  * @param {number} y - Y coordinate in data space
  */
 function addTempDot(chartDiv, x, y) {
-    console.log(`Adding temporary dot at (${x}, ${y})`);
-
     const xaxis = chartDiv._fullLayout.xaxis;
     const yaxis = chartDiv._fullLayout.yaxis;
     const isLogY = yaxis.type === 'log';
@@ -904,8 +860,6 @@ function addTempDot(chartDiv, x, y) {
 
     svgLayer.appendChild(circle);
     aimLineState.tempDotIndex = 'svg-dot';
-
-    console.log(`Temporary SVG dot added at pixel (${xPixel}, ${yPixel})`);
 }
 
 /**
@@ -916,8 +870,6 @@ function removeTempDot(chartDiv) {
     if (aimLineState.tempDotIndex === null) {
         return;
     }
-
-    console.log('Removing temporary dot');
 
     // Remove SVG circle element
     const dot = document.getElementById('aim-temp-dot');
@@ -1035,5 +987,3 @@ function init() {
 
 // Export functions for ES modules
 export { activateAimLineMode, deactivateAimLineMode, init };
-
-console.log('aimLines.js loaded');

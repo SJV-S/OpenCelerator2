@@ -136,8 +136,6 @@ function buildPhaseLineElements(metadata, chartDiv) {
  * @param {string} direction - 'top' or 'bottom'
  */
 function activatePhaseLineMode(direction) {
-    console.log(`%c[PHASE LINE] Activating phase line mode: ${direction}`, 'color: purple; font-weight: bold');
-
     const chartDiv = getChartDiv();
 
     if (!chartDiv) {
@@ -164,12 +162,10 @@ function activatePhaseLineMode(direction) {
 
     // Create click/tap handler
     phaseLineState.clickHandler = function(event) {
-        console.log('[PHASE LINE] Click detected!', event);
         handlePhaseLineDrawClick(event, chartDiv);
     };
 
     phaseLineState.touchHandler = function(event) {
-        console.log('[PHASE LINE] Touch detected!', event);
         // Prevent default to avoid triggering click as well
         event.preventDefault();
 
@@ -194,9 +190,6 @@ function activatePhaseLineMode(direction) {
 
     // Show "Phase mode" toaster on the left
     showPhaseModeToaster(1);
-
-    console.log('%c[PHASE LINE] Phase line mode activated - Phase 1: Click to place vertical line', 'color: green; font-weight: bold');
-    console.log('[PHASE LINE] Current state:', phaseLineState);
 }
 
 /**
@@ -356,8 +349,6 @@ function redrawHorizontalLine(chartDiv) {
  * Deactivates phase line drawing mode
  */
 function deactivatePhaseLineMode() {
-    console.log('Deactivating phase line mode');
-
     const chartDiv = getChartDiv();
 
     // Remove click listener
@@ -413,8 +404,6 @@ function deactivatePhaseLineMode() {
     phaseLineState.horizontalEndY = null;
     phaseLineState.tempShapes = [];
     phaseLineState.tempAnnotationIndex = null;
-
-    console.log('Phase line mode deactivated');
 }
 
 /**
@@ -430,8 +419,6 @@ function handlePhaseLineDrawClick(event, chartDiv) {
         console.warn('Could not get plot coordinates');
         return;
     }
-
-    console.log(`Phase ${phaseLineState.currentPhase} click at data coordinates:`, coords);
 
     if (phaseLineState.currentPhase === 1) {
         drawVerticalLine(chartDiv, coords);
@@ -504,8 +491,6 @@ function roundHorizontalX(x2Raw, x1) {
  * @param {Object} coords - Data coordinates {x, y}
  */
 function drawVerticalLine(chartDiv, coords) {
-    console.log(`Drawing vertical line at x=${coords.x}, y=${coords.y}`);
-
     // Store the coordinates - the vertical line goes through this point
     phaseLineState.verticalLineX = coords.x;
     phaseLineState.verticalLineY = coords.y;
@@ -528,8 +513,6 @@ function drawVerticalLine(chartDiv, coords) {
         yTop = visibleYMax;
     }
 
-    console.log(`Y-axis range: ${yBottom} to ${yTop} (log: ${isLogY})`);
-
     // Create vertical line shape
     let verticalLine;
     if (phaseLineState.direction === 'top') {
@@ -547,7 +530,6 @@ function drawVerticalLine(chartDiv, coords) {
                 width: 2
             }
         };
-        console.log(`Drawing line from BOTTOM (y=${yBottom}) UP to clicked point (y=${coords.y})`);
     } else {
         // "bottom" mode: Line from TOP DOWN to clicked point (horizontal will be at bottom)
         verticalLine = {
@@ -563,7 +545,6 @@ function drawVerticalLine(chartDiv, coords) {
                 width: 2
             }
         };
-        console.log(`Drawing line from TOP (y=${yTop}) DOWN to clicked point (y=${coords.y})`);
     }
 
     // Get current shapes or initialize empty array
@@ -584,7 +565,6 @@ function drawVerticalLine(chartDiv, coords) {
     updatePhaseModeToaster(2);
 
     showArrowControls(chartDiv);
-    console.log(`Phase 2: Click to the right to draw horizontal line from y=${coords.y}`);
 }
 
 /**
@@ -593,8 +573,6 @@ function drawVerticalLine(chartDiv, coords) {
  * @param {Object} coords - Data coordinates {x, y}
  */
 function drawHorizontalLine(chartDiv, coords) {
-    console.log(`Drawing horizontal line from (${phaseLineState.verticalLineX}, ${phaseLineState.verticalLineY}) to (${coords.x}, ${coords.y})`);
-
     // Validate that click is to the right of vertical line BEFORE rounding
     if (coords.x <= phaseLineState.verticalLineX) {
         console.warn('Please click to the right of the vertical line');
@@ -603,8 +581,6 @@ function drawHorizontalLine(chartDiv, coords) {
 
     // Round x2 to nearest multiple of 7, ensuring it's not equal to x1
     const x2Rounded = roundHorizontalX(coords.x, phaseLineState.verticalLineX);
-
-    console.log(`Original x2: ${coords.x}, Rounded x2: ${x2Rounded}`);
 
     // Store horizontal endpoint - use the ROUNDED x2 coordinate and KEEP the first click y coordinate for a truly horizontal line
     phaseLineState.horizontalEndX = x2Rounded;
@@ -624,8 +600,6 @@ function drawHorizontalLine(chartDiv, coords) {
             width: 2
         }
     };
-
-    console.log(`Drawing horizontal line at y=${phaseLineState.verticalLineY} from x=${phaseLineState.verticalLineX} to x=${x2Rounded}`);
 
     // Get current shapes
     const currentShapes = chartDiv.layout.shapes || [];
@@ -649,7 +623,6 @@ function drawHorizontalLine(chartDiv, coords) {
     }
 
     showTextInput(chartDiv);
-    console.log('Phase 3: Enter text label');
 }
 
 /**
@@ -681,15 +654,11 @@ function addPhaseTextLabel(chartDiv, text) {
     const textX = phaseLineState.horizontalEndX;
     const textY = phaseLineState.verticalLineY;
 
-    console.log(`Adding phase text label: "${text}" at (${textX}, ${textY})`);
-
     // BUG FIX: For log scale axes, Plotly annotations need log10 values even with yref: 'y'
     // while shapes use actual data values. This is inconsistent Plotly behavior.
     const yaxis = chartDiv._fullLayout.yaxis;
     const isLogY = yaxis.type === 'log';
     const annotationY = isLogY ? Math.log10(textY) : textY;
-
-    console.log(`  Annotation Y (log10 if log scale): ${annotationY}`);
 
     // Create annotation for the text label
     const annotation = {
@@ -737,8 +706,6 @@ function addPhaseTextLabel(chartDiv, text) {
 
     // Show save confirmation toast
     showSaveConfirmationToast(chartDiv);
-
-    console.log('Phase line drawn, awaiting save confirmation');
 }
 
 /**
@@ -816,9 +783,7 @@ function finalizePhaseLine(chartDiv) {
     relayout(chartDiv, { shapes, annotations });
 
     chartState.PhaseLines[lineId] = metadata;
-    console.log('[LINE SAVE] 1. Phase line added to chartState:', lineId);
     eventBus.emit(EVENTS.LINE_PHASE_SAVED, { lineId, metadata });
-    console.log('[LINE SAVE] 2. LINE_PHASE_SAVED event emitted');
 
     phaseLineState.tempShapes = [];
     phaseLineState.tempAnnotationIndex = null;
@@ -832,8 +797,6 @@ function removePhaseAnnotation(chartDiv) {
     if (phaseLineState.tempAnnotationIndex === null) {
         return;
     }
-
-    console.log('Removing phase annotation at index:', phaseLineState.tempAnnotationIndex);
 
     // Get current annotations
     let annotations = [...(chartDiv.layout.annotations || [])];
@@ -855,8 +818,6 @@ function removePhaseShapes(chartDiv) {
     if (phaseLineState.tempShapes.length === 0) {
         return;
     }
-
-    console.log('Removing phase shapes:', phaseLineState.tempShapes);
 
     // Get current shapes
     let currentShapes = chartDiv.layout.shapes || [];

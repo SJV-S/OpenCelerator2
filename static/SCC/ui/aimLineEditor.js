@@ -20,5 +20,3 @@ const editor = createLineEditor({
 export function showAimLineEditor(lineId) {
     editor.show(lineId);
 }
-
-console.log('aimLineEditor.js loaded');

@@ -172,5 +172,3 @@ function hideModal() {
 export function initCelSettingsModal() {
     // Nothing to do — modal is created lazily on first open
 }
-
-console.log('celSettingsModal.js loaded');

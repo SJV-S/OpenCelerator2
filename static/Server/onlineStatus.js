@@ -2,6 +2,7 @@
 // Pings /api/health to detect actual server reachability (not just network adapter state)
 
 import { TIMING_MS } from '../SCC/config.js';
+import { eventBus, EVENTS } from '../SCC/eventBus.js';
 
 let statusElement = null;
 let appVersion = null;
@@ -51,6 +52,9 @@ function setReachable(reachable) {
     _serverReachable = reachable;
     if (changed) {
         console.log(`[Status] ${reachable ? 'Server reachable' : 'Server unreachable'}`);
+        if (reachable) {
+            eventBus.emit(EVENTS.SYNC_SERVER_RECONNECTED);
+        }
     }
     updateStatus();
 }

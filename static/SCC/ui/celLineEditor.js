@@ -20,5 +20,3 @@ const editor = createLineEditor({
 export function showCelLineEditor(lineId) {
     editor.show(lineId);
 }
-
-console.log('celLineEditor.js loaded');

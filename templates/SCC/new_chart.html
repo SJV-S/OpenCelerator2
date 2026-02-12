@@ -79,12 +79,30 @@ html, body {
         <button class="chart-btn w-full px-6 py-3 border-2 border-gray-300 rounded-lg text-gray-800 bg-white font-medium" data-type="Timing" disabled data-coming-soon>Timing (Coming Soon)</button>
         <button class="chart-btn w-full px-6 py-3 border-2 border-gray-300 rounded-lg text-gray-800 bg-white font-medium" data-type="FrequencyCollections" disabled data-coming-soon>Frequency Collections (Coming Soon)</button>
     </div>
+
+    <!-- Divider -->
+    <div class="flex items-center gap-4 mb-6" style="margin-top: 1.5rem">
+        <div class="flex-1 border-t border-gray-300"></div>
+        <span class="text-sm text-gray-400">or</span>
+        <div class="flex-1 border-t border-gray-300"></div>
+    </div>
+
+    <!-- Import Chart -->
+    <button id="import-chart-btn" class="w-full px-6 py-3 border-2 border-[#6ad1e3] rounded-lg text-[#05c3de] bg-white font-medium flex items-center justify-center gap-2 hover:bg-[#6ad1e3] hover:text-white transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+        </svg>
+        Import Chart
+    </button>
+    <input type="file" id="import-chart-input" accept=".json" class="hidden">
+    <p id="import-status" class="mt-2 text-sm text-center hidden"></p>
 </main>
 {% endblock %}
 
 {% block scripts %}
 <script type="module">
     import { initStorage, createChart } from '/static/SCC/storage/chartStorage.js';
+    import { importChartFromJson } from '/static/SCC/import/chartImport.js';
     import { initServerSync } from '/static/Server/init.js';
 
     await initStorage();
@@ -127,6 +145,57 @@ html, body {
                 window.location.href = `/chart/${id}`;
             }
         });
+    });
+
+    // Import chart
+    document.getElementById('import-chart-btn').addEventListener('click', () => {
+        document.getElementById('import-chart-input').click();
+    });
+
+    document.getElementById('import-chart-input').addEventListener('change', async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        e.target.value = '';
+        const status = document.getElementById('import-status');
+
+        try {
+            const text = await file.text();
+
+            let json;
+            try {
+                json = JSON.parse(text);
+            } catch (parseErr) {
+                status.textContent = `Invalid JSON file: ${parseErr.message}`;
+                status.className = 'mt-2 text-sm text-center text-red-500';
+                status.classList.remove('hidden');
+                return;
+            }
+
+            const result = await importChartFromJson(json, file.name);
+            if (!result.success) {
+                status.textContent = result.error;
+                status.className = 'mt-2 text-sm text-center text-red-500';
+                status.classList.remove('hidden');
+                return;
+            }
+
+            let message = `Imported "${result.chartName}"`;
+            if (result.warnings.length > 0) {
+                message += ` (${result.warnings.length} feature(s) not supported)`;
+            }
+            status.textContent = message + ' — redirecting...';
+            status.className = 'mt-2 text-sm text-center text-green-600';
+            status.classList.remove('hidden');
+
+            setTimeout(() => { window.location.href = '/'; }, 1000);
+
+        } catch (err) {
+            console.error('Import error:', err);
+            status.textContent = `Import failed: ${err.message}`;
+            status.className = 'mt-2 text-sm text-center text-red-500';
+            status.classList.remove('hidden');
+        }
     });
 
     // Focus name input on load

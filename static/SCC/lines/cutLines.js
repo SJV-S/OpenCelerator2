@@ -36,8 +36,6 @@ var cutLinesState = {
  * Activates cut lines mode
  */
 function activateCutLinesMode() {
-    console.log('Activating cut lines mode');
-
     const chartDiv = getChartDiv();
     if (!chartDiv) {
         console.error('Chart div not found');
@@ -86,16 +84,12 @@ function activateCutLinesMode() {
     chartDiv.addEventListener('touchend', cutLinesState.touchEndHandler);
 
     showCutLineToast();
-
-    console.log('Cut lines mode activated');
 }
 
 /**
  * Deactivates cut lines mode
  */
 function deactivateCutLinesMode() {
-    console.log('Deactivating cut lines mode');
-
     const chartDiv = getChartDiv();
     if (!chartDiv) return;
 
@@ -136,8 +130,6 @@ function deactivateCutLinesMode() {
     removeCutLineOverlay();
     removeCutLineToast();
     cutLinesState.currentX = null;
-
-    console.log('Cut lines mode deactivated');
 }
 
 function handleCutLineMouseMove(event, chartDiv) {
@@ -313,7 +305,6 @@ function showCutLineToast() {
     cutLinesState.toastElement = createInfoToast({
         message: 'Click to cut',
         onCancel: () => {
-            console.log('Cancel button clicked');
             deactivateCutLinesMode();
         }
     });
@@ -349,5 +340,3 @@ function init() {
 }
 
 export { activateCutLinesMode, deactivateCutLinesMode, init };
-
-console.log('cutLines.js loaded');

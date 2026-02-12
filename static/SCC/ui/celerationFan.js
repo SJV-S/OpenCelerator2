@@ -293,15 +293,12 @@ export function addCelerationFan() {
 }
 
 export function toggleCelerationFan(visible) {
-    console.log('[toggleCelerationFan] called with visible:', visible);
     const chartDiv = getChartDiv();
     if (!chartDiv) {
-        console.log('[toggleCelerationFan] No chartDiv found');
         return;
     }
 
     const fanElements = getFanSvgElements(chartDiv);
-    console.log('[toggleCelerationFan] Found', fanElements.length, 'fan elements');
     fanElements.forEach(el => {
         el.style.display = visible ? '' : 'none';
     });

@@ -146,7 +146,6 @@ export async function migrateChart(chart) {
             console.error(`[Migration] No migration function for version ${v} → ${v + 1}`);
             break;
         }
-        console.log(`[Migration] Running ${v} → ${v + 1}`);
         const changed = await migrateFn(chart);
         if (changed) modified = true;
     }

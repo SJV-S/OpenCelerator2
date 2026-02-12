@@ -24,7 +24,7 @@ import {
 } from './series/dataEntry.js';
 import { initializeSeriesNav } from './series/traceStyles.js';
 import { createToast } from './ui/toaster.js';
-import { refreshChart, init as replotInit } from './series/replot.js';
+import { init as replotInit } from './series/replot.js';
 import { alignStartDate, updateChartDateLabels, updateDateDisplay, adjustDateInput, initializeDateInput, updatePlotDateLabel } from './util/dates.js';
 import { initStartDateModal, initChartWindowControl, initChartHeightControl } from './ui/startDateModal.js';
 import { initLineSettingsModal } from './ui/lineSettingsModal.js';
@@ -52,10 +52,10 @@ import { init as aimLinesInit } from './lines/aimLines.js';
 import { init as cutLinesInit } from './lines/cutLines.js';
 import { init as celLineInit } from './lines/celLine.js';
 import { init as lineHoverInit } from './lines/lineHover.js';
-import { initGridToggle, toggleDateLines, toggleCountLines, toggleMinorGrid } from './series/grid.js';
+import { initGridToggle } from './series/grid.js';
 import { injectCelerationFan, initFanDrag, toggleCelerationFan, init as celerationFanInit } from './ui/celerationFan.js';
 import { injectCredits, initCreditClick, regenerateCredits, init as creditInit } from './ui/credit.js';
-import { toggleLegend, renderCustomLegend, init as customLegendInit } from './ui/customLegend.js';
+import { toggleLegend, init as customLegendInit } from './ui/customLegend.js';
 import { setupPanConstraints } from './util/panning_controls.js';
 import { resizeChartByHeight, emitFanReposition, rescaleChartElements } from './util/resize-chart.js';
 import { getTemplate } from './util/chartLayouts.js';
@@ -151,8 +151,8 @@ export function initializeChart() {
     initializeDateInputs();
 
     // Trigger chart refresh to render data from chartState.series
-    refreshChart();
-    renderCustomLegend();
+    // (replot subscribes to DATA_CHART_REFRESH, legend subscribes to UI_LEGEND_RENDER emitted by replot)
+    eventBus.emit(EVENTS.DATA_CHART_REFRESH);
 
     // Set up pan slider last, after everything is initialized
     panSliderSetupChart(chartDiv);
@@ -195,8 +195,6 @@ export function adjustDate(days) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('Main.js: Initializing application');
-
     // Initialize event bus subscriptions for all modules
     // Order matters: subscribers must register before events are emitted
     lineClickHandlerInit();
@@ -214,7 +212,6 @@ document.addEventListener('DOMContentLoaded', () => {
     celerationFanInit();
     creditInit();
     panSliderInit();
-    console.log('Main.js: Event bus subscriptions initialized');
 
     // Initialize icons in buttons with data-icon attributes
     document.querySelectorAll('[data-icon]').forEach(button => {
@@ -241,8 +238,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initialize series navigation and config panel
     initializeSeriesNav();
-
-    console.log('Main.js: Application initialized');
 });
 
 export function setupEventListeners() {
@@ -342,8 +337,8 @@ export function setupEventListeners() {
 
         legendToggle.addEventListener('change', (e) => {
             toggleLegend(e.target.checked);
-            eventBus.emit(EVENTS.UI_LEGEND_RENDER);
-            // Blur the checkbox so spacebar can be used for navigation
+            // toggleLegend emits UI_LEGEND_VISIBILITY_CHANGED (triggers auto-save)
+            // and handles rendering internally — no additional emit needed
             e.target.blur();
         });
     }
@@ -384,7 +379,8 @@ export function setupEventListeners() {
 
         placeZerosToggle.addEventListener('change', (e) => {
             chartState.placeZerosBelowFloor = e.target.checked;
-            // Trigger chart refresh to apply the change
+            // Notify bus of preference change (triggers auto-save) then refresh chart
+            eventBus.emit(EVENTS.CHART_ZEROS_CHANGED, { enabled: e.target.checked });
             eventBus.emit(EVENTS.DATA_CHART_REFRESH);
             e.target.blur();
         });
@@ -401,7 +397,6 @@ export function setupEventListeners() {
         gridDateLinesToggle.checked = chartState.lineVisibility.grid.dateLines;
         gridDateLinesToggle.addEventListener('change', (e) => {
             chartState.lineVisibility.grid.dateLines = e.target.checked;
-            toggleDateLines(e.target.checked);
             eventBus.emit(EVENTS.CHART_GRID_VISIBILITY_CHANGED, { visible: isAnyGridOn() });
             e.target.blur();
         });
@@ -412,7 +407,6 @@ export function setupEventListeners() {
         gridCountLinesToggle.checked = chartState.lineVisibility.grid.countLines;
         gridCountLinesToggle.addEventListener('change', (e) => {
             chartState.lineVisibility.grid.countLines = e.target.checked;
-            toggleCountLines(e.target.checked);
             eventBus.emit(EVENTS.CHART_GRID_VISIBILITY_CHANGED, { visible: isAnyGridOn() });
             e.target.blur();
         });
@@ -423,7 +417,6 @@ export function setupEventListeners() {
         gridMinorToggle.checked = chartState.lineVisibility.grid.minorGrid;
         gridMinorToggle.addEventListener('change', (e) => {
             chartState.lineVisibility.grid.minorGrid = e.target.checked;
-            toggleMinorGrid(e.target.checked);
             eventBus.emit(EVENTS.CHART_GRID_VISIBILITY_CHANGED, { visible: isAnyGridOn() });
             e.target.blur();
         });
@@ -480,7 +473,7 @@ export function setupEventListeners() {
             emitFanReposition();
             await rescaleChartElements(chartDiv);
             regenerateCredits();
-            renderCustomLegend();
+            eventBus.emit(EVENTS.UI_LEGEND_RENDER, { save: false });
             // Slider updates automatically via plotly_relayout event
         });
     };
@@ -495,8 +488,4 @@ export function setupEventListeners() {
         chartState.containerHeight = newHeight;
         initializeChart();
     }, true);
-
-    console.log('Event listeners set up');
 }
-
-console.log('Main.js loaded');

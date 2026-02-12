@@ -179,8 +179,6 @@ function toggleLineCategoryEdit(category, enabled, showToast = true) {
 
     // Emit event with category and enabled state
     eventBus.emit(EVENTS.NAV_LINE_CLICKABILITY_TOGGLE, { category, enabled });
-    console.log(`${category} line editing ${enabled ? 'enabled' : 'disabled'}`);
-
     // Show feedback to user
     if (showToast) {
         const categoryLabels = {
@@ -280,13 +278,11 @@ function initGestureNavigation() {
             if (deltaY > TIMING_MS.SWIPE_THRESHOLD) {
                 // Swipe up - show counter
                 if (!counterVisible) {
-                    console.log('Swipe up detected - showing counter');
                     showCounter();
                 }
             } else if (deltaY < -TIMING_MS.SWIPE_THRESHOLD) {
                 // Swipe down - hide counter
                 if (counterVisible) {
-                    console.log('Swipe down detected - hiding counter');
                     hideCounter();
                 }
             }

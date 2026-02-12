@@ -137,7 +137,6 @@ export function theilSenFit(x, y) {
 
     const n = x.length;
     if (n < MIN_POINTS) {
-        console.log(`Insufficient data points: ${n} (need at least ${MIN_POINTS})`);
         return null;
     }
 
@@ -184,7 +183,6 @@ export function leastSquaresFit(x, y) {
 
     const n = x.length;
     if (n < MIN_POINTS) {
-        console.log(`Insufficient data points: ${n} (need at least ${MIN_POINTS})`);
         return null;
     }
 
@@ -222,7 +220,6 @@ export function quarterIntersectFit(x, y) {
 
     const n = x.length;
     if (n < MIN_POINTS) {
-        console.log(`Insufficient data points: ${n} (need at least ${MIN_POINTS})`);
         return null;
     }
 
@@ -306,7 +303,6 @@ export function splitMiddleLineFit(x, y) {
  */
 export function meanFit(x, y) {
     if (!y || y.length < MIN_POINTS) {
-        console.log(`Insufficient data points: ${y?.length || 0} (need at least ${MIN_POINTS})`);
         return null;
     }
 
@@ -324,7 +320,6 @@ export function meanFit(x, y) {
  */
 export function medianFit(x, y) {
     if (!y || y.length < MIN_POINTS) {
-        console.log(`Insufficient data points: ${y?.length || 0} (need at least ${MIN_POINTS})`);
         return null;
     }
 
@@ -474,18 +469,16 @@ export function calculateBounceLines(xPositions, slope, intercept, bounds) {
  *
  * @param {number} slope - Slope in log-space per x-unit (chart-native unit)
  * @param {number} unit - Number of x-units per standard period (from CHART_TYPE_CONFIG)
- * @returns {string} Formatted label like "×2.50" or "÷1.25"
+ * @returns {string} Formatted label like "x2.50" or "÷1.25"
  */
 export function formatCelerationLabel(slope, unit) {
     let cel = Math.pow(10, slope * unit);
 
-    let symbol = '×';
+    let symbol = '\u00d7';
     if (cel < 1) {
-        symbol = '÷';
+        symbol = '\u00f7';
         cel = 1 / cel;
     }
 
     return `${symbol}${cel.toFixed(2)}`;
 }
-
-console.log('fit_lines.js loaded');

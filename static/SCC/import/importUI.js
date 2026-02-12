@@ -644,6 +644,9 @@ async function performImport() {
             // (e.g. monthly data on a yearly chart → 12 points/year)
             autoAggregateImport();
 
+            // Notify bus that traceStyles were mutated (names + aggregation)
+            eventBus.emit(EVENTS.UI_TRACE_STYLE_CHANGED);
+
             // NOW emit events — chart renders with correct names and aggregation
             eventBus.emit(EVENTS.DATA_IMPORT_COMPLETED, {
                 count: result.count,
@@ -768,11 +771,6 @@ function resetImportUI() {
 // ============================================================================
 
 function setupEventSubscriptions() {
-    // Listen for import completion (for external triggers)
-    eventBus.subscribe(EVENTS.DATA_IMPORT_COMPLETED, (data) => {
-        console.log('[ImportUI] Import completed:', data);
-    }, true);
-
     // Listen for import failures
     eventBus.subscribe(EVENTS.DATA_IMPORT_FAILED, (data) => {
         console.error('[ImportUI] Import failed:', data);

@@ -29,6 +29,8 @@
 export const EVENTS = {
     // Data Events
     DATA_ENTRY_SUBMITTED: 'data:entry_submitted',
+    DATA_ENTRY_UPDATED: 'data:entry_updated',
+    DATA_ENTRY_DELETED: 'data:entry_deleted',
     DATA_START_DATE_CHANGED: 'data:start_date_changed',
     DATA_CHART_REFRESH: 'data:chart_refresh',
     DATA_CHART_REPLOT_COMPLETE: 'data:chart_replot_complete',
@@ -66,6 +68,7 @@ export const EVENTS = {
 
     // UI Events
     UI_LEGEND_RENDER: 'ui:legend_render',
+    UI_LEGEND_VISIBILITY_CHANGED: 'ui:legend_visibility_changed',
     UI_TRACE_STYLE_CHANGED: 'ui:trace_style_changed',
 
     // Misc Series Events
@@ -85,6 +88,10 @@ export const EVENTS = {
     CHART_WINDOW_CHANGED: 'chart:window_changed',
     CHART_HEIGHT_CHANGED: 'chart:height_changed',
     CHART_GRID_VISIBILITY_CHANGED: 'chart:grid_visibility_changed',
+    CHART_ZEROS_CHANGED: 'chart:zeros_changed',
+
+    // Share Events
+    CHART_SHARED: 'chart:shared',
 
     // Counter Events
     COUNTER_ENTRY_DATE_CHANGED: 'counter:entry_date_changed',
@@ -104,6 +111,8 @@ export const EVENTS = {
     STORAGE_ERROR: 'storage:error',
 
     // Sync Events
+    SYNC_READY: 'sync:ready',
+    SYNC_SERVER_RECONNECTED: 'sync:server_reconnected',
     SYNC_CHART_UPDATED: 'sync:chart_updated',
 
     // Data Import Events
@@ -139,6 +148,8 @@ export const EVENT_CATEGORIES = {
 const EVENT_CATEGORY_MAP = {
     // Data mutations
     [EVENTS.DATA_ENTRY_SUBMITTED]: [EVENT_CATEGORIES.STATE_MUTATING],
+    [EVENTS.DATA_ENTRY_UPDATED]: [EVENT_CATEGORIES.STATE_MUTATING],
+    [EVENTS.DATA_ENTRY_DELETED]: [EVENT_CATEGORIES.STATE_MUTATING],
     [EVENTS.DATA_START_DATE_CHANGED]: [EVENT_CATEGORIES.STATE_MUTATING],
     // Note: DATA_CHART_REFRESH is a rendering event, not a mutation - excluded from STATE_MUTATING
 
@@ -165,6 +176,8 @@ const EVENT_CATEGORY_MAP = {
     [EVENTS.CHART_WINDOW_CHANGED]: [EVENT_CATEGORIES.STATE_MUTATING],
     [EVENTS.CHART_HEIGHT_CHANGED]: [EVENT_CATEGORIES.STATE_MUTATING],
     [EVENTS.CHART_GRID_VISIBILITY_CHANGED]: [EVENT_CATEGORIES.STATE_MUTATING],
+    [EVENTS.CHART_ZEROS_CHANGED]: [EVENT_CATEGORIES.STATE_MUTATING],
+    [EVENTS.CHART_SHARED]: [EVENT_CATEGORIES.STATE_MUTATING],
 
     // Series visibility
     [EVENTS.SERIES_VISIBILITY_CHANGED]: [EVENT_CATEGORIES.STATE_MUTATING],
@@ -175,6 +188,7 @@ const EVENT_CATEGORY_MAP = {
     // UI state changes
     [EVENTS.UI_TRACE_STYLE_CHANGED]: [EVENT_CATEGORIES.STATE_MUTATING],
     [EVENTS.UI_LEGEND_RENDER]: [EVENT_CATEGORIES.STATE_MUTATING],
+    [EVENTS.UI_LEGEND_VISIBILITY_CHANGED]: [EVENT_CATEGORIES.STATE_MUTATING],
 
     // Credits
     [EVENTS.CREDITS_UPDATED]: [EVENT_CATEGORIES.STATE_MUTATING]
