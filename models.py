@@ -65,6 +65,9 @@ class ShareLink(db.Model):
 class RequestLog(db.Model):
     """Telemetry: one row per HTTP request"""
     __tablename__ = 'request_logs'
+    __table_args__ = (
+        db.Index('idx_request_logs_user_timestamp', 'user_id', 'timestamp'),
+    )
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     timestamp = db.Column(db.Integer, nullable=False)

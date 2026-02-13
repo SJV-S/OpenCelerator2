@@ -216,15 +216,16 @@ export async function checkForUpdates(localManifest) {
 
     const response = await api('/api/sync', {
         method: 'POST',
-        body: { user_id: userId, local_manifest: localManifest, uploads: [] }
+        body: { user_id: userId, last_sync_at: lastSyncAt, local_manifest: localManifest, uploads: [] }
     });
 
     if (!response.ok) throw new Error(`Sync check failed: ${response.status}`);
 
     const result = await response.json();
+    lastSyncAt = Math.floor(Date.now() / 1000);
 
     const downloads = await processDownloads(result.downloads);
-    return { downloads };
+    return { downloads, serverManifest: result.server_manifest, tombstones: result.tombstones };
 }
 
 // NOTE: Full sync not currently in use - charts uploaded individually via share link creation
@@ -303,6 +304,43 @@ export async function pushChart(chartUuid) {
     });
 
     if (!response.ok) throw new Error(`Push failed: ${response.status}`);
+}
+
+export async function pushCharts(chartUuids) {
+    if (!isInitialized()) throw new Error('Sync not initialized');
+
+    const uploads = [];
+    for (const chartUuid of chartUuids) {
+        const chart = await getChartFromIndexedDB(chartUuid);
+        if (!chart || !chart.chartKey) continue;
+        // Skip charts we don't own and can't edit
+        if (chart.publicKey && chart.publicKey !== signingPublicKeyB64 && !chart.acceptingEdits) continue;
+
+        const chartKeyBytes = fromHex(chart.chartKey);
+        const chartKey = await crypto.subtle.importKey('raw', chartKeyBytes,
+            { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+        stampOwnerFields(chart);
+        const encryptedData = await encrypt(chartKey, chart);
+        const signature = await signPayload(encryptedData);
+        const wrappedKey = await wrapKey(chartKey, userKey);
+
+        uploads.push({
+            chart_uuid: chartUuid,
+            data: encryptedData,
+            updated_at: chart.lastModified || Math.floor(Date.now() / 1000),
+            wrapped_key: wrappedKey,
+            signature
+        });
+    }
+
+    if (uploads.length === 0) return;
+
+    const response = await api('/api/sync', {
+        method: 'POST',
+        body: { user_id: userId, local_manifest: [], uploads }
+    });
+
+    if (!response.ok) throw new Error(`Batch push failed: ${response.status}`);
 }
 
 // ============================================================================

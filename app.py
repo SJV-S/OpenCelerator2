@@ -7,6 +7,7 @@ from flask_socketio import SocketIO, join_room, leave_room
 
 from models import db, Chart, ChartAccess, ChartTombstone, ShareLink, AccountLink, Subscription, init_db
 from telemetry import log_request
+from sharing_detection import check_sharing
 import config
 
 app = Flask(__name__)
@@ -51,6 +52,9 @@ def requires_subscription(f):
         return f(*args, **kwargs)
     return decorated
 
+
+# Account sharing detection — runs before every request
+app.before_request(check_sharing)
 
 # Telemetry — log every request
 app.after_request(log_request)

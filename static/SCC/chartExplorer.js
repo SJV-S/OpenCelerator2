@@ -1,7 +1,7 @@
 import { initStorage, listCharts, deleteChart, updateChartTags } from '/static/SCC/storage/chartStorage.js';
 
 import { openDB } from '/static/lib/idb.js';
-import { checkForUpdates } from '/static/Server/syncClient.js';
+import { checkForUpdates, pushCharts } from '/static/Server/syncClient.js';
 import { initServerSync, isSyncEnabled } from '/static/Server/init.js';
 import { initSettingsModal } from '/static/SCC/ui/settingsModal.js';
 
@@ -352,7 +352,7 @@ async function loadCharts() {
     if (isSyncEnabled()) {
         try {
             const manifest = charts.map(c => ({ chart_uuid: c.id, updated_at: c.updatedAt || 0 }));
-            const { downloads, tombstones } = await checkForUpdates(manifest);
+            const { downloads, tombstones, serverManifest } = await checkForUpdates(manifest);
             let changed = false;
 
             // Delete locally any non-shared charts tombstoned on another device
@@ -379,6 +379,26 @@ async function loadCharts() {
             if (changed) {
                 charts = await listCharts();
                 renderCharts();
+            }
+
+            // Push charts the server is missing or has stale versions of
+            if (serverManifest) {
+                const serverMap = new Map(serverManifest.map(s => [s.chart_uuid, s.updated_at]));
+                const toPush = [];
+                for (const c of charts) {
+                    if (c.shared) continue;
+                    const serverTs = serverMap.get(c.id);
+                    if (serverTs === undefined || (c.updatedAt && c.updatedAt > serverTs)) {
+                        toPush.push(c.id);
+                    }
+                }
+                if (toPush.length > 0) {
+                    try {
+                        await pushCharts(toPush);
+                    } catch (err) {
+                        console.warn('[Sync] Batch push failed:', err);
+                    }
+                }
             }
         } catch (err) {
             console.warn('[Sync] Pull on load failed:', err);
