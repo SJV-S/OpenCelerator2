@@ -1,15 +1,14 @@
 """
-Account sharing detection — blocks users whose 30-day activity exceeds thresholds.
+Account sharing detection — blocks users with too many unique IPs in a rolling window.
 
 Registered as a before_request hook. On every authenticated API request, queries
-RequestLog for the user's unique IP count and total request count. Returns 403
-if any threshold is exceeded.
+RequestLog for the user's unique IP count. Returns 403 if the threshold is exceeded.
 """
 
 import time
 
 from flask import request, jsonify
-from models import db, RequestLog
+from models import db, RequestLog, SharingViolation
 import config
 
 # Routes exempt from sharing detection (HTML pages, health, static assets)
@@ -52,24 +51,27 @@ def check_sharing():
     if not user_id:
         return jsonify({'error': 'user_id required'}), 403
 
-    cutoff = int(time.time()) - (config.SHARING_WINDOW_DAYS * 86400)
+    cutoff = int(time.time()) - (config.SHARING_WINDOW_HOURS * 3600)
 
     row = db.session.execute(
         db.text(
-            'SELECT COUNT(DISTINCT ip_hash) AS unique_ips, COUNT(id) AS total_requests '
+            'SELECT COUNT(DISTINCT ip_hash) AS unique_ips '
             'FROM request_logs '
             'WHERE user_id = :uid AND timestamp >= :cutoff'
         ),
         {'uid': user_id, 'cutoff': cutoff}
     ).one()
 
-    unique_ips = row.unique_ips
-    total_requests = row.total_requests
-
-    if (unique_ips > config.EXTREME_IP_THRESHOLD
-            or total_requests > config.EXTREME_REQUEST_THRESHOLD
-            or (unique_ips > config.MODERATE_IP_THRESHOLD
-                and total_requests > config.MODERATE_REQUEST_THRESHOLD)):
+    if row.unique_ips > config.SHARING_IP_THRESHOLD:
+        try:
+            db.session.add(SharingViolation(
+                user_id=user_id,
+                unique_ips=row.unique_ips,
+                timestamp=int(time.time()),
+            ))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
         return jsonify({'error': 'account_sharing_detected'}), 403
 
     return None

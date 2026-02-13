@@ -81,6 +81,7 @@ const PRECACHE_STATIC = [
     '/static/SCC/ui/modalHelpers.js',
     '/static/SCC/ui/panSlider.js',
     '/static/SCC/ui/phaseLineEditor.js',
+    '/static/SCC/ui/resetSettings.js',
     '/static/SCC/ui/settingsModal.js',
     '/static/SCC/ui/share.js',
     '/static/SCC/ui/startDateModal.js',

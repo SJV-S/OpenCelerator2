@@ -95,6 +95,16 @@ class Subscription(db.Model):
     created_at = db.Column(db.Integer, nullable=False)
 
 
+class SharingViolation(db.Model):
+    """Log of account sharing detection triggers"""
+    __tablename__ = 'sharing_violations'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.String(64), nullable=False)
+    unique_ips = db.Column(db.Integer, nullable=False)
+    timestamp = db.Column(db.Integer, nullable=False)
+
+
 class ChartTombstone(db.Model):
     """Tombstones for deleted charts (retained 1 year for sync)"""
     __tablename__ = 'chart_tombstones'
