@@ -17,7 +17,7 @@
         </div>
 
         <!-- Chart Window -->
-        <label class="block text-sm font-semibold text-gray-600 mb-2 lg:mb-1 text-center">Chart Window</label>
+        <label id="chart-window-label" class="block text-sm font-semibold text-gray-600 mb-2 lg:mb-1 text-center">Chart Window</label>
         <div class="flex items-center justify-center gap-3">
             <button type="button" id="chart-window-dec" class="w-10 h-10 flex items-center justify-center border-2 border-gray-300 rounded hover:bg-gray-100 active:bg-gray-200 transition-colors">
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -33,7 +33,7 @@
         </div>
 
         <!-- Chart Height -->
-        <label class="block text-sm font-semibold text-gray-600 mb-2 lg:mb-1 mt-4 lg:mt-3 text-center">Chart Height</label>
+        <label class="block text-sm font-semibold text-gray-600 mb-2 lg:mb-1 mt-4 lg:mt-3 text-center">Chart Height in Pixels</label>
         <div class="flex items-center justify-center gap-3">
             <button type="button" id="chart-height-dec" class="w-10 h-10 flex items-center justify-center border-2 border-gray-300 rounded hover:bg-gray-100 active:bg-gray-200 transition-colors">
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -116,6 +116,13 @@
                 <option value="bottom-left">Bottom Left</option>
             </select>
         </div>
+    </div>
+
+    <!-- Reset to Defaults -->
+    <div class="mt-4 lg:mt-3 border-t border-gray-300 pt-4 lg:pt-3">
+        <button type="button" id="reset-settings-btn" class="w-full py-3 lg:py-2 px-4 bg-gray-400 text-white font-semibold rounded hover:bg-gray-500 active:bg-gray-600 transition-colors text-sm">
+            Reset to Defaults
+        </button>
     </div>
 
 </div>

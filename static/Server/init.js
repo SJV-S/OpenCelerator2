@@ -36,9 +36,12 @@ export async function initServerSync() {
     let passphrase = await db.get(STORE_NAME, 'passphrase');
 
     if (!passphrase) {
-        passphrase = generatePassphrase();
-        await db.put(STORE_NAME, passphrase, 'passphrase');
-        console.log('[Server] Generated new passphrase');
+        if (!window.location.pathname.startsWith('/welcome')) {
+            window.location.href = '/welcome';
+            return;
+        }
+        // On welcome page: don't generate yet, just return early
+        return;
     }
 
     let prefs = await db.get(STORE_NAME, PREFS_KEY);

@@ -2,16 +2,13 @@
  * allLines.js
  * Standard definitions for all line metadata objects
  *
- * Line styling configuration is accessed via chartState.lineStyles:
- *   - chartState.lineStyles.phase.color
- *   - chartState.lineStyles.phase.width
- *   - chartState.lineStyles.aim.color
- *   - chartState.lineStyles.aim.width
+ * New-line styling defaults are read from user preferences via getLineDefaults().
+ * Per-line styles are stored in each line's metadata.style object.
  */
 
 import { chartState } from '../chartState.js';
-import { COLORS, LINE_DEFAULTS } from '../config.js';
 import { eventBus, EVENTS } from '../eventBus.js';
+import { getLineDefaults } from '../ui/lineSettingsModal.js';
 import { relayout } from '../util/plotlyWrapper.js';
 import { getChartDiv } from '../util/dom.js';
 
@@ -26,6 +23,7 @@ import { getChartDiv } from '../util/dom.js';
  * @param {number} annotationIndex - Index of the annotation
  */
 function phaseLineMetadata(direction, verticalLineDate, verticalLineY, horizontalEndDate, text, shapeIndices, annotationIndex) {
+    const defaults = getLineDefaults('phase');
     return {
         id: Date.now(),
         direction: direction,
@@ -34,11 +32,11 @@ function phaseLineMetadata(direction, verticalLineDate, verticalLineY, horizonta
         horizontalEndDate: horizontalEndDate,
         text: text,
         style: {
-            color: COLORS.PHASE_LINE,
-            width: LINE_DEFAULTS.PHASE_WIDTH,
-            dash: 'solid',
-            fontColor: COLORS.PHASE_LINE,
-            fontSize: 12
+            color: defaults.color,
+            width: defaults.width,
+            dash: defaults.dash,
+            fontColor: defaults.fontColor,
+            fontSize: defaults.fontSize
         },
         shapeIndices: shapeIndices,
         annotationIndex: annotationIndex
@@ -57,6 +55,7 @@ function phaseLineMetadata(direction, verticalLineDate, verticalLineY, horizonta
  * @param {number} annotationIndex - Index of the annotation
  */
 function aimLineMetadata(direction, date1, y1, date2, y2, text, shapeIndices, annotationIndex) {
+    const defaults = getLineDefaults('aim');
     return {
         id: Date.now(),
         direction: direction,
@@ -66,11 +65,11 @@ function aimLineMetadata(direction, date1, y1, date2, y2, text, shapeIndices, an
         y2: y2,
         text: text,
         style: {
-            color: COLORS.AIM_LINE,
-            width: LINE_DEFAULTS.AIM_WIDTH,
-            dash: 'solid',
-            fontColor: COLORS.AIM_LINE,
-            fontSize: 12
+            color: defaults.color,
+            width: defaults.width,
+            dash: defaults.dash,
+            fontColor: defaults.fontColor,
+            fontSize: defaults.fontSize
         },
         shapeIndices: shapeIndices,
         annotationIndex: annotationIndex

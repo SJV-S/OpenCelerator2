@@ -65,6 +65,7 @@ import { initializeShareTab } from './ui/share.js';
 import { init as crosshairInit } from './ui/crosshair.js';
 import { init as panSliderInit, setupChartListener as panSliderSetupChart } from './ui/panSlider.js';
 import { initImportUI } from './import/importUI.js';
+import { initResetSettings } from './ui/resetSettings.js';
 
 /**
  * Initialize the chart using client-side templates
@@ -235,6 +236,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initialize import tab UI
     initImportUI();
+
+    // Initialize reset settings button
+    initResetSettings();
 
     // Initialize series navigation and config panel
     initializeSeriesNav();

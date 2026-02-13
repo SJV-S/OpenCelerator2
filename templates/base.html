@@ -73,8 +73,11 @@
             const results = [];
             for (const name of dbs) {
                 try {
-                    const openReq = indexedDB.open(name);
-                    openReq.onsuccess = () => { openReq.result.close(); };
+                    await new Promise((resolve) => {
+                        const openReq = indexedDB.open(name);
+                        openReq.onsuccess = () => { openReq.result.close(); resolve(); };
+                        openReq.onerror = () => resolve();
+                    });
                     await new Promise((resolve, reject) => {
                         const req = indexedDB.deleteDatabase(name);
                         req.onsuccess = () => { results.push(name + ': deleted'); resolve(); };

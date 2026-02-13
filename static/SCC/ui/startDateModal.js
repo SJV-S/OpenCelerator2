@@ -8,7 +8,7 @@
 import { chartState } from '../chartState.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 import { createToast, createConfirmToast } from './toaster.js';
-import { CHART_TYPE_CONFIG, CHART_MATH, LAYOUT } from '../config.js';
+import { CHART_TYPE_CONFIG, CHART_MATH, LAYOUT, WINDOW_UNITS } from '../config.js';
 import { getChartDiv } from '../util/dom.js';
 import {
     getMondaysInMonth,
@@ -524,6 +524,14 @@ export function initChartWindowControl() {
     chartWindowEl = document.getElementById('chart-window-value');
     const decBtn = document.getElementById('chart-window-dec');
     const incBtn = document.getElementById('chart-window-inc');
+
+    // Set dynamic label with unit name from chart type
+    const windowLabel = document.getElementById('chart-window-label');
+    if (windowLabel) {
+        const unitInfo = WINDOW_UNITS[chartState.chartType];
+        const unitName = unitInfo ? unitInfo.name + 's' : 'Days';
+        windowLabel.textContent = `Chart Window in ${unitName}`;
+    }
 
     if (chartWindowEl) updateChartWindowDisplay();
     if (decBtn) decBtn.addEventListener('click', () => adjustSettingsChartWindow(-1));

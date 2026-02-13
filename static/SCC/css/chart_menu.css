@@ -417,6 +417,37 @@
     color: #555;
 }
 
+.crosshair-top-grid {
+    display: grid;
+    grid-template-columns: 1fr 1px 1fr;
+    gap: 0 12px;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid #ccc;
+}
+
+.crosshair-top-grid .crosshair-divider {
+    background: #ccc;
+}
+
+.crosshair-top-grid .crosshair-section {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.crosshair-row-stacked {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding: 4px 0;
+}
+
+.crosshair-row-stacked .crosshair-value {
+    color: #555;
+    padding-left: 8px;
+}
+
 /* ===== SERIES TAB SUB-MENU ===== */
 #series-content.chart-menu-tab-pane.active {
     display: flex;

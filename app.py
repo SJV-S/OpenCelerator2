@@ -56,6 +56,11 @@ def index():
     return render_template('SCC/chart_explorer.html')
 
 
+@app.route('/welcome')
+def welcome():
+    return render_template('SCC/welcome.html')
+
+
 @app.route('/new')
 def new_chart():
     return render_template('SCC/new_chart.html')

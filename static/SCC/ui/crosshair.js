@@ -17,9 +17,9 @@
 
 import { chartState } from '../chartState.js';
 import { CORRECTS, ERRORS, WINDOW_UNITS } from '../config.js';
-import { xPositionToDate } from '../util/dates.js';
+import { dateToXPosition, xPositionToDate } from '../util/dates.js';
 import { formatValue } from '../util/format.js';
-import { getFirstConfig } from '../series/traceStyles.js';
+import { getFirstConfig, isSeriesVisible } from '../series/traceStyles.js';
 import { getChartDiv } from '../util/dom.js';
 
 // =============================================================================
@@ -49,6 +49,10 @@ const state = {
     // Trace data from last x-change lookup
     currentTraceData: null,
 
+    // Cel line data from last x-change lookup
+    celLineCache: null,
+    currentCelData: null,
+
     // Current cursor position for redraw
     currentXPixel: null,
     currentYPixel: null,
@@ -70,6 +74,14 @@ const MARKER_STYLES = {
 
 const MARKER_PADDING = 8;
 const MARKER_OPACITY = 0.4;
+
+// Bounce envelope → upper/lower display labels
+const BOUNCE_LABELS = {
+    '5-95 percentile':        { upper: '95th pctl', lower: '5th pctl' },
+    'Interquartile range':    { upper: '75th pctl', lower: '25th pctl' },
+    'Standard deviation':     { upper: '+1 SD',     lower: '-1 SD' },
+    '90% confidence interval':{ upper: '95% CI',    lower: '5% CI' }
+};
 
 // Dashed line pattern
 const DASH_PATTERN = [4, 4];
@@ -201,18 +213,26 @@ function buildInfoPanel() {
 
     const refs = state.elements.infoPanelRefs;
 
-    // Date section
+    // Top grid: Date + Cursor side-by-side
+    const topGrid = document.createElement('div');
+    topGrid.className = 'crosshair-top-grid';
+
     const dateSection = createSection('Date');
     refs.dayLabel = createRow(dateSection, 'Day:');
     refs.monthLabel = createRow(dateSection, 'Month:');
     refs.yearLabel = createRow(dateSection, 'Year:');
-    infoContent.appendChild(dateSection);
+    topGrid.appendChild(dateSection);
 
-    // Cursor section
+    const divider = document.createElement('div');
+    divider.className = 'crosshair-divider';
+    topGrid.appendChild(divider);
+
     const cursorSection = createSection('Cursor');
     refs.xLabel = createRow(cursorSection, 'x:');
     refs.yLabel = createRow(cursorSection, 'y:');
-    infoContent.appendChild(cursorSection);
+    topGrid.appendChild(cursorSection);
+
+    infoContent.appendChild(topGrid);
 
     // Series section
     const seriesSection = createSection('Series');
@@ -220,6 +240,33 @@ function buildInfoPanel() {
     refs.seriesContainer = seriesSection;
     refs.seriesRows = new Map();
     infoContent.appendChild(seriesSection);
+
+    // Change Lines section (cel lines)
+    const celSection = createSection('Change Lines');
+    celSection.id = 'crosshair-cel-section';
+    celSection.style.display = 'none';
+    refs.celContainer = celSection;
+
+    // Pre-create a pool of row elements (9 rows = 3 lines × 3 values max)
+    refs.celRowPool = [];
+    for (let i = 0; i < 9; i++) {
+        const row = document.createElement('div');
+        row.className = 'crosshair-row-stacked';
+        row.style.display = 'none';
+
+        const labelSpan = document.createElement('span');
+        labelSpan.className = 'crosshair-label';
+        row.appendChild(labelSpan);
+
+        const valueSpan = document.createElement('span');
+        valueSpan.className = 'crosshair-value';
+        row.appendChild(valueSpan);
+
+        celSection.appendChild(row);
+        refs.celRowPool.push({ row, labelSpan, valueSpan });
+    }
+
+    infoContent.appendChild(celSection);
 }
 
 function createSection(heading) {
@@ -295,7 +342,7 @@ function buildSeriesConfigs() {
 
         for (const compoundKey of keysSeen) {
             const row = document.createElement('div');
-            row.className = 'crosshair-row';
+            row.className = 'crosshair-row-stacked';
             row.style.display = 'none';
 
             const labelSpan = document.createElement('span');
@@ -337,6 +384,51 @@ function getMarkerSize(seriesId) {
     return (chartSize * style.sizeMultiplier) + MARKER_PADDING;
 }
 
+/**
+ * Build cache of visible cel line data for crosshair evaluation
+ * Converts dates to x-positions once, avoiding per-frame work
+ */
+function buildCelLineCache() {
+    state.celLineCache = [];
+    const chartDiv = state.elements?.chart;
+    if (!chartDiv) return;
+
+    const globalVisible = chartState.lineVisibility?.change !== false;
+
+    for (const [id, meta] of Object.entries(chartState.CelLines)) {
+        if (id === 'settings') continue;
+
+        // Skip if global change line visibility is off
+        if (!globalVisible) continue;
+
+        // Skip if the parent series is hidden
+        if (!isSeriesVisible(meta.seriesKey)) continue;
+
+        // Skip hidden shapes (per-line visibility)
+        const shapeName = `cel-${meta.id}`;
+        const shape = (chartDiv.layout.shapes || []).find(s => s.name === shapeName);
+        if (shape && shape.visible === false) continue;
+
+        const x0 = dateToXPosition(meta.date1);
+        const x1 = dateToXPosition(meta.date2);
+
+        state.celLineCache.push({
+            id: meta.id,
+            seriesKey: meta.seriesKey,
+            x0, x1,
+            slope: meta.slope,
+            intercept: meta.intercept,
+            bounceUpperOffset: meta.bounceUpperOffset,
+            bounceLowerOffset: meta.bounceLowerOffset,
+            color: meta.style.color,
+            bounceColor: meta.style.bounceColor,
+            fitMethod: meta.fitMethod,
+            bounceEnvelope: meta.bounceEnvelope,
+            text: meta.text
+        });
+    }
+}
+
 // =============================================================================
 // Activation / Deactivation
 // =============================================================================
@@ -356,6 +448,9 @@ function activateCrosshair() {
 
     // Rebuild series configs in case traces changed
     buildSeriesConfigs();
+
+    // Rebuild cel line cache for crosshair evaluation
+    buildCelLineCache();
 
     const chartDiv = state.elements.chart;
 
@@ -417,6 +512,8 @@ function deactivateCrosshair() {
     state.currentXPixel = null;
     state.currentYPixel = null;
     state.currentTraceData = null;
+    state.celLineCache = null;
+    state.currentCelData = null;
 
     // Cancel pending RAF
     if (state.rafPending) {
@@ -548,7 +645,10 @@ function processFrame() {
         const traceData = findTraceDataAtX(xRounded);
         state.currentTraceData = traceData;
 
-        updateInfoPanel(xRounded, yLogValue, traceData);
+        const celData = findCelLinesAtX(xRounded, yLogValue);
+        state.currentCelData = celData;
+
+        updateInfoPanel(xRounded, yLogValue, traceData, celData);
     }
 
     // --- Tier 1: Cursor y-value updates every frame ---
@@ -633,6 +733,62 @@ function drawCanvas() {
                 ctx.moveTo(xMarkerPixel, yMarkerPixel + halfSize);
                 ctx.lineTo(xMarkerPixel - halfSize, yMarkerPixel - halfSize);
                 ctx.lineTo(xMarkerPixel + halfSize, yMarkerPixel - halfSize);
+                ctx.closePath();
+                ctx.fill();
+            }
+        }
+
+        ctx.globalAlpha = 1;
+    }
+
+    // Draw diamond markers at cel line values
+    if (state.currentCelData && state.currentCelData.length > 0 && state.lastXRounded !== null) {
+        const fullLayout = state.elements.chart._fullLayout;
+        const xMarkerPixel = fullLayout.xaxis._offset + fullLayout.xaxis.l2p(state.lastXRounded);
+        const CEL_MARKER_OPACITY = 0.7;
+        const CEL_COLOR = '#a855f7';
+        const CEL_DIAMOND_HALF = 6;
+        const CEL_BOUNCE_HALF = 4;
+
+        for (const cel of state.currentCelData) {
+            // Trend diamond
+            if (cel.trendY > 0) {
+                const yPx = fullLayout.yaxis._offset + fullLayout.yaxis.l2p(Math.log10(cel.trendY));
+                ctx.globalAlpha = CEL_MARKER_OPACITY;
+                ctx.fillStyle = CEL_COLOR;
+                ctx.beginPath();
+                ctx.moveTo(xMarkerPixel, yPx - CEL_DIAMOND_HALF);
+                ctx.lineTo(xMarkerPixel + CEL_DIAMOND_HALF, yPx);
+                ctx.lineTo(xMarkerPixel, yPx + CEL_DIAMOND_HALF);
+                ctx.lineTo(xMarkerPixel - CEL_DIAMOND_HALF, yPx);
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            // Upper bounce diamond (smaller)
+            if (cel.upperY != null && cel.upperY > 0) {
+                const yPx = fullLayout.yaxis._offset + fullLayout.yaxis.l2p(Math.log10(cel.upperY));
+                ctx.globalAlpha = CEL_MARKER_OPACITY;
+                ctx.fillStyle = CEL_COLOR;
+                ctx.beginPath();
+                ctx.moveTo(xMarkerPixel, yPx - CEL_BOUNCE_HALF);
+                ctx.lineTo(xMarkerPixel + CEL_BOUNCE_HALF, yPx);
+                ctx.lineTo(xMarkerPixel, yPx + CEL_BOUNCE_HALF);
+                ctx.lineTo(xMarkerPixel - CEL_BOUNCE_HALF, yPx);
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            // Lower bounce diamond (smaller)
+            if (cel.lowerY != null && cel.lowerY > 0) {
+                const yPx = fullLayout.yaxis._offset + fullLayout.yaxis.l2p(Math.log10(cel.lowerY));
+                ctx.globalAlpha = CEL_MARKER_OPACITY;
+                ctx.fillStyle = CEL_COLOR;
+                ctx.beginPath();
+                ctx.moveTo(xMarkerPixel, yPx - CEL_BOUNCE_HALF);
+                ctx.lineTo(xMarkerPixel + CEL_BOUNCE_HALF, yPx);
+                ctx.lineTo(xMarkerPixel, yPx + CEL_BOUNCE_HALF);
+                ctx.lineTo(xMarkerPixel - CEL_BOUNCE_HALF, yPx);
                 ctx.closePath();
                 ctx.fill();
             }
@@ -730,6 +886,68 @@ function binarySearchClosest(arr, target) {
 }
 
 // =============================================================================
+// Cel Line Evaluation
+// =============================================================================
+
+/**
+ * Find cel lines that intersect the current x position and compute their Y values.
+ * When multiple cel lines for the same series overlap, keep only the one whose
+ * trend value is closest to the cursor's y position (in log space).
+ *
+ * @param {number} xRounded - Rounded x position
+ * @param {number} yLogValue - Cursor y in log10 space
+ * @returns {Array} Array of { id, seriesKey, trendY, upperY, lowerY, color, bounceColor, text }
+ */
+function findCelLinesAtX(xRounded, yLogValue) {
+    if (!state.celLineCache || state.celLineCache.length === 0) return [];
+
+    // Evaluate all matching cel lines
+    const candidates = [];
+
+    for (const line of state.celLineCache) {
+        if (xRounded < line.x0 || xRounded > line.x1) continue;
+
+        const logY = line.slope * xRounded + line.intercept;
+        const trendY = Math.pow(10, logY);
+
+        let upperY = null;
+        let lowerY = null;
+
+        if (line.bounceUpperOffset != null) {
+            upperY = Math.pow(10, logY + line.bounceUpperOffset);
+        }
+        if (line.bounceLowerOffset != null) {
+            lowerY = Math.pow(10, logY + line.bounceLowerOffset);
+        }
+
+        candidates.push({
+            id: line.id,
+            seriesKey: line.seriesKey,
+            trendY,
+            upperY,
+            lowerY,
+            color: line.color,
+            bounceColor: line.bounceColor,
+            fitMethod: line.fitMethod,
+            bounceEnvelope: line.bounceEnvelope,
+            text: line.text,
+            _logDist: Math.abs(logY - yLogValue)
+        });
+    }
+
+    // Group by seriesKey, keep only nearest per series
+    const bySeriesKey = new Map();
+    for (const c of candidates) {
+        const existing = bySeriesKey.get(c.seriesKey);
+        if (!existing || c._logDist < existing._logDist) {
+            bySeriesKey.set(c.seriesKey, c);
+        }
+    }
+
+    return Array.from(bySeriesKey.values());
+}
+
+// =============================================================================
 // Info Panel Updates
 // =============================================================================
 
@@ -747,7 +965,7 @@ function updateCursorY(yLogValue) {
  * Update info panel with data at current position
  * Uses textContent only - no innerHTML
  */
-function updateInfoPanel(xRounded, yLogValue, traceData) {
+function updateInfoPanel(xRounded, yLogValue, traceData, celData) {
     const refs = state.elements?.infoPanelRefs;
     if (!refs) return;
 
@@ -808,6 +1026,53 @@ function updateInfoPanel(xRounded, yLogValue, traceData) {
             rowRefs.valueSpan.textContent = displayValue;
             rowRefs.row.style.display = '';
         }
+    }
+
+    // Change Lines section - show/hide cel line rows
+    if (refs.celRowPool) {
+        let rowIdx = 0;
+        const pool = refs.celRowPool;
+
+        if (celData && celData.length > 0) {
+            for (const cel of celData) {
+                const seriesName = formatSeriesName(cel.seriesKey);
+                const bounceLabels = BOUNCE_LABELS[cel.bounceEnvelope];
+
+                // Trend row — label is the fit method (e.g. "Least-squares")
+                if (rowIdx < pool.length) {
+                    const r = pool[rowIdx++];
+                    r.labelSpan.textContent = `${cel.fitMethod} (${seriesName}):`;
+                    r.valueSpan.textContent = formatValue(cel.trendY);
+                    r.row.style.display = '';
+                }
+
+                // Upper bounce row
+                if (cel.upperY != null && rowIdx < pool.length) {
+                    const r = pool[rowIdx++];
+                    const label = bounceLabels?.upper || 'Upper';
+                    r.labelSpan.textContent = `${label} (${seriesName}):`;
+                    r.valueSpan.textContent = formatValue(cel.upperY);
+                    r.row.style.display = '';
+                }
+
+                // Lower bounce row
+                if (cel.lowerY != null && rowIdx < pool.length) {
+                    const r = pool[rowIdx++];
+                    const label = bounceLabels?.lower || 'Lower';
+                    r.labelSpan.textContent = `${label} (${seriesName}):`;
+                    r.valueSpan.textContent = formatValue(cel.lowerY);
+                    r.row.style.display = '';
+                }
+            }
+        }
+
+        // Hide unused pool rows
+        for (let i = rowIdx; i < pool.length; i++) {
+            pool[i].row.style.display = 'none';
+        }
+
+        // Show/hide the section
+        refs.celContainer.style.display = rowIdx > 0 ? '' : 'none';
     }
 }
 
