@@ -6,6 +6,7 @@
  */
 
 import { chartState } from '../chartState.js';
+import { WINDOW_UNITS } from '../config.js';
 import { setupModalClose } from './modalHelpers.js';
 
 let modalOverlay = null;
@@ -14,6 +15,7 @@ let modalOverlay = null;
 let fitMethodSelect = null;
 let bounceEnvelopeSelect = null;
 let forecastInput = null;
+let forecastUnitSpan = null;
 
 /**
  * Create the modal DOM structure (once, lazily)
@@ -111,12 +113,11 @@ function createModal() {
         e.target.blur();
     });
 
-    const daysSpan = document.createElement('span');
-    daysSpan.className = 'text-sm text-gray-500';
-    daysSpan.textContent = 'days';
+    forecastUnitSpan = document.createElement('span');
+    forecastUnitSpan.className = 'text-sm text-gray-500';
 
     forecastWrapper.appendChild(forecastInput);
-    forecastWrapper.appendChild(daysSpan);
+    forecastWrapper.appendChild(forecastUnitSpan);
     forecastRow.appendChild(forecastLabel);
     forecastRow.appendChild(forecastWrapper);
 
@@ -148,6 +149,8 @@ function syncValues() {
     fitMethodSelect.value = settings.fitMethod || 'Theil-Sen';
     bounceEnvelopeSelect.value = settings.bounceEnvelope || 'None';
     forecastInput.value = settings.forecast || 0;
+    const wu = WINDOW_UNITS[chartState.chartType];
+    forecastUnitSpan.textContent = wu ? wu.name.toLowerCase() + 's' : 'days';
 }
 
 /**

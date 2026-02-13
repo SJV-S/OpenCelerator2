@@ -13,6 +13,7 @@
  */
 
 import { chartState } from '../chartState.js';
+import { WINDOW_UNITS } from '../config.js';
 import { timestampsToXPositions, dateToXPosition } from '../util/dates.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 import { createToast } from '../ui/toaster.js';
@@ -118,7 +119,8 @@ function handleLineClick(lineName) {
             if (metadata.fitMethod) {
                 message += ` (${metadata.fitMethod}`;
                 if (metadata.forecast && metadata.forecast > 0) {
-                    message += `, +${metadata.forecast}d`;
+                    const abbr = WINDOW_UNITS[chartState.chartType]?.abbrev || 'd';
+                    message += `, +${metadata.forecast}${abbr}`;
                 }
                 message += ')';
             }

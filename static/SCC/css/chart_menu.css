@@ -448,6 +448,10 @@
     padding-left: 8px;
 }
 
+.crosshair-cel-row {
+    padding-left: 24px;
+}
+
 /* ===== SERIES TAB SUB-MENU ===== */
 #series-content.chart-menu-tab-pane.active {
     display: flex;

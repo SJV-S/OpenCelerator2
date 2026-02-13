@@ -241,17 +241,12 @@ function buildInfoPanel() {
     refs.seriesRows = new Map();
     infoContent.appendChild(seriesSection);
 
-    // Change Lines section (cel lines)
-    const celSection = createSection('Change Lines');
-    celSection.id = 'crosshair-cel-section';
-    celSection.style.display = 'none';
-    refs.celContainer = celSection;
-
-    // Pre-create a pool of row elements (9 rows = 3 lines × 3 values max)
+    // Pre-create a pool of cel row elements (9 rows = 3 lines × 3 values max)
+    // Appended to series container; repositioned dynamically in updateInfoPanel
     refs.celRowPool = [];
     for (let i = 0; i < 9; i++) {
         const row = document.createElement('div');
-        row.className = 'crosshair-row-stacked';
+        row.className = 'crosshair-row-stacked crosshair-cel-row';
         row.style.display = 'none';
 
         const labelSpan = document.createElement('span');
@@ -262,11 +257,9 @@ function buildInfoPanel() {
         valueSpan.className = 'crosshair-value';
         row.appendChild(valueSpan);
 
-        celSection.appendChild(row);
+        refs.seriesContainer.appendChild(row);
         refs.celRowPool.push({ row, labelSpan, valueSpan });
     }
-
-    infoContent.appendChild(celSection);
 }
 
 function createSection(heading) {
@@ -356,6 +349,13 @@ function buildSeriesConfigs() {
             refs.seriesContainer.appendChild(row);
             refs.seriesRows.set(compoundKey, { row, labelSpan, valueSpan });
         }
+
+        // Re-append cel pool rows so they stay in the series container after rebuild
+        if (refs.celRowPool) {
+            for (const poolEntry of refs.celRowPool) {
+                refs.seriesContainer.appendChild(poolEntry.row);
+            }
+        }
     }
 }
 
@@ -412,9 +412,35 @@ function buildCelLineCache() {
         const x0 = dateToXPosition(meta.date1);
         const x1 = dateToXPosition(meta.date2);
 
+        // Match this cel line to a specific compound key (seriesName_aggId)
+        // by finding which trace's data best fits the cel line at its midpoint
+        const midX = Math.round((x0 + x1) / 2);
+        const midLogY = meta.slope * midX + meta.intercept;
+        let matchedKey = null;
+        let bestDist = Infinity;
+
+        for (const trace of chartDiv.data) {
+            if (!trace.meta || !trace.x || !trace.y) continue;
+            const { seriesName, aggId } = trace.meta;
+            if (seriesName !== meta.seriesKey) continue;
+
+            const { index, dist: xDist } = binarySearchClosest(trace.x, midX);
+            if (index < 0 || xDist > 0.5) continue;
+
+            const val = trace.y[index];
+            if (val == null || val <= 0) continue;
+
+            const dist = Math.abs(Math.log10(val) - midLogY);
+            if (dist < bestDist) {
+                bestDist = dist;
+                matchedKey = `${seriesName}_${aggId}`;
+            }
+        }
+
         state.celLineCache.push({
             id: meta.id,
             seriesKey: meta.seriesKey,
+            matchedKey,
             x0, x1,
             slope: meta.slope,
             intercept: meta.intercept,
@@ -1000,7 +1026,7 @@ function updateInfoPanel(xRounded, yLogValue, traceData, celData) {
             if (displayName.length > 30) {
                 displayName = displayName.slice(0, 30) + '...';
             }
-            rowRefs.labelSpan.textContent = `${displayName}:`;
+            rowRefs.labelSpan.textContent = displayName;
 
             // Format value - timing shows reciprocal
             let displayValue;
@@ -1028,40 +1054,59 @@ function updateInfoPanel(xRounded, yLogValue, traceData, celData) {
         }
     }
 
-    // Change Lines section - show/hide cel line rows
+    // Change lines — position cel pool rows after their matching series rows
     if (refs.celRowPool) {
         let rowIdx = 0;
         const pool = refs.celRowPool;
 
         if (celData && celData.length > 0) {
             for (const cel of celData) {
-                const seriesName = formatSeriesName(cel.seriesKey);
                 const bounceLabels = BOUNCE_LABELS[cel.bounceEnvelope];
 
-                // Trend row — label is the fit method (e.g. "Least-squares")
+                let anchorRow = refs.seriesRows.get(cel.matchedKey)?.row;
+                if (!anchorRow) {
+                    for (const [key, rowRefs] of refs.seriesRows) {
+                        if (key.startsWith(cel.seriesKey + '_')) { anchorRow = rowRefs.row; break; }
+                    }
+                }
+
+                // Collect the cel rows for this line so we can insert them in order
+                const celRows = [];
+
+                // Trend row
                 if (rowIdx < pool.length) {
                     const r = pool[rowIdx++];
-                    r.labelSpan.textContent = `${cel.fitMethod} (${seriesName}):`;
+                    r.labelSpan.textContent = cel.fitMethod;
                     r.valueSpan.textContent = formatValue(cel.trendY);
                     r.row.style.display = '';
+                    celRows.push(r.row);
                 }
 
                 // Upper bounce row
                 if (cel.upperY != null && rowIdx < pool.length) {
                     const r = pool[rowIdx++];
-                    const label = bounceLabels?.upper || 'Upper';
-                    r.labelSpan.textContent = `${label} (${seriesName}):`;
+                    r.labelSpan.textContent = bounceLabels?.upper || 'Upper';
                     r.valueSpan.textContent = formatValue(cel.upperY);
                     r.row.style.display = '';
+                    celRows.push(r.row);
                 }
 
                 // Lower bounce row
                 if (cel.lowerY != null && rowIdx < pool.length) {
                     const r = pool[rowIdx++];
-                    const label = bounceLabels?.lower || 'Lower';
-                    r.labelSpan.textContent = `${label} (${seriesName}):`;
+                    r.labelSpan.textContent = bounceLabels?.lower || 'Lower';
                     r.valueSpan.textContent = formatValue(cel.lowerY);
                     r.row.style.display = '';
+                    celRows.push(r.row);
+                }
+
+                // Insert cel rows right after the anchor series row
+                if (anchorRow) {
+                    let insertBefore = anchorRow.nextSibling;
+                    for (const celRow of celRows) {
+                        refs.seriesContainer.insertBefore(celRow, insertBefore);
+                        insertBefore = celRow.nextSibling;
+                    }
                 }
             }
         }
@@ -1070,9 +1115,6 @@ function updateInfoPanel(xRounded, yLogValue, traceData, celData) {
         for (let i = rowIdx; i < pool.length; i++) {
             pool[i].row.style.display = 'none';
         }
-
-        // Show/hide the section
-        refs.celContainer.style.display = rowIdx > 0 ? '' : 'none';
     }
 }
 

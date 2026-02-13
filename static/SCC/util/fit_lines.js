@@ -399,12 +399,9 @@ export function calculateBounceBounds(yLog, x, slope, intercept, envelope = DEFA
             break;
 
         case BOUNCE_ENVELOPES.INTERQUARTILE:
-            const q75 = percentile(residuals, 75);
-            const q25 = percentile(residuals, 25);
-            const iqr = q75 - q25;
             bounds = {
-                upper: q75,
-                lower: q25 - iqr  // Extends below Q1 by one IQR
+                upper: percentile(residuals, 75),
+                lower: percentile(residuals, 25)
             };
             break;
 
