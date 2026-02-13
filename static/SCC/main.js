@@ -42,6 +42,7 @@ import {
     otherCeleration,
     toggleLineCategoryEdit,
     isLineCategoryEditEnabled,
+    disableAllLineEditing,
     initGestureNavigation,
     initFormKeyboardShortcuts,
     init as navigationInit
@@ -274,7 +275,10 @@ export function setupEventListeners() {
     Object.entries(lineActions).forEach(([action, handler]) => {
         const element = document.querySelector(`[data-action="${action}"]`);
         if (element) {
-            element.addEventListener('click', handler);
+            element.addEventListener('click', () => {
+                disableAllLineEditing();
+                handler();
+            });
         }
     });
 

@@ -51,10 +51,10 @@
     <script>
         // Service Worker Registration
         if ('serviceWorker' in navigator) {
-            let refreshing = false;
             navigator.serviceWorker.addEventListener('controllerchange', () => {
-                if (refreshing) return;
-                refreshing = true;
+                var last = parseInt(sessionStorage.getItem('sw-reload-at') || '0');
+                if (Date.now() - last < 10000) return;
+                sessionStorage.setItem('sw-reload-at', String(Date.now()));
                 location.reload();
             });
             navigator.serviceWorker.register('/service-worker.js')
@@ -63,31 +63,38 @@
         }
 
         // Nuclear reset - wipes BIP39 identity, all charts, and localStorage.
-        // A new passphrase will be generated on next page load.
+        // Clears store contents (not deleteDatabase) because chartStorage.js
+        // and init.js hold open connections that block deleteDatabase.
         window.nuke = async function() {
             if (!confirm('This will delete ALL charts, reset your BIP39 passphrase, and clear all local data. Continue?')) {
                 console.log('Nuke cancelled');
                 return;
             }
-            const dbs = ['SCC_Charts', 'SCC_Identity'];
-            const results = [];
-            for (const name of dbs) {
-                try {
-                    await new Promise((resolve) => {
-                        const openReq = indexedDB.open(name);
-                        openReq.onsuccess = () => { openReq.result.close(); resolve(); };
-                        openReq.onerror = () => resolve();
-                    });
-                    await new Promise((resolve, reject) => {
-                        const req = indexedDB.deleteDatabase(name);
-                        req.onsuccess = () => { results.push(name + ': deleted'); resolve(); };
-                        req.onerror = () => { results.push(name + ': error'); reject(req.error); };
-                        req.onblocked = () => { results.push(name + ': blocked (close other tabs)'); resolve(); };
-                    });
-                } catch (e) {
-                    results.push(name + ': ' + e.message);
-                }
+            var results = [];
+            function clearStore(dbName, storeName, storeOpts) {
+                return new Promise(function(resolve) {
+                    var req = indexedDB.open(dbName, 1);
+                    req.onupgradeneeded = function(e) {
+                        var db = e.target.result;
+                        if (!db.objectStoreNames.contains(storeName)) {
+                            db.createObjectStore(storeName, storeOpts);
+                        }
+                    };
+                    req.onsuccess = function() {
+                        var db = req.result;
+                        if (!db.objectStoreNames.contains(storeName)) {
+                            db.close(); results.push(dbName + ': no store'); resolve(); return;
+                        }
+                        var tx = db.transaction(storeName, 'readwrite');
+                        tx.objectStore(storeName).clear();
+                        tx.oncomplete = function() { db.close(); results.push(dbName + ': cleared'); resolve(); };
+                        tx.onerror = function() { db.close(); results.push(dbName + ': error'); resolve(); };
+                    };
+                    req.onerror = function() { results.push(dbName + ': open error'); resolve(); };
+                });
             }
+            await clearStore('SCC_Charts', 'charts', { keyPath: 'id' });
+            await clearStore('SCC_Identity', 'credentials');
             localStorage.clear();
             results.push('localStorage: cleared');
             console.log('[NUKE]', results.join(' | '));

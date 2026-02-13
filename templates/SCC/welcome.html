@@ -17,6 +17,13 @@ html, body {
     border-color: #6ad1e3;
     background: #f0fbfd;
 }
+.path-btn {
+    transition: all 0.15s ease;
+}
+.path-btn:hover {
+    border-color: #6ad1e3;
+    background: #f0fbfd;
+}
 {% endblock %}
 
 {% block body_class %}bg-white min-h-screen{% endblock %}
@@ -29,47 +36,111 @@ html, body {
 </header>
 
 <main class="page-fade max-w-md mx-auto px-6 py-12">
-    <!-- Step 1: Display Name -->
-    <div class="mb-8">
-        <label for="display-name" class="block text-sm font-medium text-gray-700 mb-2">Username</label>
-        <input
-            type="text"
-            id="display-name"
-            placeholder="Enter your username..."
-            class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg text-lg"
-            autocomplete="off"
-            maxlength="50"
-        >
+
+    <!-- Path choice screen -->
+    <div id="path-choice" class="space-y-4">
+        <button id="choose-create" class="path-btn w-full px-6 py-5 border-2 border-gray-300 rounded-lg text-left">
+            <span class="block text-base font-medium text-gray-800">Create new user</span>
+            <span class="block text-sm text-gray-500 mt-1">Set up a fresh identity</span>
+        </button>
+        <button id="choose-import" class="path-btn w-full px-6 py-5 border-2 border-gray-300 rounded-lg text-left">
+            <span class="block text-base font-medium text-gray-800">Import existing user</span>
+            <span class="block text-sm text-gray-500 mt-1">Restore from a backup file or sync link</span>
+        </button>
     </div>
 
-    <!-- Step 2: Use Case -->
-    <div class="mb-14">
-        <p class="block text-sm font-medium text-gray-700 mb-3">How will you use the chart?</p>
-        <div class="space-y-3">
-            <label class="use-case-btn flex items-center px-4 py-3 border-2 border-gray-300 rounded-lg">
-                <input type="radio" name="use-case" value="Business" class="hidden">
-                <span class="text-gray-800">Business</span>
-            </label>
-            <label class="use-case-btn flex items-center px-4 py-3 border-2 border-gray-300 rounded-lg">
-                <input type="radio" name="use-case" value="Teaching" class="hidden">
-                <span class="text-gray-800">Teaching</span>
-            </label>
-            <label class="use-case-btn flex items-center px-4 py-3 border-2 border-gray-300 rounded-lg">
-                <input type="radio" name="use-case" value="Both" class="hidden">
-                <span class="text-gray-800">Both</span>
-            </label>
+    <!-- Create new user flow -->
+    <div id="create-flow" class="hidden">
+        <button id="back-from-create" class="text-sm text-gray-500 hover:text-gray-700 mb-6 flex items-center gap-1">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+            Back
+        </button>
+
+        <div class="mb-8">
+            <label for="display-name" class="block text-sm font-medium text-gray-700 mb-2">Username</label>
+            <input
+                type="text"
+                id="display-name"
+                placeholder="Enter your username..."
+                class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg text-lg"
+                autocomplete="off"
+                maxlength="50"
+            >
         </div>
+
+        <div class="mb-14">
+            <p class="block text-sm font-medium text-gray-700 mb-3">How will you use the chart?</p>
+            <div class="space-y-3">
+                <label class="use-case-btn flex items-center px-4 py-3 border-2 border-gray-300 rounded-lg">
+                    <input type="radio" name="use-case" value="Business" class="hidden">
+                    <span class="text-gray-800">Business</span>
+                </label>
+                <label class="use-case-btn flex items-center px-4 py-3 border-2 border-gray-300 rounded-lg">
+                    <input type="radio" name="use-case" value="Teaching" class="hidden">
+                    <span class="text-gray-800">Teaching</span>
+                </label>
+                <label class="use-case-btn flex items-center px-4 py-3 border-2 border-gray-300 rounded-lg">
+                    <input type="radio" name="use-case" value="Both" class="hidden">
+                    <span class="text-gray-800">Both</span>
+                </label>
+            </div>
+        </div>
+
+        <button
+            id="get-started-btn"
+            disabled
+            class="w-full px-6 py-3 rounded-lg text-white font-medium bg-[#6ad1e3] hover:bg-[#5bc4d6] transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[#6ad1e3]"
+        >
+            Start using the Standard Change Chart
+        </button>
     </div>
 
-    <!-- Get Started -->
-    <button
-        id="get-started-btn"
-        disabled
-        style="margin-top: 2rem;"
-        class="w-full px-6 py-3 rounded-lg text-white font-medium bg-[#6ad1e3] hover:bg-[#5bc4d6] transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[#6ad1e3]"
-    >
-        Start using the Standard Change Chart
-    </button>
+    <!-- Import existing user flow -->
+    <div id="import-flow" class="hidden">
+        <button id="back-from-import" class="text-sm text-gray-500 hover:text-gray-700 mb-6 flex items-center gap-1">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+            Back
+        </button>
+
+        <!-- Backup file upload -->
+        <div class="mb-8">
+            <p class="block text-sm font-medium text-gray-700 mb-3">Upload backup file</p>
+            <input type="file" id="backup-file" accept=".json" class="hidden">
+            <button id="backup-file-btn" class="w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-[#6ad1e3] hover:text-gray-800 transition-colors">
+                Choose .json backup file...
+            </button>
+            <p id="backup-file-name" class="hidden text-sm text-gray-500 mt-2"></p>
+        </div>
+
+        <div class="relative flex items-center my-8">
+            <div class="flex-1 border-t border-gray-200"></div>
+            <span class="px-4 text-sm text-gray-400">or</span>
+            <div class="flex-1 border-t border-gray-200"></div>
+        </div>
+
+        <!-- Sync link paste -->
+        <div class="mb-8">
+            <label for="sync-link-input" class="block text-sm font-medium text-gray-700 mb-3">Paste sync link</label>
+            <input
+                type="text"
+                id="sync-link-input"
+                placeholder="https://...../sync/..."
+                class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg text-sm"
+                autocomplete="off"
+            >
+            <button
+                id="import-link-btn"
+                disabled
+                class="w-full mt-3 px-6 py-3 rounded-lg text-white font-medium bg-[#6ad1e3] hover:bg-[#5bc4d6] transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[#6ad1e3]"
+            >
+                Import from link
+            </button>
+        </div>
+
+        <!-- Status / error area -->
+        <div id="import-status" class="hidden mt-4 px-4 py-3 rounded-lg text-sm"></div>
+    </div>
+
 </main>
 {% endblock %}
 
@@ -78,10 +149,43 @@ html, body {
     import { openDB } from '/static/lib/idb.js';
     import { generatePassphrase } from '/static/SCC/storage/passphrase.js';
     import { deriveSigningKeyPair, exportPublicKey } from '/static/Server/crypto.js';
+    import { restoreFromBackup } from '/static/SCC/storage/backupStorage.js';
+    import { redeemAccountLink } from '/static/Server/accountLink.js';
 
     const DB_NAME = 'SCC_Identity';
     const STORE_NAME = 'credentials';
 
+    // --- Path choice ---
+    const pathChoice = document.getElementById('path-choice');
+    const createFlow = document.getElementById('create-flow');
+    const importFlow = document.getElementById('import-flow');
+
+    function showView(view) {
+        pathChoice.classList.add('hidden');
+        createFlow.classList.add('hidden');
+        importFlow.classList.add('hidden');
+        view.classList.remove('hidden');
+    }
+
+    document.getElementById('choose-create').addEventListener('click', () => {
+        showView(createFlow);
+        document.getElementById('display-name').focus();
+    });
+
+    document.getElementById('choose-import').addEventListener('click', () => {
+        showView(importFlow);
+    });
+
+    document.getElementById('back-from-create').addEventListener('click', () => {
+        showView(pathChoice);
+    });
+
+    document.getElementById('back-from-import').addEventListener('click', () => {
+        showView(pathChoice);
+        clearImportStatus();
+    });
+
+    // --- Create new user (existing logic, unchanged) ---
     const nameInput = document.getElementById('display-name');
     const useCaseRadios = document.querySelectorAll('input[name="use-case"]');
     const getStartedBtn = document.getElementById('get-started-btn');
@@ -129,6 +233,126 @@ html, body {
         window.location.href = '/';
     });
 
-    nameInput.focus();
+    // --- Import: shared status helpers ---
+    const importStatus = document.getElementById('import-status');
+
+    function showImportStatus(msg, isError) {
+        importStatus.textContent = msg;
+        importStatus.className = isError
+            ? 'mt-4 px-4 py-3 rounded-lg text-sm bg-red-50 text-red-700 border border-red-200'
+            : 'mt-4 px-4 py-3 rounded-lg text-sm bg-blue-50 text-blue-700 border border-blue-200';
+        importStatus.classList.remove('hidden');
+    }
+
+    function clearImportStatus() {
+        importStatus.classList.add('hidden');
+        importStatus.textContent = '';
+    }
+
+    // --- Import: backup file ---
+    const backupFileInput = document.getElementById('backup-file');
+    const backupFileBtn = document.getElementById('backup-file-btn');
+    const backupFileName = document.getElementById('backup-file-name');
+
+    backupFileBtn.addEventListener('click', () => backupFileInput.click());
+
+    backupFileInput.addEventListener('change', async () => {
+        const file = backupFileInput.files[0];
+        if (!file) return;
+
+        clearImportStatus();
+        backupFileName.textContent = file.name;
+        backupFileName.classList.remove('hidden');
+        backupFileBtn.disabled = true;
+        backupFileBtn.textContent = 'Importing...';
+
+        try {
+            const text = await file.text();
+            let backup;
+            try {
+                backup = JSON.parse(text);
+            } catch {
+                throw new Error('File is not valid JSON.');
+            }
+
+            if (!backup.backupVersionFormat) {
+                throw new Error('Not a valid backup file (missing backupVersionFormat).');
+            }
+
+            if (!backup.identity?.passphrase) {
+                throw new Error('Backup file does not contain identity data.');
+            }
+
+            await restoreFromBackup(backup, { discardExisting: false });
+            window.location.href = '/';
+        } catch (err) {
+            showImportStatus(err.message, true);
+            backupFileBtn.disabled = false;
+            backupFileBtn.textContent = 'Choose .json backup file...';
+            backupFileName.classList.add('hidden');
+            backupFileInput.value = '';
+        }
+    });
+
+    // --- Import: sync link ---
+    const syncLinkInput = document.getElementById('sync-link-input');
+    const importLinkBtn = document.getElementById('import-link-btn');
+
+    syncLinkInput.addEventListener('input', () => {
+        importLinkBtn.disabled = !syncLinkInput.value.trim();
+    });
+
+    function parseSyncLink(raw) {
+        const trimmed = raw.trim();
+        try {
+            const url = new URL(trimmed);
+            const parts = url.pathname.split('/').filter(Boolean);
+            // Expected: ['sync', linkId, linkSecret]
+            if (parts.length >= 3 && parts[0] === 'sync') {
+                return { linkId: parts[1], linkSecret: parts[2] };
+            }
+        } catch { /* not a valid URL */ }
+        return null;
+    }
+
+    importLinkBtn.addEventListener('click', async () => {
+        clearImportStatus();
+        const parsed = parseSyncLink(syncLinkInput.value);
+        if (!parsed) {
+            showImportStatus('Invalid sync link. Expected format: https://.../sync/<id>/<secret>', true);
+            return;
+        }
+
+        importLinkBtn.disabled = true;
+        importLinkBtn.textContent = 'Importing...';
+
+        try {
+            const { passphrase, displayName } = await redeemAccountLink(parsed.linkId, parsed.linkSecret);
+
+            const db = await openDB(DB_NAME, 1, {
+                upgrade(db) {
+                    if (!db.objectStoreNames.contains(STORE_NAME)) {
+                        db.createObjectStore(STORE_NAME);
+                    }
+                }
+            });
+
+            const keyPair = await deriveSigningKeyPair(passphrase);
+            const publicKeyB64 = await exportPublicKey(keyPair.publicKey);
+
+            await db.put(STORE_NAME, passphrase, 'passphrase');
+            await db.put(STORE_NAME, publicKeyB64, 'publicKey');
+            if (displayName) {
+                await db.put(STORE_NAME, displayName, 'display_name');
+            }
+            await db.put(STORE_NAME, { syncAllChartsToServer: true }, 'user_preferences');
+
+            window.location.href = '/';
+        } catch (err) {
+            showImportStatus(err.message, true);
+            importLinkBtn.disabled = false;
+            importLinkBtn.textContent = 'Import from link';
+        }
+    });
 </script>
 {% endblock %}

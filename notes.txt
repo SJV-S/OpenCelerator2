@@ -26,8 +26,12 @@ To-do
 - Renaming display name BEFORE an aggregation take is created doesn't seem to take
 - Credit lines doesn't adapt to narrow chart windows
 - Check clickability of dates across chart types for data entry
+- I forgot to filter timing in previous for non-minute charts!
 
 - Survey prompts
 -- Investigate the occurrence of any cross-module imports that should be handled by the event bus system instead
 -- Survey the code for all fallback references and code blocks. I want to see if they make sense
 --
+
+
+

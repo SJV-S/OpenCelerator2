@@ -76,6 +76,15 @@ class RequestLog(db.Model):
     chart_uuid = db.Column(db.String(36), nullable=True)
 
 
+class AccountLink(db.Model):
+    """Temporary one-time-use encrypted link for transferring identity between devices"""
+    __tablename__ = 'account_links'
+
+    link_id = db.Column(db.String(36), primary_key=True)
+    encrypted_blob = db.Column(db.LargeBinary, nullable=False)
+    created_at = db.Column(db.Integer, nullable=False)  # Unix seconds
+
+
 class ChartTombstone(db.Model):
     """Tombstones for deleted charts (retained 1 year for sync)"""
     __tablename__ = 'chart_tombstones'

@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+
+{% block title %}Sync Device{% endblock %}
+
+{% block base_style %}
+html, body {
+    height: 100%;
+}
+{% endblock %}
+
+{% block body_class %}bg-white min-h-screen{% endblock %}
+
+{% block content %}
+<header class="border-b border-gray-200 bg-white">
+    <div class="max-w-md mx-auto px-6 py-4 flex items-center justify-center">
+        <h1 class="text-lg font-semibold text-gray-800">Sync Device</h1>
+    </div>
+</header>
+
+<main class="page-fade max-w-md mx-auto px-6 py-12">
+    <!-- Loading state -->
+    <div id="link-loading" class="text-center">
+        <div class="w-10 h-10 mx-auto mb-4 border-4 border-gray-200 border-t-[#6ad1e3] rounded-full animate-spin"></div>
+        <p class="text-gray-600">Retrieving identity...</p>
+    </div>
+
+    <!-- Error state -->
+    <div id="link-error" class="hidden text-center">
+        <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100 flex items-center justify-center">
+            <svg class="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+        </div>
+        <p id="link-error-msg" class="text-gray-700 mb-6"></p>
+        <a href="/" class="inline-block px-5 py-2 rounded-lg bg-[#6ad1e3] text-white font-medium text-sm hover:bg-[#5bc4d6] transition-colors">
+            Go to Chart Explorer
+        </a>
+    </div>
+
+    <!-- Confirmation -->
+    <div id="link-confirm" class="hidden">
+        <p class="text-sm text-gray-700 mb-5">
+            Switch user from <span id="confirm-old-name" class="font-semibold"></span> to <span id="confirm-new-name" class="font-semibold"></span>?
+        </p>
+        <label class="flex items-center gap-2 mb-5 cursor-pointer">
+            <input type="checkbox" id="keep-charts" checked class="accent-[#6ad1e3] w-4 h-4">
+            <span class="text-sm text-gray-600">Keep charts from previous identity</span>
+        </label>
+        <div class="flex gap-3">
+            <a href="/" class="flex-1 px-4 py-2 text-center text-sm font-medium border-2 border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                No
+            </a>
+            <button id="confirm-switch-btn" class="flex-1 px-4 py-2 text-sm font-medium bg-[#6ad1e3] text-white rounded-lg hover:bg-[#5bc4d6] transition-colors">
+                Yes
+            </button>
+        </div>
+    </div>
+
+    <!-- Success state -->
+    <div id="link-success" class="hidden text-center">
+        <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-green-100 flex items-center justify-center">
+            <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+        </div>
+        <p class="text-gray-700 mb-2">Identity synced successfully!</p>
+        <a href="/" id="link-continue" class="inline-block mt-4 px-5 py-2 rounded-lg bg-[#6ad1e3] text-white font-medium text-sm hover:bg-[#5bc4d6] transition-colors">
+            Continue
+        </a>
+    </div>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script type="module">
+    import { openDB } from '/static/lib/idb.js';
+    import { redeemAccountLink } from '/static/Server/accountLink.js';
+    import { deriveSigningKeyPair, exportPublicKey } from '/static/Server/crypto.js';
+
+    const DB_NAME = 'SCC_Identity';
+    const STORE_NAME = 'credentials';
+
+    const loadingEl = document.getElementById('link-loading');
+    const errorEl = document.getElementById('link-error');
+    const errorMsg = document.getElementById('link-error-msg');
+    const confirmEl = document.getElementById('link-confirm');
+    const successEl = document.getElementById('link-success');
+
+    function showError(msg) {
+        loadingEl.classList.add('hidden');
+        errorMsg.textContent = msg;
+        errorEl.classList.remove('hidden');
+    }
+
+    function showSuccess() {
+        loadingEl.classList.add('hidden');
+        confirmEl.classList.add('hidden');
+        successEl.classList.remove('hidden');
+    }
+
+    async function storeIdentity(passphrase, displayName) {
+        const db = await openDB(DB_NAME, 1, {
+            upgrade(db) {
+                if (!db.objectStoreNames.contains(STORE_NAME)) {
+                    db.createObjectStore(STORE_NAME);
+                }
+            }
+        });
+
+        const keyPair = await deriveSigningKeyPair(passphrase);
+        const publicKeyB64 = await exportPublicKey(keyPair.publicKey);
+
+        await db.put(STORE_NAME, passphrase, 'passphrase');
+        await db.put(STORE_NAME, publicKeyB64, 'publicKey');
+        if (displayName) {
+            await db.put(STORE_NAME, displayName, 'display_name');
+        }
+    }
+
+    async function getExistingIdentity() {
+        try {
+            const db = await openDB(DB_NAME, 1);
+            const passphrase = await db.get(STORE_NAME, 'passphrase');
+            if (!passphrase) return null;
+            const displayName = await db.get(STORE_NAME, 'display_name') || null;
+            return { passphrase, displayName };
+        } catch {
+            return null;
+        }
+    }
+
+    // Extract linkId and linkSecret from URL path: /sync/<linkId>/<linkSecret>
+    const pathParts = window.location.pathname.split('/').filter(Boolean);
+    // pathParts = ['sync', linkId, linkSecret]
+    if (pathParts.length < 3 || pathParts[0] !== 'sync') {
+        showError('Invalid link format.');
+    } else {
+        const linkId = pathParts[1];
+        const linkSecret = pathParts[2];
+
+        (async () => {
+            try {
+                const { passphrase, displayName } = await redeemAccountLink(linkId, linkSecret);
+                const existing = await getExistingIdentity();
+
+                loadingEl.classList.add('hidden');
+                document.getElementById('confirm-old-name').textContent = existing?.displayName || 'Nameless';
+                document.getElementById('confirm-new-name').textContent = displayName || 'Nameless';
+                confirmEl.classList.remove('hidden');
+
+                document.getElementById('confirm-switch-btn').addEventListener('click', async () => {
+                    document.getElementById('confirm-switch-btn').disabled = true;
+                    document.getElementById('confirm-switch-btn').textContent = 'Syncing...';
+
+                    if (!document.getElementById('keep-charts').checked) {
+                        const chartsDb = await openDB('SCC_Charts', 1);
+                        const tx = chartsDb.transaction('charts', 'readwrite');
+                        await tx.objectStore('charts').clear();
+                        await tx.done;
+                    }
+
+                    await storeIdentity(passphrase, displayName);
+                    showSuccess();
+                });
+            } catch (err) {
+                showError(err.message);
+            }
+        })();
+    }
+</script>
+{% endblock %}

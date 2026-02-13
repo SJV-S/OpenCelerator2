@@ -200,7 +200,8 @@ function renderCurrentEntry() {
             <!-- Dynamic Misc Series -->
             ${miscFieldsHtml}
 
-            <!-- Timing -->
+            <!-- Timing (minute charts only) -->
+            ${chartState.minuteChart ? `
             <div class="mb-6">
                 <label class="block text-sm font-semibold text-gray-600 mb-2 text-center">Timing</label>
                 <div class="grid grid-cols-3 gap-4">
@@ -233,6 +234,7 @@ function renderCurrentEntry() {
                     </div>
                 </div>
             </div>
+            ` : ''}
         </div>
     `;
 
@@ -253,12 +255,17 @@ export function updateCurrentEntry() {
     const parseOrMissing = (el) => { const n = parseInt(el.value); return isNaN(n) ? MISSING : n; };
     const corrects = parseOrMissing(container.querySelector('[data-field="corrects"]'));
     const errors = parseOrMissing(container.querySelector('[data-field="errors"]'));
-    const hours = parseOrMissing(container.querySelector('[data-field="hours"]'));
-    const minutes = parseOrMissing(container.querySelector('[data-field="minutes"]'));
-    const seconds = parseOrMissing(container.querySelector('[data-field="seconds"]'));
 
-    // Convert timing back to total minutes (same as dataEntry.js)
-    const timingMinutes = (hours || 0) * 60 + (minutes || 0) + (seconds || 0) / 60;
+    // Timing: minute charts read from inputs, non-minute charts use 1
+    let timingMinutes;
+    if (chartState.minuteChart) {
+        const hours = parseOrMissing(container.querySelector('[data-field="hours"]'));
+        const minutes = parseOrMissing(container.querySelector('[data-field="minutes"]'));
+        const seconds = parseOrMissing(container.querySelector('[data-field="seconds"]'));
+        timingMinutes = (hours || 0) * 60 + (minutes || 0) + (seconds || 0) / 60;
+    } else {
+        timingMinutes = 1;
+    }
 
     // Update chartState.series at the original index
     const dataIndex = point.index;

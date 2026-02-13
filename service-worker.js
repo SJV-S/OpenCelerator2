@@ -41,6 +41,7 @@ const PRECACHE_STATIC = [
     '/static/SCC/navigation.js',
     '/static/SCC/pwaInstall.js',
     // Libraries
+    '/static/lib/qrcode-generator.min.js',
     '/static/lib/idb.js',
     '/static/lib/plotly-2.35.2.min.js',
     '/static/lib/socket.io-4.7.4.min.js',
@@ -107,6 +108,7 @@ const PRECACHE_STATIC = [
     '/static/SCC/import/nativeImport.js',
     '/static/SCC/import/openCeleratorImport.js',
     // Server sync
+    '/static/Server/accountLink.js',
     '/static/Server/crypto.js',
     '/static/Server/init.js',
     '/static/Server/onlineStatus.js',

@@ -2,8 +2,11 @@ import { createBackupData, restoreFromBackup } from '/static/SCC/storage/backupS
 import { listCharts } from '/static/SCC/storage/chartStorage.js';
 import { setUserPreference, getUserPreferences, getDisplayName, setDisplayName } from '/static/Server/init.js';
 import { downloadFile } from '/static/SCC/util/download.js';
+import { createAccountLink } from '/static/Server/accountLink.js';
+import { getStoredPassphrase } from '/static/Server/syncDevice.js';
 
 let pendingBackupData = null;
+let linkCountdownTimer = null;
 
 let onChartsChanged = () => {};
 
@@ -31,6 +34,24 @@ async function openSettingsModal() {
     document.getElementById('settings-modal').classList.add('flex');
 }
 
+function resetAccountLinkUI() {
+    if (linkCountdownTimer) {
+        clearInterval(linkCountdownTimer);
+        linkCountdownTimer = null;
+    }
+    document.getElementById('account-link-section').classList.remove('hidden');
+    const resultEl = document.getElementById('account-link-result');
+    resultEl.classList.add('hidden');
+    document.getElementById('account-link-qr').innerHTML = '';
+    document.getElementById('account-link-url').value = '';
+    const genBtn = document.getElementById('generate-link-btn');
+    genBtn.disabled = false;
+    genBtn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+    </svg>
+    Generate sync link`;
+}
+
 function closeSettingsModal() {
     document.getElementById('settings-modal').classList.add('hidden');
     document.getElementById('settings-modal').classList.remove('flex');
@@ -40,6 +61,7 @@ function closeSettingsModal() {
     document.getElementById('backup-import-section').classList.remove('hidden');
     document.getElementById('sync-confirm').classList.add('hidden');
     hideImportStatus();
+    resetAccountLinkUI();
 
     // Collapse both groups
     document.getElementById('backup-group').classList.add('hidden');
@@ -132,6 +154,72 @@ export function initSettingsModal(deps) {
     // --- Backup Import ---
     document.getElementById('backup-import-btn').addEventListener('click', () => {
         document.getElementById('backup-import-input').click();
+    });
+
+    // --- Account Link ---
+    document.getElementById('generate-link-btn').addEventListener('click', async () => {
+        const btn = document.getElementById('generate-link-btn');
+        btn.disabled = true;
+        btn.textContent = 'Generating...';
+
+        try {
+            const passphrase = await getStoredPassphrase();
+            if (!passphrase) {
+                btn.disabled = false;
+                btn.textContent = 'Generate sync link';
+                return;
+            }
+            const displayName = await getDisplayName();
+            const { url } = await createAccountLink(passphrase, displayName);
+
+            // Hide generate button, show result
+            document.getElementById('account-link-section').classList.add('hidden');
+            const resultEl = document.getElementById('account-link-result');
+            resultEl.classList.remove('hidden');
+
+            // Render QR code
+            const qrContainer = document.getElementById('account-link-qr');
+            qrContainer.innerHTML = '';
+            /* global qrcode */
+            const qr = qrcode(0, 'M');
+            qr.addData(url);
+            qr.make();
+            qrContainer.innerHTML = qr.createSvgTag(4, 0);
+
+            // Set URL input
+            document.getElementById('account-link-url').value = url;
+
+            // Start countdown (15 minutes = 900 seconds)
+            let remaining = 900;
+            const countdownEl = document.getElementById('link-countdown');
+            const tick = () => {
+                const min = Math.floor(remaining / 60);
+                const sec = remaining % 60;
+                countdownEl.textContent = `${min}:${sec.toString().padStart(2, '0')}`;
+                if (remaining <= 0) {
+                    clearInterval(linkCountdownTimer);
+                    linkCountdownTimer = null;
+                    resetAccountLinkUI();
+                }
+                remaining--;
+            };
+            tick();
+            linkCountdownTimer = setInterval(tick, 1000);
+        } catch (err) {
+            btn.disabled = false;
+            btn.textContent = 'Generate sync link';
+            console.error('[AccountLink] Error:', err);
+            alert(err.message);
+        }
+    });
+
+    document.getElementById('copy-link-btn').addEventListener('click', () => {
+        const urlInput = document.getElementById('account-link-url');
+        const btn = document.getElementById('copy-link-btn');
+        navigator.clipboard.writeText(urlInput.value).then(() => {
+            btn.textContent = 'Copied!';
+            setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+        });
     });
 
     document.getElementById('backup-import-input').addEventListener('change', async (e) => {
