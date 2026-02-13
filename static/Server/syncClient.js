@@ -8,6 +8,7 @@ import { getUserId, getUserKey } from '../SCC/storage/passphrase.js';
 import { openDB } from '../lib/idb.js';
 import { eventBus, EVENTS } from '../SCC/eventBus.js';
 import { connectToChart, disconnectFromChart } from './wsClient.js';
+import { api, setUserId } from './client-api.js';
 
 async function getChartFromIndexedDB(chartId) {
     const db = await openDB('SCC_Charts', 1);
@@ -25,6 +26,7 @@ let signingDisplayName = null;  // Human-readable owner name (display only), set
 export async function initSync(passphrase, privateKey, publicKeyB64, displayName = null) {
     userId = await getUserId(passphrase);
     userKey = await getUserKey(passphrase);
+    setUserId(userId);
     signingPrivateKey = privateKey;
     signingPublicKeyB64 = publicKeyB64;
     signingPublicKey = await importPublicKey(publicKeyB64);
@@ -184,15 +186,9 @@ export async function uploadCharts(localCharts) {
         });
     }
 
-    const response = await fetch('/api/sync', {
+    const response = await api('/api/sync', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            user_id: userId,
-            last_sync_at: 0,
-            local_manifest: [],
-            uploads
-        })
+        body: { user_id: userId, last_sync_at: 0, local_manifest: [], uploads }
     });
 
     if (!response.ok) throw new Error(`Upload failed: ${response.status}`);
@@ -201,15 +197,9 @@ export async function uploadCharts(localCharts) {
 export async function pullCharts() {
     if (!isInitialized()) throw new Error('Sync not initialized - call initSync first');
 
-    const response = await fetch('/api/sync', {
+    const response = await api('/api/sync', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            user_id: userId,
-            last_sync_at: lastSyncAt,
-            local_manifest: [],
-            uploads: []
-        })
+        body: { user_id: userId, last_sync_at: lastSyncAt, local_manifest: [], uploads: [] }
     });
 
     if (!response.ok) throw new Error(`Pull failed: ${response.status}`);
@@ -224,14 +214,9 @@ export async function pullCharts() {
 export async function checkForUpdates(localManifest) {
     if (!isInitialized()) throw new Error('Sync not initialized - call initSync first');
 
-    const response = await fetch('/api/sync', {
+    const response = await api('/api/sync', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            user_id: userId,
-            local_manifest: localManifest,
-            uploads: []
-        })
+        body: { user_id: userId, local_manifest: localManifest, uploads: [] }
     });
 
     if (!response.ok) throw new Error(`Sync check failed: ${response.status}`);
@@ -271,15 +256,9 @@ export async function sync(localCharts) {
 
     const localManifest = localCharts.map(c => ({ chart_uuid: c.id, updated_at: c.updatedAt }));
 
-    const response = await fetch('/api/sync', {
+    const response = await api('/api/sync', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            user_id: userId,
-            last_sync_at: lastSyncAt,
-            local_manifest: localManifest,
-            uploads
-        })
+        body: { user_id: userId, last_sync_at: lastSyncAt, local_manifest: localManifest, uploads }
     });
 
     if (!response.ok) throw new Error(`Sync failed: ${response.status}`);
@@ -308,10 +287,9 @@ export async function pushChart(chartUuid) {
     const signature = await signPayload(encryptedData);
     const wrappedKey = await wrapKey(chartKey, userKey);
 
-    const response = await fetch('/api/sync', {
+    const response = await api('/api/sync', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
             user_id: userId,
             local_manifest: [],
             uploads: [{
@@ -321,7 +299,7 @@ export async function pushChart(chartUuid) {
                 wrapped_key: wrappedKey,
                 signature
             }]
-        })
+        }
     });
 
     if (!response.ok) throw new Error(`Push failed: ${response.status}`);
@@ -361,10 +339,9 @@ async function _createShareLink(chartUuid, acceptingEdits) {
     const wrappedKeyForUser = await wrapKey(chartKey, userKey);
     const wrappedKeyForShare = await wrapKey(chartKey, shareKey);
 
-    const response = await fetch('/api/share/edit', {
+    const response = await api('/api/share/edit', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
             chart_uuid: chartUuid,
             user_id: userId,
             data: encryptedData,
@@ -372,7 +349,7 @@ async function _createShareLink(chartUuid, acceptingEdits) {
             wrapped_key_for_share: wrappedKeyForShare,
             last_modified: chart.lastModified || Math.floor(Date.now() / 1000),
             signature
-        })
+        }
     });
     if (!response.ok) throw new Error(`Failed to create share link: ${response.status}`);
 
@@ -388,19 +365,17 @@ async function _createShareLink(chartUuid, acceptingEdits) {
 // ============================================================================
 
 export async function deleteChart(chartUuid) {
-    const response = await fetch('/api/chart', {
+    const response = await api('/api/chart', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chart_uuid: chartUuid, user_id: userId })
+        body: { chart_uuid: chartUuid, user_id: userId }
     });
     return response.ok;
 }
 
 export async function leaveChart(chartUuid) {
-    const response = await fetch('/api/chart/leave', {
+    const response = await api('/api/chart/leave', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chart_uuid: chartUuid, user_id: userId })
+        body: { chart_uuid: chartUuid, user_id: userId }
     });
     return response.ok;
 }
@@ -410,7 +385,7 @@ export async function leaveChart(chartUuid) {
 // ============================================================================
 
 export async function joinSharedChart(chartUuid, shareSecret) {
-    const response = await fetch(`/api/chart/${chartUuid}/shared`);
+    const response = await api(`/api/chart/${chartUuid}/shared`);
     if (!response.ok) {
         const body = await response.json().catch(() => ({}));
         throw new Error(body.error || `Failed to fetch shared chart: ${response.status}`);
@@ -455,14 +430,14 @@ export async function syncChart(chartId, updatedAt = null) {
 
         // If updatedAt is null (reconnect or initial), use poll endpoint to check
         if (updatedAt === null) {
-            const pollResponse = await fetch(`/api/chart/${chartId}/poll?t=${chart.lastModified || 0}`);
+            const pollResponse = await api(`/api/chart/${chartId}/poll?t=${chart.lastModified || 0}`);
             if (!pollResponse.ok) return false;
             const pollData = await pollResponse.json();
             if (!pollData.changed) return false;
             updatedAt = pollData.updated_at;
         }
 
-        const response = await fetch(`/api/chart/${chartId}/shared`);
+        const response = await api(`/api/chart/${chartId}/shared`);
         if (!response.ok) return false;
         const { data, signature: signatureHex } = await response.json();
 
@@ -503,7 +478,7 @@ export async function startSyncWatch(chartId) {
     if (chart && chart.shared && chart.chartKey) {
         connectToChart(chartId, ({ chartUuid, updatedAt }) => {
             syncChart(chartUuid, updatedAt);
-        });
+        }, userId);
     }
 }
 

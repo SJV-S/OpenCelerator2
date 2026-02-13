@@ -1,10 +1,11 @@
 import time
+from functools import wraps
 from flask import Flask, render_template, request, jsonify, redirect, url_for, send_from_directory, make_response
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_socketio import SocketIO, join_room, leave_room
 
-from models import db, Chart, ChartAccess, ChartTombstone, ShareLink, AccountLink, init_db
+from models import db, Chart, ChartAccess, ChartTombstone, ShareLink, AccountLink, Subscription, init_db
 from telemetry import log_request
 import config
 
@@ -24,6 +25,32 @@ app.config['MAX_CONTENT_LENGTH'] = config.MAX_CONTENT_LENGTH
 
 # Initialize database
 init_db(app)
+
+
+def requires_subscription(f):
+    """Gate route behind paid subscription. Bypassed when REQUIRE_PAYMENT is False."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not config.REQUIRE_PAYMENT:
+            return f(*args, **kwargs)
+
+        user_id = request.headers.get('X-User-Id')
+        if not user_id:
+            # Fall back to JSON body for POST/DELETE requests
+            if request.is_json:
+                body = request.get_json(silent=True)
+                if body and isinstance(body, dict):
+                    user_id = body.get('user_id')
+        if not user_id:
+            return jsonify({'error': 'payment_required'}), 402
+
+        sub = db.session.get(Subscription, user_id)
+        if not sub or sub.paid_until < int(time.time()):
+            return jsonify({'error': 'payment_required', 'paid_until': sub.paid_until if sub else 0}), 402
+
+        return f(*args, **kwargs)
+    return decorated
+
 
 # Telemetry — log every request
 app.after_request(log_request)
@@ -129,6 +156,7 @@ def purge_if_over_limit():
 
 @app.route('/api/sync', methods=['POST'])
 @limiter.limit(config.RATELIMIT_API_WRITE)
+@requires_subscription
 def sync():
     """
     Main sync endpoint - handles upload/download of encrypted charts.
@@ -249,6 +277,7 @@ def sync():
 
 @app.route('/api/chart', methods=['DELETE'])
 @limiter.limit(config.RATELIMIT_API_DELETE)
+@requires_subscription
 def delete_chart():
     """Owner deletes chart entirely"""
     data = request.get_json()
@@ -280,6 +309,7 @@ def delete_chart():
 
 @app.route('/api/chart/leave', methods=['DELETE'])
 @limiter.limit(config.RATELIMIT_API_DELETE)
+@requires_subscription
 def leave_chart():
     """Collaborator removes their own access"""
     data = request.get_json()
@@ -304,6 +334,7 @@ def leave_chart():
 
 @app.route('/api/share/edit', methods=['POST'])
 @limiter.limit(config.RATELIMIT_API_WRITE)
+@requires_subscription
 def create_edit_link():
     """
     Store chart with wrapped key for sharing.
@@ -357,6 +388,7 @@ def create_edit_link():
 
 @app.route('/api/chart/<chart_uuid>/poll')
 @limiter.limit(config.RATELIMIT_POLL)
+@requires_subscription
 def poll_chart(chart_uuid):
     """Lightweight check if chart has been updated"""
     last_known = request.args.get('t', 0, type=int)
@@ -370,6 +402,7 @@ def poll_chart(chart_uuid):
 
 
 @app.route('/api/chart/<chart_uuid>/shared')
+@requires_subscription
 def get_shared_chart(chart_uuid):
     """Get chart data and wrapped key for share link"""
     chart = db.session.get(Chart, chart_uuid)
@@ -408,6 +441,7 @@ def get_shared_chart(chart_uuid):
 
 @app.route('/api/account-link', methods=['POST'])
 @limiter.limit(config.RATELIMIT_ACCOUNT_LINK)
+@requires_subscription
 def create_account_link():
     """Store an encrypted identity blob for one-time retrieval."""
     data = request.get_json()
@@ -438,6 +472,7 @@ def create_account_link():
 
 @app.route('/api/account-link/<link_id>')
 @limiter.limit(config.RATELIMIT_DEFAULT)
+@requires_subscription
 def get_account_link(link_id):
     """Retrieve an encrypted identity blob. Idempotent — TTL handles cleanup."""
     account_link = db.session.get(AccountLink, link_id)
@@ -474,6 +509,15 @@ def sync_link_page(link_id, link_secret):
 def handle_join_chart(data):
     """Client subscribes to updates for a specific chart"""
     chart_uuid = data.get('chart_uuid')
+
+    if config.REQUIRE_PAYMENT:
+        user_id = data.get('user_id')
+        if not user_id:
+            return
+        sub = db.session.get(Subscription, user_id)
+        if not sub or sub.paid_until < int(time.time()):
+            return
+
     if chart_uuid:
         join_room(f'chart:{chart_uuid}')
 
@@ -484,6 +528,17 @@ def handle_leave_chart(data):
     chart_uuid = data.get('chart_uuid')
     if chart_uuid:
         leave_room(f'chart:{chart_uuid}')
+
+
+@app.route('/api/subscription/status')
+def subscription_status():
+    """Check subscription status for a user. Not gated."""
+    user_id = request.headers.get('X-User-Id')
+    if not user_id:
+        return jsonify({'paid_until': None})
+
+    sub = db.session.get(Subscription, user_id)
+    return jsonify({'paid_until': sub.paid_until if sub else None})
 
 
 if __name__ == '__main__':

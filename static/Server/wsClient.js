@@ -8,17 +8,20 @@
 
 let socket = null;
 let currentChartId = null;
+let currentUserId = null;
 let onChartUpdated = null;
 
 /**
  * Connect to the WebSocket server and join a chart room.
  * @param {string} chartId - The chart UUID to subscribe to
  * @param {Function} callback - Called with { chartUuid, updatedAt } on remote update
+ * @param {string} [userId] - User ID sent with join_chart for subscription verification
  */
-export function connectToChart(chartId, callback) {
+export function connectToChart(chartId, callback, userId = null) {
     disconnectFromChart();
 
     currentChartId = chartId;
+    currentUserId = userId;
     onChartUpdated = callback;
 
     // io() is globally available from the Socket.IO CDN script
@@ -32,7 +35,7 @@ export function connectToChart(chartId, callback) {
 
     socket.on('connect', () => {
         console.log('[WS] Connected, joining chart room:', chartId);
-        socket.emit('join_chart', { chart_uuid: chartId });
+        socket.emit('join_chart', { chart_uuid: chartId, user_id: currentUserId });
     });
 
     socket.on('chart_updated', (data) => {
@@ -47,7 +50,7 @@ export function connectToChart(chartId, callback) {
 
     socket.on('reconnect', () => {
         console.log('[WS] Reconnected, rejoining chart room');
-        socket.emit('join_chart', { chart_uuid: chartId });
+        socket.emit('join_chart', { chart_uuid: chartId, user_id: currentUserId });
         // Force a catch-up check — may have missed updates while disconnected
         if (onChartUpdated) {
             onChartUpdated({ chartUuid: chartId, updatedAt: null });
@@ -93,6 +96,7 @@ export function disconnectFromChart() {
         socket = null;
     }
     currentChartId = null;
+    currentUserId = null;
     onChartUpdated = null;
 }
 

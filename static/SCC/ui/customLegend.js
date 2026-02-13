@@ -294,7 +294,7 @@ function toggleLineVisibility(lineType) {
             legendItem.classList.toggle('legend-item-hidden', !newState);
         }
 
-        eventBus.emit(EVENTS.CHART_GRID_VISIBILITY_CHANGED, { visible: newState });
+        setTimeout(() => eventBus.emit(EVENTS.CHART_GRID_VISIBILITY_CHANGED, { visible: newState }), 0);
         return;
     }
 

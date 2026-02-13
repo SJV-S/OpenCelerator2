@@ -112,6 +112,7 @@ const PRECACHE_STATIC = [
     '/static/Server/crypto.js',
     '/static/Server/init.js',
     '/static/Server/onlineStatus.js',
+    '/static/Server/client-api.js',
     '/static/Server/syncClient.js',
     '/static/Server/syncDevice.js',
     '/static/Server/wsClient.js',

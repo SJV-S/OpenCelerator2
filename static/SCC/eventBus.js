@@ -115,6 +115,12 @@ export const EVENTS = {
     SYNC_SERVER_RECONNECTED: 'sync:server_reconnected',
     SYNC_CHART_UPDATED: 'sync:chart_updated',
 
+    // API Events
+    API_REQUEST: 'api:request',
+    API_RESPONSE: 'api:response',
+    API_ERROR: 'api:error',
+    SUBSCRIPTION_EXPIRED: 'subscription:expired',
+
     // Data Import Events
     DATA_IMPORT_STARTED: 'data:import_started',
     DATA_IMPORT_FILE_PARSED: 'data:import_file_parsed',

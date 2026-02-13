@@ -85,6 +85,13 @@ class AccountLink(db.Model):
     created_at = db.Column(db.Integer, nullable=False)  # Unix seconds
 
 
+class Subscription(db.Model):
+    __tablename__ = 'subscriptions'
+    user_id = db.Column(db.String(64), primary_key=True)
+    paid_until = db.Column(db.Integer, nullable=False)
+    created_at = db.Column(db.Integer, nullable=False)
+
+
 class ChartTombstone(db.Model):
     """Tombstones for deleted charts (retained 1 year for sync)"""
     __tablename__ = 'chart_tombstones'

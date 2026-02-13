@@ -347,8 +347,8 @@ function createModal() {
     saveBtn.className = 'flex-1 py-2 bg-[#6ad1e3] hover:bg-[#5bc1d3] rounded text-white font-medium transition-colors';
     saveBtn.textContent = 'Save';
     saveBtn.addEventListener('click', () => {
-        handleSave();
         hideModal();
+        setTimeout(handleSave, 0);
     });
 
     buttonContainer.appendChild(cancelBtn);

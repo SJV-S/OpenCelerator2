@@ -3,6 +3,7 @@
 
 import { TIMING_MS } from '../SCC/config.js';
 import { eventBus, EVENTS } from '../SCC/eventBus.js';
+import { api } from './client-api.js';
 
 let statusElement = null;
 let appVersion = null;
@@ -31,8 +32,7 @@ async function pingServer() {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), TIMING_MS.HEALTH_PING_TIMEOUT);
 
-        const response = await fetch(HEALTH_URL, {
-            method: 'GET',
+        const response = await api(HEALTH_URL, {
             cache: 'no-store',
             signal: controller.signal,
         });

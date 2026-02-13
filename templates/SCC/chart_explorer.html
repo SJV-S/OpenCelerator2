@@ -44,6 +44,17 @@ html, body {
 .tag {
     pointer-events: none;
 }
+.paid-feature {
+    position: relative;
+    cursor: not-allowed;
+    opacity: 0.45;
+    pointer-events: none;
+}
+body[data-subscription="active"] .paid-feature {
+    cursor: unset;
+    opacity: 1;
+    pointer-events: auto;
+}
 {% endblock %}
 
 {% block body_class %}bg-white min-h-screen{% endblock %}
@@ -224,7 +235,7 @@ html, body {
         <h3 class="text-lg font-semibold text-gray-800 mb-5">Settings</h3>
 
         <!-- Sync toggle -->
-        <label class="flex items-center gap-3 mb-5 cursor-pointer">
+        <label class="flex items-center gap-3 mb-5 cursor-pointer paid-feature" title="Paid feature">
             <input type="checkbox" id="settings-sync-checkbox" class="accent-[#6ad1e3] w-4 h-4">
             <span class="text-sm text-gray-700">Sync across devices</span>
             <span class="relative group cursor-help text-gray-400 hover:text-gray-600">
@@ -271,7 +282,7 @@ html, body {
         </div>
 
         <!-- Sync device toggle -->
-        <button id="sync-toggle" class="w-full px-3 py-2 mb-3 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 transition-colors flex items-center justify-between" type="button">
+        <button id="sync-toggle" class="w-full px-3 py-2 mb-3 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 transition-colors flex items-center justify-between paid-feature" title="Paid feature" type="button">
             <span>Sync device</span>
             <svg id="sync-chevron" class="w-4 h-4 text-gray-500 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>

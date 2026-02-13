@@ -386,11 +386,14 @@ export function setupEventListeners() {
         placeZerosToggle.checked = chartState.placeZerosBelowFloor;
 
         placeZerosToggle.addEventListener('change', (e) => {
-            chartState.placeZerosBelowFloor = e.target.checked;
-            // Notify bus of preference change (triggers auto-save) then refresh chart
-            eventBus.emit(EVENTS.CHART_ZEROS_CHANGED, { enabled: e.target.checked });
-            eventBus.emit(EVENTS.DATA_CHART_REFRESH);
+            const enabled = e.target.checked;
+            chartState.placeZerosBelowFloor = enabled;
             e.target.blur();
+            // Defer heavy chart work so the toggle animates immediately
+            setTimeout(() => {
+                eventBus.emit(EVENTS.CHART_ZEROS_CHANGED, { enabled });
+                eventBus.emit(EVENTS.DATA_CHART_REFRESH);
+            }, 0);
         });
     }
 
@@ -405,8 +408,8 @@ export function setupEventListeners() {
         gridDateLinesToggle.checked = chartState.lineVisibility.grid.dateLines;
         gridDateLinesToggle.addEventListener('change', (e) => {
             chartState.lineVisibility.grid.dateLines = e.target.checked;
-            eventBus.emit(EVENTS.CHART_GRID_VISIBILITY_CHANGED, { visible: isAnyGridOn() });
             e.target.blur();
+            setTimeout(() => eventBus.emit(EVENTS.CHART_GRID_VISIBILITY_CHANGED, { visible: isAnyGridOn() }), 0);
         });
     }
 
@@ -415,8 +418,8 @@ export function setupEventListeners() {
         gridCountLinesToggle.checked = chartState.lineVisibility.grid.countLines;
         gridCountLinesToggle.addEventListener('change', (e) => {
             chartState.lineVisibility.grid.countLines = e.target.checked;
-            eventBus.emit(EVENTS.CHART_GRID_VISIBILITY_CHANGED, { visible: isAnyGridOn() });
             e.target.blur();
+            setTimeout(() => eventBus.emit(EVENTS.CHART_GRID_VISIBILITY_CHANGED, { visible: isAnyGridOn() }), 0);
         });
     }
 
@@ -425,8 +428,8 @@ export function setupEventListeners() {
         gridMinorToggle.checked = chartState.lineVisibility.grid.minorGrid;
         gridMinorToggle.addEventListener('change', (e) => {
             chartState.lineVisibility.grid.minorGrid = e.target.checked;
-            eventBus.emit(EVENTS.CHART_GRID_VISIBILITY_CHANGED, { visible: isAnyGridOn() });
             e.target.blur();
+            setTimeout(() => eventBus.emit(EVENTS.CHART_GRID_VISIBILITY_CHANGED, { visible: isAnyGridOn() }), 0);
         });
     }
 

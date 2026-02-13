@@ -38,9 +38,9 @@ def _extract_chart_uuid():
 def _extract_user_id():
     if request.is_json:
         body = request.get_json(silent=True)
-        if body and isinstance(body, dict):
-            return body.get('user_id')
-    return None
+        if body and isinstance(body, dict) and body.get('user_id'):
+            return body['user_id']
+    return request.headers.get('X-User-Id')
 
 
 def log_request(response):

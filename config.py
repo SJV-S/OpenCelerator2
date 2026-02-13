@@ -34,6 +34,9 @@ TOMBSTONE_RETENTION_SECONDS = 365 * 24 * 3600  # 1 year
 SHARE_LINK_TTL_SECONDS = 14 * 24 * 3600  # 14 days
 ACCOUNT_LINK_TTL_SECONDS = 15 * 60  # 15 minutes
 
+# --- Payments ---
+REQUIRE_PAYMENT = False
+
 # --- Service Worker ---
 if DEVELOPER_MODE:
     SW_CACHE_HEADERS = {

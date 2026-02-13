@@ -6,6 +6,7 @@
  */
 
 import { deriveKey, encrypt, decrypt } from './crypto.js';
+import { api } from './client-api.js';
 
 /**
  * Generate a hex string from random bytes.
@@ -34,10 +35,9 @@ export async function createAccountLink(passphrase, displayName) {
     const encryptedBlob = await encrypt(key, { passphrase, displayName });
 
     // POST the opaque blob to the server
-    const res = await fetch('/api/account-link', {
+    const res = await api('/api/account-link', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ link_id: linkId, encrypted_blob: encryptedBlob })
+        body: { link_id: linkId, encrypted_blob: encryptedBlob }
     });
 
     if (res.status === 409) throw new Error('Link ID collision — try again');
@@ -55,7 +55,7 @@ export async function createAccountLink(passphrase, displayName) {
  * @returns {Promise<{passphrase: string, displayName: string}>}
  */
 export async function redeemAccountLink(linkId, linkSecret) {
-    const res = await fetch(`/api/account-link/${encodeURIComponent(linkId)}`);
+    const res = await api(`/api/account-link/${encodeURIComponent(linkId)}`);
 
     if (res.status === 404) {
         const body = await res.json().catch(() => ({}));

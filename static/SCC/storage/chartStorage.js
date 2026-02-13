@@ -30,7 +30,7 @@ import { migrateChart } from '../import/jsonBackwardsCompatibility.js';
 import { compactChart, expandChart } from './compactJson.js';
 import { generateChartKey } from '../../Server/crypto.js';
 import { pushChart, isInitialized, isChartOwner, startSyncWatch, leaveChart as syncLeaveChart, deleteChart as syncDeleteChart } from '../../Server/syncClient.js';
-import { isSyncEnabled, getPublicKeyB64 } from '../../Server/init.js';
+import { isSyncEnabled, getPublicKeyB64, isPaidUser } from '../../Server/init.js';
 import { hasSocket } from '../../Server/wsClient.js';
 
 // Convert CryptoKey to hex string for storage
@@ -417,7 +417,7 @@ function debouncedSaveToIndexedDB() {
     saveTimeout = setTimeout(async () => {
         if (chartState.id) {
             await saveChart(chartState.id);
-            if ((chartState.shared || isSyncEnabled()) && isInitialized()) {
+            if ((chartState.shared || isSyncEnabled()) && isInitialized() && isPaidUser()) {
                 // Reconnect WebSocket if it dropped (e.g. after sleep/tab freeze)
                 if (chartState.shared && !hasSocket()) {
                     startSyncWatch(chartState.id);
@@ -466,7 +466,7 @@ function queuePush(chartId) {
 }
 
 async function drainPushQueue() {
-    if (!isSyncEnabled() || !isInitialized()) return;
+    if (!isSyncEnabled() || !isInitialized() || !isPaidUser()) return;
 
     let queue;
     try {

@@ -184,11 +184,15 @@ function openCreditEditDialog() {
     document.getElementById('credit-input-0').focus();
 
     const handleSave = () => {
-        chartState.credits[0] = document.getElementById('credit-input-0').value;
-        chartState.credits[1] = document.getElementById('credit-input-1').value;
-        renderCredits();
+        const c0 = document.getElementById('credit-input-0').value;
+        const c1 = document.getElementById('credit-input-1').value;
         overlay.remove();
-        eventBus.emit(EVENTS.CREDITS_UPDATED);
+        setTimeout(() => {
+            chartState.credits[0] = c0;
+            chartState.credits[1] = c1;
+            renderCredits();
+            eventBus.emit(EVENTS.CREDITS_UPDATED);
+        }, 0);
     };
 
     const handleCancel = () => overlay.remove();
