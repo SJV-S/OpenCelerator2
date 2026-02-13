@@ -111,7 +111,8 @@ def init_db(app):
 
         # Migration: add signature to charts
         try:
-            db.session.execute(db.text('ALTER TABLE charts ADD COLUMN signature BLOB'))
+            col_type = 'BLOB' if 'sqlite' in app.config['SQLALCHEMY_DATABASE_URI'] else 'BYTEA'
+            db.session.execute(db.text(f'ALTER TABLE charts ADD COLUMN signature {col_type}'))
             db.session.commit()
         except Exception:
             db.session.rollback()  # Column already exists

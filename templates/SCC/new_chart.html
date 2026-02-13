@@ -76,7 +76,7 @@ html, body {
         <button class="chart-btn w-full px-6 py-3 border-2 border-gray-300 rounded-lg text-gray-800 bg-white font-medium" data-type="Weekly">Weekly</button>
         <button class="chart-btn w-full px-6 py-3 border-2 border-gray-300 rounded-lg text-gray-800 bg-white font-medium" data-type="Monthly">Monthly</button>
         <button class="chart-btn w-full px-6 py-3 border-2 border-gray-300 rounded-lg text-gray-800 bg-white font-medium" data-type="Yearly">Yearly</button>
-        <button class="chart-btn w-full px-6 py-3 border-2 border-gray-300 rounded-lg text-gray-800 bg-white font-medium" data-type="Timing" disabled data-coming-soon>Timing (Coming Soon)</button>
+        <button class="chart-btn w-full px-6 py-3 border-2 border-gray-300 rounded-lg text-gray-800 bg-white font-medium" data-type="Timing" disabled data-coming-soon data-minute-only>Timing (Coming Soon)</button>
         <button class="chart-btn w-full px-6 py-3 border-2 border-gray-300 rounded-lg text-gray-800 bg-white font-medium" data-type="FrequencyCollections" disabled data-coming-soon>Frequency Collections (Coming Soon)</button>
     </div>
 
@@ -123,6 +123,18 @@ html, body {
             nameError.classList.add('hidden');
         }
     }
+
+    const modeRadios = document.querySelectorAll('input[name="chart-mode"]');
+
+    function updateMinuteOnlyButtons() {
+        const isCount = document.querySelector('input[name="chart-mode"]:checked').value === 'count';
+        document.querySelectorAll('[data-minute-only]').forEach(btn => {
+            btn.style.display = isCount ? 'none' : '';
+        });
+    }
+
+    modeRadios.forEach(r => r.addEventListener('change', updateMinuteOnlyButtons));
+    updateMinuteOnlyButtons();
 
     nameInput.addEventListener('input', updateButtonState);
     updateButtonState();

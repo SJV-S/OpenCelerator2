@@ -47,14 +47,6 @@ let db = null;
 let saveTimeout = null;
 const SAVE_DEBOUNCE_MS = 1000;
 const PUSH_QUEUE_KEY = 'syncPushQueue';
-
-function uuid() {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-        const r = Math.random() * 16 | 0;
-        return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
-    });
-}
-
 // ============================================================================
 // Serialization Helpers
 // ============================================================================
@@ -131,7 +123,7 @@ export async function saveChart(id = null) {
     }
 
     try {
-        const chartId = id || chartState.id || uuid();
+        const chartId = id || chartState.id || crypto.randomUUID();
         chartState.id = chartId;
         const data = serializeChart(chartId, chartState);
 
@@ -316,7 +308,7 @@ export async function createChart(name, chartType, minuteChart) {
         return null;
     }
 
-    const chartId = uuid();
+    const chartId = crypto.randomUUID();
     const startDate = findNearestMonday(new Date());
     startDate.setHours(0, 0, 0, 0);
     const now = Math.floor(Date.now() / 1000);
@@ -382,7 +374,7 @@ export async function importChart(chartData) {
     }
 
     try {
-        const chartId = uuid();
+        const chartId = crypto.randomUUID();
 
         // Generate a fresh encryption key for the imported chart
         const cryptoKey = await generateChartKey();

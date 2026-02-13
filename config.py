@@ -21,7 +21,7 @@ else:
         raise RuntimeError('IP_HASH_SECRET must be set in .env for production')
 
 # --- Database ---
-DATABASE_URL = 'sqlite:///scc_charts.db'
+DATABASE_URL = os.environ.get('DATABASE_URL', 'sqlite:///scc_charts.db')
 # Handle postgres:// URLs that need postgresql:// prefix
 if DATABASE_URL.startswith('postgres://'):
     DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)

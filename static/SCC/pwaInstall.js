@@ -8,11 +8,18 @@ function initPasteLink() {
     const modal = document.getElementById('paste-link-modal');
     if (!btn || !modal) return;
 
-    // Only show in standalone PWA mode
-    if (!window.matchMedia('(display-mode: standalone)').matches) return;
+    function showPasteLink() {
+        btn.classList.remove('hidden');
+        btn.classList.add('flex');
+    }
 
-    btn.classList.remove('hidden');
-    btn.classList.add('flex');
+    // Show immediately if already running as installed PWA
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+        showPasteLink();
+    }
+
+    // Also show when installed during this session (no refresh needed)
+    window.addEventListener('appinstalled', showPasteLink);
 
     const input = document.getElementById('paste-link-input');
     const goBtn = document.getElementById('paste-link-go');

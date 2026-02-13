@@ -200,8 +200,8 @@ function createToast(options) {
             const wrappedConfig = {
                 ...buttonConfig,
                 onClick: () => {
-                    if (buttonConfig.onClick) buttonConfig.onClick();
                     toast.remove();
+                    if (buttonConfig.onClick) setTimeout(buttonConfig.onClick, 0);
                 }
             };
             const button = createButton(wrappedConfig, borderColor);

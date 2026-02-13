@@ -5,8 +5,8 @@
 import { BIP39_WORDLIST } from '../util/BIP39Words.js';
 import { sha256, deriveKey } from '../../Server/crypto.js';
 
-const WORD_COUNT = 10;
-const VALID_WORD_COUNTS = [8, 10];
+const WORD_COUNT = 12;
+const VALID_WORD_COUNTS = [8, 10, 12];
 
 export function generatePassphrase() {
     const indices = crypto.getRandomValues(new Uint32Array(WORD_COUNT));
