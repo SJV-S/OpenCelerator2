@@ -356,7 +356,7 @@ function checkBackupReminder() {
     if (Math.floor(Date.now() / 1000) < nextDue) return;
 
     createConfirmToast({
-        message: 'Time for a backup!',
+        message: 'Backup reminder.',
         yesLabel: 'Backup',
         noLabel: 'Dismiss',
         onYes: async () => {

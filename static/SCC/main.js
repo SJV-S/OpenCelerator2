@@ -67,6 +67,7 @@ import { init as crosshairInit } from './ui/crosshair.js';
 import { init as panSliderInit, setupChartListener as panSliderSetupChart } from './ui/panSlider.js';
 import { initImportUI } from './import/importUI.js';
 import { initResetSettings } from './ui/resetSettings.js';
+import { isChartOwner } from '../Server/syncClient.js';
 
 /**
  * Initialize the chart using client-side templates
@@ -450,6 +451,26 @@ export function setupEventListeners() {
         chartNameInput.addEventListener('input', (e) => {
             chartState.chartName = e.target.value.trim() || 'Unnamed';
             eventBus.emit(EVENTS.CHART_NAME_CHANGED, { name: chartState.chartName });
+        });
+    }
+
+    // Fullscreen toggle
+    const fullscreenBtn = document.getElementById('fullscreen-toggle');
+    if (fullscreenBtn) {
+        fullscreenBtn.addEventListener('click', () => {
+            const isFullscreen = document.body.classList.toggle('fullscreen-mode');
+            fullscreenBtn.innerHTML = isFullscreen
+                ? icons.fullscreenCompress()
+                : icons.fullscreenExpand();
+            // Defer heavy chart work so the icon swap renders immediately
+            const showViewOnlyToast = !isFullscreen && !isChartOwner(chartState) && !chartState.acceptingEdits;
+            setTimeout(() => {
+                chartState.containerHeight = null;
+                initializeChart();
+                if (showViewOnlyToast) {
+                    createToast({ message: 'View-only chart — changes are not saved', duration: 4000, position: 'top-right' });
+                }
+            }, 0);
         });
     }
 

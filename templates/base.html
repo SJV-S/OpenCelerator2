@@ -51,7 +51,9 @@
     <script>
         // Service Worker Registration
         if ('serviceWorker' in navigator) {
+            var hadController = !!navigator.serviceWorker.controller;
             navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (!hadController) { hadController = true; return; }
                 var last = parseInt(sessionStorage.getItem('sw-reload-at') || '0');
                 if (Date.now() - last < 10000) return;
                 sessionStorage.setItem('sw-reload-at', String(Date.now()));

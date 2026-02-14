@@ -77,26 +77,43 @@ function fetchVersion() {
 
 /**
  * Create and inject the status indicator element
+ * Mounts inside .chart-menu-tabs (sidebar tab column) at the bottom,
+ * or falls back to document.body for non-chart pages.
  */
 function createStatusElement() {
     if (statusElement) return statusElement;
 
     statusElement = document.createElement('div');
     statusElement.id = 'online-status';
-    statusElement.style.cssText = `
-        position: fixed;
-        top: 12px;
-        right: 12px;
-        font-size: 11px;
-        font-family: "Open Sans", sans-serif;
-        padding: 4px 8px;
-        border-radius: 4px;
-        z-index: 9999;
-        transition: opacity 0.3s, background-color 0.3s;
-        pointer-events: none;
-    `;
 
-    document.body.appendChild(statusElement);
+    const tabsColumn = document.querySelector('.chart-menu-tabs');
+    if (tabsColumn) {
+        statusElement.style.cssText = `
+            margin-top: auto;
+            font-size: 11px;
+            font-family: "Open Sans", sans-serif;
+            padding: 6px 0;
+            text-align: center;
+            transition: opacity 0.3s, background-color 0.3s;
+            pointer-events: none;
+        `;
+        tabsColumn.appendChild(statusElement);
+    } else {
+        statusElement.style.cssText = `
+            position: fixed;
+            top: 12px;
+            right: 12px;
+            font-size: 11px;
+            font-family: "Open Sans", sans-serif;
+            padding: 4px 8px;
+            border-radius: 4px;
+            z-index: 9999;
+            transition: opacity 0.3s, background-color 0.3s;
+            pointer-events: none;
+        `;
+        document.body.appendChild(statusElement);
+    }
+
     return statusElement;
 }
 

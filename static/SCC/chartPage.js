@@ -11,8 +11,9 @@
 
 import { initializeChart, setupEventListeners } from './main.js';
 import { initStorage, loadChart } from './storage/chartStorage.js';
-import { joinSharedChart, startSyncWatch, checkForUpdates } from '../Server/syncClient.js';
+import { joinSharedChart, startSyncWatch, checkForUpdates, isChartOwner } from '../Server/syncClient.js';
 import { initServerSync, isSyncEnabled } from '../Server/init.js';
+import { icons } from './ui/icons.js';
 import { openDB } from '../lib/idb.js';
 import { eventBus, EVENTS } from './eventBus.js';
 import { chartState } from './chartState.js';
@@ -41,6 +42,13 @@ async function init() {
     if (!success) {
         window.location.href = '/';
         return;
+    }
+
+    // Default to fullscreen for view-only shared charts
+    if (!isChartOwner(chartState) && !chartState.acceptingEdits) {
+        document.body.classList.add('fullscreen-mode');
+        const btn = document.getElementById('fullscreen-toggle');
+        if (btn) btn.innerHTML = icons.fullscreenCompress();
     }
 
     const menuContent = document.getElementById('chart-menu-content');

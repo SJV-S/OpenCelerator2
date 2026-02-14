@@ -195,7 +195,7 @@ function exportDataToCSV() {
  * @param {string} type - 'view' or 'edit'
  */
 async function handleShareLinkClick(type) {
-    if (!isChartOwner(chartState)) return;
+    if (!isChartOwner(chartState) && !chartState.acceptingEdits) return;
 
     if (!chartState.shared && !isSyncEnabled()) return;
 
@@ -454,14 +454,15 @@ function initializeShareTab() {
         }
         const shareBtns = [document.getElementById('share-view-btn'), document.getElementById('share-edit-btn')];
         const syncOff = !chartState.shared && !isSyncEnabled();
+        const viewOnly = !owner && !chartState.acceptingEdits;
         for (const el of shareBtns) {
             if (!el) continue;
-            if (!owner) {
+            if (viewOnly) {
                 el.style.opacity = '0.45';
                 el.style.cursor = 'not-allowed';
                 el.title = chartState.ownerName
-                    ? `${chartState.ownerName} owns this chart`
-                    : 'Someone else owns this chart';
+                    ? `${chartState.ownerName} owns this chart (view only)`
+                    : 'Someone else owns this chart (view only)';
             } else if (syncOff) {
                 el.style.opacity = '0.45';
                 el.style.cursor = 'not-allowed';
