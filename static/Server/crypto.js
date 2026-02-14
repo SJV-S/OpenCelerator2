@@ -4,11 +4,25 @@
 
 const PBKDF2_ITERATIONS = 100000;
 
-// Hex encode/decode helpers
+// Hex helpers (used for sha256 and local chartKey storage)
 const toHex = bytes => Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
 export const fromHex = hex => new Uint8Array(hex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
 
-// Base64 encode/decode helpers (for ECDSA key serialization)
+// Base64 helpers for binary payloads (wire format)
+function encodeB64(bytes) {
+    let bin = '';
+    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin);
+}
+
+function decodeB64(b64) {
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return bytes;
+}
+
+// Base64 helpers for ECDSA key serialization (ArrayBuffer-based)
 const toBase64 = buffer => btoa(String.fromCharCode(...new Uint8Array(buffer)));
 const fromBase64 = b64 => Uint8Array.from(atob(b64), c => c.charCodeAt(0)).buffer;
 
@@ -32,19 +46,22 @@ export async function deriveKey(passphrase, salt) {
 
 export async function encrypt(key, data) {
     const iv = crypto.getRandomValues(new Uint8Array(12));
-    const plaintext = typeof data === 'string' ? data : JSON.stringify(data);
-    const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(plaintext));
+    const payload = data instanceof Uint8Array
+        ? data
+        : new TextEncoder().encode(typeof data === 'string' ? data : JSON.stringify(data));
+    const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, payload);
     const combined = new Uint8Array(12 + ciphertext.byteLength);
     combined.set(iv);
     combined.set(new Uint8Array(ciphertext), 12);
-    return toHex(combined);
+    return encodeB64(combined);
 }
 
-export async function decrypt(key, encryptedHex, parseJson = true) {
-    const combined = fromHex(encryptedHex);
+export async function decrypt(key, encoded, parseJson = true) {
+    const combined = decodeB64(encoded);
     const plaintext = await crypto.subtle.decrypt(
         { name: 'AES-GCM', iv: combined.slice(0, 12) }, key, combined.slice(12)
     );
+    if (parseJson === 'raw') return new Uint8Array(plaintext);
     const text = new TextDecoder().decode(plaintext);
     return parseJson ? JSON.parse(text) : text;
 }
@@ -59,11 +76,11 @@ export async function wrapKey(chartKey, wrappingKey) {
     const combined = new Uint8Array(12 + wrapped.byteLength);
     combined.set(iv);
     combined.set(new Uint8Array(wrapped), 12);
-    return toHex(combined);
+    return encodeB64(combined);
 }
 
-export async function unwrapKey(wrappedHex, unwrappingKey) {
-    const combined = fromHex(wrappedHex);
+export async function unwrapKey(wrappedB64, unwrappingKey) {
+    const combined = decodeB64(wrappedB64);
     return crypto.subtle.unwrapKey(
         'raw', combined.slice(12), unwrappingKey,
         { name: 'AES-GCM', iv: combined.slice(0, 12) },
@@ -190,16 +207,16 @@ export async function deriveSigningKeyPair(passphrase) {
     return { privateKey, publicKey };
 }
 
-export async function sign(dataHex, privateKey) {
+export async function sign(dataB64, privateKey) {
     const signature = await crypto.subtle.sign(
-        { name: 'ECDSA', hash: 'SHA-256' }, privateKey, fromHex(dataHex)
+        { name: 'ECDSA', hash: 'SHA-256' }, privateKey, decodeB64(dataB64)
     );
-    return toHex(new Uint8Array(signature));
+    return encodeB64(new Uint8Array(signature));
 }
 
-export async function verify(dataHex, signatureHex, publicKey) {
+export async function verify(dataB64, signatureB64, publicKey) {
     return crypto.subtle.verify(
-        { name: 'ECDSA', hash: 'SHA-256' }, publicKey, fromHex(signatureHex), fromHex(dataHex)
+        { name: 'ECDSA', hash: 'SHA-256' }, publicKey, decodeB64(signatureB64), decodeB64(dataB64)
     );
 }
 

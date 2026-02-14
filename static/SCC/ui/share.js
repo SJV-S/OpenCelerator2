@@ -5,6 +5,7 @@ import { chartState } from '../chartState.js';
 import { createToast, createConfirmToast } from './toaster.js';
 import { icons } from './icons.js';
 import { createViewLink, createEditLink, isInitialized, isChartOwner, startSyncWatch, stopSyncWatch } from '../../Server/syncClient.js';
+import { isSyncEnabled } from '../../Server/init.js';
 import { importChart, deleteChart } from '../storage/chartStorage.js';
 import { getFirstConfig } from '../series/traceStyles.js';
 import { isOnline } from '../../Server/onlineStatus.js';
@@ -196,6 +197,8 @@ function exportDataToCSV() {
 async function handleShareLinkClick(type) {
     if (!isChartOwner(chartState)) return;
 
+    if (!chartState.shared && !isSyncEnabled()) return;
+
     const viewStatus = document.getElementById('share-view-status');
     const editStatus = document.getElementById('share-edit-status');
     const status = type === 'view' ? viewStatus : editStatus;
@@ -210,7 +213,7 @@ async function handleShareLinkClick(type) {
     }
 
     if (!isInitialized()) {
-        createToast({ message: 'Sync not enabled', duration: 2000, position: 'top-right' });
+        createToast({ message: 'Sync not initialized', duration: 2000, position: 'top-right' });
         return;
     }
 
@@ -450,18 +453,23 @@ function initializeShareTab() {
             }
         }
         const shareBtns = [document.getElementById('share-view-btn'), document.getElementById('share-edit-btn')];
+        const syncOff = !chartState.shared && !isSyncEnabled();
         for (const el of shareBtns) {
             if (!el) continue;
-            if (owner) {
-                el.style.opacity = '';
-                el.style.cursor = '';
-                el.title = '';
-            } else {
+            if (!owner) {
                 el.style.opacity = '0.45';
                 el.style.cursor = 'not-allowed';
                 el.title = chartState.ownerName
                     ? `${chartState.ownerName} owns this chart`
                     : 'Someone else owns this chart';
+            } else if (syncOff) {
+                el.style.opacity = '0.45';
+                el.style.cursor = 'not-allowed';
+                el.title = 'Enable "Sync Across Devices" in the Chart Explorer settings to use share links.';
+            } else {
+                el.style.opacity = '';
+                el.style.cursor = '';
+                el.title = '';
             }
         }
     }, true);

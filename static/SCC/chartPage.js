@@ -64,7 +64,9 @@ async function init() {
         }
     }, true);
 
-    startSyncWatch(chartId);
+    if (chartState.shared || isSyncEnabled()) {
+        startSyncWatch(chartId);
+    }
 
     // For non-shared charts with sync enabled, check server for newer version
     if (!chartState.shared && isSyncEnabled()) {

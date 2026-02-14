@@ -2,8 +2,9 @@ import { initStorage, listCharts, deleteChart, updateChartTags } from '/static/S
 
 import { openDB } from '/static/lib/idb.js';
 import { checkForUpdates, pushCharts } from '/static/Server/syncClient.js';
-import { initServerSync, isSyncEnabled } from '/static/Server/init.js';
-import { initSettingsModal } from '/static/SCC/ui/settingsModal.js';
+import { initServerSync, isSyncEnabled, getUserPreferences, setUserPreference } from '/static/Server/init.js';
+import { initSettingsModal, performBackupExport } from '/static/SCC/ui/settingsModal.js';
+import { createConfirmToast } from '/static/SCC/ui/toaster.js';
 import { initDonateModal } from '/static/SCC/ui/donateModal.js';
 
 let charts = [];
@@ -343,6 +344,31 @@ function addTagsFromInput() {
     renderCurrentTags();
 }
 
+const UNIT_SECONDS = { days: 86400, weeks: 604800, months: 2592000 };
+
+function checkBackupReminder() {
+    const prefs = getUserPreferences();
+    if (!prefs.backupRemindersEnabled) return;
+
+    const intervalSec = (prefs.backupReminderInterval || 1) * (UNIT_SECONDS[prefs.backupReminderUnit] || UNIT_SECONDS.weeks);
+    const nextDue = (prefs.lastBackupTimestamp || 0) + intervalSec;
+
+    if (Math.floor(Date.now() / 1000) < nextDue) return;
+
+    createConfirmToast({
+        message: 'Time for a backup!',
+        yesLabel: 'Backup',
+        noLabel: 'Dismiss',
+        onYes: async () => {
+            try { await performBackupExport(); } catch (e) { console.error('[BackupReminder]', e); }
+            setUserPreference('lastBackupTimestamp', Math.floor(Date.now() / 1000));
+        },
+        onNo: () => {
+            setUserPreference('lastBackupTimestamp', Math.floor(Date.now() / 1000));
+        }
+    });
+}
+
 async function loadCharts() {
     await initStorage();
     charts = await listCharts();
@@ -350,6 +376,7 @@ async function loadCharts() {
 
     // Pull updates from server if sync enabled
     await initServerSync();
+    checkBackupReminder();
     if (isSyncEnabled()) {
         try {
             const manifest = charts.map(c => ({ chart_uuid: c.id, updated_at: c.updatedAt || 0 }));

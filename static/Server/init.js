@@ -15,7 +15,11 @@ const STORE_NAME = 'credentials';
 const PREFS_KEY = 'user_preferences';
 
 const DEFAULT_PREFERENCES = {
-    syncAllChartsToServer: true
+    syncAllChartsToServer: true,
+    backupRemindersEnabled: false,
+    backupReminderInterval: 1,
+    backupReminderUnit: 'weeks',
+    lastBackupTimestamp: 0
 };
 
 let initialized = false;

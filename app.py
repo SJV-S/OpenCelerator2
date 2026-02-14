@@ -1,4 +1,5 @@
 import time
+from base64 import b64encode, b64decode
 from flask import Flask, render_template, request, jsonify, redirect, url_for, send_from_directory, make_response
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -8,6 +9,16 @@ from models import db, Chart, ChartAccess, ChartTombstone, ShareLink, AccountLin
 from telemetry import log_request
 from sharing_detection import check_sharing
 import config
+
+
+def decode_blob(value):
+    """Decode a base64-encoded string to bytes, passthrough if already bytes."""
+    return b64decode(value) if isinstance(value, str) else value
+
+
+def encode_blob(value):
+    """Encode bytes to a base64 string for JSON responses."""
+    return b64encode(value).decode('ascii')
 
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins=config.CORS_ALLOWED_ORIGINS)
@@ -169,10 +180,10 @@ def sync():
     # Process uploads - store new/updated charts
     for upload in uploads:
         chart_uuid = upload['chart_uuid']
-        chart_data = bytes.fromhex(upload['data']) if isinstance(upload['data'], str) else upload['data']
-        wrapped_key = bytes.fromhex(upload['wrapped_key']) if isinstance(upload['wrapped_key'], str) else upload['wrapped_key']
+        chart_data = decode_blob(upload['data'])
+        wrapped_key = decode_blob(upload['wrapped_key'])
         updated_at = min(upload['updated_at'], int(time.time()) + 300)
-        signature = bytes.fromhex(upload['signature']) if upload.get('signature') else None
+        signature = decode_blob(upload['signature']) if upload.get('signature') else None
 
         # Check if chart exists
         existing = db.session.get(Chart, chart_uuid)
@@ -234,10 +245,10 @@ def sync():
         if chart.last_modified > local_updated:
             downloads.append({
                 'chart_uuid': chart.chart_uuid,
-                'data': chart.data.hex(),
+                'data': encode_blob(chart.data),
                 'updated_at': chart.last_modified,
-                'wrapped_key': access.wrapped_key.hex(),
-                'signature': chart.signature.hex() if chart.signature else None
+                'wrapped_key': encode_blob(access.wrapped_key),
+                'signature': encode_blob(chart.signature) if chart.signature else None
             })
 
     # Get tombstones since last sync
@@ -325,11 +336,11 @@ def create_edit_link():
     if not all([chart_uuid, user_id, encrypted_data, wrapped_key, wrapped_key_for_share, last_modified]):
         return jsonify({'error': 'Missing required fields'}), 400
 
-    chart_data = bytes.fromhex(encrypted_data)
-    wrapped_key_bytes = bytes.fromhex(wrapped_key)
-    wrapped_share_bytes = bytes.fromhex(wrapped_key_for_share)
-    signature_hex = data.get('signature')
-    signature_bytes = bytes.fromhex(signature_hex) if signature_hex else None
+    chart_data = b64decode(encrypted_data)
+    wrapped_key_bytes = b64decode(wrapped_key)
+    wrapped_share_bytes = b64decode(wrapped_key_for_share)
+    signature_str = data.get('signature')
+    signature_bytes = b64decode(signature_str) if signature_str else None
 
     # Store/update chart
     chart = db.session.get(Chart, chart_uuid)
@@ -399,10 +410,10 @@ def get_shared_chart(chart_uuid):
 
     return jsonify({
         'chart_uuid': chart_uuid,
-        'data': chart.data.hex(),
-        'wrapped_key': share_link.wrapped_key.hex(),
+        'data': encode_blob(chart.data),
+        'wrapped_key': encode_blob(share_link.wrapped_key),
         'updated_at': chart.last_modified,
-        'signature': chart.signature.hex() if chart.signature else None
+        'signature': encode_blob(chart.signature) if chart.signature else None
     })
 
 
@@ -429,7 +440,7 @@ def create_account_link():
     if db.session.get(AccountLink, link_id):
         return jsonify({'error': 'Link already exists'}), 409
 
-    blob_bytes = bytes.fromhex(encrypted_blob)
+    blob_bytes = b64decode(encrypted_blob)
     account_link = AccountLink(
         link_id=link_id,
         encrypted_blob=blob_bytes,
@@ -462,7 +473,7 @@ def get_account_link(link_id):
 
         return jsonify({'error': 'Link has expired'}), 404
 
-    return jsonify({'encrypted_blob': account_link.encrypted_blob.hex()})
+    return jsonify({'encrypted_blob': encode_blob(account_link.encrypted_blob)})
 
 
 @app.route('/sync/<link_id>/<link_secret>')

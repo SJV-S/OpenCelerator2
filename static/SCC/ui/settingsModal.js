@@ -1,12 +1,40 @@
 import { createBackupData, restoreFromBackup } from '/static/SCC/storage/backupStorage.js';
 import { listCharts } from '/static/SCC/storage/chartStorage.js';
-import { setUserPreference, getUserPreferences, getDisplayName, setDisplayName } from '/static/Server/init.js';
+import { setUserPreference, getUserPreferences, getDisplayName, setDisplayName, isSyncEnabled } from '/static/Server/init.js';
 import { downloadFile } from '/static/SCC/util/download.js';
 import { createAccountLink } from '/static/Server/accountLink.js';
 import { getStoredPassphrase } from '/static/Server/syncDevice.js';
 
+export async function performBackupExport() {
+    const backup = await createBackupData();
+    const json = JSON.stringify(backup);
+    const today = new Date().toISOString().slice(0, 10);
+    const name = backup.identity?.display_name
+        ?.replaceAll(' ', '-')
+        .replace(/[\/\\:*?"<>|]/g, '-');
+    const filename = name ? `${name}-scc-full-backup-${today}.json` : `scc-full-backup-${today}.json`;
+    downloadFile(json, filename, 'application/json;charset=utf-8;');
+    await setUserPreference('lastBackupTimestamp', Math.floor(Date.now() / 1000));
+}
+
 let pendingBackupData = null;
 let linkCountdownTimer = null;
+
+const SYNC_OFF_TOOLTIP = 'Enable "Sync Across Devices" to use sync links.';
+
+function updateGenerateLinkBtn() {
+    const btn = document.getElementById('generate-link-btn');
+    if (!btn) return;
+    if (isSyncEnabled()) {
+        btn.style.opacity = '';
+        btn.style.cursor = '';
+        btn.title = '';
+    } else {
+        btn.style.opacity = '0.45';
+        btn.style.cursor = 'not-allowed';
+        btn.title = SYNC_OFF_TOOLTIP;
+    }
+}
 
 let onChartsChanged = () => {};
 
@@ -30,8 +58,14 @@ async function openSettingsModal() {
     const displayName = await getDisplayName();
     document.getElementById('settings-owner-name').value = displayName || '';
 
+    document.getElementById('backup-reminder-checkbox').checked = prefs.backupRemindersEnabled;
+    document.getElementById('backup-reminder-options').classList.toggle('hidden', !prefs.backupRemindersEnabled);
+    document.getElementById('backup-reminder-interval').value = prefs.backupReminderInterval;
+    document.getElementById('backup-reminder-unit').value = prefs.backupReminderUnit;
+
     document.getElementById('settings-modal').classList.remove('hidden');
     document.getElementById('settings-modal').classList.add('flex');
+    updateGenerateLinkBtn();
 }
 
 function resetAccountLinkUI() {
@@ -101,6 +135,7 @@ export function initSettingsModal(deps) {
 
     document.getElementById('settings-sync-checkbox').addEventListener('change', (e) => {
         setUserPreference('syncAllChartsToServer', e.target.checked);
+        updateGenerateLinkBtn();
     });
 
     document.getElementById('settings-owner-name').addEventListener('blur', (e) => {
@@ -130,14 +165,7 @@ export function initSettingsModal(deps) {
         btn.textContent = 'Exporting...';
 
         try {
-            const backup = await createBackupData();
-            const json = JSON.stringify(backup);
-            const today = new Date().toISOString().slice(0, 10);
-            const name = backup.identity?.display_name
-                ?.replaceAll(' ', '-')
-                .replace(/[\/\\:*?"<>|]/g, '-');
-            const filename = name ? `${name}-scc-full-backup-${today}.json` : `scc-full-backup-${today}.json`;
-            downloadFile(json, filename, 'application/json;charset=utf-8;');
+            await performBackupExport();
         } catch (err) {
             console.error('Backup export failed:', err);
             alert('Backup export failed. Check console for details.');
@@ -145,6 +173,29 @@ export function initSettingsModal(deps) {
             btn.disabled = false;
             btn.innerHTML = originalText;
         }
+    });
+
+    // --- Backup Reminder Controls ---
+    document.getElementById('backup-reminder-checkbox').addEventListener('change', async (e) => {
+        const enabled = e.target.checked;
+        await setUserPreference('backupRemindersEnabled', enabled);
+        document.getElementById('backup-reminder-options').classList.toggle('hidden', !enabled);
+        if (enabled) {
+            const prefs = getUserPreferences();
+            if (!prefs.lastBackupTimestamp) {
+                await setUserPreference('lastBackupTimestamp', Math.floor(Date.now() / 1000));
+            }
+        }
+    });
+
+    document.getElementById('backup-reminder-interval').addEventListener('change', async (e) => {
+        const val = Math.max(1, Math.min(365, parseInt(e.target.value) || 1));
+        e.target.value = val;
+        await setUserPreference('backupReminderInterval', val);
+    });
+
+    document.getElementById('backup-reminder-unit').addEventListener('change', async (e) => {
+        await setUserPreference('backupReminderUnit', e.target.value);
     });
 
     // Confirmation buttons (backup import)
@@ -158,6 +209,7 @@ export function initSettingsModal(deps) {
 
     // --- Account Link ---
     document.getElementById('generate-link-btn').addEventListener('click', async () => {
+        if (!isSyncEnabled()) return;
         const btn = document.getElementById('generate-link-btn');
         btn.disabled = true;
         btn.textContent = 'Generating...';

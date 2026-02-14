@@ -3,7 +3,8 @@
  * Signs all pushes with ECDSA, verifies pulls based on chart ownership policy
  */
 
-import { encrypt, decrypt, generateChartKey, wrapKey, unwrapKey, deriveKey, sign, verify, importPublicKey, fromHex } from './crypto.js';
+import { generateChartKey, wrapKey, unwrapKey, deriveKey, sign, verify, importPublicKey, fromHex } from './crypto.js';
+import { encryptCompressed as encrypt, decryptCompressed as decrypt } from './compress.js';
 import { getUserId, getUserKey } from '../SCC/storage/passphrase.js';
 import { openDB } from '../lib/idb.js';
 import { eventBus, EVENTS } from '../SCC/eventBus.js';
