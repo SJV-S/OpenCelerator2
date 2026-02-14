@@ -8,13 +8,11 @@ import { openDB } from '../lib/idb.js';
 import { generatePassphrase } from '../SCC/storage/passphrase.js';
 import { initSync, setSigningDisplayName } from './syncClient.js';
 import { deriveSigningKeyPair, exportPublicKey } from './crypto.js';
-import { api } from './client-api.js';
 import { eventBus, EVENTS } from '../SCC/eventBus.js';
 
 const DB_NAME = 'SCC_Identity';
 const STORE_NAME = 'credentials';
 const PREFS_KEY = 'user_preferences';
-const PAID_UNTIL_KEY = 'paid_until';
 
 const DEFAULT_PREFERENCES = {
     syncAllChartsToServer: true
@@ -23,31 +21,6 @@ const DEFAULT_PREFERENCES = {
 let initialized = false;
 let userPreferences = null;
 let publicKeyB64Cache = null;
-let paidUntil = null;
-
-function updateSubscriptionAttr() {
-    const active = paidUntil === null || paidUntil > Math.floor(Date.now() / 1000);
-    document.body.dataset.subscription = active ? 'active' : 'expired';
-}
-
-export async function setPaidUntil(timestamp) {
-    paidUntil = timestamp;
-    updateSubscriptionAttr();
-    try {
-        const db = await openDB(DB_NAME, 1);
-        await db.put(STORE_NAME, timestamp, PAID_UNTIL_KEY);
-    } catch (e) {
-        console.warn('[Server] Failed to persist paid_until:', e);
-    }
-}
-
-/**
- * Returns true if user should be treated as paid.
- * null (no data yet) is treated as paid to avoid false lockouts.
- */
-export function isPaidUser() {
-    return paidUntil === null || paidUntil > Math.floor(Date.now() / 1000);
-}
 
 export async function initServerSync() {
     if (initialized) return;
@@ -95,29 +68,7 @@ export async function initServerSync() {
     initialized = true;
     console.log('[Server] Sync initialized');
     eventBus.emit(EVENTS.SYNC_READY);
-
-    // Load cached paid_until from IDB (instant, no flicker)
-    const cachedPaidUntil = await db.get(STORE_NAME, PAID_UNTIL_KEY);
-    if (cachedPaidUntil !== undefined) {
-        paidUntil = cachedPaidUntil;
-    }
-    updateSubscriptionAttr();
-
-    // Non-blocking fetch to refresh subscription status from server
-    api('/api/subscription/status').then(async (res) => {
-        if (!res.ok) return;
-        const data = await res.json();
-        const serverValue = data.paid_until;
-        if (serverValue !== paidUntil) {
-            await setPaidUntil(serverValue);
-        }
-    }).catch(() => {});
 }
-
-// Self-healing: server rejected a request with 402 → lock immediately
-eventBus.subscribe(EVENTS.SUBSCRIPTION_EXPIRED, () => {
-    setPaidUntil(0);
-});
 
 export function getPublicKeyB64() {
     return publicKeyB64Cache;

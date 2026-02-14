@@ -4,6 +4,7 @@ import { openDB } from '/static/lib/idb.js';
 import { checkForUpdates, pushCharts } from '/static/Server/syncClient.js';
 import { initServerSync, isSyncEnabled } from '/static/Server/init.js';
 import { initSettingsModal } from '/static/SCC/ui/settingsModal.js';
+import { initDonateModal } from '/static/SCC/ui/donateModal.js';
 
 let charts = [];
 let chartToDelete = null;
@@ -518,3 +519,4 @@ showShareError();
 window.addEventListener('pageshow', loadCharts);
 
 initSettingsModal({ onChartsChanged: loadCharts });
+initDonateModal();

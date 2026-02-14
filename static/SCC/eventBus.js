@@ -119,8 +119,6 @@ export const EVENTS = {
     API_REQUEST: 'api:request',
     API_RESPONSE: 'api:response',
     API_ERROR: 'api:error',
-    SUBSCRIPTION_EXPIRED: 'subscription:expired',
-
     // Data Import Events
     DATA_IMPORT_STARTED: 'data:import_started',
     DATA_IMPORT_FILE_PARSED: 'data:import_file_parsed',

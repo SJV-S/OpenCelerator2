@@ -148,17 +148,6 @@ body {
     border: 2px solid white;
     box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 }
-.paid-feature {
-    position: relative;
-    cursor: not-allowed;
-    opacity: 0.45;
-    pointer-events: none;
-}
-body[data-subscription="active"] .paid-feature {
-    cursor: unset;
-    opacity: 1;
-    pointer-events: auto;
-}
 {% endblock %}
 
 {% block content %}

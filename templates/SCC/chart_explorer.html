@@ -44,17 +44,6 @@ html, body {
 .tag {
     pointer-events: none;
 }
-.paid-feature {
-    position: relative;
-    cursor: not-allowed;
-    opacity: 0.45;
-    pointer-events: none;
-}
-body[data-subscription="active"] .paid-feature {
-    cursor: unset;
-    opacity: 1;
-    pointer-events: auto;
-}
 {% endblock %}
 
 {% block body_class %}bg-white min-h-screen{% endblock %}
@@ -76,6 +65,12 @@ body[data-subscription="active"] .paid-feature {
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
                 </svg>
                 Install App
+            </button>
+            <button id="donate-btn" class="px-5 py-2 rounded-lg border-2 border-[#6ad1e3] text-[#05c3de] font-medium text-sm flex items-center gap-2 hover:bg-[#6ad1e3] hover:text-white transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8h1a4 4 0 010 8h-1M3 8h14v9a4 4 0 01-4 4H7a4 4 0 01-4-4V8zm3-5v3m4-3v3m4-3v3"/>
+                </svg>
+                Donate
             </button>
             <button id="settings-btn" class="px-5 py-2 rounded-lg border-2 border-[#6ad1e3] text-[#05c3de] font-medium text-sm flex items-center gap-2 hover:bg-[#6ad1e3] hover:text-white transition-colors">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -235,15 +230,15 @@ body[data-subscription="active"] .paid-feature {
         <h3 class="text-lg font-semibold text-gray-800 mb-5">Settings</h3>
 
         <!-- Sync toggle -->
-        <label class="flex items-center gap-3 mb-5 cursor-pointer paid-feature" title="Paid feature">
+        <label class="flex items-center gap-3 mb-5 cursor-pointer">
             <input type="checkbox" id="settings-sync-checkbox" class="accent-[#6ad1e3] w-4 h-4">
             <span class="text-sm text-gray-700">Sync across devices</span>
             <span class="relative group cursor-help text-gray-400 hover:text-gray-600">
                 <svg xmlns="http://www.w3.org/2000/svg" class="inline w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
                 </svg>
-                <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 text-xs text-white bg-gray-800 rounded shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                    To sync, download the backup file and upload on your other device. Your charts are private through encryption. The server cannot read them.
+                <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 text-xs text-white bg-gray-800 rounded shadow-lg w-96 text-wrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                    Your charts are private through encryption. By design, the server cannot read or recover them if you lose your account. Think of the server as a blind relay and not storage. Regular backups are therefore recommended.
                 </span>
             </span>
         </label>
@@ -271,7 +266,16 @@ body[data-subscription="active"] .paid-feature {
         <div id="backup-group" class="hidden mb-5">
             <!-- Backup file download -->
             <div>
-                <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Backup file</p>
+                <p class="text-xs font-medium text-gray-500 tracking-wide mb-2 flex items-center gap-1"><span class="uppercase">Backup file</span>
+                    <span class="relative group cursor-help text-gray-400 hover:text-gray-600">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="inline w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
+                        </svg>
+                        <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 text-xs text-white bg-gray-800 rounded shadow-lg w-96 text-wrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                            This creates a backup file of everything. Use it to recover all your charts and identity. Store it somewhere safe.
+                        </span>
+                    </span>
+                </p>
                 <button id="backup-export-btn" class="w-full px-3 py-2 text-sm font-medium bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors flex items-center justify-center gap-2">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
@@ -282,7 +286,7 @@ body[data-subscription="active"] .paid-feature {
         </div>
 
         <!-- Sync device toggle -->
-        <button id="sync-toggle" class="w-full px-3 py-2 mb-3 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 transition-colors flex items-center justify-between paid-feature" title="Paid feature" type="button">
+        <button id="sync-toggle" class="w-full px-3 py-2 mb-3 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 transition-colors flex items-center justify-between" type="button">
             <span>Sync device</span>
             <svg id="sync-chevron" class="w-4 h-4 text-gray-500 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
@@ -292,7 +296,16 @@ body[data-subscription="active"] .paid-feature {
         <div id="sync-group" class="hidden mb-5">
             <!-- Account link -->
             <div id="account-link-section" class="mb-4">
-                <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Sync link</p>
+                <p class="text-xs font-medium text-gray-500 tracking-wide mb-2 flex items-center gap-1"><span class="uppercase">Sync link</span>
+                    <span class="relative group cursor-help text-gray-400 hover:text-gray-600">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="inline w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
+                        </svg>
+                        <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 text-xs text-white bg-gray-800 rounded shadow-lg w-96 text-wrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                            Copy link and open in the browser on the device you want to sync your identity and all charts.
+                        </span>
+                    </span>
+                </p>
                 <button id="generate-link-btn" class="w-full px-3 py-2 text-sm font-medium bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors flex items-center justify-center gap-2">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
@@ -316,7 +329,16 @@ body[data-subscription="active"] .paid-feature {
 
             <!-- Backup file import -->
             <div id="backup-import-section" class="mb-4">
-                <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Backup file</p>
+                <p class="text-xs font-medium text-gray-500 tracking-wide mb-2 flex items-center gap-1"><span class="uppercase">Backup file</span>
+                    <span class="relative group cursor-help text-gray-400 hover:text-gray-600">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="inline w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
+                        </svg>
+                        <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 text-xs text-white bg-gray-800 rounded shadow-lg w-96 text-wrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                            This will wipe your current identity and replace it with the one you import, and sync all charts associated with the new identity.
+                        </span>
+                    </span>
+                </p>
                 <input type="file" id="backup-import-input" accept=".json" class="hidden">
                 <button id="backup-import-btn" class="w-full px-3 py-2 text-sm font-medium bg-[#6ad1e3] text-white rounded-lg hover:bg-[#5bc4d6] transition-colors flex items-center justify-center gap-2">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -348,6 +370,7 @@ body[data-subscription="active"] .paid-feature {
         </div>
     </div>
 </div>
+{% include "SCC/donateModal.html" %}
 {% endblock %}
 
 {% block scripts %}

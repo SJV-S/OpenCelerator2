@@ -69,9 +69,6 @@ export async function api(url, { method = 'GET', body, signal, cache } = {}) {
             eventBus.emit(EVENTS.API_RESPONSE, { url, method, status: response.status });
         } else {
             eventBus.emit(EVENTS.API_ERROR, { url, method, status: response.status });
-            if (response.status === 402) {
-                eventBus.emit(EVENTS.SUBSCRIPTION_EXPIRED);
-            }
         }
     }
 

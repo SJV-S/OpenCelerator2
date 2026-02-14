@@ -88,13 +88,6 @@ class AccountLink(db.Model):
     created_at = db.Column(db.Integer, nullable=False)  # Unix seconds
 
 
-class Subscription(db.Model):
-    __tablename__ = 'subscriptions'
-    user_id = db.Column(db.String(64), primary_key=True)
-    paid_until = db.Column(db.Integer, nullable=False)
-    created_at = db.Column(db.Integer, nullable=False)
-
-
 class SharingViolation(db.Model):
     """Log of account sharing detection triggers"""
     __tablename__ = 'sharing_violations'
