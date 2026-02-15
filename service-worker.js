@@ -27,9 +27,7 @@ const PRECACHE_STATIC = [
     '/static/SCC/icons/celeration.svg',
     // Images
     '/static/SCC/images/PayPal_icon.png',
-    '/static/SCC/images/base_chain_qr.png',
     '/static/SCC/images/bitcoin_logo.png',
-    '/static/SCC/images/lightning_qr.png',
     // CSS
     '/static/SCC/css/chart_menu.css',
     '/static/SCC/css/tailwind.css',

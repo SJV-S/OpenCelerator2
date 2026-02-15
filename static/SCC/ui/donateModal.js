@@ -1,3 +1,5 @@
+import { DONATE } from '../config.js';
+
 let copyTimer = null;
 
 function openModal(id) {
@@ -10,6 +12,14 @@ function closeModal(id) {
     const el = document.getElementById(id);
     el.classList.add('hidden');
     el.classList.remove('flex');
+}
+
+function renderQR(containerId, data) {
+    /* global qrcode */
+    const qr = qrcode(0, 'M');
+    qr.addData(data);
+    qr.make();
+    document.getElementById(containerId).innerHTML = qr.createSvgTag(4, 0);
 }
 
 function copyAddress(address, button) {
@@ -44,7 +54,7 @@ export function initDonateModal() {
 
     // PayPal
     document.getElementById('donate-paypal-btn').addEventListener('click', () => {
-        window.open('https://paypal.me/devpigeon', '_blank');
+        window.open(DONATE.PAYPAL_URL, '_blank');
     });
 
     // Bitcoin — switch modals
@@ -78,12 +88,16 @@ export function initDonateModal() {
         }
     });
 
+    // Render QR codes
+    renderQR('btc-qr', DONATE.BTC_ADDRESS);
+    renderQR('ln-qr', DONATE.LIGHTNING_ADDRESS);
+
     // Copy addresses
     document.getElementById('copy-btc-btn').addEventListener('click', (e) => {
-        copyAddress('bc1qpkwvqspkxhgh6k73zfgep2ahdn2ssd7rk5j4x8', e.currentTarget);
+        copyAddress(DONATE.BTC_ADDRESS, e.currentTarget);
     });
 
     document.getElementById('copy-ln-btn').addEventListener('click', (e) => {
-        copyAddress('pigeon@getalby.com', e.currentTarget);
+        copyAddress(DONATE.LIGHTNING_ADDRESS, e.currentTarget);
     });
 }

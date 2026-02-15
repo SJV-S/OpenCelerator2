@@ -494,3 +494,12 @@ export const DEFAULT_LEGEND_CONFIG = Object.freeze({
         color: 'black'
     }
 });
+
+// ============================================================================
+// DONATION CONFIG
+// ============================================================================
+export const DONATE = Object.freeze({
+    PAYPAL_URL: 'https://paypal.me/devpigeon',
+    BTC_ADDRESS: 'bc1qpkwvqspkxhgh6k73zfgep2ahdn2ssd7rk5j4x8',
+    LIGHTNING_ADDRESS: 'pigeon@getalby.com',
+});
