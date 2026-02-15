@@ -4,7 +4,7 @@ set -e
 OWNER="Owl"
 REPO="StandardChangeChart"
 BRANCH="master"
-VPS="ubuntu@xxx"
+VPS="ubuntu@170.75.171.102"
 VPS_PATH="/srv/$REPO"
 LOCAL_GITEA="https://z4yefqvqqmuj2xwmngldklb2zxyo2ktu4e5revac33idoy2zm333g4qd.local"
 TMP="/tmp/deploy"
