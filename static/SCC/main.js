@@ -23,7 +23,7 @@ import {
     init as dataEntryInit
 } from './series/dataEntry.js';
 import { initializeSeriesNav } from './series/traceStyles.js';
-import { createToast } from './ui/toaster.js';
+import { createToast, createConfirmToast } from './ui/toaster.js';
 import { init as replotInit } from './series/replot.js';
 import { alignStartDate, updateChartDateLabels, updateDateDisplay, adjustDateInput, initializeDateInput, updatePlotDateLabel } from './util/dates.js';
 import { initStartDateModal, initChartWindowControl, initChartHeightControl } from './ui/startDateModal.js';
@@ -68,6 +68,7 @@ import { init as panSliderInit, setupChartListener as panSliderSetupChart } from
 import { initImportUI } from './import/importUI.js';
 import { initResetSettings } from './ui/resetSettings.js';
 import { isChartOwner } from '../Server/syncClient.js';
+import { saveChart } from './storage/chartStorage.js';
 
 /**
  * Initialize the chart using client-side templates
@@ -451,6 +452,39 @@ export function setupEventListeners() {
         chartNameInput.addEventListener('input', (e) => {
             chartState.chartName = e.target.value.trim() || 'Unnamed';
             eventBus.emit(EVENTS.CHART_NAME_CHANGED, { name: chartState.chartName });
+        });
+    }
+
+    // Chart type switcher
+    const chartTypeSelect = document.getElementById('chart-type-select');
+    if (chartTypeSelect) {
+        chartTypeSelect.value = chartState.chartType;
+
+        // Hide for FrequencyCollections (value not in dropdown options)
+        if (chartState.chartType === 'FrequencyCollections') {
+            document.getElementById('chart-type-section').style.display = 'none';
+        }
+
+        chartTypeSelect.addEventListener('change', (e) => {
+            const newType = e.target.value;
+            if (newType === chartState.chartType) return;
+
+            createConfirmToast({
+                message: `Switch to ${newType} chart? The page will reload.`,
+                yesLabel: 'Switch',
+                noLabel: 'Cancel',
+                onYes: async () => {
+                    chartState.chartType = newType;
+                    const config = CHART_TYPE_CONFIG[newType];
+                    chartState.chartCapacity = config?.capacity || 280;
+                    chartState.chartWindow = chartState.chartCapacity / 2;
+                    await saveChart(chartState.id);
+                    window.location.reload();
+                },
+                onNo: () => {
+                    chartTypeSelect.value = chartState.chartType;
+                }
+            });
         });
     }
 
