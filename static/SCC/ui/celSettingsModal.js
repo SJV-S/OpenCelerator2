@@ -8,6 +8,7 @@
 import { chartState } from '../chartState.js';
 import { WINDOW_UNITS } from '../config.js';
 import { setupModalClose } from './modalHelpers.js';
+import { eventBus, EVENTS } from '../eventBus.js';
 
 let modalOverlay = null;
 
@@ -56,6 +57,7 @@ function createModal() {
         if (!chartState.CelLines.settings) chartState.CelLines.settings = {};
         chartState.CelLines.settings.fitMethod = e.target.value;
         e.target.blur();
+        eventBus.emit(EVENTS.LINE_CEL_SETTINGS_CHANGED);
     });
 
     fitRow.appendChild(fitLabel);
@@ -83,6 +85,7 @@ function createModal() {
         if (!chartState.CelLines.settings) chartState.CelLines.settings = {};
         chartState.CelLines.settings.bounceEnvelope = e.target.value;
         e.target.blur();
+        eventBus.emit(EVENTS.LINE_CEL_SETTINGS_CHANGED);
     });
 
     bounceRow.appendChild(bounceLabel);
@@ -111,6 +114,7 @@ function createModal() {
         chartState.CelLines.settings.forecast = Math.max(0, value);
         e.target.value = chartState.CelLines.settings.forecast;
         e.target.blur();
+        eventBus.emit(EVENTS.LINE_CEL_SETTINGS_CHANGED);
     });
 
     forecastUnitSpan = document.createElement('span');

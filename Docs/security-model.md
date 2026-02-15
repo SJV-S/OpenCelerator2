@@ -41,7 +41,7 @@ The server stores:
 
 The server **never receives**: the passphrase, any raw encryption key, any plaintext chart data, or the link secret (URL fragment).
 
-All fields are stored as `LargeBinary` in SQLAlchemy. API endpoints (`/api/sync`, `/api/share/edit`, `/api/account-link`) accept and return base64-encoded blobs without ever decrypting.
+All cryptographic payloads are stored as `LargeBinary` in SQLAlchemy (non-crypto fields like `user_id`, `chart_uuid`, and timestamps use `String`/`Integer`). API endpoints (`/api/sync`, `/api/share/edit`, `/api/account-link`) accept and return base64-encoded blobs without ever decrypting.
 
 ### Signature Verification Is Client-Side Only
 
@@ -91,16 +91,13 @@ Truly non-extractable random keys (no derivation, no recoverable secret) would l
 
 #### Current XSS Mitigation Status
 
-The report's recommended mitigations and their implementation status:
-
 | Mitigation | Status | Notes |
 |-----------|--------|-------|
-| Content Security Policy headers | **Not implemented** | No CSP set in `app.py` or middleware. This is the highest-priority gap. |
+| Content Security Policy | **Implemented** | `<meta>` CSP in `base.html`: `script-src 'self' 'unsafe-eval' 'sha256-…' 'sha256-…'; style-src 'self' 'unsafe-inline'`. Blocks injected inline scripts, inline event handlers, and external script loading. `unsafe-eval` required by Plotly.js (`new Function()` x2). `unsafe-inline` for styles required by Plotly's inline SVG styling. Hashes cover the two remaining inline scripts (IndexedDB bootstrap, SW registration + nuke). Regenerate with `./scripts/build/CSP/update-hashes.sh`. |
+| Inline script elimination | **Implemented** | All inline `<script type="module">` blocks extracted to external files. All inline event handlers (`oninput`) replaced with `addEventListener`. Only two inline classic scripts remain, covered by CSP hashes. |
 | Input sanitization | **Partial** | `chartExplorer.js` has `escapeHtml()` using `textContent`→`innerHTML`. No project-wide sanitization framework. |
-| Avoiding innerHTML | **Not followed** | `innerHTML` used in 16 files. Most insert trusted config values, but `customLegend.js` embeds config properties (colors, sizes) directly into SVG attribute strings without escaping. |
-| Subresource integrity | **Not implemented** | Script tags in templates lack `integrity` attributes. Lower risk since scripts are self-hosted. |
-
-**Recommendation**: Implement a strict CSP header (`script-src 'self'`; no `unsafe-inline`) as the single highest-impact mitigation. The ES6 module architecture with no inline handlers is already compatible with this.
+| Avoiding innerHTML | **Not followed** | `innerHTML` used in 14 files. Most insert trusted config values, but `customLegend.js` embeds config properties (colors, sizes) directly into SVG attribute strings without escaping. |
+| Subresource integrity | **Implemented** | Library scripts in `static/lib/` have SRI `integrity` hashes on their `<script>` tags. |
 
 ### Malicious browser extensions
 
@@ -141,6 +138,6 @@ The security boundary is therefore the **browser origin**. Inside the origin, th
 | Network interception | Yes | Client-side encryption before transit |
 | Cross-user leakage | Yes | Independent per-user key material |
 | Share link brute-force | Yes | 256-bit share secrets |
-| XSS | **No** | Complete compromise of identity and data. No CSP header currently deployed. |
+| XSS | **Partial** | CSP blocks injected scripts and inline handlers. Remaining gaps: `unsafe-eval` (Plotly), innerHTML without sanitization. Full compromise still possible if attacker achieves script execution. |
 | Malicious extensions | **No** | Equivalent to XSS if content scripts permitted |
 | Device compromise | **No** | Passphrase in plaintext in IndexedDB backing store |

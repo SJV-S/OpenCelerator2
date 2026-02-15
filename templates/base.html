@@ -2,6 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-eval' 'sha256-eMeLGIkvOXByW95vM0yvYcfrI1dtFqJp8gfdN4GVFaM=' 'sha256-uGMUzZl3d+JrFeBwHw2NFkIzu/uQkdmfySYsl5GNlU0='; style-src 'self' 'unsafe-inline'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#05c3de">
     <title>{% block title %}Standard Change Chart{% endblock %}</title>
@@ -105,12 +106,6 @@
         };
     </script>
     <script type="module" src="/static/Server/onlineStatus.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            setTimeout(() => {
-                document.querySelectorAll('.page-fade').forEach(el => el.classList.add('visible'));
-            }, 100);
-        });
-    </script>
+    <script src="/static/SCC/pageFade.js"></script>
 </body>
 </html>

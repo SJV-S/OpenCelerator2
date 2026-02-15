@@ -7,7 +7,7 @@
 // Set to true during development to always fetch fresh (bypasses cache)
 const DEVELOPER_MODE = true;
 
-const SW_VERSION = '0.2.0';
+const SW_VERSION = '0.2.1';
 const CACHE_NAME = `scc-cache-v${SW_VERSION}`;
 
 // HTML pages to precache
@@ -20,10 +20,16 @@ const PRECACHE_PAGES = [
 // Static assets to precache (all JS, CSS, icons)
 const PRECACHE_STATIC = [
     '/static/manifest.json',
+    '/static/favicon.ico',
     // Icons
     '/static/SCC/icons/icon-192.png',
     '/static/SCC/icons/icon-512.png',
     '/static/SCC/icons/celeration.svg',
+    // Images
+    '/static/SCC/images/PayPal_icon.png',
+    '/static/SCC/images/base_chain_qr.png',
+    '/static/SCC/images/bitcoin_logo.png',
+    '/static/SCC/images/lightning_qr.png',
     // CSS
     '/static/SCC/css/chart_menu.css',
     '/static/SCC/css/tailwind.css',
@@ -39,7 +45,10 @@ const PRECACHE_STATIC = [
     '/static/SCC/debug.js',
     '/static/SCC/eventBus.js',
     '/static/SCC/navigation.js',
+    '/static/SCC/newChartFlow.js',
+    '/static/SCC/pageFade.js',
     '/static/SCC/pwaInstall.js',
+    '/static/SCC/welcomeFlow.js',
     // Libraries
     '/static/lib/qrcode-generator.min.js',
     '/static/lib/idb.js',
@@ -73,6 +82,7 @@ const PRECACHE_STATIC = [
     '/static/SCC/ui/celSettingsModal.js',
     '/static/SCC/ui/celerationFan.js',
     '/static/SCC/ui/credit.js',
+    '/static/SCC/ui/donateModal.js',
     '/static/SCC/ui/crosshair.js',
     '/static/SCC/ui/customLegend.js',
     '/static/SCC/ui/icons.js',
@@ -110,12 +120,14 @@ const PRECACHE_STATIC = [
     '/static/SCC/import/openCeleratorImport.js',
     // Server sync
     '/static/Server/accountLink.js',
+    '/static/Server/client-api.js',
+    '/static/Server/compress.js',
     '/static/Server/crypto.js',
     '/static/Server/init.js',
     '/static/Server/onlineStatus.js',
-    '/static/Server/client-api.js',
     '/static/Server/syncClient.js',
     '/static/Server/syncDevice.js',
+    '/static/Server/syncLinkFlow.js',
     '/static/Server/wsClient.js',
 ];
 
