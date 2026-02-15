@@ -4,7 +4,7 @@ import { openDB } from '/static/lib/idb.js';
 import { checkForUpdates, pushCharts } from '/static/Server/syncClient.js';
 import { initServerSync, isSyncEnabled, getUserPreferences, setUserPreference } from '/static/Server/init.js';
 import { initSettingsModal, performBackupExport } from '/static/SCC/ui/settingsModal.js';
-import { createConfirmToast } from '/static/SCC/ui/toaster.js';
+import { createConfirmToast, createToast } from '/static/SCC/ui/toaster.js';
 import { initDonateModal } from '/static/SCC/ui/donateModal.js';
 
 let charts = [];
@@ -541,6 +541,27 @@ function showShareError() {
     setTimeout(() => banner.remove(), 8000);
 }
 showShareError();
+
+function checkInstallSupport() {
+    // Skip if already running as installed PWA
+    if (window.matchMedia('(display-mode: standalone)').matches) return;
+
+    // Chromium-based browsers (Chrome, Edge, Opera, etc.) include "Chrome/" in the UA
+    if (/Chrome\//.test(navigator.userAgent)) return;
+
+    const key = 'scc-install-notice-count';
+    const count = parseInt(localStorage.getItem(key) || '0', 10);
+    if (count >= 2) return;
+
+    localStorage.setItem(key, String(count + 1));
+    createToast({
+        message: 'Install option is only available in Chromium-based browsers and Edge.',
+        buttons: [{ label: 'Got it', onClick: () => {}, type: 'secondary' }],
+        layout: 'horizontal',
+        duration: 8000
+    });
+}
+checkInstallSupport();
 
 // Load on page show (handles back button)
 window.addEventListener('pageshow', loadCharts);
