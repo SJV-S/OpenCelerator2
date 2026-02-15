@@ -129,14 +129,13 @@ html, body {
         }
     }
 
-    // Extract linkId and linkSecret from URL path: /sync/<linkId>/<linkSecret>
+    // Extract linkId from path and linkSecret from fragment: /sync/<linkId>#<linkSecret>
     const pathParts = window.location.pathname.split('/').filter(Boolean);
-    // pathParts = ['sync', linkId, linkSecret]
-    if (pathParts.length < 3 || pathParts[0] !== 'sync') {
+    const linkSecret = window.location.hash?.slice(1) || null;
+    if (pathParts.length < 2 || pathParts[0] !== 'sync' || !linkSecret) {
         showError('Invalid link format.');
     } else {
         const linkId = pathParts[1];
-        const linkSecret = pathParts[2];
 
         (async () => {
             try {

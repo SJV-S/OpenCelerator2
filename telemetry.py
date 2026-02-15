@@ -14,6 +14,9 @@ import config
 
 _UUID_RE = re.compile(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', re.I)
 
+_RETENTION_DAYS = 90
+_last_cleanup = 0
+
 
 def _hash_ip(ip):
     return hmac.new(
@@ -43,8 +46,31 @@ def _extract_user_id():
     return request.headers.get('X-User-Id')
 
 
+def _prune_old_logs():
+    """Delete request_logs rows older than _RETENTION_DAYS. Runs at most once per day."""
+    global _last_cleanup
+    now = int(time.time())
+    if now - _last_cleanup < 86_400:
+        return
+    _last_cleanup = now
+    try:
+        cutoff = now - _RETENTION_DAYS * 86_400
+        db.session.execute(
+            db.text('DELETE FROM request_logs WHERE timestamp < :cutoff'),
+            {'cutoff': cutoff},
+        )
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+
 def log_request(response):
     """after_request handler — logs one row per request, returns response unchanged."""
+    if request.path == '/api/health':
+        return response
+
+    _prune_old_logs()
+
     try:
         entry = RequestLog(
             timestamp=int(time.time()),

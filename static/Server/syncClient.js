@@ -396,7 +396,7 @@ async function _createShareLink(chartUuid, acceptingEdits) {
     const db = await openDB('SCC_Charts', 1);
     await db.put('charts', chart);
 
-    return { url: `${window.location.origin}/chart/${chartUuid}/${shareSecret}`, chartKey: chart.chartKey };
+    return { url: `${window.location.origin}/chart/${chartUuid}#${shareSecret}`, chartKey: chart.chartKey };
 }
 
 // ============================================================================

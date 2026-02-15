@@ -84,8 +84,7 @@ def new_chart():
 
 @app.route('/chart/_shell')
 @app.route('/chart/<chart_id>')
-@app.route('/chart/<chart_id>/<share_secret>')
-def chart(chart_id=None, share_secret=None):
+def chart(chart_id=None):
     return render_template('SCC/view_chart.html')
 
 
@@ -476,8 +475,8 @@ def get_account_link(link_id):
     return jsonify({'encrypted_blob': encode_blob(account_link.encrypted_blob)})
 
 
-@app.route('/sync/<link_id>/<link_secret>')
-def sync_link_page(link_id, link_secret):
+@app.route('/sync/<link_id>')
+def sync_link_page(link_id):
     """Render the receiver page for account link redemption."""
     return render_template('SCC/sync_link.html')
 

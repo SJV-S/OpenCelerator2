@@ -18,9 +18,9 @@ import { openDB } from '../lib/idb.js';
 import { eventBus, EVENTS } from './eventBus.js';
 import { chartState } from './chartState.js';
 
-const pathParts = window.location.pathname.split('/'); // /chart/{uuid}/{secret}
+const pathParts = window.location.pathname.split('/'); // /chart/{uuid}
 const chartId = pathParts[2];
-const shareSecret = pathParts[3];
+const shareSecret = window.location.hash?.slice(1) || null; // #<secret>
 
 async function init() {
     await initStorage();

@@ -2,7 +2,7 @@
  * Account Link — create and redeem one-time encrypted identity transfer links.
  *
  * The server only stores an opaque AES-256-GCM blob it cannot decrypt.
- * The link secret (in the URL fragment-like path) is never sent to the server.
+ * The link secret (in the URL fragment) is never sent to the server.
  */
 
 import { deriveKey, encrypt, decrypt } from './crypto.js';
@@ -44,7 +44,7 @@ export async function createAccountLink(passphrase, displayName) {
     if (res.status === 429) throw new Error('Too many links created. Please wait a minute.');
     if (!res.ok) throw new Error(`Server error: ${res.status}`);
 
-    const url = `${location.origin}/sync/${linkId}/${linkSecret}`;
+    const url = `${location.origin}/sync/${linkId}#${linkSecret}`;
     return { url, linkId };
 }
 

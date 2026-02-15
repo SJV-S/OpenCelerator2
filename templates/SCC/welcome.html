@@ -307,9 +307,10 @@ html, body {
         try {
             const url = new URL(trimmed);
             const parts = url.pathname.split('/').filter(Boolean);
-            // Expected: ['sync', linkId, linkSecret]
-            if (parts.length >= 3 && parts[0] === 'sync') {
-                return { linkId: parts[1], linkSecret: parts[2] };
+            const hash = url.hash?.slice(1) || null;
+            // Expected: /sync/<linkId>#<linkSecret>
+            if (parts.length >= 2 && parts[0] === 'sync' && hash) {
+                return { linkId: parts[1], linkSecret: hash };
             }
         } catch { /* not a valid URL */ }
         return null;
@@ -319,7 +320,7 @@ html, body {
         clearImportStatus();
         const parsed = parseSyncLink(syncLinkInput.value);
         if (!parsed) {
-            showImportStatus('Invalid sync link. Expected format: https://.../sync/<id>/<secret>', true);
+            showImportStatus('Invalid sync link. Expected format: https://.../sync/<id>#<secret>', true);
             return;
         }
 
