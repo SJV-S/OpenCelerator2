@@ -456,23 +456,29 @@ export function setupEventListeners() {
 
     // Fullscreen toggle
     const fullscreenBtn = document.getElementById('fullscreen-toggle');
-    if (fullscreenBtn) {
-        fullscreenBtn.addEventListener('click', () => {
-            const isFullscreen = document.body.classList.toggle('fullscreen-mode');
-            fullscreenBtn.innerHTML = isFullscreen
-                ? icons.fullscreenCompress()
-                : icons.fullscreenExpand();
-            // Defer heavy chart work so the icon swap renders immediately
-            const showViewOnlyToast = !isFullscreen && !isChartOwner(chartState) && !chartState.acceptingEdits;
-            setTimeout(() => {
-                chartState.containerHeight = null;
-                initializeChart();
-                if (showViewOnlyToast) {
-                    createToast({ message: 'View-only chart — changes are not saved', duration: 4000, position: 'top-right' });
-                }
-            }, 0);
-        });
+
+    function toggleFullscreen() {
+        if (!fullscreenBtn) return;
+        const isFullscreen = document.body.classList.toggle('fullscreen-mode');
+        fullscreenBtn.innerHTML = isFullscreen
+            ? icons.fullscreenCompress()
+            : icons.fullscreenExpand();
+        // Defer heavy chart work so the icon swap renders immediately
+        const showViewOnlyToast = !isFullscreen && !isChartOwner(chartState) && !chartState.acceptingEdits;
+        setTimeout(() => {
+            chartState.containerHeight = null;
+            initializeChart();
+            if (showViewOnlyToast) {
+                createToast({ message: 'View-only chart — changes are not saved', duration: 4000, position: 'top-right' });
+            }
+        }, 0);
     }
+
+    if (fullscreenBtn) {
+        fullscreenBtn.addEventListener('click', toggleFullscreen);
+    }
+
+    eventBus.subscribe(EVENTS.FULLSCREEN_TOGGLE, toggleFullscreen);
 
     // Chart window update handler - subscribes to CHART_WINDOW_CHANGED event
     const chartDiv = getChartDiv();

@@ -80,7 +80,7 @@ export function initDonateModal() {
 
     // Copy addresses
     document.getElementById('copy-btc-btn').addEventListener('click', (e) => {
-        copyAddress('bc1qg8y5pxv5g86mhj59xdk89r6tr70zdw6rh6rwh4', e.currentTarget);
+        copyAddress('bc1qpkwvqspkxhgh6k73zfgep2ahdn2ssd7rk5j4x8', e.currentTarget);
     });
 
     document.getElementById('copy-ln-btn').addEventListener('click', (e) => {

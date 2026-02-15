@@ -310,6 +310,15 @@ function initGestureNavigation() {
                 }
             }
         }
+
+        // Shift+F to toggle fullscreen
+        if (e.key === 'F' && e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                return;
+            }
+            e.preventDefault();
+            eventBus.emit(EVENTS.FULLSCREEN_TOGGLE);
+        }
     });
 }
 

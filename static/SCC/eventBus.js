@@ -99,6 +99,9 @@ export const EVENTS = {
     COUNTER_SHOW: 'counter:show',
     COUNTER_HIDE: 'counter:hide',
 
+    // Fullscreen Events
+    FULLSCREEN_TOGGLE: 'ui:fullscreen_toggle',
+
     // Chart Click Events
     CHART_CLICKED: 'chart:clicked',
 
