@@ -555,7 +555,7 @@ function checkInstallSupport() {
 
     localStorage.setItem(key, String(count + 1));
     createToast({
-        message: 'Install option is only available in Chromium-based browsers and Edge.',
+        message: 'Install option is only available in Chromium-based browsers (Chrome, Edge, Opera, etc.).',
         buttons: [{ label: 'Got it', onClick: () => {}, type: 'secondary' }],
         layout: 'horizontal',
         duration: 8000
