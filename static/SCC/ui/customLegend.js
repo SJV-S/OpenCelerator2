@@ -351,7 +351,7 @@ function renderCustomLegend() {
 
     // Apply scaled CSS custom properties
     container.style.setProperty('--legend-scale', scale);
-    container.style.gap = `${Math.round(4 * scale)}px`;
+    container.style.gap = `${Math.round(2 * scale)}px`;
     container.style.padding = `${Math.round(6 * scale)}px`;
 
     items.forEach(item => {

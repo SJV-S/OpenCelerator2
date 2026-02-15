@@ -30,7 +30,7 @@ import { migrateChart } from '../import/jsonBackwardsCompatibility.js';
 import { compactChart, expandChart } from './compactJson.js';
 import { generateChartKey } from '../../Server/crypto.js';
 import { pushChart, isInitialized, isChartOwner, startSyncWatch, leaveChart as syncLeaveChart, deleteChart as syncDeleteChart } from '../../Server/syncClient.js';
-import { isSyncEnabled, getPublicKeyB64 } from '../../Server/init.js';
+import { isSyncEnabled, getPublicKeyB64, getDisplayName } from '../../Server/init.js';
 import { hasSocket } from '../../Server/wsClient.js';
 
 // Convert CryptoKey to hex string for storage
@@ -386,6 +386,9 @@ export async function importChart(chartData) {
             id: chartId,
             chartKey,
             shared: false,
+            acceptingEdits: false,
+            publicKey: getPublicKeyB64(),
+            ownerName: await getDisplayName(),
             lastModified: Math.floor(Date.now() / 1000),
             _createdAt: chartData._createdAt || Math.floor(Date.now() / 1000)
         };
