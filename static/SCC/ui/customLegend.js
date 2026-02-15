@@ -17,6 +17,9 @@ import { restyle } from '../util/plotlyWrapper.js';
 import { getChartDiv } from '../util/dom.js';
 import { getAggLabel } from '../series/traceStyles.js';
 
+/** Escape a value for safe interpolation into an XML/SVG attribute. */
+const escAttr = v => String(v).replace(/[&"'<>]/g, c => ({'&':'&amp;','"':'&quot;',"'":'&#39;','<':'&lt;','>':'&gt;'}[c]));
+
 // Series visibility is stored in chartState.seriesVisibility (persisted via IndexedDB)
 
 /**
@@ -125,21 +128,21 @@ function getMarkerSVG(seriesKey, config, scale = 1) {
     const dashArray = DASH_MAP[config.lineDash] || '';
     const dashAttr = dashArray ? ` stroke-dasharray="${dashArray}"` : '';
     const lw = Math.max(config.lineWidth || 1, 1);
-    const lineColor = hasLine ? config.lineColor : 'transparent';
+    const lineColor = hasLine ? escAttr(config.lineColor) : 'transparent';
     inner += `<line x1="5" y1="${cy}" x2="${vbWidth - 5}" y2="${cy}" stroke="${lineColor}" stroke-width="${lw}"${dashAttr}/>`;
 
     // 2. Marker (drawn second = rendered on top)
     if (hasMarker) {
         if (seriesKey === ERRORS) {
             const fs = Math.min(Math.round((config.markerSize || 20) * scale), 18);
-            inner += `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central" font-size="${fs}" font-family="Arial" fill="${config.markerColor}">X</text>`;
+            inner += `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central" font-size="${fs}" font-family="Arial" fill="${escAttr(config.markerColor)}">X</text>`;
         } else if (seriesKey === TIMING) {
             const fs = Math.min(Math.round((config.markerSize || 20) * scale), 18);
-            inner += `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central" font-size="${fs}" font-family="Arial" fill="${config.markerColor}">−</text>`;
+            inner += `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central" font-size="${fs}" font-family="Arial" fill="${escAttr(config.markerColor)}">−</text>`;
         } else {
             const r = Math.min(Math.round((config.markerSize || 8) * scale) / 2, 9);
-            const fill = config.markerColor;
-            const stroke = config.markerEdgeColor;
+            const fill = escAttr(config.markerColor);
+            const stroke = escAttr(config.markerEdgeColor);
             switch (config.markerSymbol) {
                 case 'square':
                     inner += `<rect x="${cx - r}" y="${cy - r}" width="${r * 2}" height="${r * 2}" fill="${fill}" stroke="${stroke}" stroke-width="1"/>`;
