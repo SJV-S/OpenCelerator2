@@ -60,8 +60,7 @@ function generateMiscInputs() {
             <label id="${miscId}-series-label" class="block text-sm font-semibold text-gray-600 mb-2 text-center" for="${miscId}">${label}</label>
             <input type="text" inputmode="numeric" pattern="[0-9]*" id="${miscId}"
                    class="w-full px-3 py-3 text-lg border-2 border-gray-300 rounded focus:outline-none transition-colors text-center"
-                   placeholder=""
-                   oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+                   placeholder="">
         `;
         container.appendChild(div);
     });
@@ -284,6 +283,19 @@ function init() {
 
     // Generate initial misc inputs (may be empty if chart not yet loaded)
     generateMiscInputs();
+
+    // Numeric-only filtering for the 5 static inputs (replaces inline oninput handlers)
+    const numericFilter = (e) => { e.target.value = e.target.value.replace(/[^0-9]/g, ''); };
+    ['corrects', 'incorrects', 'hours', 'minutes', 'seconds'].forEach(id => {
+        document.getElementById(id)?.addEventListener('input', numericFilter);
+    });
+
+    // Event delegation for dynamically generated misc series inputs
+    document.getElementById('misc-inputs-container')?.addEventListener('input', (e) => {
+        if (e.target.matches('input[inputmode="numeric"]')) {
+            e.target.value = e.target.value.replace(/[^0-9]/g, '');
+        }
+    });
 
     // ========================================================================
     // Entry date indicator subscriptions

@@ -177,3 +177,6 @@ export function initOnlineStatus() {
         }
     });
 }
+
+// Self-initialize on import
+initOnlineStatus();

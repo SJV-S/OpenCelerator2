@@ -162,8 +162,7 @@ function renderCurrentEntry() {
                            value="${value}"
                            class="w-full px-3 py-3 text-lg border-2 border-gray-300 rounded focus:outline-none transition-colors text-center"
                            data-field="${miscId}"
-                           placeholder=""
-                           oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+                           placeholder="">
                 </div>
             `;
         });
@@ -183,8 +182,7 @@ function renderCurrentEntry() {
                            value="${correctsValue}"
                            class="w-full px-3 py-3 text-lg border-2 border-gray-300 rounded focus:outline-none transition-colors text-center"
                            data-field="corrects"
-                           placeholder=""
-                           oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+                           placeholder="">
                 </div>
                 <div>
                     <label class="block text-sm font-semibold text-gray-600 mb-2 text-center">Errors</label>
@@ -192,8 +190,7 @@ function renderCurrentEntry() {
                            value="${errorsValue}"
                            class="w-full px-3 py-3 text-lg border-2 border-gray-300 rounded focus:outline-none transition-colors text-center"
                            data-field="errors"
-                           placeholder=""
-                           oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+                           placeholder="">
                 </div>
             </div>
 
@@ -211,8 +208,7 @@ function renderCurrentEntry() {
                                value="${hoursValue}"
                                class="w-full px-2 py-3 text-lg border-2 border-gray-300 rounded focus:outline-none transition-colors text-center"
                                data-field="hours"
-                               placeholder=""
-                               oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+                               placeholder="">
                     </div>
                     <div>
                         <label class="block text-xs text-gray-500 mb-1 text-center">Min</label>
@@ -220,8 +216,7 @@ function renderCurrentEntry() {
                                value="${minutesValue}"
                                class="w-full px-2 py-3 text-lg border-2 border-gray-300 rounded focus:outline-none transition-colors text-center"
                                data-field="minutes"
-                               placeholder=""
-                               oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+                               placeholder="">
                     </div>
                     <div>
                         <label class="block text-xs text-gray-500 mb-1 text-center">Sec</label>
@@ -229,8 +224,7 @@ function renderCurrentEntry() {
                                value="${secondsValue}"
                                class="w-full px-2 py-3 text-lg border-2 border-gray-300 rounded focus:outline-none transition-colors text-center"
                                data-field="seconds"
-                               placeholder=""
-                               oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+                               placeholder="">
                     </div>
                 </div>
             </div>
@@ -239,6 +233,11 @@ function renderCurrentEntry() {
     `;
 
     container.appendChild(block);
+
+    // Numeric-only filtering (replaces inline oninput handlers)
+    block.querySelectorAll('input[inputmode="numeric"]').forEach(input => {
+        input.addEventListener('input', (e) => { e.target.value = e.target.value.replace(/[^0-9]/g, ''); });
+    });
 }
 
 /**

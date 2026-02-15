@@ -104,11 +104,7 @@
             location.reload();
         };
     </script>
-    <script type="module">
-        // Online/Offline status indicator
-        import { initOnlineStatus } from '/static/Server/onlineStatus.js';
-        initOnlineStatus();
-    </script>
+    <script type="module" src="/static/Server/onlineStatus.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             setTimeout(() => {
