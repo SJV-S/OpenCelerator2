@@ -199,7 +199,8 @@ export async function listCharts() {
             credits: chart.credits || {},
             tags: chart.tags || [],
             shared: chart.shared || false,
-            acceptingEdits: chart.acceptingEdits || false
+            acceptingEdits: chart.acceptingEdits || false,
+            publicKey: chart.publicKey || null
         })).sort((a, b) => b.updatedAt - a.updatedAt);
     } catch (error) {
         console.error('[Storage] List failed:', error);

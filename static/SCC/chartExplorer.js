@@ -3,7 +3,7 @@ import { icons } from '/static/SCC/ui/icons.js';
 
 import { openDB } from '/static/lib/idb.js';
 import { checkForUpdates, pushCharts } from '/static/Server/syncClient.js';
-import { initServerSync, isSyncEnabled, getUserPreferences, setUserPreference, getDisplayNameCached } from '/static/Server/init.js';
+import { initServerSync, isSyncEnabled, getUserPreferences, setUserPreference, getDisplayNameCached, getPublicKeyB64 } from '/static/Server/init.js';
 import { initSettingsModal, performBackupExport } from '/static/SCC/ui/settingsModal.js';
 import { createConfirmToast, createToast } from '/static/SCC/ui/toaster.js';
 import { initDonateModal } from '/static/SCC/ui/donateModal.js';
@@ -97,7 +97,16 @@ function createChartRow(chart) {
         </td>
         <td class="py-3 text-center">
             ${chart.shared
-                ? `<span class="inline-block w-5 h-5 ${chart.acceptingEdits ? 'text-blue-500' : 'text-gray-500'}" title="${chart.acceptingEdits ? 'Edit access' : 'View only'}">${chart.acceptingEdits ? icons.sharedEdit(20) : icons.viewOnly(20)}</span>`
+                ? (() => {
+                    const isOwner = chart.publicKey && chart.publicKey === getPublicKeyB64();
+                    const shareIcon = chart.acceptingEdits ? icons.sharedEdit(20) : icons.viewOnly(20);
+                    const shareColor = chart.acceptingEdits ? 'text-blue-500' : 'text-gray-500';
+                    const shareTitle = chart.acceptingEdits ? 'Edit access' : 'View only';
+                    if (isOwner) {
+                        return `<span class="inline-flex items-center gap-1" title="You own this chart (${shareTitle.toLowerCase()})"><span class="inline-block w-5 h-5 text-green-600">${icons.ownerSharing(20)}</span><span class="inline-block w-5 h-5 ${shareColor}">${shareIcon}</span></span>`;
+                    }
+                    return `<span class="inline-block w-5 h-5 ${shareColor}" title="${shareTitle}">${shareIcon}</span>`;
+                })()
                 : `<span class="text-gray-400 text-sm">-</span>`}
         </td>
         <td class="py-3 pr-2 text-right">
