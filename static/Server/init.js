@@ -25,6 +25,7 @@ const DEFAULT_PREFERENCES = {
 let initialized = false;
 let userPreferences = null;
 let publicKeyB64Cache = null;
+let displayNameCache = null;
 
 export async function initServerSync() {
     if (initialized) return;
@@ -56,7 +57,7 @@ export async function initServerSync() {
     userPreferences = prefs;
 
     // Read display name (human-readable, display only)
-    const displayName = await db.get(STORE_NAME, 'display_name') || null;
+    displayNameCache = await db.get(STORE_NAME, 'display_name') || null;
 
     // Derive ECDSA signing key pair (need private key for signing)
     const keyPair = await deriveSigningKeyPair(passphrase);
@@ -68,7 +69,7 @@ export async function initServerSync() {
         await db.put(STORE_NAME, publicKeyB64Cache, 'publicKey');
     }
 
-    await initSync(passphrase, keyPair.privateKey, publicKeyB64Cache, displayName);
+    await initSync(passphrase, keyPair.privateKey, publicKeyB64Cache, displayNameCache);
     initialized = true;
     console.log('[Server] Sync initialized');
     eventBus.emit(EVENTS.SYNC_READY);
@@ -96,15 +97,21 @@ export async function setUserPreference(key, value) {
 }
 
 export async function getDisplayName() {
+    if (displayNameCache !== null) return displayNameCache;
     const db = await openDB(DB_NAME, 1);
     return await db.get(STORE_NAME, 'display_name') || null;
 }
 
 export async function setDisplayName(name) {
     const val = name || null;
+    displayNameCache = val;
     const db = await openDB(DB_NAME, 1);
     await db.put(STORE_NAME, val, 'display_name');
     setSigningDisplayName(val);
+}
+
+export function getDisplayNameCached() {
+    return displayNameCache;
 }
 
 export function resetSync() {

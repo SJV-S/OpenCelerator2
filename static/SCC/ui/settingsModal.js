@@ -37,6 +37,7 @@ function updateGenerateLinkBtn() {
 }
 
 let onChartsChanged = () => {};
+let onDisplayNameChanged = () => {};
 
 function showImportStatus(message, isError) {
     const el = document.getElementById('import-status');
@@ -125,6 +126,7 @@ async function performBackupImport(discardExisting) {
 
 export function initSettingsModal(deps) {
     onChartsChanged = deps.onChartsChanged;
+    if (deps.onDisplayNameChanged) onDisplayNameChanged = deps.onDisplayNameChanged;
 
     document.getElementById('settings-btn').addEventListener('click', openSettingsModal);
     document.getElementById('settings-close-btn').addEventListener('click', closeSettingsModal);
@@ -140,6 +142,7 @@ export function initSettingsModal(deps) {
 
     document.getElementById('settings-owner-name').addEventListener('blur', (e) => {
         setDisplayName(e.target.value.trim());
+        onDisplayNameChanged();
     });
 
     // --- Section Toggle Handlers ---

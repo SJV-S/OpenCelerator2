@@ -2,10 +2,17 @@ import { initStorage, listCharts, deleteChart, updateChartTags } from '/static/S
 
 import { openDB } from '/static/lib/idb.js';
 import { checkForUpdates, pushCharts } from '/static/Server/syncClient.js';
-import { initServerSync, isSyncEnabled, getUserPreferences, setUserPreference } from '/static/Server/init.js';
+import { initServerSync, isSyncEnabled, getUserPreferences, setUserPreference, getDisplayNameCached } from '/static/Server/init.js';
 import { initSettingsModal, performBackupExport } from '/static/SCC/ui/settingsModal.js';
 import { createConfirmToast, createToast } from '/static/SCC/ui/toaster.js';
 import { initDonateModal } from '/static/SCC/ui/donateModal.js';
+
+const titleEl = document.getElementById('explorer-title');
+
+function updateTitle() {
+    const name = getDisplayNameCached();
+    titleEl.textContent = name ? `${name}'s Chart Explorer` : 'Chart Explorer';
+}
 
 let charts = [];
 let chartToDelete = null;
@@ -376,6 +383,7 @@ async function loadCharts() {
 
     // Pull updates from server if sync enabled
     await initServerSync();
+    updateTitle();
     checkBackupReminder();
     if (isSyncEnabled()) {
         try {
@@ -566,5 +574,5 @@ checkInstallSupport();
 // Load on page show (handles back button)
 window.addEventListener('pageshow', loadCharts);
 
-initSettingsModal({ onChartsChanged: loadCharts });
+initSettingsModal({ onChartsChanged: loadCharts, onDisplayNameChanged: updateTitle });
 initDonateModal();
