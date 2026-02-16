@@ -13,6 +13,7 @@ import { createToast, createConfirmToast } from '../ui/toaster.js';
 import { MISSING } from '../config.js';
 import { isMissing } from '../util/format.js';
 import { getFirstConfig } from './traceStyles.js';
+import { escapeHtml } from '../util/dom.js';
 import { parseLocalDate, dateToTimestamp } from '../util/dates.js';
 
 // Track current state
@@ -157,11 +158,11 @@ function renderCurrentEntry() {
             const value = isMissing(point.misc[miscId]) ? '' : point.misc[miscId];
             miscFieldsHtml += `
                 <div>
-                    <label class="block text-sm font-semibold text-gray-600 mb-2 text-center">${label}</label>
+                    <label class="block text-sm font-semibold text-gray-600 mb-2 text-center">${escapeHtml(label)}</label>
                     <input type="text" inputmode="numeric" pattern="[0-9]*"
-                           value="${value}"
+                           value="${escapeHtml(value)}"
                            class="w-full px-3 py-3 text-lg border-2 border-gray-300 rounded focus:outline-none transition-colors text-center"
-                           data-field="${miscId}"
+                           data-field="${escapeHtml(miscId)}"
                            placeholder="">
                 </div>
             `;

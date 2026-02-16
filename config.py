@@ -53,12 +53,18 @@ RATELIMIT_API_WRITE = '20/minute'
 RATELIMIT_API_DELETE = '10/minute'
 RATELIMIT_POLL = '120/minute'
 RATELIMIT_ACCOUNT_LINK = '5/minute'
+RATELIMIT_REPORT = '10/minute'
 RATELIMIT_STORAGE_URI = 'memory://'
 MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16 MB
 
 # --- Account Sharing Detection ---
 SHARING_IP_THRESHOLD = 6
 SHARING_WINDOW_HOURS = 6
+
+# --- Bad-Push IP Bans ---
+BAN_DURATION_SECONDS = 12 * 3600      # 12-hour per-strike ban
+BAN_PERMANENT_STRIKES = 3             # Strikes before permanent user+IP ban
+BAN_TIER2_THRESHOLD = 3              # Distinct permabanned user_ids to trigger IP-wide ban
 
 # --- Dev server ---
 DEV_HOST = '0.0.0.0'

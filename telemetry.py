@@ -64,9 +64,19 @@ def _prune_old_logs():
         db.session.rollback()
 
 
+_LOG_PREFIXES = (
+    '/api/sync',
+    '/api/chart',
+    '/api/share',
+    '/api/account-link',
+    '/api/report-bad-push',
+)
+
+
 def log_request(response):
-    """after_request handler — logs one row per request, returns response unchanged."""
-    if request.path == '/api/health':
+    """after_request handler — only logs requests to known API routes."""
+    path = request.path
+    if not any(path.startswith(p) for p in _LOG_PREFIXES):
         return response
 
     _prune_old_logs()

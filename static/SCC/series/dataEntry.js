@@ -15,7 +15,7 @@ import { eventBus, EVENTS } from '../eventBus.js';
 import { snapToChartBoundary, formatDateInputValue, xPositionToDate, dateToXPosition, parseLocalDate, dateToTimestamp } from '../util/dates.js';
 import { relayout } from '../util/plotlyWrapper.js';
 import { getFirstConfig } from './traceStyles.js';
-import { getChartDiv } from '../util/dom.js';
+import { getChartDiv, escapeHtml } from '../util/dom.js';
 
 // Shape name for the entry date indicator line
 const ENTRY_DATE_INDICATOR_NAME = 'entry-date-indicator';
@@ -57,8 +57,8 @@ function generateMiscInputs() {
 
         const div = document.createElement('div');
         div.innerHTML = `
-            <label id="${miscId}-series-label" class="block text-sm font-semibold text-gray-600 mb-2 text-center" for="${miscId}">${label}</label>
-            <input type="text" inputmode="numeric" pattern="[0-9]*" id="${miscId}"
+            <label id="${escapeHtml(miscId)}-series-label" class="block text-sm font-semibold text-gray-600 mb-2 text-center" for="${escapeHtml(miscId)}">${escapeHtml(label)}</label>
+            <input type="text" inputmode="numeric" pattern="[0-9]*" id="${escapeHtml(miscId)}"
                    class="w-full px-3 py-3 text-lg border-2 border-gray-300 rounded focus:outline-none transition-colors text-center"
                    placeholder="">
         `;

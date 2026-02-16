@@ -7,6 +7,7 @@ import { initServerSync, isSyncEnabled, getUserPreferences, setUserPreference, g
 import { initSettingsModal, performBackupExport } from '/static/SCC/ui/settingsModal.js';
 import { createConfirmToast, createToast } from '/static/SCC/ui/toaster.js';
 import { initDonateModal } from '/static/SCC/ui/donateModal.js';
+import { escapeHtml } from '/static/SCC/util/dom.js';
 
 const titleEl = document.getElementById('explorer-title');
 
@@ -50,11 +51,7 @@ function parseCredits(credits) {
     return lines;
 }
 
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
+// escapeHtml imported from util/dom.js
 
 function createTagHtml(tag) {
     const escaped = escapeHtml(tag);
@@ -73,7 +70,7 @@ function createChartRow(chart) {
     row.innerHTML = `
         <td class="py-3 pl-2 pr-3">
             ${hasCredits ? `
-                <button class="expand-btn text-gray-400 hover:text-gray-600 p-1" data-id="${chart.id}">
+                <button class="expand-btn text-gray-400 hover:text-gray-600 p-1" data-id="${escapeHtml(chart.id)}">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
                     </svg>
@@ -81,14 +78,14 @@ function createChartRow(chart) {
             ` : '<span class="w-6 inline-block"></span>'}
         </td>
         <td class="py-3">
-            <a href="/chart/${chart.id}" class="chart-link text-gray-800 text-[15px] font-medium hover:underline">${escapeHtml(chart.chartName || 'Unnamed')}</a>
+            <a href="/chart/${escapeHtml(chart.id)}" class="chart-link text-gray-800 text-[15px] font-medium hover:underline">${escapeHtml(chart.chartName || 'Unnamed')}</a>
             <div class="text-xs text-gray-400 mt-0.5">Updated ${formatDate(chart.updatedAt)}</div>
         </td>
         <td class="py-3 text-gray-600 text-sm">${formatChartType(chart.chartType, chart.minuteChart)}</td>
         <td class="py-3">
             <div class="flex items-center gap-1 flex-wrap">
                 ${tags.map(t => createTagHtml(t)).join('')}
-                <button class="edit-tags-btn text-gray-400 hover:text-gray-600 p-1" data-id="${chart.id}">
+                <button class="edit-tags-btn text-gray-400 hover:text-gray-600 p-1" data-id="${escapeHtml(chart.id)}">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                     </svg>
@@ -105,7 +102,7 @@ function createChartRow(chart) {
                 : `<span class="text-gray-400 text-sm">-</span>`}
         </td>
         <td class="py-3 pr-2 text-right">
-            <button class="delete-btn text-gray-400 hover:text-red-500 p-1" data-id="${chart.id}" data-name="${escapeHtml(chart.chartName || 'Unnamed')}">
+            <button class="delete-btn text-gray-400 hover:text-red-500 p-1" data-id="${escapeHtml(chart.id)}" data-name="${escapeHtml(chart.chartName || 'Unnamed')}">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                 </svg>
@@ -547,7 +544,7 @@ function showShareError() {
 
     const banner = document.createElement('div');
     banner.className = 'fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-red-50 border border-red-300 text-red-800 px-5 py-3 rounded-lg shadow-md text-sm font-medium flex items-center gap-3';
-    banner.innerHTML = `<span>${msg}</span><button class="text-red-400 hover:text-red-600 text-lg leading-none">&times;</button>`;
+    banner.innerHTML = `<span>${escapeHtml(msg)}</span><button class="text-red-400 hover:text-red-600 text-lg leading-none">&times;</button>`;
     banner.querySelector('button').addEventListener('click', () => banner.remove());
     document.body.appendChild(banner);
     setTimeout(() => banner.remove(), 8000);

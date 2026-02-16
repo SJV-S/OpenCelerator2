@@ -20,6 +20,7 @@ class Chart(db.Model):
     data = db.Column(db.LargeBinary, nullable=False)  # Encrypted chart JSON
     last_modified = db.Column(db.Integer, nullable=False)  # Client timestamp (unencrypted metadata)
     signature = db.Column(db.LargeBinary, nullable=True)  # ECDSA signature of encrypted data
+    hmac = db.Column(db.LargeBinary, nullable=True)  # HMAC-SHA256 tag (chartKey-based authentication)
 
     # Relationships
     access_entries = db.relationship('ChartAccess', back_populates='chart', cascade='all, delete-orphan')
@@ -105,6 +106,17 @@ class SharingViolation(db.Model):
     user_id = db.Column(db.String(64), nullable=False)
     unique_ips = db.Column(db.Integer, nullable=False)
     timestamp = db.Column(db.Integer, nullable=False)
+
+
+class IPBan(db.Model):
+    """IP ban records for bad-push detection (tier 1 = user+IP, tier 2 = IP-wide)"""
+    __tablename__ = 'ip_bans'
+
+    ip_hash = db.Column(db.String(64), primary_key=True)
+    user_id = db.Column(db.String(64), primary_key=True)  # '*' for tier 2 IP-wide ban
+    strikes = db.Column(db.Integer, nullable=False, default=1)
+    banned_until = db.Column(db.Integer, nullable=True)  # Unix seconds, null = permanent
+    created_at = db.Column(db.Integer, nullable=False)
 
 
 class ChartTombstone(db.Model):

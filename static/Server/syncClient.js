@@ -3,7 +3,7 @@
  * Signs all pushes with ECDSA, verifies pulls based on chart ownership policy
  */
 
-import { generateChartKey, wrapKey, unwrapKey, deriveKey, sha256, sign, verify, importPublicKey, fromHex } from './crypto.js';
+import { generateChartKey, wrapKey, unwrapKey, deriveKey, sha256, sign, verify, hmac, verifyHmac, importPublicKey, fromHex } from './crypto.js';
 import { encryptCompressed as encrypt, decryptCompressed as decrypt } from './compress.js';
 import { getUserKey } from '../SCC/storage/passphrase.js';
 import { openDB } from '../lib/idb.js';
@@ -56,7 +56,7 @@ const _writeBackInProgress = new Set();
  * @param {object|null} localChart - The local IDB chart (null for first pull/join)
  * @returns {{ accepted: boolean, reason?: string }}
  */
-async function verifyPull(encryptedDataHex, signatureHex, chartData, localChart) {
+async function verifyPull(encryptedDataHex, signatureHex, hmacTag, chartData, localChart, chartKeyBytes = null) {
     if (!chartData.publicKey || !signatureHex) {
         return { accepted: false, reason: 'Missing publicKey or signature' };
     }
@@ -66,13 +66,25 @@ async function verifyPull(encryptedDataHex, signatureHex, chartData, localChart)
 
     if (chartData.publicKey === signingPublicKeyB64) {
         if (!await verify(encryptedDataHex, signatureHex, signingPublicKey)) {
-            // Collaborator signed with their key, not ours — allow if accepting edits
+            // Collaborator signed with their key, not ours — verify HMAC to prove chartKey possession
             if (!acceptingEdits) {
                 return { accepted: false, reason: 'Signature does not match owner key' };
             }
+            if (!hmacTag || !chartKeyBytes) {
+                return { accepted: false, reason: 'Edit push missing HMAC' };
+            }
+            if (!await verifyHmac(encryptedDataHex, hmacTag, chartKeyBytes)) {
+                return { accepted: false, reason: 'HMAC verification failed — pusher lacks chartKey' };
+            }
         }
     } else if (acceptingEdits) {
-        // Edit link: skip verification, accept any push
+        // Edit link: verify HMAC to prove pusher has the chartKey
+        if (!hmacTag || !chartKeyBytes) {
+            return { accepted: false, reason: 'Edit push missing HMAC' };
+        }
+        if (!await verifyHmac(encryptedDataHex, hmacTag, chartKeyBytes)) {
+            return { accepted: false, reason: 'HMAC verification failed — pusher lacks chartKey' };
+        }
     } else {
         const trustedKey = localChart?.publicKey;
         if (trustedKey) {
@@ -94,6 +106,17 @@ async function verifyPull(encryptedDataHex, signatureHex, chartData, localChart)
     }
 
     return { accepted: true };
+}
+
+/**
+ * Fire-and-forget report of a failed signature verification to the server.
+ * The server bans the offending uploader's IP+user_id pair.
+ */
+function reportBadPush(chartUuid, reason) {
+    api('/api/report-bad-push', {
+        method: 'POST',
+        body: { chart_uuid: chartUuid, user_id: userId, reason }
+    }).catch(() => {});
 }
 
 /**
@@ -119,6 +142,11 @@ async function writeBack(chartUuid) {
 async function signPayload(encryptedDataHex) {
     if (!signingPrivateKey) return null;
     return sign(encryptedDataHex, signingPrivateKey);
+}
+
+async function hmacPayload(encryptedDataB64, chartKeyBytes) {
+    if (!chartKeyBytes) return null;
+    return hmac(encryptedDataB64, chartKeyBytes);
 }
 
 /**
@@ -160,15 +188,17 @@ async function processDownloads(items) {
     const accepted = [];
     for (const item of items) {
         const chartKey = await unwrapKey(item.wrapped_key, userKey);
+        const chartKeyBytes = new Uint8Array(await crypto.subtle.exportKey('raw', chartKey));
         const data = await decrypt(chartKey, item.data);
 
         const localChart = await getChartFromIndexedDB(item.chart_uuid);
-        const verification = await verifyPull(item.data, item.signature, data, localChart);
+        const verification = await verifyPull(item.data, item.signature, item.hmac || null, data, localChart, chartKeyBytes);
 
         if (verification.accepted) {
             accepted.push({ id: item.chart_uuid, data, updatedAt: item.updated_at });
         } else {
             console.warn(`[Sync] Rejected pull for ${item.chart_uuid}: ${verification.reason}`);
+            reportBadPush(item.chart_uuid, verification.reason);
             if (localChart) writeBack(item.chart_uuid);
         }
     }
@@ -185,17 +215,19 @@ export async function uploadCharts(localCharts) {
     const now = Math.floor(Date.now() / 1000);
     const uploads = [];
     for (const chart of localCharts) {
-        let chartKey;
+        let chartKey, chartKeyBytes;
         if (chart.chartKeyHex) {
-            const keyBytes = fromHex(chart.chartKeyHex);
-            chartKey = await crypto.subtle.importKey('raw', keyBytes, { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+            chartKeyBytes = fromHex(chart.chartKeyHex);
+            chartKey = await crypto.subtle.importKey('raw', chartKeyBytes, { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
         } else {
             chartKey = await generateChartKey();
+            chartKeyBytes = new Uint8Array(await crypto.subtle.exportKey('raw', chartKey));
         }
         stampOwnerFields(chart.data);
         stampCollaborator(chart.data);
         const encryptedData = await encrypt(chartKey, chart.data);
         const signature = await signPayload(encryptedData);
+        const hmacTag = await hmacPayload(encryptedData, chartKeyBytes);
         const wrappedKey = await wrapKey(chartKey, userKey);
 
         uploads.push({
@@ -203,7 +235,8 @@ export async function uploadCharts(localCharts) {
             data: encryptedData,
             updated_at: now,
             wrapped_key: wrappedKey,
-            signature
+            signature,
+            hmac: hmacTag
         });
     }
 
@@ -255,17 +288,19 @@ export async function sync(localCharts) {
 
     const uploads = [];
     for (const chart of localCharts) {
-        let chartKey;
+        let chartKey, chartKeyBytes;
         if (chart.chartKeyHex) {
-            const keyBytes = fromHex(chart.chartKeyHex);
-            chartKey = await crypto.subtle.importKey('raw', keyBytes, { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+            chartKeyBytes = fromHex(chart.chartKeyHex);
+            chartKey = await crypto.subtle.importKey('raw', chartKeyBytes, { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
         } else {
             chartKey = await generateChartKey();
+            chartKeyBytes = new Uint8Array(await crypto.subtle.exportKey('raw', chartKey));
         }
         stampOwnerFields(chart.data);
         stampCollaborator(chart.data);
         const encryptedData = await encrypt(chartKey, chart.data);
         const signature = await signPayload(encryptedData);
+        const hmacTag = await hmacPayload(encryptedData, chartKeyBytes);
         const wrappedKey = await wrapKey(chartKey, userKey);
 
         uploads.push({
@@ -273,7 +308,8 @@ export async function sync(localCharts) {
             data: encryptedData,
             updated_at: chart.updatedAt,
             wrapped_key: wrappedKey,
-            signature
+            signature,
+            hmac: hmacTag
         });
     }
 
@@ -309,6 +345,7 @@ export async function pushChart(chartUuid) {
 
     const encryptedData = await encrypt(chartKey, chart);
     const signature = await signPayload(encryptedData);
+    const hmacTag = await hmacPayload(encryptedData, chartKeyBytes);
     const wrappedKey = await wrapKey(chartKey, userKey);
 
     const response = await api('/api/sync', {
@@ -322,7 +359,8 @@ export async function pushChart(chartUuid) {
                 data: encryptedData,
                 updated_at: chart.lastModified || Math.floor(Date.now() / 1000),
                 wrapped_key: wrappedKey,
-                signature
+                signature,
+                hmac: hmacTag
             }]
         }
     });
@@ -347,6 +385,7 @@ export async function pushCharts(chartUuids) {
         stampCollaborator(chart);
         const encryptedData = await encrypt(chartKey, chart);
         const signature = await signPayload(encryptedData);
+        const hmacTag = await hmacPayload(encryptedData, chartKeyBytes);
         const wrappedKey = await wrapKey(chartKey, userKey);
 
         uploads.push({
@@ -354,7 +393,8 @@ export async function pushCharts(chartUuids) {
             data: encryptedData,
             updated_at: chart.lastModified || Math.floor(Date.now() / 1000),
             wrapped_key: wrappedKey,
-            signature
+            signature,
+            hmac: hmacTag
         });
     }
 
@@ -400,6 +440,7 @@ async function _createShareLink(chartUuid, acceptingEdits) {
     // Encrypt chart and wrap key for both user and share recipient
     const encryptedData = await encrypt(chartKey, chart);
     const signature = await signPayload(encryptedData);
+    const hmacTag = await hmacPayload(encryptedData, chartKeyBytes);
     const wrappedKeyForUser = await wrapKey(chartKey, userKey);
     const wrappedKeyForShare = await wrapKey(chartKey, shareKey);
 
@@ -413,7 +454,8 @@ async function _createShareLink(chartUuid, acceptingEdits) {
             wrapped_key: wrappedKeyForUser,
             wrapped_key_for_share: wrappedKeyForShare,
             last_modified: chart.lastModified || Math.floor(Date.now() / 1000),
-            signature
+            signature,
+            hmac: hmacTag
         }
     });
     if (!response.ok) throw new Error(`Failed to create share link: ${response.status}`);
@@ -455,18 +497,20 @@ export async function joinSharedChart(chartUuid, shareSecret) {
         const body = await response.json().catch(() => ({}));
         throw new Error(body.error || `Failed to fetch shared chart: ${response.status}`);
     }
-    const { data, wrapped_key, updated_at, signature: signatureHex } = await response.json();
+    const { data, wrapped_key, updated_at, signature: signatureHex, hmac: hmacTag } = await response.json();
 
     const shareKey = await deriveKey(shareSecret, chartUuid);
     const chartKey = await unwrapKey(wrapped_key, shareKey);
-    const chartKeyHex = Array.from(new Uint8Array(await crypto.subtle.exportKey('raw', chartKey)))
+    const chartKeyRaw = new Uint8Array(await crypto.subtle.exportKey('raw', chartKey));
+    const chartKeyHex = Array.from(chartKeyRaw)
         .map(b => b.toString(16).padStart(2, '0')).join('');
 
     const chartData = await decrypt(chartKey, data);
 
     // First join — no local chart for timestamp check
-    const verification = await verifyPull(data, signatureHex, chartData, null);
+    const verification = await verifyPull(data, signatureHex, hmacTag || null, chartData, null, chartKeyRaw);
     if (!verification.accepted) {
+        reportBadPush(chartUuid, verification.reason);
         throw new Error(`Join rejected: ${verification.reason}`);
     }
 
@@ -505,15 +549,16 @@ export async function syncChart(chartId, updatedAt = null) {
 
         const response = await api(`/api/chart/${chartId}/shared`);
         if (!response.ok) return false;
-        const { data, signature: signatureHex } = await response.json();
+        const { data, signature: signatureHex, hmac: hmacTag } = await response.json();
 
         const chartKeyBytes = fromHex(chart.chartKey);
         const chartKey = await crypto.subtle.importKey('raw', chartKeyBytes, { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
         const chartData = await decrypt(chartKey, data);
 
-        const verification = await verifyPull(data, signatureHex, chartData, chart);
+        const verification = await verifyPull(data, signatureHex, hmacTag || null, chartData, chart, chartKeyBytes);
         if (!verification.accepted) {
             console.warn(`[Sync] Rejected sync for ${chartId}: ${verification.reason}`);
+            reportBadPush(chartId, verification.reason);
             writeBack(chartId);
             return false;
         }

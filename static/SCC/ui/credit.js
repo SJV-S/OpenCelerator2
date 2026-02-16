@@ -5,7 +5,7 @@ import { chartState } from '../chartState.js';
 import { isMobile, COLORS, FONTS, RESIZE, CHART_TYPE_CONFIG } from '../config.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 import { relayout } from '../util/plotlyWrapper.js';
-import { getChartDiv } from '../util/dom.js';
+import { getChartDiv, escapeHtml } from '../util/dom.js';
 
 const CREDIT_COLOR = COLORS.FAN; // Using same color as fan
 const MAX_CREDIT_LENGTH = 160;
@@ -160,11 +160,11 @@ function openCreditEditDialog() {
                 <input type="text" id="credit-input-0"
                        class="w-full p-1.5 text-xs border border-gray-300 rounded font-mono"
                        maxlength="${MAX_CREDIT_LENGTH}"
-                       value="${line0.replace(/"/g, '&quot;')}">
+                       value="${escapeHtml(line0)}">
                 <input type="text" id="credit-input-1"
                        class="w-full p-1.5 text-xs border border-gray-300 rounded font-mono"
                        maxlength="${MAX_CREDIT_LENGTH}"
-                       value="${line1.replace(/"/g, '&quot;')}">
+                       value="${escapeHtml(line1)}">
             </div>
             <div class="flex gap-3 mt-4 justify-end">
                 <button id="credit-edit-cancel"
