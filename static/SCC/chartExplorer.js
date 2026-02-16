@@ -98,7 +98,16 @@ function createChartRow(chart) {
                     chart.isOwner
                         ? `<span class="inline-block w-5 h-5 text-green-600" title="You own this chart">${icons.ownerSharing(20)}</span>`
                         : ''
-                  }<span class="inline-block w-5 h-5 ${chart.acceptingEdits ? 'text-blue-500' : 'text-gray-500'}" title="${chart.acceptingEdits ? 'Edit access' : 'View only'}">${chart.acceptingEdits ? icons.sharedEdit(20) : icons.viewOnly(20)}</span></span>`
+                  }<span class="inline-block w-5 h-5 ${chart.acceptingEdits ? 'text-blue-500' : 'text-gray-500'}" title="${(() => {
+                      if (!chart.acceptingEdits) return 'View only';
+                      const lines = ['Edit access'];
+                      if (!chart.isOwner && chart.ownerName) lines.push('Owner: ' + chart.ownerName);
+                      if (chart.collaborators.length) {
+                          lines.push('Collaborators:');
+                          chart.collaborators.forEach(c => lines.push('  ' + (c.displayName || '(unnamed)')));
+                      }
+                      return lines.join('\n');
+                  })()}">${chart.acceptingEdits ? icons.sharedEdit(20) : icons.viewOnly(20)}</span></span>`
                 : `<span class="text-gray-400 text-sm">-</span>`}
         </td>
         <td class="py-3 pr-2 text-right">

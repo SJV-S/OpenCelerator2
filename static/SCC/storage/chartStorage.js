@@ -208,7 +208,9 @@ export async function listCharts() {
             tags: chart.tags || [],
             shared: chart.shared || false,
             acceptingEdits: chart.acceptingEdits || false,
-            isOwner: !!(chart.shared && myKey && chart.publicKey === myKey)
+            isOwner: !!(chart.shared && myKey && chart.publicKey === myKey),
+            collaborators: chart.collaborators || [],
+            ownerName: chart.ownerName || ''
         })).sort((a, b) => b.updatedAt - a.updatedAt);
     } catch (error) {
         console.error('[Storage] List failed:', error);
