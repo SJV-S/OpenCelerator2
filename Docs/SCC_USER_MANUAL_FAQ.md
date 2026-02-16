@@ -59,9 +59,24 @@ The Standard Change Chart (SCC) is a web application for tracking and visualizin
 
 It can be used for behavioral tracking, education, business metrics, or any scenario where you want to measure change over time.
 
-The app works in any modern web browser (Chrome, Firefox, Safari, Edge) on desktops, laptops, tablets, and phones. It can also be installed as a standalone app on your device, which means it works offline and appears as its own icon on your home screen or app drawer.
+The app works in any modern web browser (Chrome, Firefox, Safari, Edge) on desktops, laptops, tablets, and phones. It can also be installed as a standalone app on your device (see [Installing as an App](#installing-as-an-app) below), which means it works offline and appears as its own icon on your home screen or app drawer.
 
 All data is stored locally in your browser by default. Nothing is sent to any server unless you explicitly turn on syncing or sharing.
+
+### Installing as an App
+
+SCC is a Progressive Web App (PWA). When your browser detects it can be installed, an **"Install App"** button appears in the top-right corner of the Chart Explorer.
+
+1. Click **"Install App"**.
+2. Your browser shows its native install prompt — confirm to install.
+3. The app appears as a standalone icon on your home screen, taskbar, or app drawer.
+
+Once installed, the app:
+- Opens in its own window without a browser address bar.
+- Works offline — all pages and assets are cached locally by a service worker.
+- Auto-updates in the background when connected to the internet.
+
+**Supported platforms**: Chrome and Edge on desktop and Android; Safari on iOS 16.4+. The install button only appears when the browser supports PWA installation and the app has not already been installed.
 
 ---
 
@@ -95,7 +110,12 @@ The Chart Explorer is the home page. It shows all your saved charts in a table.
 ### What you see
 - A **search bar** at the top to find charts.
 - A **table** listing all charts, with columns: Name, Type (Daily/Weekly/Monthly/Yearly), Tags, Shared.
-- **Buttons in the top-right corner**: Paste Link (app version only), Install App (when available), Donate, Settings (gear icon), and **New Chart** (teal button).
+- **Buttons in the top-right corner**:
+  - **Paste Link** — Only visible when running as an installed app (no address bar). Opens a dialog where you can paste a share link or sync link to navigate to it. In a regular browser tab, you would paste the link directly in the address bar instead.
+  - **Install App** — Appears when your browser supports installing the app (see Section 1). Hidden if already installed.
+  - **Donate** — Opens a donation dialog with PayPal and Bitcoin (base chain and Lightning) options.
+  - **Settings** (gear icon) — Opens the settings modal.
+  - **New Chart** (teal button) — Create a new chart.
 
 ### Searching and filtering
 - Type in the search bar to search. Choose the search mode using the radio buttons next to it:
@@ -132,6 +152,7 @@ Opens a modal with:
    - **Weekly** — each position = one week (Monday to Sunday)
    - **Monthly** — each position = one calendar month
    - **Yearly** — each position = one year
+   - **Frequency Collections** — (Coming Soon) visible in the interface but currently disabled
 5. Your chart opens immediately.
 
 Alternatively, click **"Import Chart"** at the bottom to upload an existing chart file (.json) exported from SCC or OpenCelerator.
@@ -148,9 +169,10 @@ When you open a chart, you see:
   - **Red X marks** = Errors
   - **Purple dashes** = Timing frequency (minute charts only)
 - **Grid lines** — horizontal and vertical reference lines.
-- **Credit information** — text labels below the chart (if filled in).
+- **Credit information** — text labels below the chart (if filled in). On mobile, credits appear in the Credit tab instead.
+- A **pan slider** — a horizontal range slider above the chart for scrolling through data that extends beyond the visible window. It is transparent by default and becomes visible when you hover over it. Drag the slider thumb left or right to pan through your data.
 - A **return button** in the bottom-right corner to go back to the Chart Explorer.
-- A **menu hint** (up/down arrows) near the bottom — click or press spacebar to open the menu.
+- A **menu hint** near the bottom center of the screen — a white arrow icon (pointing up when the menu is closed, down when open) with a text box below it. On desktop it reads "Press spacebar for menu"; on mobile it reads "Swipe up for menu." The hint fades away after a few seconds.
 
 ### Why logarithmic?
 A logarithmic scale shows proportional changes clearly. A change from 1 to 2 (doubling) looks the same size as a change from 50 to 100 (also doubling). This makes it easy to spot consistent rates of improvement or decline.
@@ -159,7 +181,7 @@ A logarithmic scale shows proportional changes clearly. A change from 1 to 2 (do
 On a minute chart: frequency = count ÷ timing in minutes. If someone completed 30 items in 5 minutes, the frequency is 6 per minute. On a count chart, the raw count is plotted directly.
 
 ### What is the "chart window"?
-The chart window controls how many time periods are visible at once. If your data spans more time than the window shows, you can scroll left/right using the pan slider that appears when you hover near the bottom of the chart.
+The chart window controls how many time periods are visible at once. Default values vary by chart type: Daily = 7, Weekly = 5, Monthly = 6, Yearly = 5. If your data spans more time than the window shows, you can scroll left/right using the pan slider above the chart.
 
 ---
 
@@ -177,11 +199,17 @@ The menu is a panel with 7 tabs that gives you access to all chart features.
 - **Swipe down** on a touch device
 - Click outside the menu
 
+### Desktop vs. mobile layout
+- **Desktop** (screen width ≥ 1024px): The menu is a fixed sidebar on the left side of the screen (280–400px wide). It is always visible when open, and the chart area shifts right to make room. The Credit tab is hidden on desktop because credit fields are shown directly below the chart.
+- **Mobile** (screen width < 1024px): The menu is a full-screen overlay that slides up from the bottom. All 7 tabs are available, including the Credit tab (which is the only place to view credits on mobile since they don't fit below the chart). Tabs are displayed as text-labeled buttons along the top of the menu.
+
 ### The 7 tabs
+Tabs are labeled with plain text (no icons or numbers on the tab buttons themselves).
+
 | Tab | What it does |
 |-----|-------------|
 | **Data** | Enter new data points, or view/edit/delete previous entries |
-| **Credit** | View and edit the chart's credit labels (supervisor, performer, organization, etc.) |
+| **Credit** | View and edit the chart's credit labels (supervisor, performer, organization, etc.). Hidden on desktop where credits appear below the chart. |
 | **Lines** | Access the four line drawing tools and their edit mode toggles |
 | **Series** | Add/remove extra data tracks, customize how each series looks |
 | **Settings** | Change chart name, type, window size, height, grid, and display options |
@@ -202,11 +230,16 @@ The menu is a panel with 7 tabs that gives you access to all chart features.
 
 The data point appears on the chart immediately and the menu closes.
 
+### Validation
+- All numeric input fields only accept digits (0–9). Non-numeric characters are silently stripped.
+- On minute charts, at least one timing field (Hours, Minutes, or Seconds) must have a value. If all three are empty when you click Submit, the "Timing" label turns **red** and submission is blocked. Fill in a timing value and the label returns to normal.
+- On count charts, timing fields are not shown and no timing validation occurs.
+
 ### Tips
 - **Click on the chart to set the date**: When the Data tab is open, clicking a spot on the chart auto-fills the date field to that position's date.
 - **Order doesn't matter**: You can enter data for any date in any order. The app sorts everything chronologically.
 - **Date snapping**: On weekly charts, dates snap to Monday. On monthly charts, to the 1st. On yearly charts, to January 1st. Daily charts accept any date.
-- **Duplicate dates**: If you add data to a date that already has data, both entries are kept. If too many points land on one position, the app automatically switches to showing the median and notifies you.
+- **Duplicate dates**: If you add data to a date that already has data, both entries are kept. If more than 10 points land on one position, the app automatically switches to showing the median and notifies you.
 
 ---
 
@@ -258,6 +291,8 @@ When multiple data points fall on the same chart position, they need to be combi
 2. Under **"Per-Position (on X)"**, select a method from the dropdown: Raw (default), Median, Mean, Min, Max, First, Last, or Sum.
 3. Click **Add**.
 
+**What "Raw" means**: Every data point is plotted individually at its position, even if multiple points share the same position. If any single position accumulates more than 10 data points, the app automatically switches that series to median aggregation to prevent visual clutter.
+
 **Rolling window** (smoothing across positions):
 1. Under **"Rolling Window (across X)"**, select a method.
 2. Set the **window size** (e.g., 7 for a 7-period moving average).
@@ -290,13 +325,15 @@ Event markers are vertical lines with a horizontal arm and a text label. They ma
 2. In the **"Event Markers"** section at the top, click one of two buttons:
    - **Top icon** — the line drops down from the top of the chart
    - **Bottom icon** — the line rises up from the bottom of the chart
-3. The menu closes and your cursor changes to a special icon.
-4. **Click on the chart** where you want the vertical line placed.
-5. **Click again to the right** to set where the horizontal arm ends.
-6. A text box appears — type a label (e.g., "New program", "Week 3 change").
-7. Confirm to place the line.
+3. The menu closes and your cursor changes to a crosshair.
+4. **Click on the chart** where you want the vertical line placed. A temporary purple vertical line appears.
+5. **Click again to the right** to set where the horizontal arm ends. A temporary purple horizontal line appears.
+6. A **text input dialog** slides in from the top-right corner of the screen. It has the heading "Enter Event Marker Text", a text field (max 50 characters), and **Submit** / **Cancel** buttons. Type a label (e.g., "New program", "Week 3 change"). Press **Enter** or click **Submit** to continue. Press **Escape** or click **Cancel** to discard the line and exit drawing mode.
+7. A confirmation prompt appears asking **"Save line?"** with **Yes** and **No** buttons. Click **Yes** to finalize the line, or **No** to discard it.
 
 The event marker now appears with a vertical line, horizontal arm, and your label at the end.
+
+On touch devices, tap instead of click — all line drawing modes fully support touch input.
 
 ---
 
@@ -312,8 +349,8 @@ Count markers are lines that mark target levels or goals. They can be flat (hori
 3. The menu closes and your cursor changes.
 4. **Click on the chart** for the first point.
 5. **Click again** for the second point. For horizontal lines, the second click only sets where the line ends — the height stays the same as your first click.
-6. A text box appears — type a label (e.g., "Goal: 50/min").
-7. Confirm to place the line.
+6. A **text input dialog** slides in from the top-right corner with the heading "Enter Event Marker Text", a text field (max 50 characters), and **Submit** / **Cancel** buttons. Type a label (e.g., "Goal: 50/min"). Press **Enter** or click **Submit** to continue. Press **Escape** or click **Cancel** to discard the line.
+7. A confirmation prompt appears asking **"Save line?"** with **Yes** and **No** buttons. Click **Yes** to finalize the line, or **No** to discard it.
 
 ---
 
@@ -325,8 +362,9 @@ Cut lines are vertical dividers that split your data into segments. Use them to 
 1. Open the menu → **Lines** tab.
 2. In the **"Cut Series Line"** section, click the **scissors icon** button.
 3. The menu closes. A vertical guide line follows your cursor across the chart.
-4. **Click** where you want to place the cut.
-5. **Click again** anywhere to deactivate cut-line mode, or press Escape.
+4. **Click** where you want to place the cut. The cut is placed and drawing mode deactivates automatically.
+
+To place multiple cuts, repeat the process — each activation places one cut. On touch devices, touch and drag to position the guide line, then release to place the cut.
 
 ---
 
@@ -334,19 +372,24 @@ Cut lines are vertical dividers that split your data into segments. Use them to 
 
 Change lines are trend lines fitted to your data. They show the rate of change over a selected time range — whether things are getting better, getting worse, or staying the same.
 
+### Configuring change line settings (before drawing)
+Change line settings — fit method, bounce envelope, and forecast — are **global settings** that apply to all new change lines, not per-line options. Configure them before drawing:
+
+1. Open the menu → **Lines** tab.
+2. Click the **gear icon** next to the **"Add Change Line"** section heading.
+3. A **"Change Line Settings"** modal appears with three controls:
+   - **Fit Method** — a dropdown with 6 options (see below)
+   - **Bounce Envelope** — a dropdown with 5 options (see below)
+   - **Forecast** — a number input (0–100) with a unit label matching your chart type (e.g., "days", "weeks")
+4. Changes apply immediately when you select them — there is no Save button. Click **Close** when done.
+
 ### How to draw one
 1. Open the menu → **Lines** tab.
 2. In the **"Add Change Line"** section, click the **line icon** button.
 3. The menu closes. A notification appears with buttons for each data series (Corrects, Errors, Timing, and any misc series you've added).
 4. **Click the series** you want to analyze.
 5. Your cursor changes. **Click and drag** across a range on the chart. A shaded area highlights your selection.
-6. The app automatically calculates a trend line and shows it.
-7. A dialog appears where you can adjust:
-   - **Fit method** — how the line is calculated (see below)
-   - **Bounce envelopes** — variability bands around the line (see below)
-   - **Forecast** — extend the line beyond your data to project where the trend is heading
-   - **Label** — the text shown on the line (defaults to the celeration value)
-8. Confirm to place the line.
+6. The app automatically calculates and places a trend line using the current global settings (fit method, bounce envelope, and forecast configured via the gear icon).
 
 ### Fit methods
 Six methods for calculating the trend:
@@ -391,7 +434,7 @@ You cannot click on a line to edit it by default. Editing must be explicitly tur
 5. Now **click on the line** on the chart.
 6. An edit dialog appears where you can change the line's color, width, style, text, or remove it.
 
-**Important**: All edit mode toggles turn OFF automatically every time you open the menu. You must re-enable them each time you want to edit a line.
+**Important**: All edit mode toggles turn OFF automatically every time you open the menu. This is intentional — the menu overlay covers the chart and blocks interaction with lines, so leaving edit mode on would be confusing. You must re-enable the toggle each time you want to edit a line.
 
 ---
 
@@ -409,7 +452,7 @@ You can set default styles for new event markers and count markers so every new 
    - **Font size** — label text size
 4. Changes are saved to your profile and apply to all future lines across all charts. Existing lines are not affected.
 
-The change line section also has its own gear icon for setting change line defaults (trend line color, width, dash, and bounce line styles).
+The change line section also has a gear icon, but it opens a different modal — the **Change Line Settings** for fit method, bounce envelope, and forecast (see Section 14).
 
 ---
 
@@ -424,13 +467,25 @@ Type a new name in the **"Chart Name"** field at the top. Saved automatically.
 Use the **"Chart Type"** dropdown to switch between Daily, Weekly, Monthly, or Yearly. The page reloads to apply the change.
 
 ### Chart Window
-Controls how many time positions are visible at once. Use the **left/right arrow buttons** next to the window number to decrease/increase. If your data extends beyond the visible window, scroll using the pan slider at the bottom of the chart.
+Controls how many time positions are visible at once. The label shows the unit for your chart type (e.g., "Chart Window in Days"). Use the **left/right arrow buttons** next to the window number to decrease/increase. Each click adjusts by one snap increment (14 for Daily, 5 for Weekly, etc.).
+
+- **Defaults**: Daily = 7, Weekly = 5, Monthly = 6, Yearly = 5
+- **Minimum**: Daily = 28, Weekly = 10, Monthly = 24, Yearly = 20
+- **Maximum**: The chart's full capacity (Daily = 280, Weekly = 200, Monthly = 240, Yearly = 200)
+
+If your data extends beyond the visible window, scroll using the pan slider above the chart.
 
 ### Start Date
-Click **"Start Date"** to change where the chart begins on the timeline.
+Click **"Start Date"** to open a modal dialog where you can set when the chart timeline begins. The modal shows spinbox controls (left/right arrow buttons around a value) — which spinboxes appear depends on chart type:
+- **Daily**: Monday (week number 1–5), Month (1–12), Year
+- **Weekly**: Month (1–12), Year
+- **Monthly**: Year
+- **Yearly**: Decade
+
+Year and Decade fields accept direct text input. Click **Save** to apply or **Cancel** to discard. Changing the start date does not delete any data — it only shifts what's visible.
 
 ### Chart Height
-Use the **minus/plus buttons** next to "Chart Height in Pixels" to make the chart shorter or taller.
+Use the **minus/plus buttons** next to "Chart Height in Pixels" to make the chart shorter or taller. Each click adjusts by 30 pixels. Minimum height is 600 pixels; maximum is your screen height.
 
 ### Grid
 Three toggles:
@@ -442,13 +497,23 @@ Three toggles:
 Toggle to show/hide the celeration fan (a visual reference overlay). Desktop only — hidden on mobile.
 
 ### Place Zeros Below Floor
-When ON (default), zero values appear as visible dots just below the bottom of the chart. When OFF, zeros are invisible.
+When ON (default), zero values (and values below the floor threshold on minute charts) are plotted as visible markers just below the bottom gridline of the chart, using the same marker style as the series they belong to (green dots for Corrects, red X marks for Errors, etc.) but without connecting lines. When OFF, these values are invisible.
 
 ### Legend
 Toggle to show/hide the legend box on the chart. When the legend is visible, a **"Legend Position"** dropdown lets you place it in any corner: Top Right (default), Top Left, Bottom Right, Bottom Left.
 
 ### Reset to Defaults
-Button at the bottom that resets all settings to their original values.
+Button at the bottom that resets visual and layout settings. A confirmation prompt asks **"Reset all visual settings to defaults?"** with **Reset** / **Cancel** buttons.
+
+What gets reset:
+- **Chart window** → half of the chart's capacity
+- **Chart height** → clears any custom height, reverts to the default flex layout
+- **Grid toggles** → all OFF (date lines, count lines, minor grid)
+- **Celeration fan** → ON
+- **Place zeros below floor** → ON
+- **Legend** → ON, positioned at Top Right
+
+What is **not** reset: chart name, start date, data, drawn lines, and series configuration.
 
 ---
 
@@ -470,13 +535,18 @@ The legend is a small box on the chart showing which colors and symbols correspo
 
 - **Show/hide**: Menu → Settings tab → **Legend** toggle.
 - **Position**: When the legend is on, use the **Legend Position** dropdown (same Settings tab) to choose a corner.
-- **Toggle individual series**: Hover over the legend on the chart to reveal show/hide controls for each series.
+- **Toggle individual series**: **Click a series name** in the legend to hide or show it. Hidden series appear grayed out in the legend and their data points disappear from the chart. Click again to restore. The legend also has a collapsible section for toggling line categories (count markers, event markers, change lines, grid).
 
 ---
 
 ## 20. THE CELERATION FAN
 
-The celeration fan is a visual reference overlay — a fan-shaped set of lines radiating from a single point, each representing a different rate of change. Compare your data trend to the fan lines to quickly estimate the rate of acceleration or deceleration.
+The celeration fan is a visual reference overlay — a fan-shaped set of 9 lines radiating from a single point, each representing a different rate of change. Compare your data's change line to the fan lines to estimate the rate of acceleration or deceleration.
+
+The 9 fan lines represent these celeration values:
+**×16, ×4, ×2, ×1.4, ×1, ÷1.4, ÷2, ÷4, ÷16**
+
+The ×1 line is horizontal (no change). Lines above ×1 show acceleration (values increasing); lines below show deceleration (values decreasing). The rate label (e.g., "per week", "per month") depends on your chart type.
 
 - **Show/hide**: Menu → Settings tab → **Celeration Fan** toggle.
 - **Move it**: When visible, drag the fan to reposition it on the chart.
@@ -490,7 +560,11 @@ The celeration fan is a visual reference overlay — a fan-shaped set of lines r
 The crosshair is a data inspection tool that shows detailed values at any position on the chart.
 
 - **Activate**: Hold **Shift** and move your mouse over the chart.
-- **What you see**: Gray dashed crosshair lines follow your cursor. Colored markers appear on data points at the current position. An info panel shows the exact date, the cursor's Y-value, and all series values at that position.
+- **What you see**: Gray dashed crosshair lines follow your cursor on a canvas overlay. Colored markers appear on data points at the current X position.
+- **Info panel**: The crosshair replaces the menu sidebar (on desktop) or opens a panel with three sections:
+  - **Date**: Day name and number, month name and number, year
+  - **Cursor**: The X position (integer) and Y value at the cursor
+  - **Series**: Each visible series' value at that X position, with the series name and aggregation info (if aggregation is active). If change lines cross the cursor's X position, their fit method label, trend Y value, and bounce envelope values are shown below their matching series.
 
 ---
 
@@ -521,7 +595,7 @@ Shared charts update in real time. When anyone makes a change, all other viewers
 In the Share tab, scroll to the bottom. If the chart is shared, a **"Stop sharing chart"** button appears in red. Click it to disable all share links.
 
 ### Simultaneous editing
-Multiple people can edit via edit links. If two people save changes at the exact same moment, the last save wins — there is no merge. In practice this rarely matters.
+Multiple people can edit via edit links. If two people save changes at the exact same moment, the last save wins — there is no merge. When a remote update arrives, the other editor's chart reloads and replots automatically with the new data. There is no conflict warning — any unsaved local changes are silently replaced by the incoming version. In practice this rarely matters because saves happen frequently (every ~1 second).
 
 ---
 
@@ -598,7 +672,7 @@ SCC can also import chart files from OpenCelerator. The format is auto-detected.
 2. Turn on **"Sync Across Devices"**.
 3. Expand the **"Sync Device"** section by clicking it.
 4. Click **"Generate sync link"**.
-5. A **QR code** and **URL** appear. The link is one-time-use and expires within 24 hours.
+5. A **QR code** and **URL** appear, along with a **countdown timer** (MM:SS format). The link is one-time-use and expires after **15 minutes**. When the timer reaches zero, the link becomes invalid and the UI resets so you can generate a new one.
 6. On your **new device**, either:
    - Scan the QR code, or
    - On the welcome screen, choose "Import existing user" → "Paste Sync Link" → paste the URL → click "Import from link"
@@ -625,6 +699,8 @@ Syncing is free.
 2. Expand the **"Backup"** section.
 3. Click **"Download backup"**.
 4. A file is downloaded containing all your charts and identity. Store it somewhere safe.
+
+The filename follows the pattern: `YourName-scc-full-backup-YYYY-MM-DD.json` (or `scc-full-backup-YYYY-MM-DD.json` if no display name is set). Spaces in names are replaced with hyphens.
 
 ### Restoring from a backup
 Two options:
@@ -654,7 +730,7 @@ SCC does not use traditional accounts with emails and passwords. Instead:
 Chart Explorer → Settings gear → type a new name in the **"Username"** field.
 
 ### If you clear your browser data
-You will lose your identity and all charts. Restore from a backup file or by using a sync link from another device.
+You will lose your identity and all charts. The app detects the missing identity and automatically redirects you to the welcome screen (the same screen you saw on first launch), where you can either create a new user or import an existing one. Restore from a backup file or by using a sync link from another device.
 
 ### Multiple devices
 Set up device sync (see section 27). Both devices then share the same identity and keep charts in sync.
@@ -678,12 +754,14 @@ Set up device sync (see section 27). Both devices then share the same identity a
 | **Swipe Up** | Open the menu |
 | **Swipe Down** | Close the menu |
 | **Drag on chart** | Pan/scroll horizontally |
+| **Tap on chart** | Place a point when drawing event markers, count markers, or cut lines (same as clicking) |
+| **Touch and drag** | Select a range when drawing change lines (same as click-and-drag) |
 
 ---
 
 ## 31. AUTO-SAVE
 
-The app saves your work automatically. Every time you enter data, draw a line, or change a setting, the chart is saved to your browser's storage after a brief delay (about 1 second). There is no "Save" button — it's always automatic.
+The app saves your work automatically. Every time you enter data, draw a line, or change a setting, the chart is saved to your browser's storage after a brief delay (about 1 second). There is no "Save" button and no visual save indicator — saving happens silently in the background.
 
 If sync is enabled, the chart is also pushed to the server after each save.
 
@@ -692,7 +770,7 @@ If sync is enabled, the chart is also pushed to the server after each save.
 ## 32. TROUBLESHOOTING
 
 ### My chart looks empty even though I entered data
-- **Scroll to your data**: Your data might be outside the visible window. Use the pan slider at the bottom of the chart, or increase the chart window size in **Menu → Settings → Chart Window**.
+- **Scroll to your data**: Your data might be outside the visible window. Use the pan slider above the chart (hover to reveal it), or increase the chart window size in **Menu → Settings → Chart Window**.
 - **Check the start date**: In **Menu → Settings → Start Date**, make sure it's set before your earliest data.
 - **Check zero handling**: If all values are zero and "Place Zeros Below Floor" is off (**Menu → Settings**), they'll be invisible. Turn it on.
 - **Check series visibility**: Hover over the legend and make sure your series aren't hidden.
@@ -707,7 +785,7 @@ Check that you mapped the correct column to "Date" during the column mapping ste
 The fan is desktop-only — it's hidden on phones and small screens. Make sure the toggle is on: **Menu → Settings → Celeration Fan**.
 
 ### A shared chart isn't updating
-Real-time sync needs an active internet connection. If the connection drops, the app falls back to checking periodically. Reloading the page re-establishes the connection.
+Real-time sync needs an active internet connection. The app maintains a live connection that automatically reconnects with increasing delays (starting at 1 second, up to 30 seconds) if it drops. On reconnect, it catches up on any missed changes. If updates still aren't coming through, reloading the page forces a fresh connection and a pull from the server.
 
 ### I accidentally deleted something
 There is no undo feature. Deletions of data points, lines, and charts are permanent. Regular backups are strongly recommended.
