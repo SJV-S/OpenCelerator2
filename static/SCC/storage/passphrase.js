@@ -18,11 +18,7 @@ export function validatePassphrase(passphrase) {
     return VALID_WORD_COUNTS.includes(words.length) && words.every(w => BIP39_WORDLIST.includes(w));
 }
 
-export async function getUserId(passphrase) {
-    return sha256(passphrase);
-}
-
 export async function getUserKey(passphrase) {
-    const userId = await getUserId(passphrase);
-    return deriveKey(passphrase, userId);
+    const salt = await sha256(passphrase);
+    return deriveKey(passphrase, salt);
 }

@@ -37,7 +37,7 @@ class ChartAccess(db.Model):
     __tablename__ = 'chart_access'
 
     chart_uuid = db.Column(db.String(36), db.ForeignKey('charts.chart_uuid'), primary_key=True)
-    user_id = db.Column(db.String(64), primary_key=True)  # SHA256 of user's passphrase
+    user_id = db.Column(db.String(64), primary_key=True)  # SHA256 of user's public key
     wrapped_key = db.Column(db.LargeBinary, nullable=False)  # chart_key encrypted with user's derived key
 
     # Relationships
@@ -49,6 +49,15 @@ class ChartAccess(db.Model):
             'user_id': self.user_id
         }
 
+
+
+class Identity(db.Model):
+    """Maps user_id (SHA-256 of public key) to raw ECDSA public key"""
+    __tablename__ = 'identities'
+
+    user_id = db.Column(db.String(64), primary_key=True)
+    public_key = db.Column(db.Text, nullable=False)  # Base64 SPKI
+    created_at = db.Column(db.Integer, nullable=False)
 
 
 class ShareLink(db.Model):

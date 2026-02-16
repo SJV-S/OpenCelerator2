@@ -13,6 +13,7 @@ import { createToast, createConfirmToast } from '../ui/toaster.js';
 import { MISSING } from '../config.js';
 import { isMissing } from '../util/format.js';
 import { getFirstConfig } from './traceStyles.js';
+import { parseLocalDate, dateToTimestamp } from '../util/dates.js';
 
 // Track current state
 let currentDataForDate = [];
@@ -25,11 +26,10 @@ export function loadDataForDate() {
     const dateInput = document.getElementById('entry-date');
     if (!dateInput) return;
 
-    const selectedDate = new Date(dateInput.value);
-    selectedDate.setHours(0, 0, 0, 0);
+    const selectedDate = parseLocalDate(dateInput.value);
 
     // Get start and end of the selected day (in seconds)
-    const startOfDay = Math.floor(selectedDate.getTime() / 1000);
+    const startOfDay = dateToTimestamp(selectedDate);
     const endOfDay = startOfDay + (24 * 60 * 60);
 
     // Filter data for this date (preserve null for non-observations)

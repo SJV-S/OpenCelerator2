@@ -1,4 +1,5 @@
 import { initStorage, listCharts, deleteChart, updateChartTags } from '/static/SCC/storage/chartStorage.js';
+import { icons } from '/static/SCC/ui/icons.js';
 
 import { openDB } from '/static/lib/idb.js';
 import { checkForUpdates, pushCharts } from '/static/Server/syncClient.js';
@@ -96,9 +97,7 @@ function createChartRow(chart) {
         </td>
         <td class="py-3 text-center">
             ${chart.shared
-                ? `<svg class="w-5 h-5 text-green-500 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                   </svg>`
+                ? `<span class="inline-block w-5 h-5 ${chart.acceptingEdits ? 'text-blue-500' : 'text-gray-500'}" title="${chart.acceptingEdits ? 'Edit access' : 'View only'}">${chart.acceptingEdits ? icons.sharedEdit(20) : icons.viewOnly(20)}</span>`
                 : `<span class="text-gray-400 text-sm">-</span>`}
         </td>
         <td class="py-3 pr-2 text-right">

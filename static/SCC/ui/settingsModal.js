@@ -4,17 +4,18 @@ import { setUserPreference, getUserPreferences, getDisplayName, setDisplayName, 
 import { downloadFile } from '/static/SCC/util/download.js';
 import { createAccountLink } from '/static/Server/accountLink.js';
 import { getStoredPassphrase } from '/static/Server/syncDevice.js';
+import { formatDateInputValue, nowUnixSeconds } from '/static/SCC/util/dates.js';
 
 export async function performBackupExport() {
     const backup = await createBackupData();
     const json = JSON.stringify(backup);
-    const today = new Date().toISOString().slice(0, 10);
+    const today = formatDateInputValue(new Date());
     const name = backup.identity?.display_name
         ?.replaceAll(' ', '-')
         .replace(/[\/\\:*?"<>|]/g, '-');
     const filename = name ? `${name}-scc-full-backup-${today}.json` : `scc-full-backup-${today}.json`;
     downloadFile(json, filename, 'application/json;charset=utf-8;');
-    await setUserPreference('lastBackupTimestamp', Math.floor(Date.now() / 1000));
+    await setUserPreference('lastBackupTimestamp', nowUnixSeconds());
 }
 
 let pendingBackupData = null;
@@ -186,7 +187,7 @@ export function initSettingsModal(deps) {
         if (enabled) {
             const prefs = getUserPreferences();
             if (!prefs.lastBackupTimestamp) {
-                await setUserPreference('lastBackupTimestamp', Math.floor(Date.now() / 1000));
+                await setUserPreference('lastBackupTimestamp', nowUnixSeconds());
             }
         }
     });

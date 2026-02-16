@@ -15,7 +15,7 @@ import { createToast } from '../ui/toaster.js';
 import { icons, applySvgCursor, restoreCursor } from '../ui/icons.js';
 import { chartState } from '../chartState.js';
 import { CORRECTS, ERRORS, TIMING, LINE_DEFAULTS, COLORS, CHART_TYPE_CONFIG } from '../config.js';
-import { xPositionToDate, dateToXPosition } from '../util/dates.js';
+import { xPositionToDate, dateToXPosition, formatDateInputValue } from '../util/dates.js';
 import { fit, FIT_METHODS, BOUNCE_ENVELOPES, DEFAULT_FIT_METHOD, DEFAULT_BOUNCE_ENVELOPE, calculateBounceBounds, calculateBounceLines, formatCelerationLabel } from '../util/fit_lines.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 import { getFirstConfig, isSeriesVisible } from '../series/traceStyles.js';
@@ -812,8 +812,8 @@ function handleCelLineConfirm(data, baseKey) {
     // Store dates as YYYY-MM-DD strings to avoid timezone issues with ISO serialization
     const date1 = xPositionToDate(firstX);
     const date2 = xPositionToDate(lastX);
-    const date1Str = date1.getFullYear() + '-' + String(date1.getMonth() + 1).padStart(2, '0') + '-' + String(date1.getDate()).padStart(2, '0');
-    const date2Str = date2.getFullYear() + '-' + String(date2.getMonth() + 1).padStart(2, '0') + '-' + String(date2.getDate()).padStart(2, '0');
+    const date1Str = formatDateInputValue(date1);
+    const date2Str = formatDateInputValue(date2);
 
     // Build metadata object
     const metadata = {

@@ -14,7 +14,7 @@
 
 import { chartState } from '../chartState.js';
 import { WINDOW_UNITS } from '../config.js';
-import { timestampsToXPositions, dateToXPosition } from '../util/dates.js';
+import { dateToXPosition } from '../util/dates.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 import { createToast } from '../ui/toaster.js';
 import { removeLine } from './allLines.js';
@@ -263,10 +263,8 @@ function setLineCategoryClickability(category, makeClickable) {
                 clickablePromise = clickablePromise
                     .then(() => useDelay ? delay(TRACE_DRAW_DELAY) : Promise.resolve())
                     .then(() => {
-                        const verticalTimestamp = Math.floor(phaseLine.verticalLineDate.getTime() / 1000);
-                        const horizontalEndTimestamp = Math.floor(phaseLine.horizontalEndDate.getTime() / 1000);
-                        const verticalX = timestampsToXPositions([verticalTimestamp])[0];
-                        const horizontalEndX = timestampsToXPositions([horizontalEndTimestamp])[0];
+                        const verticalX = dateToXPosition(phaseLine.verticalLineDate);
+                        const horizontalEndX = dateToXPosition(phaseLine.horizontalEndDate);
 
                         const points = [];
                         let verticalPoints;
@@ -293,10 +291,8 @@ function setLineCategoryClickability(category, makeClickable) {
                 clickablePromise = clickablePromise
                     .then(() => useDelay ? delay(TRACE_DRAW_DELAY) : Promise.resolve())
                     .then(() => {
-                        const timestamp1 = Math.floor(aimLine.date1.getTime() / 1000);
-                        const timestamp2 = Math.floor(aimLine.date2.getTime() / 1000);
-                        const x1 = timestampsToXPositions([timestamp1])[0];
-                        const x2 = timestampsToXPositions([timestamp2])[0];
+                        const x1 = dateToXPosition(aimLine.date1);
+                        const x2 = dateToXPosition(aimLine.date2);
 
                         const points = [interpolateLinePoints(x1, aimLine.y1, x2, aimLine.y2, isLogY)];
 
@@ -347,8 +343,7 @@ function setLineCategoryClickability(category, makeClickable) {
                             cutPromise = cutPromise
                                 .then(() => useDelay ? delay(TRACE_DRAW_DELAY) : Promise.resolve())
                                 .then(() => {
-                                    const timestamp = Math.floor(cut.date.getTime() / 1000);
-                                    const xPos = timestampsToXPositions([timestamp])[0] - 0.5;
+                                    const xPos = dateToXPosition(cut.date) - 0.5;
                                     const points = [interpolateLinePoints(xPos, yBottom, xPos, yTop, isLogY)];
 
                                     return makeLineClickable({
@@ -370,7 +365,9 @@ function setLineCategoryClickability(category, makeClickable) {
                 if (trace.meta?.type === 'clickableLine') clickableIndices.push(i);
             });
             if (clickableIndices.length > 0) {
-                return Plotly.moveTraces(chartDiv, clickableIndices, clickableIndices.map(() => -1));
+                const total = chartDiv.data.length;
+                const targets = clickableIndices.map((_, i) => total - clickableIndices.length + i);
+                return Plotly.moveTraces(chartDiv, clickableIndices, targets);
             }
         });
 
@@ -426,11 +423,9 @@ function drawCutLineMarkers() {
 
     if (chartState.LineCuts && Object.keys(chartState.LineCuts).length > 0) {
         const cutEntries = Object.values(chartState.LineCuts);
-        const cutTimestamps = cutEntries.map(cut => Math.floor(cut.date.getTime() / 1000));
-        const cutXPositions = timestampsToXPositions(cutTimestamps).map(x => x - 0.5);
 
-        cutEntries.forEach((cut, index) => {
-            const xPos = cutXPositions[index];
+        cutEntries.forEach((cut) => {
+            const xPos = dateToXPosition(cut.date) - 0.5;
             shapes.push({
                 type: 'line',
                 x0: xPos,

@@ -3,9 +3,9 @@
  * Signs all pushes with ECDSA, verifies pulls based on chart ownership policy
  */
 
-import { generateChartKey, wrapKey, unwrapKey, deriveKey, sign, verify, importPublicKey, fromHex } from './crypto.js';
+import { generateChartKey, wrapKey, unwrapKey, deriveKey, sha256, sign, verify, importPublicKey, fromHex } from './crypto.js';
 import { encryptCompressed as encrypt, decryptCompressed as decrypt } from './compress.js';
-import { getUserId, getUserKey } from '../SCC/storage/passphrase.js';
+import { getUserKey } from '../SCC/storage/passphrase.js';
 import { openDB } from '../lib/idb.js';
 import { eventBus, EVENTS } from '../SCC/eventBus.js';
 import { connectToChart, disconnectFromChart } from './wsClient.js';
@@ -25,7 +25,7 @@ let signingPublicKey = null;    // CryptoKey (for verification), set by initSync
 let signingDisplayName = null;  // Human-readable owner name (display only), set by initSync
 
 export async function initSync(passphrase, privateKey, publicKeyB64, displayName = null) {
-    userId = await getUserId(passphrase);
+    userId = await sha256(publicKeyB64);
     userKey = await getUserKey(passphrase);
     setUserId(userId);
     signingPrivateKey = privateKey;
@@ -134,6 +134,25 @@ function stampOwnerFields(chart) {
 }
 
 /**
+ * Stamp collaborator identity on charts we don't own but can edit.
+ * Adds or updates a {publicKey, displayName} entry in chart.collaborators[].
+ */
+function stampCollaborator(chart) {
+    if (!chart.publicKey || chart.publicKey === signingPublicKeyB64) return;
+    if (!chart.acceptingEdits) return;
+    if (!Array.isArray(chart.collaborators)) chart.collaborators = [];
+
+    const existing = chart.collaborators.find(c => c.publicKey === signingPublicKeyB64);
+    if (existing) {
+        if (existing.displayName !== signingDisplayName) {
+            existing.displayName = signingDisplayName;
+        }
+    } else {
+        chart.collaborators.push({ publicKey: signingPublicKeyB64, displayName: signingDisplayName });
+    }
+}
+
+/**
  * Process downloaded items: unwrap, decrypt, verify, collect accepted charts.
  * Triggers write-back for rejected pulls that have a local version.
  */
@@ -174,6 +193,7 @@ export async function uploadCharts(localCharts) {
             chartKey = await generateChartKey();
         }
         stampOwnerFields(chart.data);
+        stampCollaborator(chart.data);
         const encryptedData = await encrypt(chartKey, chart.data);
         const signature = await signPayload(encryptedData);
         const wrappedKey = await wrapKey(chartKey, userKey);
@@ -189,7 +209,7 @@ export async function uploadCharts(localCharts) {
 
     const response = await api('/api/sync', {
         method: 'POST',
-        body: { user_id: userId, last_sync_at: 0, local_manifest: [], uploads }
+        body: { user_id: userId, public_key: signingPublicKeyB64, last_sync_at: 0, local_manifest: [], uploads }
     });
 
     if (!response.ok) throw new Error(`Upload failed: ${response.status}`);
@@ -200,7 +220,7 @@ export async function pullCharts() {
 
     const response = await api('/api/sync', {
         method: 'POST',
-        body: { user_id: userId, last_sync_at: lastSyncAt, local_manifest: [], uploads: [] }
+        body: { user_id: userId, public_key: signingPublicKeyB64, last_sync_at: lastSyncAt, local_manifest: [], uploads: [] }
     });
 
     if (!response.ok) throw new Error(`Pull failed: ${response.status}`);
@@ -217,7 +237,7 @@ export async function checkForUpdates(localManifest) {
 
     const response = await api('/api/sync', {
         method: 'POST',
-        body: { user_id: userId, last_sync_at: lastSyncAt, local_manifest: localManifest, uploads: [] }
+        body: { user_id: userId, public_key: signingPublicKeyB64, last_sync_at: lastSyncAt, local_manifest: localManifest, uploads: [] }
     });
 
     if (!response.ok) throw new Error(`Sync check failed: ${response.status}`);
@@ -243,6 +263,7 @@ export async function sync(localCharts) {
             chartKey = await generateChartKey();
         }
         stampOwnerFields(chart.data);
+        stampCollaborator(chart.data);
         const encryptedData = await encrypt(chartKey, chart.data);
         const signature = await signPayload(encryptedData);
         const wrappedKey = await wrapKey(chartKey, userKey);
@@ -260,7 +281,7 @@ export async function sync(localCharts) {
 
     const response = await api('/api/sync', {
         method: 'POST',
-        body: { user_id: userId, last_sync_at: lastSyncAt, local_manifest: localManifest, uploads }
+        body: { user_id: userId, public_key: signingPublicKeyB64, last_sync_at: lastSyncAt, local_manifest: localManifest, uploads }
     });
 
     if (!response.ok) throw new Error(`Sync failed: ${response.status}`);
@@ -284,6 +305,7 @@ export async function pushChart(chartUuid) {
 
     // Stamp identity for signature verification
     stampOwnerFields(chart);
+    stampCollaborator(chart);
 
     const encryptedData = await encrypt(chartKey, chart);
     const signature = await signPayload(encryptedData);
@@ -293,6 +315,7 @@ export async function pushChart(chartUuid) {
         method: 'POST',
         body: {
             user_id: userId,
+            public_key: signingPublicKeyB64,
             local_manifest: [],
             uploads: [{
                 chart_uuid: chartUuid,
@@ -321,6 +344,7 @@ export async function pushCharts(chartUuids) {
         const chartKey = await crypto.subtle.importKey('raw', chartKeyBytes,
             { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
         stampOwnerFields(chart);
+        stampCollaborator(chart);
         const encryptedData = await encrypt(chartKey, chart);
         const signature = await signPayload(encryptedData);
         const wrappedKey = await wrapKey(chartKey, userKey);
@@ -338,7 +362,7 @@ export async function pushCharts(chartUuids) {
 
     const response = await api('/api/sync', {
         method: 'POST',
-        body: { user_id: userId, local_manifest: [], uploads }
+        body: { user_id: userId, public_key: signingPublicKeyB64, local_manifest: [], uploads }
     });
 
     if (!response.ok) throw new Error(`Batch push failed: ${response.status}`);
@@ -367,6 +391,7 @@ async function _createShareLink(chartUuid, acceptingEdits) {
     // Set sharing policy in chart data (inside encrypted blob)
     chart.acceptingEdits = acceptingEdits;
     stampOwnerFields(chart);
+    stampCollaborator(chart);
 
     const shareSecret = Array.from(crypto.getRandomValues(new Uint8Array(32)))
         .map(b => b.toString(16).padStart(2, '0')).join('');
@@ -383,6 +408,7 @@ async function _createShareLink(chartUuid, acceptingEdits) {
         body: {
             chart_uuid: chartUuid,
             user_id: userId,
+            public_key: signingPublicKeyB64,
             data: encryptedData,
             wrapped_key: wrappedKeyForUser,
             wrapped_key_for_share: wrappedKeyForShare,
@@ -406,7 +432,7 @@ async function _createShareLink(chartUuid, acceptingEdits) {
 export async function deleteChart(chartUuid) {
     const response = await api('/api/chart', {
         method: 'DELETE',
-        body: { chart_uuid: chartUuid, user_id: userId }
+        body: { chart_uuid: chartUuid, user_id: userId, public_key: signingPublicKeyB64 }
     });
     return response.ok;
 }
@@ -414,7 +440,7 @@ export async function deleteChart(chartUuid) {
 export async function leaveChart(chartUuid) {
     const response = await api('/api/chart/leave', {
         method: 'DELETE',
-        body: { chart_uuid: chartUuid, user_id: userId }
+        body: { chart_uuid: chartUuid, user_id: userId, public_key: signingPublicKeyB64 }
     });
     return response.ok;
 }
@@ -448,6 +474,7 @@ export async function joinSharedChart(chartUuid, shareSecret) {
     chartData.chartKey = chartKeyHex;
     chartData.shared = true;
     chartData.lastModified = updated_at;
+    stampCollaborator(chartData);
 
     const db = await openDB('SCC_Charts', 1);
     await db.put('charts', chartData);

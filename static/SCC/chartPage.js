@@ -11,7 +11,7 @@
 
 import { initializeChart, setupEventListeners } from './main.js';
 import { initStorage, loadChart } from './storage/chartStorage.js';
-import { joinSharedChart, startSyncWatch, checkForUpdates, isChartOwner } from '../Server/syncClient.js';
+import { joinSharedChart, startSyncWatch, checkForUpdates, isChartOwner, pushChart } from '../Server/syncClient.js';
 import { initServerSync, isSyncEnabled } from '../Server/init.js';
 import { icons } from './ui/icons.js';
 import { openDB } from '../lib/idb.js';
@@ -42,6 +42,11 @@ async function init() {
     if (!success) {
         window.location.href = '/';
         return;
+    }
+
+    // After joining via edit link, push immediately so the collaborator entry propagates
+    if (shareSecret && chartState.acceptingEdits) {
+        pushChart(chartId).catch(err => console.warn('[Sync] Post-join push failed:', err));
     }
 
     // Default to fullscreen for view-only shared charts

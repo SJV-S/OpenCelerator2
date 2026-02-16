@@ -5,7 +5,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_socketio import SocketIO, join_room, leave_room
 
-from models import db, Chart, ChartAccess, ChartTombstone, ShareLink, AccountLink, init_db
+from models import db, Chart, ChartAccess, ChartTombstone, ShareLink, AccountLink, Identity, init_db
 from telemetry import log_request
 from sharing_detection import check_sharing
 import config
@@ -19,6 +19,7 @@ def decode_blob(value):
 def encode_blob(value):
     """Encode bytes to a base64 string for JSON responses."""
     return b64encode(value).decode('ascii')
+
 
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins=config.CORS_ALLOWED_ORIGINS)
@@ -36,6 +37,23 @@ app.config['MAX_CONTENT_LENGTH'] = config.MAX_CONTENT_LENGTH
 
 # Initialize database
 init_db(app)
+
+
+def ensure_identity(user_id, public_key_b64):
+    """Store public key on first encounter, verify match on subsequent requests."""
+    if not public_key_b64:
+        return
+    existing = db.session.get(Identity, user_id)
+    if existing:
+        if existing.public_key != public_key_b64:
+            app.logger.warning(f'[Identity] Public key mismatch for user_id {user_id[:8]}…')
+        return
+    try:
+        identity = Identity(user_id=user_id, public_key=public_key_b64, created_at=int(time.time()))
+        db.session.add(identity)
+        db.session.flush()
+    except Exception:
+        db.session.rollback()  # Concurrent insert — already stored
 
 
 # Account sharing detection — runs before every request
@@ -172,6 +190,7 @@ def sync():
         return jsonify({'error': 'user_id required'}), 400
 
     user_id = data['user_id']
+    ensure_identity(user_id, data.get('public_key'))
     last_sync_at = data.get('last_sync_at', 0)
     local_manifest = {item['chart_uuid']: item['updated_at'] for item in data.get('local_manifest', [])}
     uploads = data.get('uploads', [])
@@ -273,6 +292,8 @@ def delete_chart():
     if not chart_uuid or not user_id:
         return jsonify({'error': 'chart_uuid and user_id required'}), 400
 
+    ensure_identity(user_id, data.get('public_key'))
+
     access = db.session.get(ChartAccess, (chart_uuid, user_id))
     if not access:
         return jsonify({'error': 'Not authorized'}), 403
@@ -304,6 +325,8 @@ def leave_chart():
     if not chart_uuid or not user_id:
         return jsonify({'error': 'chart_uuid and user_id required'}), 400
 
+    ensure_identity(user_id, data.get('public_key'))
+
     access = db.session.get(ChartAccess, (chart_uuid, user_id))
     if access:
         db.session.delete(access)
@@ -334,6 +357,8 @@ def create_edit_link():
 
     if not all([chart_uuid, user_id, encrypted_data, wrapped_key, wrapped_key_for_share, last_modified]):
         return jsonify({'error': 'Missing required fields'}), 400
+
+    ensure_identity(user_id, data.get('public_key'))
 
     chart_data = b64decode(encrypted_data)
     wrapped_key_bytes = b64decode(wrapped_key)

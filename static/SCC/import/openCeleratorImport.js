@@ -22,6 +22,7 @@ import {
     MISSING
 } from '../config.js';
 import { isMissing } from '../util/format.js';
+import { findNearestMonday, timestampToDate } from '../util/dates.js';
 
 // ============================================================================
 // Marker Symbol Mapping (matplotlib -> Plotly)
@@ -411,7 +412,7 @@ export function buildChartFromOpenCelerator(json, fileName) {
     // Calculate startDate
     let startDate = null;
     if (series.xValues.length > 0) {
-        startDate = calculateMondayBefore(Math.min(...series.xValues));
+        startDate = findNearestMonday(timestampToDate(Math.min(...series.xValues)));
     }
 
     const chartData = {
@@ -469,16 +470,6 @@ function parseDateToTimestamp(dateStr) {
     } catch {
         return null;
     }
-}
-
-function calculateMondayBefore(timestamp) {
-    const date = new Date(timestamp * 1000);
-    const dayOfWeek = date.getDay();
-    const daysToMonday = (dayOfWeek === 0) ? 6 : dayOfWeek - 1;
-    const mondayOffset = daysToMonday * 86400 * 1000;
-    const mondayDate = new Date(date.getTime() - mondayOffset);
-    mondayDate.setHours(0, 0, 0, 0);
-    return mondayDate;
 }
 
 function cleanNumericValue(value) {

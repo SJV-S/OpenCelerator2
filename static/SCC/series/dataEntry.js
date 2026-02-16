@@ -12,7 +12,7 @@
 import { chartState } from '../chartState.js';
 import { TIMING_MS, COLORS, CHART_MATH, MISSING } from '../config.js';
 import { eventBus, EVENTS } from '../eventBus.js';
-import { snapToChartBoundary, formatDateInputValue, xPositionToDate, dateToXPosition } from '../util/dates.js';
+import { snapToChartBoundary, formatDateInputValue, xPositionToDate, dateToXPosition, parseLocalDate, dateToTimestamp } from '../util/dates.js';
 import { relayout } from '../util/plotlyWrapper.js';
 import { getFirstConfig } from './traceStyles.js';
 import { getChartDiv } from '../util/dom.js';
@@ -117,9 +117,9 @@ function submitEntry() {
 
     // Combine selected date with current time to create Unix timestamp
     const now = new Date();
-    const selectedDate = new Date(entryDate);
+    const selectedDate = parseLocalDate(entryDate);
     selectedDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
-    const timestamp = Math.floor(selectedDate.getTime() / 1000);
+    const timestamp = dateToTimestamp(selectedDate);
 
     // Append data points to fixed series arrays
     chartState.series.xValues.push(timestamp);

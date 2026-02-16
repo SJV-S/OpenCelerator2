@@ -11,7 +11,7 @@ All chart data is encrypted client-side before leaving the browser. The server s
 | Key | Derivation | Purpose |
 |-----|-----------|---------|
 | BIP39 passphrase | 12 random words (root secret) | Stored in IndexedDB. All other keys derived from this. |
-| userId | SHA-256(passphrase) | Server-side identity. Used in ChartAccess table lookups. |
+| userId | SHA-256(publicKeyBase64) | Server-side identity. Used in ChartAccess table lookups. |
 | userKey | PBKDF2(passphrase, userId, 100k iterations) → AES-256-GCM | Wraps/unwraps per-chart keys. Never sent to server. |
 | Signing key pair | PBKDF2(passphrase, 'ecdsa-signing', 100k iterations) → ECDSA P-256 | Signs all chart pushes. Public key embedded in chart data for ownership verification. |
 | Per-chart key | Random AES-256-GCM per chart | Encrypts chart data. Wrapped with userKey before server storage. |
@@ -21,7 +21,7 @@ All chart data is encrypted client-side before leaving the browser. The server s
 ### Implementation References
 
 - Passphrase generation: `static/SCC/storage/passphrase.js` — `generatePassphrase()` via `crypto.getRandomValues(new Uint32Array(12))`
-- userId: `passphrase.js:getUserId()` → `sha256(passphrase)`
+- userId: `syncClient.js:initSync()` → `sha256(publicKeyB64)`
 - Key derivation: `static/Server/crypto.js:deriveKey()` — PBKDF2-SHA-256, `PBKDF2_ITERATIONS = 100000`
 - Signing keys: `crypto.js:deriveSigningKeyPair()` — custom P-256 scalar multiplication with range validation against curve order N
 - Chart keys: `crypto.js:generateChartKey()` — `crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 })`
@@ -33,7 +33,7 @@ All chart data is encrypted client-side before leaving the browser. The server s
 ## Server-Side Storage
 
 The server stores:
-- **user_id**: SHA-256 hash (cannot reverse to passphrase) — `models.py:ChartAccess.user_id`
+- **user_id**: SHA-256 of ECDSA public key (cannot reverse to passphrase) — `models.py:ChartAccess.user_id`
 - **wrapped_key**: per-chart AES key encrypted with user's userKey (server cannot unwrap) — `models.py:ChartAccess.wrapped_key`
 - **data**: chart content encrypted with per-chart key (server cannot decrypt) — `models.py:Chart.data`
 - **signature**: ECDSA signature over encrypted data (server cannot forge) — `models.py:Chart.signature`

@@ -70,6 +70,11 @@
  *
  * NO exceptions. Seconds in, seconds out. The * 1000 conversion belongs at
  * the point of consumption (e.g. display formatting), never in storage.
+ *
+ * Helper functions:
+ * - nowUnixSeconds()      → current time as Unix seconds
+ * - timestampToDate(ts)   → Unix seconds → Date object
+ * - dateToTimestamp(date)  → Date object → Unix seconds
  * =============================================================================
  *
  * =============================================================================
@@ -86,6 +91,21 @@ import { chartState } from '../chartState.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 import { createToast } from '../ui/toaster.js';
 import { relayout } from './plotlyWrapper.js';
+
+/** Current time as Unix seconds. */
+function nowUnixSeconds() {
+    return Math.floor(Date.now() / 1000);
+}
+
+/** Unix seconds → Date object. */
+function timestampToDate(ts) {
+    return new Date(ts * 1000);
+}
+
+/** Date object → Unix seconds. */
+function dateToTimestamp(date) {
+    return Math.floor(date.getTime() / 1000);
+}
 
 /**
  * Find the nearest Monday before (or at) a given date.
@@ -736,8 +756,11 @@ function deserializeDate(value) {
 }
 
 export {
+    nowUnixSeconds,
+    timestampToDate,
+    dateToTimestamp,
     findNearestMonday,
-alignStartDate,
+    alignStartDate,
     calculateStartDate,
     parseLocalDate,
     snapToChartBoundary,
