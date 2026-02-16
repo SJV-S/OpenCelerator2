@@ -220,27 +220,6 @@ export async function verify(dataB64, signatureB64, publicKey) {
     );
 }
 
-// ============================================================================
-// HMAC-SHA256 (chartKey-based authentication)
-// ============================================================================
-
-async function importHmacKey(keyBytes) {
-    return crypto.subtle.importKey(
-        'raw', keyBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']
-    );
-}
-
-export async function hmac(dataB64, keyBytes) {
-    const hmacKey = await importHmacKey(keyBytes);
-    const tag = await crypto.subtle.sign('HMAC', hmacKey, decodeB64(dataB64));
-    return encodeB64(new Uint8Array(tag));
-}
-
-export async function verifyHmac(dataB64, tagB64, keyBytes) {
-    const hmacKey = await importHmacKey(keyBytes);
-    return crypto.subtle.verify('HMAC', hmacKey, decodeB64(tagB64), decodeB64(dataB64));
-}
-
 export async function exportPublicKey(key) {
     return toBase64(await crypto.subtle.exportKey('spki', key));
 }

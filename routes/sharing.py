@@ -37,8 +37,6 @@ def create_edit_link():
     wrapped_share_bytes = b64decode(wrapped_key_for_share)
     signature_str = data.get('signature')
     signature_bytes = b64decode(signature_str) if signature_str else None
-    hmac_str = data.get('hmac')
-    hmac_bytes = b64decode(hmac_str) if hmac_str else None
 
     # Store/update chart
     chart = db.session.get(Chart, chart_uuid)
@@ -46,10 +44,9 @@ def create_edit_link():
         chart.data = chart_data
         chart.last_modified = last_modified
         chart.signature = signature_bytes
-        chart.hmac = hmac_bytes
     else:
         chart = Chart(chart_uuid=chart_uuid, data=chart_data, last_modified=last_modified,
-                      signature=signature_bytes, hmac=hmac_bytes)
+                      signature=signature_bytes)
         db.session.add(chart)
 
     # Store owner access
@@ -101,6 +98,5 @@ def get_shared_chart(chart_uuid):
         'data': encode_blob(chart.data),
         'wrapped_key': encode_blob(share_link.wrapped_key),
         'updated_at': chart.last_modified,
-        'signature': encode_blob(chart.signature) if chart.signature else None,
-        'hmac': encode_blob(chart.hmac) if chart.hmac else None
+        'signature': encode_blob(chart.signature) if chart.signature else None
     })

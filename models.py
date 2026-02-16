@@ -20,7 +20,6 @@ class Chart(db.Model):
     data = db.Column(db.LargeBinary, nullable=False)  # Encrypted chart JSON
     last_modified = db.Column(db.Integer, nullable=False)  # Client timestamp (unencrypted metadata)
     signature = db.Column(db.LargeBinary, nullable=True)  # ECDSA signature of encrypted data
-    hmac = db.Column(db.LargeBinary, nullable=True)  # HMAC-SHA256 tag (chartKey-based authentication)
 
     # Relationships
     access_entries = db.relationship('ChartAccess', back_populates='chart', cascade='all, delete-orphan')

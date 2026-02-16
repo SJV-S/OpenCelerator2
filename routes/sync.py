@@ -104,7 +104,6 @@ def sync():
         wrapped_key = decode_blob(upload['wrapped_key'])
         updated_at = min(upload['updated_at'], int(time.time()) + 300)
         signature = decode_blob(upload['signature']) if upload.get('signature') else None
-        hmac_tag = decode_blob(upload['hmac']) if upload.get('hmac') else None
 
         # Check if chart exists
         existing = db.session.get(Chart, chart_uuid)
@@ -115,15 +114,13 @@ def sync():
                 existing.data = chart_data
                 existing.last_modified = updated_at
                 existing.signature = signature
-                existing.hmac = hmac_tag
         else:
             # Create new chart
             new_chart = Chart(
                 chart_uuid=chart_uuid,
                 data=chart_data,
                 last_modified=updated_at,
-                signature=signature,
-                hmac=hmac_tag
+                signature=signature
             )
             db.session.add(new_chart)
 
@@ -171,8 +168,7 @@ def sync():
                 'data': encode_blob(chart.data),
                 'updated_at': chart.last_modified,
                 'wrapped_key': encode_blob(access.wrapped_key),
-                'signature': encode_blob(chart.signature) if chart.signature else None,
-                'hmac': encode_blob(chart.hmac) if chart.hmac else None
+                'signature': encode_blob(chart.signature) if chart.signature else None
             })
 
     # Get tombstones since last sync
