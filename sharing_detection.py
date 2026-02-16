@@ -16,6 +16,7 @@ _EXEMPT_PREFIXES = (
     '/static/',
     '/chart/',
     '/sync/',
+    '/api/account-link/',
 )
 
 _EXEMPT_EXACT = frozenset((
