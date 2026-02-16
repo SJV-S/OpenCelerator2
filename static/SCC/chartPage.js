@@ -44,8 +44,14 @@ async function init() {
         return;
     }
 
-    // After joining via edit link, push immediately so the collaborator entry propagates
+    // After joining via edit link, bump timestamp and push so the collaborator entry propagates
     if (shareSecret && chartState.acceptingEdits) {
+        const idb = await openDB('SCC_Charts', 1);
+        const chart = await idb.get('charts', chartId);
+        if (chart) {
+            chart.lastModified = Math.floor(Date.now() / 1000);
+            await idb.put('charts', chart);
+        }
         pushChart(chartId).catch(err => console.warn('[Sync] Post-join push failed:', err));
     }
 

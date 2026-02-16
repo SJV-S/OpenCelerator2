@@ -303,14 +303,13 @@ window.debugLegend = function() {
 };
 
 /**
- * Print all known collaborator display names for the current chart
+ * Print all participants on the current chart (owner + collaborators)
  */
 window.collaborators = function() {
-    const collabs = chartState.collaborators;
-    if (!Array.isArray(collabs) || collabs.length === 0) {
-        console.log('No collaborators on this chart');
-        return;
-    }
-    console.log(`Collaborators (${collabs.length}):`);
-    collabs.forEach((c, i) => console.log(`  ${i + 1}. ${c.displayName || '(unnamed)'}`));
+    const owner = chartState.ownerName || '(unnamed)';
+    const collabs = Array.isArray(chartState.collaborators) ? chartState.collaborators : [];
+
+    console.log(`Participants (${1 + collabs.length}):`);
+    console.log(`  1. ${owner} (owner)`);
+    collabs.forEach((c, i) => console.log(`  ${i + 2}. ${c.displayName || '(unnamed)'}`));
 };
