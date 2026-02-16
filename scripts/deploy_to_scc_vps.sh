@@ -28,7 +28,10 @@ sed -i 's/0.0.0.0:5002/127.0.0.1:5002/' "$TMP/scripts/run_production.sh"
 echo "[4/5] Deploying to server via tar+ssh..."
 tar czf - -C "$TMP" . | ssh "$VPS" "mkdir -p \"$VPS_PATH\" && tar xzf - -C \"$VPS_PATH\""
 
-echo "[5/5] Cleanup..."
+echo "[5/6] Restarting server..."
+ssh "$VPS" "sudo systemctl restart scc"
+
+echo "[6/6] Cleanup..."
 rm -rf "$TMP"
 
 echo "Done. Deployed to ${VPS}:${VPS_PATH}"

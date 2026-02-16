@@ -35,4 +35,5 @@ push.sh
 notes.txt
 scripts/build/Tailwind/tailwindcss
 CLAUDE.md
+push_to_my_gitea.sh
 

@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-eval' 'sha256-eMeLGIkvOXByW95vM0yvYcfrI1dtFqJp8gfdN4GVFaM=' 'sha256-uGMUzZl3d+JrFeBwHw2NFkIzu/uQkdmfySYsl5GNlU0='; style-src 'self' 'unsafe-inline'">
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-eval' 'sha256-eMeLGIkvOXByW95vM0yvYcfrI1dtFqJp8gfdN4GVFaM=' 'sha256-D6TwYQkGjLZuXKryHhhV4m3xFOtIiysa6dgui4qaWFo='; style-src 'self' 'unsafe-inline'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#05c3de">
     <title>{% block title %}Standard Change Chart{% endblock %}</title>
@@ -102,6 +102,25 @@
             localStorage.clear();
             results.push('localStorage: cleared');
             console.log('[NUKE]', results.join(' | '));
+            location.reload();
+        };
+
+        // Force service worker update - unregisters, clears caches, re-registers.
+        window.swUpdate = async function() {
+            if (!('serviceWorker' in navigator)) {
+                console.log('[SW] Service workers not supported');
+                return;
+            }
+            var reg = await navigator.serviceWorker.getRegistration();
+            if (reg) {
+                await reg.unregister();
+                console.log('[SW] Unregistered');
+            }
+            var keys = await caches.keys();
+            await Promise.all(keys.map(k => caches.delete(k)));
+            console.log('[SW] Cleared ' + keys.length + ' cache(s)');
+            await navigator.serviceWorker.register('/service-worker.js');
+            console.log('[SW] Re-registered — reloading');
             location.reload();
         };
     </script>
