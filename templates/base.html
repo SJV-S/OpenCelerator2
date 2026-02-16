@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-eval' 'sha256-eMeLGIkvOXByW95vM0yvYcfrI1dtFqJp8gfdN4GVFaM=' 'sha256-9Wu/Kcbslt4Kmuk8//iiFIBtZXwR1Gl0INfjSFCNR10='; style-src 'self' 'unsafe-inline'">
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-eval' 'sha256-eMeLGIkvOXByW95vM0yvYcfrI1dtFqJp8gfdN4GVFaM=' 'sha256-1p7knB3CQvRYJg9ZVWkqV0o09D8is8tL32W1Nv7J9w4='; style-src 'self' 'unsafe-inline'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#05c3de">
     <title>{% block title %}Standard Change Chart{% endblock %}</title>
@@ -105,7 +105,7 @@
             localStorage.clear();
             results.push('localStorage: cleared');
             console.log('[NUKE]', results.join(' | '));
-            location.reload();
+            window.location.href = '/welcome';
         };
 
         // Force service worker update - unregisters, clears caches, re-registers.
