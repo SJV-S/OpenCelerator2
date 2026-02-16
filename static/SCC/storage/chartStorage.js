@@ -189,6 +189,14 @@ export async function listCharts() {
     try {
         const all = await db.getAll(STORE_NAME);
 
+        // Get user's public key for ownership detection (cache → IndexedDB fallback)
+        let myKey = getPublicKeyB64();
+        if (!myKey) {
+            const identityDb = await openDB('SCC_Identity', 1);
+            myKey = await identityDb.get('credentials', 'publicKey');
+            identityDb.close();
+        }
+
         return all.map(chart => ({
             id: chart.id,
             chartName: chart.chartName,
@@ -200,7 +208,7 @@ export async function listCharts() {
             tags: chart.tags || [],
             shared: chart.shared || false,
             acceptingEdits: chart.acceptingEdits || false,
-            publicKey: chart.publicKey || null
+            isOwner: !!(chart.shared && myKey && chart.publicKey === myKey)
         })).sort((a, b) => b.updatedAt - a.updatedAt);
     } catch (error) {
         console.error('[Storage] List failed:', error);
