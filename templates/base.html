@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-eval' 'sha256-eMeLGIkvOXByW95vM0yvYcfrI1dtFqJp8gfdN4GVFaM=' 'sha256-w/gTANdVcxh6j896j4KMH1sF5fNiV+ObuG79H6IulTs='; style-src 'self' 'unsafe-inline'">
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-eval' 'sha256-eMeLGIkvOXByW95vM0yvYcfrI1dtFqJp8gfdN4GVFaM=' 'sha256-9Wu/Kcbslt4Kmuk8//iiFIBtZXwR1Gl0INfjSFCNR10='; style-src 'self' 'unsafe-inline'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#05c3de">
     <title>{% block title %}Standard Change Chart{% endblock %}</title>
@@ -62,9 +62,11 @@
                 sessionStorage.setItem('sw-reload-at', String(Date.now()));
                 location.reload();
             });
-            navigator.serviceWorker.register('/service-worker.js')
-                .then(reg => console.log('[SW] Registered:', reg.scope))
-                .catch(err => console.error('[SW] Registration failed:', err));
+            if (!location.pathname.startsWith('/welcome')) {
+                navigator.serviceWorker.register('/service-worker.js')
+                    .then(reg => console.log('[SW] Registered:', reg.scope))
+                    .catch(err => console.error('[SW] Registration failed:', err));
+            }
         }
 
         // Nuclear reset - wipes BIP39 identity, all charts, and localStorage.
