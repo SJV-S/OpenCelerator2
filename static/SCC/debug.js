@@ -301,3 +301,16 @@ window.debugLegend = function() {
 
     console.log('=== END LEGEND DEBUG ===');
 };
+
+/**
+ * Print all known collaborator display names for the current chart
+ */
+window.collaborators = function() {
+    const collabs = chartState.collaborators;
+    if (!Array.isArray(collabs) || collabs.length === 0) {
+        console.log('No collaborators on this chart');
+        return;
+    }
+    console.log(`Collaborators (${collabs.length}):`);
+    collabs.forEach((c, i) => console.log(`  ${i + 1}. ${c.displayName || '(unnamed)'}`));
+};
