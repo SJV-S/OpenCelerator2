@@ -4,7 +4,6 @@ from flask_socketio import join_room, leave_room
 from models import db, init_db
 from extensions import limiter, socketio
 from telemetry import log_request
-from sharing_detection import check_sharing
 from routes.helpers import valid_uuid
 import config
 
@@ -38,9 +37,6 @@ app.register_blueprint(accounts_bp)
 # =============================================================================
 # Middleware
 # =============================================================================
-
-# Account sharing detection — runs before every request
-app.before_request(check_sharing)
 
 # Security headers
 @app.after_request

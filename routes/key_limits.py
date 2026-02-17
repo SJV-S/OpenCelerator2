@@ -9,7 +9,7 @@ import time
 
 from sqlalchemy import func
 
-from models import db, Identity, Chart, ChartAccess, RequestLog
+from models import db, Identity, Chart, RequestLog
 import config
 
 
@@ -53,18 +53,17 @@ def check_write_quotas(user_id):
         config.PER_KEY_STORAGE_LIMIT_BYTES,
     )
 
-    # Total storage used by this user
+    # Total storage used by charts this user created
     total_bytes = (
         db.session.query(func.coalesce(func.sum(func.length(Chart.data)), 0))
-        .join(ChartAccess, Chart.chart_uuid == ChartAccess.chart_uuid)
-        .filter(ChartAccess.user_id == user_id)
+        .filter(Chart.created_by == user_id)
         .scalar()
     )
     if total_bytes >= effective_limit:
         return False, 'Storage quota exceeded'
 
-    # Chart count
-    chart_count = ChartAccess.query.filter_by(user_id=user_id).count()
+    # Chart count (only charts this user created)
+    chart_count = Chart.query.filter_by(created_by=user_id).count()
     if chart_count >= config.PER_KEY_CHART_LIMIT:
         return False, 'Chart limit exceeded'
 
@@ -74,14 +73,16 @@ def check_write_quotas(user_id):
 def check_key_rate(user_id, is_write):
     """Enforce per-key request rate limit (writes or reads per minute).
 
-    Counts recent RequestLog entries for this user_id.
+    Writes are identified by bytes_uploaded being set on previous requests.
+    Reads count all requests (since the read limit is the overall ceiling).
     """
     one_minute_ago = int(time.time()) - 60
 
-    count = RequestLog.query.filter(
-        RequestLog.user_id == user_id,
-        RequestLog.timestamp > one_minute_ago,
-    ).count()
+    filters = [RequestLog.user_id == user_id, RequestLog.timestamp > one_minute_ago]
+    if is_write:
+        filters.append(RequestLog.bytes_uploaded.isnot(None))
+
+    count = RequestLog.query.filter(*filters).count()
 
     limit = config.PER_KEY_WRITE_LIMIT_PER_MINUTE if is_write else config.PER_KEY_READ_LIMIT_PER_MINUTE
     if count >= limit:

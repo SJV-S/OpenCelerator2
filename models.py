@@ -20,6 +20,7 @@ class Chart(db.Model):
     data = db.Column(db.LargeBinary, nullable=False)  # Encrypted chart JSON
     last_modified = db.Column(db.Integer, nullable=False)  # Client timestamp (unencrypted metadata)
     signature = db.Column(db.LargeBinary, nullable=True)  # ECDSA signature of encrypted data
+    created_by = db.Column(db.String(64), nullable=True)  # user_id of first uploader (for quota attribution)
 
     # Relationships
     access_entries = db.relationship('ChartAccess', back_populates='chart', cascade='all, delete-orphan')
@@ -97,15 +98,6 @@ class AccountLink(db.Model):
     encrypted_blob = db.Column(db.LargeBinary, nullable=False)
     created_at = db.Column(db.Integer, nullable=False)  # Unix seconds
 
-
-class SharingViolation(db.Model):
-    """Log of account sharing detection triggers"""
-    __tablename__ = 'sharing_violations'
-
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    user_id = db.Column(db.String(64), nullable=False)
-    unique_ips = db.Column(db.Integer, nullable=False)
-    timestamp = db.Column(db.Integer, nullable=False)
 
 
 

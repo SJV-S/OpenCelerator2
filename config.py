@@ -65,11 +65,6 @@ RATELIMIT_ACCOUNT_LINK = '5/minute'
 RATELIMIT_STORAGE_URI = 'memory://'
 MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16 MB
 
-# --- Account Sharing Detection ---
-SHARING_IP_THRESHOLD = 6
-SHARING_WINDOW_HOURS = 6
-
-
 # --- Dev server ---
 DEV_HOST = '0.0.0.0'
 DEV_PORT = 5002

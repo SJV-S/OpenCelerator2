@@ -64,7 +64,7 @@ def create_edit_link():
         chart.signature = signature_bytes
     else:
         chart = Chart(chart_uuid=chart_uuid, data=chart_data, last_modified=last_modified,
-                      signature=signature_bytes)
+                      signature=signature_bytes, created_by=user_id)
         db.session.add(chart)
 
     # Store owner access

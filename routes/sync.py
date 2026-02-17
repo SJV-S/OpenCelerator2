@@ -115,7 +115,8 @@ def sync():
                 chart_uuid=chart_uuid,
                 data=chart_data,
                 last_modified=updated_at,
-                signature=signature
+                signature=signature,
+                created_by=user_id
             )
             db.session.add(new_chart)
 
