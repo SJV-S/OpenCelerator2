@@ -4,6 +4,8 @@ from flask import Blueprint, request, jsonify, current_app
 from models import db, Chart, ChartAccess, ChartTombstone
 from extensions import limiter, socketio
 from routes.helpers import valid_user_id, valid_uuid, decode_blob, encode_blob, ensure_identity
+from routes.key_limits import check_key_rate, check_write_quotas
+from telemetry import _hash_ip
 import config
 
 sync_bp = Blueprint('sync', __name__)
@@ -58,15 +60,29 @@ def sync():
     if not valid_user_id(user_id):
         return jsonify({'error': 'Invalid user_id'}), 400
 
-    if not ensure_identity(user_id, data.get('public_key')):
+    ip_hash = _hash_ip(request.remote_addr or '0.0.0.0')
+    if not ensure_identity(user_id, data.get('public_key'), ip_hash):
         return jsonify({'error': 'public_key required and must match user_id'}), 403
+
+    uploads = data.get('uploads', [])
+    is_write = len(uploads) > 0
+
+    # Per-key rate limit
+    ok, msg = check_key_rate(user_id, is_write=is_write)
+    if not ok:
+        return jsonify({'error': msg}), 429
+
+    # Per-key storage quota (only when uploading)
+    if is_write:
+        ok, msg = check_write_quotas(user_id)
+        if not ok:
+            return jsonify({'error': msg}), 403
 
     last_sync_at = data.get('last_sync_at', 0)
     local_manifest = {}
     for item in data.get('local_manifest', []):
         if valid_uuid(item.get('chart_uuid')):
             local_manifest[item['chart_uuid']] = item['updated_at']
-    uploads = data.get('uploads', [])
 
     # Process uploads - store new/updated charts
     for upload in uploads:

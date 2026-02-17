@@ -5,6 +5,7 @@ from base64 import b64encode, b64decode
 
 from flask import current_app
 from models import db, Identity
+from routes.key_limits import check_new_key_limits
 
 _RE_USER_ID = re.compile(r'^[0-9a-f]{64}$', re.I)
 _RE_UUID = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', re.I)
@@ -34,9 +35,10 @@ def verify_user_id(user_id, public_key_b64):
     return user_id.lower() == expected.lower()
 
 
-def ensure_identity(user_id, public_key_b64):
+def ensure_identity(user_id, public_key_b64, ip_hash=None):
     """Store public key on first encounter, verify match on subsequent requests.
-    Returns False if public_key is missing or user_id doesn't match the key."""
+    Returns False if public_key is missing or user_id doesn't match the key.
+    On first encounter, enforces new-key rate limits (requires ip_hash)."""
     if not public_key_b64:
         return False
     if not verify_user_id(user_id, public_key_b64):
@@ -45,6 +47,14 @@ def ensure_identity(user_id, public_key_b64):
     existing = db.session.get(Identity, user_id)
     if existing:
         return True
+
+    # New key — enforce rate limits
+    if ip_hash:
+        ok, msg = check_new_key_limits(user_id, ip_hash)
+        if not ok:
+            current_app.logger.warning(f'[Identity] new-key limit hit for {user_id[:8]}…: {msg}')
+            return False
+
     try:
         identity = Identity(user_id=user_id, public_key=public_key_b64, created_at=int(time.time()))
         db.session.add(identity)

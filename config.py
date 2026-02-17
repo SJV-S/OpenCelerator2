@@ -38,9 +38,9 @@ ACCOUNT_LINK_TTL_SECONDS = 15 * 60  # 15 minutes
 PER_KEY_STORAGE_LIMIT_BYTES = 50 * 1024 * 1024  # 50 MB — ~2,000 large charts (200 KB raw ≈ 25 KB compressed)
 PER_KEY_STORAGE_RATE_BYTES = 5 * 1024 * 1024  # 5 MB/day from first seen; full 50 MB in 10 days
 PER_KEY_CHART_LIMIT = 2500  # derived from storage quota: 50 MB / ~25 KB per large chart (added 500 as charts are likely to be smaller than 25 KB)
-PER_KEY_WRITE_LIMIT = '15/minute'  # below IP limit (25/min); single user doesn't need the full shared-NAT budget
-PER_KEY_READ_LIMIT = '30/minute'  # prevents read amplification across multiple IPs
-NEW_KEY_RATE_LIMIT_PER_HOUR = 20  # global cap on previously unseen keys; organic adoption is slow
+PER_KEY_WRITE_LIMIT_PER_MINUTE = 15  # below IP limit (25/min); single user doesn't need the full shared-NAT budget
+PER_KEY_READ_LIMIT_PER_MINUTE = 30  # prevents read amplification across multiple IPs
+NEW_KEY_RATE_LIMIT_PER_HOUR = 20  # global cap on previously unseen keys; organic adoption is assumed to be slow right now
 
 # --- Service Worker ---
 if DEVELOPER_MODE:

@@ -5,6 +5,8 @@ from flask import Blueprint, request, jsonify, current_app
 from models import db, Chart, ChartAccess, ShareLink
 from extensions import limiter
 from routes.helpers import valid_user_id, valid_uuid, encode_blob, ensure_identity
+from routes.key_limits import check_key_rate, check_write_quotas
+from telemetry import _hash_ip
 import config
 
 sharing_bp = Blueprint('sharing', __name__)
@@ -30,8 +32,19 @@ def create_edit_link():
     if not valid_uuid(chart_uuid) or not valid_user_id(user_id):
         return jsonify({'error': 'Invalid format'}), 400
 
-    if not ensure_identity(user_id, data.get('public_key')):
+    ip_hash = _hash_ip(request.remote_addr or '0.0.0.0')
+    if not ensure_identity(user_id, data.get('public_key'), ip_hash):
         return jsonify({'error': 'public_key required and must match user_id'}), 403
+
+    # Per-key rate limit
+    ok, msg = check_key_rate(user_id, is_write=True)
+    if not ok:
+        return jsonify({'error': msg}), 429
+
+    # Per-key storage quota
+    ok, msg = check_write_quotas(user_id)
+    if not ok:
+        return jsonify({'error': msg}), 403
 
     chart_data = b64decode(encrypted_data)
     wrapped_key_bytes = b64decode(wrapped_key)

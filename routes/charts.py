@@ -4,6 +4,8 @@ from flask import Blueprint, request, jsonify
 from models import db, Chart, ChartAccess, ChartTombstone
 from extensions import limiter
 from routes.helpers import valid_user_id, valid_uuid, ensure_identity
+from routes.key_limits import check_key_rate
+from telemetry import _hash_ip
 import config
 
 charts_bp = Blueprint('charts', __name__)
@@ -22,8 +24,14 @@ def delete_chart():
     if not valid_uuid(chart_uuid) or not valid_user_id(user_id):
         return jsonify({'error': 'Invalid format'}), 400
 
-    if not ensure_identity(user_id, data.get('public_key')):
+    ip_hash = _hash_ip(request.remote_addr or '0.0.0.0')
+    if not ensure_identity(user_id, data.get('public_key'), ip_hash):
         return jsonify({'error': 'public_key required and must match user_id'}), 403
+
+    # Per-key rate limit
+    ok, msg = check_key_rate(user_id, is_write=True)
+    if not ok:
+        return jsonify({'error': msg}), 429
 
     access = db.session.get(ChartAccess, (chart_uuid, user_id))
     if not access:
@@ -59,8 +67,14 @@ def leave_chart():
     if not valid_uuid(chart_uuid) or not valid_user_id(user_id):
         return jsonify({'error': 'Invalid format'}), 400
 
-    if not ensure_identity(user_id, data.get('public_key')):
+    ip_hash = _hash_ip(request.remote_addr or '0.0.0.0')
+    if not ensure_identity(user_id, data.get('public_key'), ip_hash):
         return jsonify({'error': 'public_key required and must match user_id'}), 403
+
+    # Per-key rate limit
+    ok, msg = check_key_rate(user_id, is_write=True)
+    if not ok:
+        return jsonify({'error': msg}), 429
 
     access = db.session.get(ChartAccess, (chart_uuid, user_id))
     if access:
