@@ -16,7 +16,7 @@
  */
 
 import { chartState } from '../chartState.js';
-import { CORRECTS, ERRORS, WINDOW_UNITS } from '../config.js';
+import { CORRECTS, ERRORS, LAYOUT, WINDOW_UNITS } from '../config.js';
 import { dateToXPosition, xPositionToDate } from '../util/dates.js';
 import { formatValue } from '../util/format.js';
 import { getFirstConfig, isSeriesVisible } from '../series/traceStyles.js';
@@ -209,6 +209,7 @@ function buildInfoPanel() {
     if (!infoContent) return;
 
     state.elements.infoPanel = infoContent;
+    infoContent.style.fontSize = LAYOUT.CROSSHAIR_FONT_SIZE;
     infoContent.innerHTML = '';
 
     const refs = state.elements.infoPanelRefs;

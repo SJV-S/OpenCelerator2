@@ -84,6 +84,7 @@ export const LAYOUT = Object.freeze({
     TOAST_PADDING: '12px 16px',
     TOAST_BORDER_WIDTH: '2px',
     BUTTON_BORDER_RADIUS: '6px',
+    CROSSHAIR_FONT_SIZE: '13px',
 
     X_AXIS_MARGIN_OFFSET: 0.2,
     CHART_HEIGHT_MULTIPLIER: 0.98,
