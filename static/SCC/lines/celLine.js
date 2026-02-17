@@ -22,6 +22,7 @@ import { getFirstConfig, isSeriesVisible } from '../series/traceStyles.js';
 import { getPixelCoordinates } from '../util/plotCoordinates.js';
 import { getChartDiv } from '../util/dom.js';
 import { relayout } from '../util/plotlyWrapper.js';
+import { getCelLineSettings } from '../ui/celSettingsModal.js';
 
 /**
  * Get the cel line color for a data series.
@@ -764,11 +765,11 @@ function handleCelLineConfirm(data, baseKey) {
     const filteredX = validPairs.map(p => p.x);
     const filteredLogY = validPairs.map(p => p.logY);
 
-    // Get fit settings from chartState (or use defaults)
-    const settings = chartState.CelLines.settings || {};
-    const fitMethod = settings.fitMethod || DEFAULT_FIT_METHOD;
-    const bounceEnvelope = settings.bounceEnvelope || DEFAULT_BOUNCE_ENVELOPE;
-    const forecast = settings.forecast || 0;
+    // Get fit settings from user preferences
+    const settings = getCelLineSettings();
+    const fitMethod = settings.fitMethod;
+    const bounceEnvelope = settings.bounceEnvelope;
+    const forecast = settings.forecast;
 
     const fitResult = fit(filteredX, filteredLogY, fitMethod);
 
@@ -788,7 +789,7 @@ function handleCelLineConfirm(data, baseKey) {
     const y2_display = Math.pow(10, logY2);
 
     const config = CHART_TYPE_CONFIG[chartState.chartType] || CHART_TYPE_CONFIG.Daily;
-    const labelFormat = settings.labelFormat || 'celeration';
+    const labelFormat = settings.labelFormat;
     const wu = WINDOW_UNITS[chartState.chartType];
     const unitName = wu ? wu.name.toLowerCase() : 'day';
     const slopeLabel = labelFormat === 'doubling'
@@ -905,9 +906,6 @@ function redrawCelLines() {
     // Rebuild shapes and annotations from chartState using the builder
     const globalVisible = chartState.lineVisibility.change;
     Object.values(chartState.CelLines).forEach(entry => {
-        // Skip the settings object
-        if (entry === chartState.CelLines.settings) return;
-
         const metadata = entry;
 
         const elements = buildCelLineElements(metadata, chartDiv);
@@ -949,8 +947,7 @@ function setCelLineVisibility(visible) {
     const seriesVisibleById = new Map();
     if (visible) {
         for (const [id, entry] of Object.entries(chartState.CelLines)) {
-            if (entry === chartState.CelLines.settings) continue;
-            seriesVisibleById.set(String(id), isSeriesVisible(entry.seriesKey));
+                seriesVisibleById.set(String(id), isSeriesVisible(entry.seriesKey));
         }
     }
 
@@ -995,7 +992,6 @@ function updateCelLineSeriesVisibility(seriesKey, seriesVisible) {
     // Find cel line IDs that belong to this series
     const affectedIds = [];
     for (const [id, entry] of Object.entries(chartState.CelLines)) {
-        if (entry === chartState.CelLines.settings) continue;
         if (entry.seriesKey === seriesKey) affectedIds.push(String(id));
     }
     if (affectedIds.length === 0) return;

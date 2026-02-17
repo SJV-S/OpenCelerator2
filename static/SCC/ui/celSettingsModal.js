@@ -1,14 +1,15 @@
 /**
- * Cel Settings Modal - Change line settings (Fit Method, Bounce Envelope, Forecast)
+ * Cel Settings Modal - Change line settings (Fit Method, Bounce Envelope, Forecast, Label Format)
  *
  * Triggered by the gear icon next to "Add change line" in the lines tab.
- * Reads/writes chartState.CelLines.settings on change (no save button).
+ * Reads/writes IDB user_preferences.celLineSettings on change (no save button).
  */
 
 import { chartState } from '../chartState.js';
 import { WINDOW_UNITS } from '../config.js';
 import { setupModalClose } from './modalHelpers.js';
 import { eventBus, EVENTS } from '../eventBus.js';
+import { getUserPreferences, setUserPreference } from '../../Server/init.js';
 
 let modalOverlay = null;
 
@@ -18,6 +19,32 @@ let bounceEnvelopeSelect = null;
 let forecastInput = null;
 let forecastUnitSpan = null;
 let labelFormatSelect = null;
+
+const CEL_DEFAULTS = {
+    fitMethod: 'Theil-Sen',
+    bounceEnvelope: 'None',
+    forecast: 0,
+    labelFormat: 'celeration'
+};
+
+/**
+ * Get the effective cel line settings.
+ * Falls back to CEL_DEFAULTS when no IDB preference exists.
+ * @returns {{ fitMethod: string, bounceEnvelope: string, forecast: number, labelFormat: string }}
+ */
+export function getCelLineSettings() {
+    const stored = getUserPreferences().celLineSettings;
+    return { ...CEL_DEFAULTS, ...stored };
+}
+
+/**
+ * Persist a single setting to IDB user_preferences
+ */
+async function persistSetting(key, value) {
+    const current = getUserPreferences().celLineSettings || {};
+    current[key] = value;
+    await setUserPreference('celLineSettings', current);
+}
 
 /**
  * Create the modal DOM structure (once, lazily)
@@ -55,8 +82,7 @@ function createModal() {
     });
 
     fitMethodSelect.addEventListener('change', (e) => {
-        if (!chartState.CelLines.settings) chartState.CelLines.settings = {};
-        chartState.CelLines.settings.fitMethod = e.target.value;
+        persistSetting('fitMethod', e.target.value);
         e.target.blur();
         eventBus.emit(EVENTS.LINE_CEL_SETTINGS_CHANGED);
     });
@@ -83,8 +109,7 @@ function createModal() {
     });
 
     bounceEnvelopeSelect.addEventListener('change', (e) => {
-        if (!chartState.CelLines.settings) chartState.CelLines.settings = {};
-        chartState.CelLines.settings.bounceEnvelope = e.target.value;
+        persistSetting('bounceEnvelope', e.target.value);
         e.target.blur();
         eventBus.emit(EVENTS.LINE_CEL_SETTINGS_CHANGED);
     });
@@ -110,10 +135,9 @@ function createModal() {
     forecastInput.className = 'w-16 px-2 py-2 lg:py-1 text-sm text-center border-2 border-gray-300 rounded focus:outline-none focus:border-[#6ad1e3] transition-colors';
 
     forecastInput.addEventListener('change', (e) => {
-        if (!chartState.CelLines.settings) chartState.CelLines.settings = {};
-        const value = parseInt(e.target.value) || 0;
-        chartState.CelLines.settings.forecast = Math.max(0, value);
-        e.target.value = chartState.CelLines.settings.forecast;
+        const value = Math.max(0, parseInt(e.target.value) || 0);
+        e.target.value = value;
+        persistSetting('forecast', value);
         e.target.blur();
         eventBus.emit(EVENTS.LINE_CEL_SETTINGS_CHANGED);
     });
@@ -148,8 +172,7 @@ function createModal() {
     });
 
     labelFormatSelect.addEventListener('change', (e) => {
-        if (!chartState.CelLines.settings) chartState.CelLines.settings = {};
-        chartState.CelLines.settings.labelFormat = e.target.value;
+        persistSetting('labelFormat', e.target.value);
         e.target.blur();
         eventBus.emit(EVENTS.LINE_CEL_SETTINGS_CHANGED);
     });
@@ -182,11 +205,11 @@ function createModal() {
  * Sync control values from chartState before showing
  */
 function syncValues() {
-    const settings = chartState.CelLines.settings || {};
-    fitMethodSelect.value = settings.fitMethod || 'Theil-Sen';
-    bounceEnvelopeSelect.value = settings.bounceEnvelope || 'None';
-    forecastInput.value = settings.forecast || 0;
-    labelFormatSelect.value = settings.labelFormat || 'celeration';
+    const settings = getCelLineSettings();
+    fitMethodSelect.value = settings.fitMethod;
+    bounceEnvelopeSelect.value = settings.bounceEnvelope;
+    forecastInput.value = settings.forecast;
+    labelFormatSelect.value = settings.labelFormat;
     const wu = WINDOW_UNITS[chartState.chartType];
     forecastUnitSpan.textContent = wu ? wu.name.toLowerCase() + 's' : 'days';
 }

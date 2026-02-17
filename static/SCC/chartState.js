@@ -68,16 +68,7 @@ export const chartState = {
     LineCuts: {},
     PhaseLines: {},
     AimLines: {},
-    CelLines: {
-        // Default settings for new celeration lines
-        settings: {
-            fitMethod: 'Theil-Sen',      // 'Theil-Sen', 'Least-squares', 'Quarter-intersect', 'Split-middle-line', 'Mean', 'Median'
-            bounceEnvelope: 'None',      // 'None', '5-95 percentile', 'Interquartile range', 'Standard deviation', '90% confidence interval'
-            forecast: 0,                 // Number of days/units to project forward beyond data range
-            labelFormat: 'celeration'    // 'celeration' (×/÷ per unit) or 'doubling' (units to ×2/÷2)
-        }
-        // Individual lines are stored by ID: { [lineId]: metadata, ... }
-    },
+    CelLines: {},  // Individual lines stored by ID: { [lineId]: metadata, ... }
 
     // Line visibility (by type)
     lineVisibility: {

@@ -482,22 +482,20 @@ export function formatCelerationLabel(slope, unit) {
 
 /**
  * Format celeration value as doubling/halving time
- * Expresses how many standard periods it takes for the value to double (or halve).
+ * Expresses how many x-position units it takes for the value to double (or halve).
  *
  * @param {number} slope - Slope in log-space per x-unit (chart-native unit)
- * @param {number} unit - Number of x-units per standard period (from CHART_TYPE_CONFIG)
- * @param {string} unitName - Human-readable unit name (e.g. "day", "week")
- * @returns {string} Formatted label like "3.5 days to ×2" or "7.2 weeks to ÷2"
+ * @param {number} unit - Unused (kept for call-site symmetry with formatCelerationLabel)
+ * @param {string} unitName - Human-readable x-position unit name (e.g. "day", "year")
+ * @returns {string} Formatted label like "3.5 days to ×2" or "7.2 years to ÷2"
  */
 export function formatDoublingTimeLabel(slope, unit, unitName) {
-    const slopePerPeriod = slope * unit;
-
-    if (slopePerPeriod === 0) {
+    if (slope === 0) {
         return 'no change';
     }
 
-    const doublingTime = Math.log10(2) / Math.abs(slopePerPeriod);
-    const symbol = slopePerPeriod > 0 ? '\u00d72' : '\u00f72';
+    const doublingTime = Math.log10(2) / Math.abs(slope);
+    const symbol = slope > 0 ? '\u00d72' : '\u00f72';
     const plural = unitName + (doublingTime === 1 ? '' : 's');
 
     return `${doublingTime.toFixed(1)} ${plural} to ${symbol}`;

@@ -11,7 +11,7 @@
  *   1: Counter-based traceStyles keys ("0", "1", ...) with explicit onXAgg / acrossXAgg
  *   2: Add collaborators array for edit-link recipients
  */
-export const CURRENT_SCHEMA_VERSION = 2;
+export const CURRENT_SCHEMA_VERSION = 3;
 
 // ============================================================================
 // Migration Functions
@@ -126,6 +126,18 @@ async function migrate_1_to_2(chart) {
     return true;
 }
 
+/**
+ * Migration 2 → 3: Remove CelLines.settings (moved to IDB user_preferences).
+ *
+ * Before: CelLines.settings = { fitMethod, bounceEnvelope, forecast, labelFormat }
+ * After:  CelLines only contains line entries keyed by ID
+ */
+async function migrate_2_to_3(chart) {
+    if (!chart.CelLines || !chart.CelLines.settings) return false;
+    delete chart.CelLines.settings;
+    return true;
+}
+
 // ============================================================================
 // Migration Registry
 // ============================================================================
@@ -137,6 +149,7 @@ async function migrate_1_to_2(chart) {
 const migrations = [
     migrate_0_to_1,
     migrate_1_to_2,
+    migrate_2_to_3,
 ];
 
 // ============================================================================

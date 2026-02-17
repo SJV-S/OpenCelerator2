@@ -181,12 +181,9 @@ window.clearCelLines = function() {
 
     Plotly.relayout(chartDiv, { shapes, annotations });
 
-    // Clear from chartState (preserve settings object)
-    const settings = chartState.CelLines.settings;
+    // Clear from chartState
     Object.keys(chartState.CelLines).forEach(key => {
-        if (key !== 'settings') {
-            delete chartState.CelLines[key];
-        }
+        delete chartState.CelLines[key];
     });
 
     // Trigger save to persist the cleared state

@@ -11,6 +11,7 @@ import { eventBus, EVENTS } from '../eventBus.js';
 import { dateToXPosition } from '../util/dates.js';
 import { CHART_TYPE_CONFIG, WINDOW_UNITS } from '../config.js';
 import { formatCelerationLabel, formatDoublingTimeLabel } from '../util/fit_lines.js';
+import { getCelLineSettings } from '../ui/celSettingsModal.js';
 import { interpolateLinePoints } from '../util/lineInterpolation.js';
 import { deleteTraces, addTraces } from '../util/plotlyWrapper.js';
 import { isSeriesVisible } from '../series/traceStyles.js';
@@ -69,7 +70,7 @@ function createHoverTrace(points, lineName, label, color) {
 function buildCelHoverLabel(celLine) {
     // Build label from raw fields — never rely on celLine.text for format
     const config = CHART_TYPE_CONFIG[chartState.chartType] || CHART_TYPE_CONFIG.Daily;
-    const labelFormat = (chartState.CelLines.settings || {}).labelFormat || 'celeration';
+    const { labelFormat } = getCelLineSettings();
     const wu = WINDOW_UNITS[chartState.chartType];
     const unitName = wu ? wu.name.toLowerCase() : 'day';
     const slope = labelFormat === 'doubling'
@@ -115,7 +116,7 @@ function buildAimHoverLabel(aimLine) {
         if (dx > 0 && aimLine.y1 > 0 && aimLine.y2 > 0) {
             const logSlope = (Math.log10(aimLine.y2) - Math.log10(aimLine.y1)) / dx;
             const config = CHART_TYPE_CONFIG[chartState.chartType] || CHART_TYPE_CONFIG.Daily;
-            const labelFormat = (chartState.CelLines.settings || {}).labelFormat || 'celeration';
+            const { labelFormat } = getCelLineSettings();
             const wu = WINDOW_UNITS[chartState.chartType];
             const unitName = wu ? wu.name.toLowerCase() : 'day';
             const slopeLabel = labelFormat === 'doubling'
