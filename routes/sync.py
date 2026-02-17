@@ -1,14 +1,13 @@
 import time
 
 from flask import Blueprint, request, jsonify, current_app
-from models import db, Chart, ChartAccess, ChartTombstone, IPBan
+from models import db, Chart, ChartAccess, ChartTombstone
 from extensions import limiter, socketio
 from routes.helpers import valid_user_id, valid_uuid, decode_blob, encode_blob, ensure_identity
 import config
 
 sync_bp = Blueprint('sync', __name__)
 
-_last_purge = 0
 _last_tombstone_purge = 0
 
 
@@ -25,33 +24,6 @@ def purge_old_tombstones():
     if deleted:
         db.session.commit()
         current_app.logger.info(f'[Purge] Removed {deleted} tombstones older than 1 year')
-
-
-def purge_if_over_limit():
-    """Delete oldest charts until total storage is under config.STORAGE_LIMIT_BYTES. Runs at most once per hour."""
-    global _last_purge
-    now = int(time.time())
-    if now - _last_purge < 3600:
-        return
-    _last_purge = now
-
-    total = db.session.query(db.func.sum(db.func.length(Chart.data))).scalar() or 0
-    if total <= config.STORAGE_LIMIT_BYTES:
-        return
-
-    # Fetch oldest charts first
-    oldest = Chart.query.order_by(Chart.last_modified.asc()).all()
-    purged = 0
-    for chart in oldest:
-        if total <= config.STORAGE_LIMIT_BYTES:
-            break
-        total -= len(chart.data)
-        db.session.delete(chart)  # cascades to chart_access, share_links
-        purged += 1
-
-    if purged:
-        db.session.commit()
-        current_app.logger.info(f'[Purge] Evicted {purged} oldest charts to stay under storage limit')
 
 
 @sync_bp.route('/api/sync', methods=['POST'])
@@ -75,7 +47,6 @@ def sync():
         "tombstones": [{"chart_uuid": "...", "deleted_at": ...}, ...]
     }
     """
-    purge_if_over_limit()
     purge_old_tombstones()
 
     data = request.get_json()
@@ -87,7 +58,9 @@ def sync():
     if not valid_user_id(user_id):
         return jsonify({'error': 'Invalid user_id'}), 400
 
-    ensure_identity(user_id, data.get('public_key'))
+    if not ensure_identity(user_id, data.get('public_key')):
+        return jsonify({'error': 'public_key required and must match user_id'}), 403
+
     last_sync_at = data.get('last_sync_at', 0)
     local_manifest = {}
     for item in data.get('local_manifest', []):
@@ -171,8 +144,9 @@ def sync():
                 'signature': encode_blob(chart.signature) if chart.signature else None
             })
 
-    # Get tombstones since last sync
+    # Get tombstones since last sync (scoped to this user)
     tombstones = ChartTombstone.query.filter(
+        ChartTombstone.user_id == user_id,
         ChartTombstone.deleted_at > last_sync_at
     ).all()
 
@@ -182,96 +156,6 @@ def sync():
         'tombstones': [{'chart_uuid': t.chart_uuid, 'deleted_at': t.deleted_at} for t in tombstones]
     })
 
-
-@sync_bp.route('/api/report-bad-push', methods=['POST'])
-@limiter.limit(config.RATELIMIT_REPORT)
-def report_bad_push():
-    """Client reports a failed signature verification on a pulled chart."""
-    data = request.get_json()
-    if not data:
-        return jsonify({'error': 'JSON body required'}), 400
-
-    chart_uuid = data.get('chart_uuid')
-    reporter_user_id = data.get('user_id')
-    reason = data.get('reason', '')
-
-    if not valid_uuid(chart_uuid) or not valid_user_id(reporter_user_id):
-        return jsonify({'error': 'Invalid format'}), 400
-
-    # Look up the most recent upload of this chart in request_logs
-    row = db.session.execute(
-        db.text(
-            'SELECT ip_hash, user_id FROM request_logs '
-            'WHERE chart_uuid = :uuid AND method = :method AND user_id IS NOT NULL '
-            'ORDER BY timestamp DESC LIMIT 1'
-        ),
-        {'uuid': chart_uuid, 'method': 'POST'}
-    ).first()
-
-    if not row:
-        return jsonify({'error': 'No upload found for this chart'}), 404
-
-    uploader_ip_hash = row.ip_hash
-    uploader_user_id = row.user_id
-
-    # Reject self-reports
-    if uploader_user_id == reporter_user_id:
-        return jsonify({'error': 'Cannot report yourself'}), 400
-
-    now = int(time.time())
-
-    # Upsert tier 1 ban: (uploader_ip_hash, uploader_user_id)
-    ban = db.session.get(IPBan, (uploader_ip_hash, uploader_user_id))
-    if ban:
-        ban.strikes += 1
-        if ban.strikes >= config.BAN_PERMANENT_STRIKES:
-            ban.banned_until = None  # Permanent
-        else:
-            ban.banned_until = now + config.BAN_DURATION_SECONDS
-    else:
-        ban = IPBan(
-            ip_hash=uploader_ip_hash,
-            user_id=uploader_user_id,
-            strikes=1,
-            banned_until=now + config.BAN_DURATION_SECONDS,
-            created_at=now,
-        )
-        db.session.add(ban)
-
-    # Check tier 2 escalation: count distinct permanently-banned user_ids for this IP
-    perma_count = db.session.execute(
-        db.text(
-            'SELECT COUNT(*) FROM ip_bans '
-            'WHERE ip_hash = :ip AND user_id != :wildcard AND banned_until IS NULL'
-        ),
-        {'ip': uploader_ip_hash, 'wildcard': '*'}
-    ).scalar()
-
-    if perma_count >= config.BAN_TIER2_THRESHOLD:
-        tier2 = db.session.get(IPBan, (uploader_ip_hash, '*'))
-        if not tier2:
-            db.session.add(IPBan(
-                ip_hash=uploader_ip_hash,
-                user_id='*',
-                strikes=0,
-                banned_until=None,  # Permanent
-                created_at=now,
-            ))
-
-    # Delete the bad chart blob
-    bad_chart = db.session.get(Chart, chart_uuid)
-    if bad_chart:
-        db.session.delete(bad_chart)
-
-    db.session.commit()
-
-    current_app.logger.info(
-        f'[BadPush] Report from {reporter_user_id[:8]}… — '
-        f'banned {uploader_user_id[:8]}…@{uploader_ip_hash[:8]}… '
-        f'(strike {ban.strikes}, reason: {reason})'
-    )
-
-    return jsonify({'success': True})
 
 
 @sync_bp.route('/api/chart/<chart_uuid>/poll')

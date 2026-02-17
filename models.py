@@ -107,22 +107,13 @@ class SharingViolation(db.Model):
     timestamp = db.Column(db.Integer, nullable=False)
 
 
-class IPBan(db.Model):
-    """IP ban records for bad-push detection (tier 1 = user+IP, tier 2 = IP-wide)"""
-    __tablename__ = 'ip_bans'
-
-    ip_hash = db.Column(db.String(64), primary_key=True)
-    user_id = db.Column(db.String(64), primary_key=True)  # '*' for tier 2 IP-wide ban
-    strikes = db.Column(db.Integer, nullable=False, default=1)
-    banned_until = db.Column(db.Integer, nullable=True)  # Unix seconds, null = permanent
-    created_at = db.Column(db.Integer, nullable=False)
-
 
 class ChartTombstone(db.Model):
     """Tombstones for deleted charts (retained 1 year for sync)"""
     __tablename__ = 'chart_tombstones'
 
     chart_uuid = db.Column(db.String(36), primary_key=True)
+    user_id = db.Column(db.String(64), primary_key=True)  # scoped per user to prevent tombstone pollution
     deleted_at = db.Column(db.Integer, nullable=False)  # Unix timestamp
 
 
@@ -132,23 +123,6 @@ def init_db(app):
     db.init_app(app)
     with app.app_context():
         db.create_all()
-
-        # Migration: add created_at to share_links (create_all won't alter existing tables)
-        try:
-            db.session.execute(db.text('ALTER TABLE share_links ADD COLUMN created_at INTEGER'))
-            db.session.execute(db.text('UPDATE share_links SET created_at = :now WHERE created_at IS NULL'),
-                               {'now': int(time.time())})
-            db.session.commit()
-        except Exception:
-            db.session.rollback()  # Column already exists
-
-        # Migration: add signature to charts
-        try:
-            col_type = 'BLOB' if 'sqlite' in app.config['SQLALCHEMY_DATABASE_URI'] else 'BYTEA'
-            db.session.execute(db.text(f'ALTER TABLE charts ADD COLUMN signature {col_type}'))
-            db.session.commit()
-        except Exception:
-            db.session.rollback()  # Column already exists
 
         if 'sqlite' in app.config['SQLALCHEMY_DATABASE_URI']:
             db.session.execute(db.text('PRAGMA journal_mode=WAL'))

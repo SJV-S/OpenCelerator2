@@ -152,6 +152,7 @@ Opens a modal with:
    - **Weekly** — each position = one week (Monday to Sunday)
    - **Monthly** — each position = one calendar month
    - **Yearly** — each position = one year
+   - **Timing** — (Coming Soon) visible only when Minute is selected, currently disabled
    - **Frequency Collections** — (Coming Soon) visible in the interface but currently disabled
 5. Your chart opens immediately.
 
@@ -181,7 +182,7 @@ A logarithmic scale shows proportional changes clearly. A change from 1 to 2 (do
 On a minute chart: frequency = count ÷ timing in minutes. If someone completed 30 items in 5 minutes, the frequency is 6 per minute. On a count chart, the raw count is plotted directly.
 
 ### What is the "chart window"?
-The chart window controls how many time periods are visible at once. Default values vary by chart type: Daily = 7, Weekly = 5, Monthly = 6, Yearly = 5. If your data spans more time than the window shows, you can scroll left/right using the pan slider above the chart.
+The chart window controls how many time periods are visible at once. Default values are half the chart's capacity: Daily = 140, Weekly = 100, Monthly = 120, Yearly = 100. If your data spans more time than the window shows, you can scroll left/right using the pan slider above the chart.
 
 ---
 
@@ -209,7 +210,7 @@ Tabs are labeled with plain text (no icons or numbers on the tab buttons themsel
 | Tab | What it does |
 |-----|-------------|
 | **Data** | Enter new data points, or view/edit/delete previous entries |
-| **Credit** | View and edit the chart's credit labels (supervisor, performer, organization, etc.). Hidden on desktop where credits appear below the chart. |
+| **Credit** | View the chart's credit lines. Mobile only — hidden on desktop where credits appear below the chart and are edited by clicking them directly. |
 | **Lines** | Access the four line drawing tools and their edit mode toggles |
 | **Series** | Add/remove extra data tracks, customize how each series looks |
 | **Settings** | Change chart name, type, window size, height, grid, and display options |
@@ -469,7 +470,7 @@ Use the **"Chart Type"** dropdown to switch between Daily, Weekly, Monthly, or Y
 ### Chart Window
 Controls how many time positions are visible at once. The label shows the unit for your chart type (e.g., "Chart Window in Days"). Use the **left/right arrow buttons** next to the window number to decrease/increase. Each click adjusts by one snap increment (14 for Daily, 5 for Weekly, etc.).
 
-- **Defaults**: Daily = 7, Weekly = 5, Monthly = 6, Yearly = 5
+- **Defaults**: Half the chart's capacity — Daily = 140, Weekly = 100, Monthly = 120, Yearly = 100
 - **Minimum**: Daily = 28, Weekly = 10, Monthly = 24, Yearly = 20
 - **Maximum**: The chart's full capacity (Daily = 280, Weekly = 200, Monthly = 240, Yearly = 200)
 
@@ -519,13 +520,11 @@ What is **not** reset: chart name, start date, data, drawn lines, and series con
 
 ## 18. CREDITS
 
-Credits are informational labels displayed below the chart. They have two rows of fields:
-- **Row 1**: Supervisor, Performer, Timer, Counted, Advisor
-- **Row 2**: Organization, Manager, Counter, Charter, Room
+Credits are two free-form text lines displayed below the chart. By default, they contain placeholder labels (Supervisor, Performer, Timer, Counted, Advisor on line 1; Organization, Manager, Counter, Charter, Room on line 2), but you can replace the text with anything you like — each line holds up to 160 characters.
 
-Fill in whichever fields are relevant to your use case and leave the rest blank.
-
-**To view or edit**: Open the menu → **Credit** tab. On desktop, credits are also visible directly below the chart.
+**How to edit**:
+- **Desktop**: Click directly on a credit line below the chart. A dialog opens with two text fields (one per line). Edit and click **Save**.
+- **Mobile**: Open the menu → **Credit** tab to view credit lines. Editing on mobile is not currently supported.
 
 ---
 

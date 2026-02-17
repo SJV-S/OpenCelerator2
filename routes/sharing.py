@@ -30,7 +30,8 @@ def create_edit_link():
     if not valid_uuid(chart_uuid) or not valid_user_id(user_id):
         return jsonify({'error': 'Invalid format'}), 400
 
-    ensure_identity(user_id, data.get('public_key'))
+    if not ensure_identity(user_id, data.get('public_key')):
+        return jsonify({'error': 'public_key required and must match user_id'}), 403
 
     chart_data = b64decode(encrypted_data)
     wrapped_key_bytes = b64decode(wrapped_key)

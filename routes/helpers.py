@@ -1,3 +1,4 @@
+import hashlib
 import re
 import time
 from base64 import b64encode, b64decode
@@ -27,18 +28,27 @@ def encode_blob(value):
     return b64encode(value).decode('ascii')
 
 
+def verify_user_id(user_id, public_key_b64):
+    """Verify that user_id is the SHA-256 hash of the base64 public key string."""
+    expected = hashlib.sha256(public_key_b64.encode('utf-8')).hexdigest()
+    return user_id.lower() == expected.lower()
+
+
 def ensure_identity(user_id, public_key_b64):
-    """Store public key on first encounter, verify match on subsequent requests."""
+    """Store public key on first encounter, verify match on subsequent requests.
+    Returns False if public_key is missing or user_id doesn't match the key."""
     if not public_key_b64:
-        return
+        return False
+    if not verify_user_id(user_id, public_key_b64):
+        current_app.logger.warning(f'[Identity] user_id {user_id[:8]}… does not match public key hash')
+        return False
     existing = db.session.get(Identity, user_id)
     if existing:
-        if existing.public_key != public_key_b64:
-            current_app.logger.warning(f'[Identity] Public key mismatch for user_id {user_id[:8]}…')
-        return
+        return True
     try:
         identity = Identity(user_id=user_id, public_key=public_key_b64, created_at=int(time.time()))
         db.session.add(identity)
         db.session.flush()
     except Exception:
         db.session.rollback()  # Concurrent insert — already stored
+    return True

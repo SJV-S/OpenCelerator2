@@ -22,7 +22,8 @@ def delete_chart():
     if not valid_uuid(chart_uuid) or not valid_user_id(user_id):
         return jsonify({'error': 'Invalid format'}), 400
 
-    ensure_identity(user_id, data.get('public_key'))
+    if not ensure_identity(user_id, data.get('public_key')):
+        return jsonify({'error': 'public_key required and must match user_id'}), 403
 
     access = db.session.get(ChartAccess, (chart_uuid, user_id))
     if not access:
@@ -31,14 +32,15 @@ def delete_chart():
     # Delete chart (cascades to chart_access and share_links)
     chart = db.session.get(Chart, chart_uuid)
     if chart:
-        db.session.delete(chart)
+        # Create per-user tombstones before cascade deletes access entries
+        now = int(time.time())
+        access_entries = ChartAccess.query.filter_by(chart_uuid=chart_uuid).all()
+        for entry in access_entries:
+            db.session.add(ChartTombstone(
+                chart_uuid=chart_uuid, user_id=entry.user_id, deleted_at=now
+            ))
 
-        # Create tombstone
-        tombstone = ChartTombstone(
-            chart_uuid=chart_uuid,
-            deleted_at=int(time.time())
-        )
-        db.session.add(tombstone)
+        db.session.delete(chart)
         db.session.commit()
 
     return jsonify({'success': True})
@@ -57,7 +59,8 @@ def leave_chart():
     if not valid_uuid(chart_uuid) or not valid_user_id(user_id):
         return jsonify({'error': 'Invalid format'}), 400
 
-    ensure_identity(user_id, data.get('public_key'))
+    if not ensure_identity(user_id, data.get('public_key')):
+        return jsonify({'error': 'public_key required and must match user_id'}), 403
 
     access = db.session.get(ChartAccess, (chart_uuid, user_id))
     if access:

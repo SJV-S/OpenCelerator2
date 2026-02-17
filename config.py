@@ -34,6 +34,14 @@ TOMBSTONE_RETENTION_SECONDS = 365 * 24 * 3600  # 1 year
 SHARE_LINK_TTL_SECONDS = 14 * 24 * 3600  # 14 days
 ACCOUNT_LINK_TTL_SECONDS = 15 * 60  # 15 minutes
 
+# --- Per-Key Limits ---
+PER_KEY_STORAGE_LIMIT_BYTES = 50 * 1024 * 1024  # 50 MB — ~2,000 large charts (200 KB raw ≈ 25 KB compressed)
+PER_KEY_STORAGE_RATE_BYTES = 5 * 1024 * 1024  # 5 MB/day from first seen; full 50 MB in 10 days
+PER_KEY_CHART_LIMIT = 2500  # derived from storage quota: 50 MB / ~25 KB per large chart (added 500 as charts are likely to be smaller than 25 KB)
+PER_KEY_WRITE_LIMIT = '15/minute'  # below IP limit (25/min); single user doesn't need the full shared-NAT budget
+PER_KEY_READ_LIMIT = '30/minute'  # prevents read amplification across multiple IPs
+NEW_KEY_RATE_LIMIT_PER_HOUR = 20  # global cap on previously unseen keys; organic adoption is slow
+
 # --- Service Worker ---
 if DEVELOPER_MODE:
     SW_CACHE_HEADERS = {
@@ -47,13 +55,13 @@ else:
 # --- WebSocket ---
 CORS_ALLOWED_ORIGINS = '*'
 
-# --- Rate Limiting ---
+# --- IP Rate Limiting ---
+NEW_KEYS_PER_IP_PER_HOUR = 3  # legitimate users need one key; shared NAT might produce a few
 RATELIMIT_DEFAULT = '60/minute'
-RATELIMIT_API_WRITE = '20/minute'
+RATELIMIT_API_WRITE = '25/minute'
 RATELIMIT_API_DELETE = '10/minute'
 RATELIMIT_POLL = '120/minute'
 RATELIMIT_ACCOUNT_LINK = '5/minute'
-RATELIMIT_REPORT = '10/minute'
 RATELIMIT_STORAGE_URI = 'memory://'
 MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16 MB
 
@@ -61,10 +69,6 @@ MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16 MB
 SHARING_IP_THRESHOLD = 6
 SHARING_WINDOW_HOURS = 6
 
-# --- Bad-Push IP Bans ---
-BAN_DURATION_SECONDS = 12 * 3600      # 12-hour per-strike ban
-BAN_PERMANENT_STRIKES = 3             # Strikes before permanent user+IP ban
-BAN_TIER2_THRESHOLD = 3              # Distinct permabanned user_ids to trigger IP-wide ban
 
 # --- Dev server ---
 DEV_HOST = '0.0.0.0'

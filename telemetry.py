@@ -69,7 +69,6 @@ _LOG_PREFIXES = (
     '/api/chart',
     '/api/share',
     '/api/account-link',
-    '/api/report-bad-push',
 )
 
 

@@ -96,16 +96,6 @@ async function verifyPull(encryptedDataHex, signatureHex, chartData, localChart)
     return { accepted: true };
 }
 
-/**
- * Fire-and-forget report of a failed signature verification to the server.
- * The server bans the offending uploader's IP+user_id pair.
- */
-function reportBadPush(chartUuid, reason) {
-    api('/api/report-bad-push', {
-        method: 'POST',
-        body: { chart_uuid: chartUuid, user_id: userId, reason }
-    }).catch(() => {});
-}
 
 /**
  * Write-back: re-push local version to overwrite invalid server data.
@@ -180,7 +170,6 @@ async function processDownloads(items) {
             accepted.push({ id: item.chart_uuid, data, updatedAt: item.updated_at });
         } else {
             console.warn(`[Sync] Rejected pull for ${item.chart_uuid}: ${verification.reason}`);
-            reportBadPush(item.chart_uuid, verification.reason);
             if (localChart) writeBack(item.chart_uuid);
         }
     }
@@ -479,7 +468,6 @@ export async function joinSharedChart(chartUuid, shareSecret) {
     // First join — no local chart for timestamp check
     const verification = await verifyPull(data, signatureHex, chartData, null);
     if (!verification.accepted) {
-        reportBadPush(chartUuid, verification.reason);
         throw new Error(`Join rejected: ${verification.reason}`);
     }
 
@@ -527,7 +515,6 @@ export async function syncChart(chartId, updatedAt = null) {
         const verification = await verifyPull(data, signatureHex, chartData, chart);
         if (!verification.accepted) {
             console.warn(`[Sync] Rejected sync for ${chartId}: ${verification.reason}`);
-            reportBadPush(chartId, verification.reason);
             writeBack(chartId);
             return false;
         }
@@ -542,7 +529,6 @@ export async function syncChart(chartId, updatedAt = null) {
         return true;
     } catch (err) {
         console.warn(`[Sync] Failed:`, err);
-        reportBadPush(chartId, err.message || 'Decryption or sync failure');
         writeBack(chartId);
         return false;
     }

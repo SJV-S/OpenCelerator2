@@ -1,11 +1,9 @@
-import time
-
 from flask import Flask, render_template, request, jsonify, send_from_directory, make_response
 from flask_socketio import join_room, leave_room
 
-from models import db, IPBan, init_db
+from models import db, init_db
 from extensions import limiter, socketio
-from telemetry import log_request, _hash_ip
+from telemetry import log_request
 from sharing_detection import check_sharing
 from routes.helpers import valid_uuid
 import config
@@ -40,54 +38,6 @@ app.register_blueprint(accounts_bp)
 # =============================================================================
 # Middleware
 # =============================================================================
-
-# IP ban check — runs before sharing detection
-_BAN_EXEMPT_PREFIXES = ('/static/', '/chart/', '/sync/')
-_BAN_EXEMPT_EXACT = frozenset(('/', '/welcome', '/new', '/api/health', '/service-worker.js'))
-
-
-def _extract_user_id_from_request():
-    """Extract user_id from JSON body or X-User-Id header."""
-    if request.is_json:
-        body = request.get_json(silent=True)
-        if body and isinstance(body, dict) and body.get('user_id'):
-            return body['user_id']
-    return request.headers.get('X-User-Id')
-
-
-def _is_ban_active(ban):
-    """Check if a ban row is currently active."""
-    if ban is None:
-        return False
-    if ban.banned_until is None:
-        return True  # Permanent
-    return ban.banned_until > int(time.time())
-
-
-def check_ip_ban():
-    """before_request handler — reject banned IPs and user+IP pairs."""
-    path = request.path
-    if path in _BAN_EXEMPT_EXACT:
-        return None
-    for prefix in _BAN_EXEMPT_PREFIXES:
-        if path.startswith(prefix):
-            return None
-
-    ip_hash = _hash_ip(request.remote_addr or '0.0.0.0')
-
-    # Tier 2: full IP ban
-    if _is_ban_active(db.session.get(IPBan, (ip_hash, '*'))):
-        return jsonify({'error': 'banned'}), 403
-
-    # Tier 1: user+IP ban
-    uid = _extract_user_id_from_request()
-    if uid and _is_ban_active(db.session.get(IPBan, (ip_hash, uid))):
-        return jsonify({'error': 'banned'}), 403
-
-    return None
-
-
-app.before_request(check_ip_ban)
 
 # Account sharing detection — runs before every request
 app.before_request(check_sharing)
