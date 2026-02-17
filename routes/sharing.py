@@ -1,7 +1,7 @@
 import time
 from base64 import b64decode
 
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, g, request, jsonify, current_app
 from models import db, Chart, ChartAccess, ShareLink
 from extensions import limiter
 from routes.helpers import valid_user_id, valid_uuid, encode_blob, ensure_identity
@@ -33,7 +33,10 @@ def create_edit_link():
         return jsonify({'error': 'Invalid format'}), 400
 
     ip_hash = _hash_ip(request.remote_addr or '0.0.0.0')
-    if not ensure_identity(user_id, data.get('public_key'), ip_hash):
+    ok, reason = ensure_identity(user_id, data.get('public_key'), ip_hash)
+    if not ok:
+        if reason == 'rate':
+            return jsonify({'error': 'Too many new accounts from this network; try again later'}), 429
         return jsonify({'error': 'public_key required and must match user_id'}), 403
 
     # Per-key rate limit
@@ -47,6 +50,7 @@ def create_edit_link():
         return jsonify({'error': msg}), 403
 
     chart_data = b64decode(encrypted_data)
+    g.bytes_uploaded = len(chart_data)
     wrapped_key_bytes = b64decode(wrapped_key)
     wrapped_share_bytes = b64decode(wrapped_key_for_share)
     signature_str = data.get('signature')

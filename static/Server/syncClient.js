@@ -10,6 +10,26 @@ import { openDB } from '../lib/idb.js';
 import { eventBus, EVENTS } from '../SCC/eventBus.js';
 import { connectToChart, disconnectFromChart } from './wsClient.js';
 import { api, setUserId } from './client-api.js';
+import { createToast } from '../SCC/ui/toaster.js';
+
+/**
+ * Check a server response for rate-limit (429) or quota (403) errors.
+ * Shows a toast notification and returns true if a limit error was found.
+ */
+async function checkLimitError(response) {
+    if (response.status !== 429 && response.status !== 403) return false;
+    try {
+        const body = await response.clone().json();
+        const msg = body.error;
+        if (!msg) return false;
+        // Only toast for known limit/quota messages — not generic auth 403s
+        if (response.status === 429 || msg.includes('quota') || msg.includes('limit')) {
+            createToast({ message: msg, duration: 6000, position: 'top-right' });
+            return true;
+        }
+    } catch { /* response wasn't JSON */ }
+    return false;
+}
 
 async function getChartFromIndexedDB(chartId) {
     const db = await openDB('SCC_Charts', 1);
@@ -213,7 +233,10 @@ export async function uploadCharts(localCharts) {
         body: { user_id: userId, public_key: signingPublicKeyB64, last_sync_at: 0, local_manifest: [], uploads }
     });
 
-    if (!response.ok) throw new Error(`Upload failed: ${response.status}`);
+    if (!response.ok) {
+        await checkLimitError(response);
+        throw new Error(`Upload failed: ${response.status}`);
+    }
 }
 
 export async function pullCharts() {
@@ -224,7 +247,10 @@ export async function pullCharts() {
         body: { user_id: userId, public_key: signingPublicKeyB64, last_sync_at: lastSyncAt, local_manifest: [], uploads: [] }
     });
 
-    if (!response.ok) throw new Error(`Pull failed: ${response.status}`);
+    if (!response.ok) {
+        await checkLimitError(response);
+        throw new Error(`Pull failed: ${response.status}`);
+    }
 
     const result = await response.json();
     lastSyncAt = Math.floor(Date.now() / 1000);
@@ -241,7 +267,10 @@ export async function checkForUpdates(localManifest) {
         body: { user_id: userId, public_key: signingPublicKeyB64, last_sync_at: lastSyncAt, local_manifest: localManifest, uploads: [] }
     });
 
-    if (!response.ok) throw new Error(`Sync check failed: ${response.status}`);
+    if (!response.ok) {
+        await checkLimitError(response);
+        throw new Error(`Sync check failed: ${response.status}`);
+    }
 
     const result = await response.json();
     lastSyncAt = Math.floor(Date.now() / 1000);
@@ -285,7 +314,10 @@ export async function sync(localCharts) {
         body: { user_id: userId, public_key: signingPublicKeyB64, last_sync_at: lastSyncAt, local_manifest: localManifest, uploads }
     });
 
-    if (!response.ok) throw new Error(`Sync failed: ${response.status}`);
+    if (!response.ok) {
+        await checkLimitError(response);
+        throw new Error(`Sync failed: ${response.status}`);
+    }
 
     const result = await response.json();
     lastSyncAt = Math.floor(Date.now() / 1000);
@@ -328,7 +360,10 @@ export async function pushChart(chartUuid) {
         }
     });
 
-    if (!response.ok) throw new Error(`Push failed: ${response.status}`);
+    if (!response.ok) {
+        await checkLimitError(response);
+        throw new Error(`Push failed: ${response.status}`);
+    }
 }
 
 export async function pushCharts(chartUuids) {
@@ -366,7 +401,10 @@ export async function pushCharts(chartUuids) {
         body: { user_id: userId, public_key: signingPublicKeyB64, local_manifest: [], uploads }
     });
 
-    if (!response.ok) throw new Error(`Batch push failed: ${response.status}`);
+    if (!response.ok) {
+        await checkLimitError(response);
+        throw new Error(`Batch push failed: ${response.status}`);
+    }
 }
 
 // ============================================================================
@@ -417,7 +455,10 @@ async function _createShareLink(chartUuid, acceptingEdits) {
             signature
         }
     });
-    if (!response.ok) throw new Error(`Failed to create share link: ${response.status}`);
+    if (!response.ok) {
+        await checkLimitError(response);
+        throw new Error(`Failed to create share link: ${response.status}`);
+    }
 
     chart.shared = true;
     const db = await openDB('SCC_Charts', 1);

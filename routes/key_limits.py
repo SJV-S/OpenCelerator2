@@ -13,23 +13,14 @@ from models import db, Identity, Chart, ChartAccess, RequestLog
 import config
 
 
-def check_new_key_limits(user_id, ip_hash):
-    """Enforce limits when creating a new Identity.
+def check_new_key_limits(ip_hash):
+    """Enforce per-IP limit when creating a new Identity.
 
-    - Global cap: max NEW_KEY_RATE_LIMIT_PER_HOUR new keys per hour
     - Per-IP cap: max NEW_KEYS_PER_IP_PER_HOUR distinct new user_ids from one IP per hour
     """
     one_hour_ago = int(time.time()) - 3600
 
-    # Global new-key rate
-    global_count = Identity.query.filter(Identity.created_at > one_hour_ago).count()
-    if global_count >= config.NEW_KEY_RATE_LIMIT_PER_HOUR:
-        return False, 'Too many new registrations; try again later'
-
     # Per-IP new-key rate: count distinct user_ids first seen from this ip_hash in the last hour.
-    # A new Identity means a new row in request_logs with a user_id not seen before that hour.
-    # We approximate by counting distinct user_ids in request_logs from this IP in the window
-    # that also have an Identity.created_at in the window.
     ip_new_keys = (
         db.session.query(func.count(func.distinct(RequestLog.user_id)))
         .join(Identity, RequestLog.user_id == Identity.user_id)

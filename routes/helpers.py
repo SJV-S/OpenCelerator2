@@ -37,23 +37,26 @@ def verify_user_id(user_id, public_key_b64):
 
 def ensure_identity(user_id, public_key_b64, ip_hash=None):
     """Store public key on first encounter, verify match on subsequent requests.
-    Returns False if public_key is missing or user_id doesn't match the key.
-    On first encounter, enforces new-key rate limits (requires ip_hash)."""
+
+    Returns (True, None) on success.
+    Returns (False, 'auth') if public_key is missing or doesn't match.
+    Returns (False, 'rate') if new-key rate limit is exceeded.
+    """
     if not public_key_b64:
-        return False
+        return False, 'auth'
     if not verify_user_id(user_id, public_key_b64):
         current_app.logger.warning(f'[Identity] user_id {user_id[:8]}… does not match public key hash')
-        return False
+        return False, 'auth'
     existing = db.session.get(Identity, user_id)
     if existing:
-        return True
+        return True, None
 
     # New key — enforce rate limits
     if ip_hash:
-        ok, msg = check_new_key_limits(user_id, ip_hash)
+        ok, msg = check_new_key_limits(ip_hash)
         if not ok:
             current_app.logger.warning(f'[Identity] new-key limit hit for {user_id[:8]}…: {msg}')
-            return False
+            return False, 'rate'
 
     try:
         identity = Identity(user_id=user_id, public_key=public_key_b64, created_at=int(time.time()))
@@ -61,4 +64,4 @@ def ensure_identity(user_id, public_key_b64, ip_hash=None):
         db.session.flush()
     except Exception:
         db.session.rollback()  # Concurrent insert — already stored
-    return True
+    return True, None

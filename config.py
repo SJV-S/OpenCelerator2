@@ -40,7 +40,8 @@ PER_KEY_STORAGE_RATE_BYTES = 5 * 1024 * 1024  # 5 MB/day from first seen; full 5
 PER_KEY_CHART_LIMIT = 2500  # derived from storage quota: 50 MB / ~25 KB per large chart (added 500 as charts are likely to be smaller than 25 KB)
 PER_KEY_WRITE_LIMIT_PER_MINUTE = 15  # below IP limit (25/min); single user doesn't need the full shared-NAT budget
 PER_KEY_READ_LIMIT_PER_MINUTE = 30  # prevents read amplification across multiple IPs
-NEW_KEY_RATE_LIMIT_PER_HOUR = 20  # global cap on previously unseen keys; organic adoption is assumed to be slow right now
+NEW_KEYS_PER_IP_PER_HOUR = 3  # legitimate users need one key; shared NAT might produce a few
+
 
 # --- Service Worker ---
 if DEVELOPER_MODE:
@@ -56,7 +57,6 @@ else:
 CORS_ALLOWED_ORIGINS = '*'
 
 # --- IP Rate Limiting ---
-NEW_KEYS_PER_IP_PER_HOUR = 3  # legitimate users need one key; shared NAT might produce a few
 RATELIMIT_DEFAULT = '60/minute'
 RATELIMIT_API_WRITE = '25/minute'
 RATELIMIT_API_DELETE = '10/minute'

@@ -86,6 +86,7 @@ class RequestLog(db.Model):
     status = db.Column(db.Integer, nullable=False)
     user_id = db.Column(db.String(64), nullable=True)
     chart_uuid = db.Column(db.String(36), nullable=True)
+    bytes_uploaded = db.Column(db.Integer, nullable=True)  # total encrypted bytes written in this request
 
 
 class AccountLink(db.Model):

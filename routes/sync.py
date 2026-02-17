@@ -1,6 +1,6 @@
 import time
 
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, g, request, jsonify, current_app
 from models import db, Chart, ChartAccess, ChartTombstone
 from extensions import limiter, socketio
 from routes.helpers import valid_user_id, valid_uuid, decode_blob, encode_blob, ensure_identity
@@ -61,7 +61,10 @@ def sync():
         return jsonify({'error': 'Invalid user_id'}), 400
 
     ip_hash = _hash_ip(request.remote_addr or '0.0.0.0')
-    if not ensure_identity(user_id, data.get('public_key'), ip_hash):
+    ok, reason = ensure_identity(user_id, data.get('public_key'), ip_hash)
+    if not ok:
+        if reason == 'rate':
+            return jsonify({'error': 'Too many new accounts from this network; try again later'}), 429
         return jsonify({'error': 'public_key required and must match user_id'}), 403
 
     uploads = data.get('uploads', [])
@@ -85,6 +88,7 @@ def sync():
             local_manifest[item['chart_uuid']] = item['updated_at']
 
     # Process uploads - store new/updated charts
+    total_bytes = 0
     for upload in uploads:
         chart_uuid = upload.get('chart_uuid')
         if not valid_uuid(chart_uuid):
@@ -93,6 +97,8 @@ def sync():
         wrapped_key = decode_blob(upload['wrapped_key'])
         updated_at = min(upload['updated_at'], int(time.time()) + 300)
         signature = decode_blob(upload['signature']) if upload.get('signature') else None
+
+        total_bytes += len(chart_data)
 
         # Check if chart exists
         existing = db.session.get(Chart, chart_uuid)
@@ -125,6 +131,9 @@ def sync():
         else:
             # Update wrapped key if provided
             access.wrapped_key = wrapped_key
+
+    if total_bytes:
+        g.bytes_uploaded = total_bytes
 
     db.session.commit()
 

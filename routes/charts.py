@@ -25,7 +25,10 @@ def delete_chart():
         return jsonify({'error': 'Invalid format'}), 400
 
     ip_hash = _hash_ip(request.remote_addr or '0.0.0.0')
-    if not ensure_identity(user_id, data.get('public_key'), ip_hash):
+    ok, reason = ensure_identity(user_id, data.get('public_key'), ip_hash)
+    if not ok:
+        if reason == 'rate':
+            return jsonify({'error': 'Too many new accounts from this network; try again later'}), 429
         return jsonify({'error': 'public_key required and must match user_id'}), 403
 
     # Per-key rate limit
@@ -68,7 +71,10 @@ def leave_chart():
         return jsonify({'error': 'Invalid format'}), 400
 
     ip_hash = _hash_ip(request.remote_addr or '0.0.0.0')
-    if not ensure_identity(user_id, data.get('public_key'), ip_hash):
+    ok, reason = ensure_identity(user_id, data.get('public_key'), ip_hash)
+    if not ok:
+        if reason == 'rate':
+            return jsonify({'error': 'Too many new accounts from this network; try again later'}), 429
         return jsonify({'error': 'public_key required and must match user_id'}), 403
 
     # Per-key rate limit

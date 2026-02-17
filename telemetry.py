@@ -8,7 +8,7 @@ import hashlib
 import time
 import re
 
-from flask import request
+from flask import g, request
 from models import db, RequestLog
 import config
 
@@ -89,6 +89,7 @@ def log_request(response):
             status=response.status_code,
             user_id=_extract_user_id(),
             chart_uuid=_extract_chart_uuid(),
+            bytes_uploaded=getattr(g, 'bytes_uploaded', None),
         )
         db.session.add(entry)
         db.session.commit()
