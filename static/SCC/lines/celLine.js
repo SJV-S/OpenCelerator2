@@ -14,9 +14,9 @@
 import { createToast } from '../ui/toaster.js';
 import { icons, applySvgCursor, restoreCursor } from '../ui/icons.js';
 import { chartState } from '../chartState.js';
-import { CORRECTS, ERRORS, TIMING, LINE_DEFAULTS, COLORS, CHART_TYPE_CONFIG } from '../config.js';
+import { CORRECTS, ERRORS, TIMING, LINE_DEFAULTS, COLORS, CHART_TYPE_CONFIG, WINDOW_UNITS } from '../config.js';
 import { xPositionToDate, dateToXPosition, formatDateInputValue } from '../util/dates.js';
-import { fit, FIT_METHODS, BOUNCE_ENVELOPES, DEFAULT_FIT_METHOD, DEFAULT_BOUNCE_ENVELOPE, calculateBounceBounds, calculateBounceLines, formatCelerationLabel } from '../util/fit_lines.js';
+import { fit, FIT_METHODS, BOUNCE_ENVELOPES, DEFAULT_FIT_METHOD, DEFAULT_BOUNCE_ENVELOPE, calculateBounceBounds, calculateBounceLines, formatCelerationLabel, formatDoublingTimeLabel } from '../util/fit_lines.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 import { getFirstConfig, isSeriesVisible } from '../series/traceStyles.js';
 import { getPixelCoordinates } from '../util/plotCoordinates.js';
@@ -788,7 +788,13 @@ function handleCelLineConfirm(data, baseKey) {
     const y2_display = Math.pow(10, logY2);
 
     const config = CHART_TYPE_CONFIG[chartState.chartType] || CHART_TYPE_CONFIG.Daily;
-    const labelText = `${fitMethod}: ${formatCelerationLabel(fitResult.slope, config.unit)}`;
+    const labelFormat = settings.labelFormat || 'celeration';
+    const wu = WINDOW_UNITS[chartState.chartType];
+    const unitName = wu ? wu.name.toLowerCase() : 'day';
+    const slopeLabel = labelFormat === 'doubling'
+        ? formatDoublingTimeLabel(fitResult.slope, config.unit, unitName)
+        : formatCelerationLabel(fitResult.slope, config.unit);
+    const labelText = `${fitMethod}: ${slopeLabel}`;
 
     // Calculate bounce bounds if envelope is enabled
     const bounceBounds = calculateBounceBounds(filteredLogY, filteredX, fitResult.slope, fitResult.intercept, bounceEnvelope);

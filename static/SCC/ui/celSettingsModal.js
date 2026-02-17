@@ -17,6 +17,7 @@ let fitMethodSelect = null;
 let bounceEnvelopeSelect = null;
 let forecastInput = null;
 let forecastUnitSpan = null;
+let labelFormatSelect = null;
 
 /**
  * Create the modal DOM structure (once, lazily)
@@ -125,6 +126,37 @@ function createModal() {
     forecastRow.appendChild(forecastLabel);
     forecastRow.appendChild(forecastWrapper);
 
+    // --- Label Format ---
+    const labelFormatRow = document.createElement('div');
+    labelFormatRow.className = 'mb-4';
+
+    const labelFormatLabel = document.createElement('label');
+    labelFormatLabel.className = 'block text-sm text-gray-500 mb-1';
+    labelFormatLabel.textContent = 'Label Format';
+
+    labelFormatSelect = document.createElement('select');
+    labelFormatSelect.className = 'w-full px-3 py-2 lg:px-2 lg:py-1 text-sm border-2 border-gray-300 rounded focus:outline-none focus:border-[#6ad1e3] transition-colors bg-white';
+    const labelFormatOptions = [
+        { value: 'celeration', text: 'Celeration (×/÷ per period)' },
+        { value: 'doubling', text: 'Doubling time' }
+    ];
+    labelFormatOptions.forEach(opt => {
+        const option = document.createElement('option');
+        option.value = opt.value;
+        option.textContent = opt.text;
+        labelFormatSelect.appendChild(option);
+    });
+
+    labelFormatSelect.addEventListener('change', (e) => {
+        if (!chartState.CelLines.settings) chartState.CelLines.settings = {};
+        chartState.CelLines.settings.labelFormat = e.target.value;
+        e.target.blur();
+        eventBus.emit(EVENTS.LINE_CEL_SETTINGS_CHANGED);
+    });
+
+    labelFormatRow.appendChild(labelFormatLabel);
+    labelFormatRow.appendChild(labelFormatSelect);
+
     // --- Close button ---
     const closeBtn = document.createElement('button');
     closeBtn.type = 'button';
@@ -137,6 +169,7 @@ function createModal() {
     content.appendChild(fitRow);
     content.appendChild(bounceRow);
     content.appendChild(forecastRow);
+    content.appendChild(labelFormatRow);
     content.appendChild(closeBtn);
     modalOverlay.appendChild(content);
 
@@ -153,6 +186,7 @@ function syncValues() {
     fitMethodSelect.value = settings.fitMethod || 'Theil-Sen';
     bounceEnvelopeSelect.value = settings.bounceEnvelope || 'None';
     forecastInput.value = settings.forecast || 0;
+    labelFormatSelect.value = settings.labelFormat || 'celeration';
     const wu = WINDOW_UNITS[chartState.chartType];
     forecastUnitSpan.textContent = wu ? wu.name.toLowerCase() + 's' : 'days';
 }

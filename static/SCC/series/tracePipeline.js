@@ -273,19 +273,13 @@ function isBelowFloor(freq, timing) {
  * @param {Function} [sort] - Optional sort function to apply chronological ordering
  */
 function calculateFrequencies(sort = (arr) => arr) {
-    // Non-minute charts use timing of 1 for all points (raw counts, but floor still works for zeros)
+    // Non-minute charts use timing of 1 for all points (floor threshold = 1)
     const timingMinutes = chartState.minuteChart
         ? sort(chartState.series.timing)
         : sort(chartState.series.timing).map(() => 1);
 
-    // Helper: convert zeros to MISSING when placeZerosBelowFloor is false
-    const handleZero = (freq) => {
-        if (freq === 0 && !chartState.placeZerosBelowFloor) return MISSING;
-        return freq;
-    };
-
-    // Calculate raw frequencies for fixed series (convert zeros to MISSING if setting is off)
-    const freq = (count, i) => isMissing(count) || isMissing(timingMinutes[i]) ? MISSING : handleZero(count / timingMinutes[i]);
+    // Calculate raw frequencies for fixed series
+    const freq = (count, i) => isMissing(count) || isMissing(timingMinutes[i]) ? MISSING : count / timingMinutes[i];
     const correctsFreqRaw = sort(chartState.series.corrects).map(freq);
     const errorsFreqRaw = sort(chartState.series.errors).map(freq);
 
@@ -297,13 +291,15 @@ function calculateFrequencies(sort = (arr) => arr) {
         isBelowFloor(freq, timingMinutes[i]) ? MISSING : freq
     );
 
-    // Create floor-adjusted shadow arrays (only show floor-adjusted values, above-floor as MISSING)
-    const correctsFloor = correctsFreqRaw.map((freq, i) =>
-        isBelowFloor(freq, timingMinutes[i]) ? placeBelowFloor(freq, timingMinutes[i]) : MISSING
-    );
-    const errorsFloor = errorsFreqRaw.map((freq, i) =>
-        isBelowFloor(freq, timingMinutes[i]) ? placeBelowFloor(freq, timingMinutes[i]) : MISSING
-    );
+    // Create floor-adjusted shadow arrays (only when placeZerosBelowFloor is on)
+    const correctsFloor = chartState.placeZerosBelowFloor
+        ? correctsFreqRaw.map((freq, i) =>
+            isBelowFloor(freq, timingMinutes[i]) ? placeBelowFloor(freq, timingMinutes[i]) : MISSING)
+        : correctsFreqRaw.map(() => MISSING);
+    const errorsFloor = chartState.placeZerosBelowFloor
+        ? errorsFreqRaw.map((freq, i) =>
+            isBelowFloor(freq, timingMinutes[i]) ? placeBelowFloor(freq, timingMinutes[i]) : MISSING)
+        : errorsFreqRaw.map(() => MISSING);
 
     const result = {
         corrects: correctsFreq,
@@ -314,7 +310,7 @@ function calculateFrequencies(sort = (arr) => arr) {
         miscFloor: {}
     };
 
-    // Calculate frequencies for dynamic misc series (convert zeros to MISSING if setting is off)
+    // Calculate frequencies for dynamic misc series
     Object.entries(chartState.series.misc).forEach(([miscId, data]) => {
         const miscFreqRaw = sort(data).map(freq);
 
@@ -322,9 +318,10 @@ function calculateFrequencies(sort = (arr) => arr) {
             isBelowFloor(freq, timingMinutes[i]) ? MISSING : freq
         );
 
-        result.miscFloor[miscId] = miscFreqRaw.map((freq, i) =>
-            isBelowFloor(freq, timingMinutes[i]) ? placeBelowFloor(freq, timingMinutes[i]) : MISSING
-        );
+        result.miscFloor[miscId] = chartState.placeZerosBelowFloor
+            ? miscFreqRaw.map((freq, i) =>
+                isBelowFloor(freq, timingMinutes[i]) ? placeBelowFloor(freq, timingMinutes[i]) : MISSING)
+            : miscFreqRaw.map(() => MISSING);
     });
 
     return result;
