@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-eval' 'sha256-eMeLGIkvOXByW95vM0yvYcfrI1dtFqJp8gfdN4GVFaM=' 'sha256-KqTRC5u5Wfp84/KozsZssX1FTrXLVFGtJ5wY7VckyT4='; style-src 'self' 'unsafe-inline'">
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-eval' 'sha256-eMeLGIkvOXByW95vM0yvYcfrI1dtFqJp8gfdN4GVFaM=' 'sha256-F3vN9izgi//DF+vqN4tNcCAWeKH1UYEls1XApnPB7Oo='; style-src 'self' 'unsafe-inline'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#05c3de">
     <title>{% block title %}Standard Change Chart{% endblock %}</title>
@@ -51,15 +51,11 @@
     {% block content %}{% endblock %}
     {% block scripts %}{% endblock %}
     <script>
-        // Clean SW update — unregister, clear caches, re-register, reload
-        function swUpdate() {
-            sessionStorage.setItem('sw-updating', '1');
-            navigator.serviceWorker.getRegistration().then(function(reg) {
-                var p = reg ? reg.unregister() : Promise.resolve();
-                p.then(function() { return caches.keys(); })
-                 .then(function(keys) { return Promise.all(keys.map(function(k) { return caches.delete(k); })); })
-                 .then(function() { return navigator.serviceWorker.register('/service-worker.js'); })
-                 .then(function() { location.reload(); });
+        // Tell waiting SW to activate, then reload once it takes control
+        function activateWaitingSW(waiting) {
+            waiting.postMessage({ type: 'SKIP_WAITING' });
+            navigator.serviceWorker.addEventListener('controllerchange', function() {
+                location.reload();
             });
         }
 
@@ -69,17 +65,13 @@
                 navigator.serviceWorker.register('/service-worker.js')
                     .then(function(reg) {
                         console.log('[SW] Registered:', reg.scope);
-                        if (sessionStorage.getItem('sw-updating')) {
-                            sessionStorage.removeItem('sw-updating');
-                            return;
-                        }
-                        if (reg.waiting) { swUpdate(); return; }
+                        if (reg.waiting) { activateWaitingSW(reg.waiting); return; }
                         reg.addEventListener('updatefound', function() {
                             var w = reg.installing;
                             if (!w) return;
                             w.addEventListener('statechange', function() {
                                 if (w.state === 'installed' && navigator.serviceWorker.controller) {
-                                    swUpdate();
+                                    activateWaitingSW(w);
                                 }
                             });
                         });

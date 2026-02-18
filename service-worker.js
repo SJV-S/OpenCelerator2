@@ -7,7 +7,7 @@
 // Set to true during development to always fetch fresh (bypasses cache)
 const DEVELOPER_MODE = true;
 
-const SW_VERSION = '0.2.14';
+const SW_VERSION = '0.2.15';
 const CACHE_NAME = `scc-cache-v${SW_VERSION}`;
 
 // HTML pages to precache
@@ -159,6 +159,13 @@ self.addEventListener('install', (event) => {
                 console.error(`[SW ${SW_VERSION}] Install failed:`, err);
             })
     );
+});
+
+// On-demand skipWaiting — triggered by the page when it detects a waiting SW
+self.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'SKIP_WAITING') {
+        self.skipWaiting();
+    }
 });
 
 self.addEventListener('activate', (event) => {
