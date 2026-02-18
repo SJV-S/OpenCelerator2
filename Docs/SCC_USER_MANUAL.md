@@ -47,9 +47,10 @@
 27. [Syncing Across Devices](#27-syncing-across-devices)
 28. [Backups](#28-backups)
 29. [Account & Identity](#29-account--identity)
-30. [Keyboard Shortcuts & Touch Gestures](#30-keyboard-shortcuts--touch-gestures)
-31. [Auto-Save](#31-auto-save)
-32. [Troubleshooting](#32-troubleshooting)
+30. [How Your Data Is Protected](#30-how-your-data-is-protected)
+31. [Keyboard Shortcuts & Touch Gestures](#31-keyboard-shortcuts--touch-gestures)
+32. [Auto-Save](#32-auto-save)
+33. [Troubleshooting](#33-troubleshooting)
 
 ---
 
@@ -585,7 +586,7 @@ The crosshair is a data inspection tool that shows detailed values at any positi
 4. The link is copied to your clipboard. A "Copied ✓" message confirms it.
 5. Send the link to the other person however you like.
 
-The recipient just opens the link in a browser. No account needed.
+The recipient just opens the link in a browser. No account needed. Share links are encrypted end-to-end — see [Section 30](#30-how-your-data-is-protected) for details.
 
 ### Real-time collaboration
 Shared charts update in real time. When anyone makes a change, all other viewers/editors see it instantly via a live connection.
@@ -736,7 +737,63 @@ Set up device sync (see section 27). Both devices then share the same identity a
 
 ---
 
-## 30. KEYBOARD SHORTCUTS & TOUCH GESTURES
+## 30. HOW YOUR DATA IS PROTECTED
+
+SCC uses a "zero-knowledge" security model. This means the server that stores your synced charts **cannot read them** — not the server operator, not a hacker who breaks into the server, not anyone. Only your devices can unlock your data.
+
+### How it works
+
+When you first enable sync, the app automatically generates secret encryption keys behind the scenes. These keys are stored only in your browser and are **never sent to any server**. Everything happens automatically — there's nothing you need to do or remember.
+
+The app creates three things from these keys:
+
+1. **An encryption key** — used to lock and unlock your charts.
+2. **A signing key** — used to stamp each chart with a tamper-proof seal, like a wax seal on a letter. This proves the data came from you and hasn't been altered.
+3. **An anonymous user ID** — a random-looking code the server uses to keep your charts organized. It cannot be traced back to you.
+
+### What happens when you save and sync
+
+Every time a chart is saved and pushed to the server:
+
+1. The chart data is **compressed**, then **encrypted** on your device using a unique key for that chart.
+2. The encrypted data is **signed** with your signing key, creating a digital seal.
+3. Only the encrypted data, the seal, and your anonymous user ID are sent to the server.
+
+The server stores these pieces but has no way to decrypt them. It's like handing someone a locked safe — they can hold it for you, but they can't open it.
+
+### What happens when you open a chart from the server
+
+When the app downloads a chart from the server:
+
+1. It checks the **digital seal** to make sure the data hasn't been tampered with.
+2. If the seal is invalid — meaning someone modified the data — the app **rejects it entirely** and keeps your local copy safe.
+3. If the seal is valid, the app decrypts the data on your device and displays it.
+
+This means even if an attacker somehow altered data on the server, your app would detect the tampering and refuse to load it.
+
+### How sharing works securely
+
+When you create a share link, the app generates a random secret and embeds it in the link itself (in the part after the `#`, which browsers never send to the server). The recipient's browser extracts this secret from the link and uses it to decrypt the chart. The server delivers the encrypted data but never has the secret needed to read it.
+
+### What this protects against
+
+- **A server breach** — an attacker who steals the server's database gets only encrypted data they cannot read.
+- **A compromised server operator** — even someone with full server access sees only meaningless encrypted data.
+- **Tampering** — any modification to your data is detected and rejected by the digital seal check.
+- **Eavesdropping** — data is encrypted before it leaves your device (and HTTPS adds a second layer on top).
+
+### What this does NOT protect against
+
+- **Losing all your devices without a backup** — if you clear your browser data on every synced device and have no backup file, your data on the server is permanently locked. There is no recovery mechanism because nobody else has your keys. This is why regular backups are strongly recommended (see Section 28).
+- **A compromised device** — if malware is running on your computer, it could access the keys stored in your browser. This is true of any app on a compromised device.
+
+### The bottom line
+
+The server is a storage locker, not a vault keeper. It holds your encrypted data but has no key. Only devices that share your identity — set up via sync link or backup — can read your charts.
+
+---
+
+## 31. KEYBOARD SHORTCUTS & TOUCH GESTURES
 
 ### Keyboard
 | Shortcut | Action |
@@ -758,7 +815,7 @@ Set up device sync (see section 27). Both devices then share the same identity a
 
 ---
 
-## 31. AUTO-SAVE
+## 32. AUTO-SAVE
 
 The app saves your work automatically. Every time you enter data, draw a line, or change a setting, the chart is saved to your browser's storage after a brief delay (about 1 second). There is no "Save" button and no visual save indicator — saving happens silently in the background.
 
@@ -766,7 +823,7 @@ If sync is enabled, the chart is also pushed to the server after each save.
 
 ---
 
-## 32. TROUBLESHOOTING
+## 33. TROUBLESHOOTING
 
 ### My chart looks empty even though I entered data
 - **Scroll to your data**: Your data might be outside the visible window. Use the pan slider above the chart (hover to reveal it), or increase the chart window size in **Menu → Settings → Chart Window**.

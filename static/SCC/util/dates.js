@@ -203,7 +203,9 @@ function parseLocalDate(date) {
     }
     if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
         const [year, month, day] = date.split('-').map(Number);
-        return new Date(year, month - 1, day);
+        const d = new Date(2000, month - 1, day);
+        d.setFullYear(year);
+        return d;
     }
     // Fallback - parse and normalize to local midnight
     // BUG INVESTIGATION: ISO strings with time component can shift dates across timezone boundaries
