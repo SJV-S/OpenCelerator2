@@ -45,7 +45,9 @@ const STORE_NAME = 'charts';
 
 let db = null;
 let saveTimeout = null;
+let syncPushTimeout = null;
 const SAVE_DEBOUNCE_MS = 1000;
+const SYNC_PUSH_DEBOUNCE_MS = 30000;
 const PUSH_QUEUE_KEY = 'syncPushQueue';
 // ============================================================================
 // Serialization Helpers
@@ -432,9 +434,9 @@ function debouncedSaveToIndexedDB() {
     saveTimeout = setTimeout(async () => {
         if (chartState.id) {
             await saveChart(chartState.id);
-            if ((chartState.shared || isSyncEnabled()) && isInitialized()) {
+            if (chartState.shared && isInitialized()) {
                 // Reconnect WebSocket if it dropped (e.g. after sleep/tab freeze)
-                if (chartState.shared && !hasSocket()) {
+                if (!hasSocket()) {
                     startSyncWatch(chartState.id);
                 }
                 pushChart(chartState.id)
@@ -443,9 +445,30 @@ function debouncedSaveToIndexedDB() {
                         console.warn('[Storage] Push failed:', err);
                         queuePush(chartState.id);
                     });
+            } else if (isSyncEnabled() && isInitialized()) {
+                scheduleSyncPush(chartState.id);
             }
         }
     }, SAVE_DEBOUNCE_MS);
+}
+
+/**
+ * Debounced server push for non-shared charts.
+ * Resets on each call so the push only fires once editing settles for 60s.
+ */
+function scheduleSyncPush(chartId) {
+    if (syncPushTimeout) {
+        clearTimeout(syncPushTimeout);
+    }
+    syncPushTimeout = setTimeout(() => {
+        syncPushTimeout = null;
+        pushChart(chartId)
+            .then(() => drainPushQueue())
+            .catch(err => {
+                console.warn('[Storage] Lazy push failed:', err);
+                queuePush(chartId);
+            });
+    }, SYNC_PUSH_DEBOUNCE_MS);
 }
 
 /**
@@ -513,4 +536,13 @@ function subscribeToEvents() {
     // Drain push queue on sync initialization (every page load) and server reconnect
     eventBus.subscribe(EVENTS.SYNC_READY, () => drainPushQueue());
     eventBus.subscribe(EVENTS.SYNC_SERVER_RECONNECTED, () => drainPushQueue());
+
+    // Queue any pending lazy sync push when page becomes hidden (tab switch, minimize, close)
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden' && syncPushTimeout) {
+            clearTimeout(syncPushTimeout);
+            syncPushTimeout = null;
+            queuePush(chartState.id);
+        }
+    });
 }

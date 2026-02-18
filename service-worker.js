@@ -7,7 +7,7 @@
 // Set to true during development to always fetch fresh (bypasses cache)
 const DEVELOPER_MODE = true;
 
-const SW_VERSION = '0.2.4';
+const SW_VERSION = '0.2.7';
 const CACHE_NAME = `scc-cache-v${SW_VERSION}`;
 
 // HTML pages to precache
@@ -175,10 +175,6 @@ self.addEventListener('activate', (event) => {
                 return Promise.all(deletePromises);
             })
             .then(() => self.clients.claim())
-            .then(() => self.clients.matchAll())
-            .then(clients => {
-                clients.forEach(c => c.postMessage({ type: 'SW_VERSION', version: SW_VERSION }));
-            })
     );
 });
 
@@ -268,13 +264,6 @@ async function cacheFirstWithNetwork(request) {
         throw err;
     }
 }
-
-// Respond with version when asked
-self.addEventListener('message', (event) => {
-    if (event.data?.type === 'GET_VERSION') {
-        event.ports[0].postMessage({ version: SW_VERSION });
-    }
-});
 
 // Fetch with timeout
 function fetchWithTimeout(request, timeoutMs) {

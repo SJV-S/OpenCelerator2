@@ -14,6 +14,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = config.SQLALCHEMY_TRACK_MODIFICAT
 app.config['MAX_CONTENT_LENGTH'] = config.MAX_CONTENT_LENGTH
 app.config['RATELIMIT_DEFAULT'] = config.RATELIMIT_DEFAULT
 app.config['RATELIMIT_STORAGE_URI'] = config.RATELIMIT_STORAGE_URI
+app.config['APP_VERSION'] = config.APP_VERSION
 
 # Initialize extensions with app
 socketio.init_app(app, cors_allowed_origins=config.CORS_ALLOWED_ORIGINS)
@@ -64,6 +65,12 @@ def service_worker():
 @app.route('/api/health')
 @limiter.exempt
 def health():
+    return jsonify(v=config.APP_VERSION), 200
+
+
+@app.route('/api/version-notice', methods=['POST'])
+@limiter.exempt
+def version_notice():
     return '', 204
 
 

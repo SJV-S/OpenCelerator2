@@ -46,6 +46,14 @@ def _extract_user_id():
     return request.headers.get('X-User-Id')
 
 
+def _extract_comment():
+    if request.is_json:
+        body = request.get_json(silent=True)
+        if body and isinstance(body, dict) and body.get('comment'):
+            return str(body['comment'])[:256]
+    return None
+
+
 def _prune_old_logs():
     """Delete request_logs rows older than _RETENTION_DAYS. Runs at most once per day."""
     global _last_cleanup
@@ -69,6 +77,7 @@ _LOG_PREFIXES = (
     '/api/chart',
     '/api/share',
     '/api/account-link',
+    '/api/version-notice',
 )
 
 
@@ -90,6 +99,7 @@ def log_request(response):
             user_id=_extract_user_id(),
             chart_uuid=_extract_chart_uuid(),
             bytes_uploaded=getattr(g, 'bytes_uploaded', None),
+            comment=_extract_comment(),
         )
         db.session.add(entry)
         db.session.commit()

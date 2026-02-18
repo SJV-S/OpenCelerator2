@@ -2,9 +2,10 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-eval' 'sha256-eMeLGIkvOXByW95vM0yvYcfrI1dtFqJp8gfdN4GVFaM=' 'sha256-1p7knB3CQvRYJg9ZVWkqV0o09D8is8tL32W1Nv7J9w4='; style-src 'self' 'unsafe-inline'">
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-eval' 'sha256-eMeLGIkvOXByW95vM0yvYcfrI1dtFqJp8gfdN4GVFaM=' 'sha256-NZdS8LDQFZcsd1R+jWACEVjnsK7cLr9/TiQ2N7u7t3E='; style-src 'self' 'unsafe-inline'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#05c3de">
+    <meta name="app-version" content="{{ config.APP_VERSION }}">
     <title>{% block title %}Standard Change Chart{% endblock %}</title>
     <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
@@ -53,15 +54,6 @@
     <script>
         // Service Worker Registration
         if ('serviceWorker' in navigator) {
-            var hadController = !!navigator.serviceWorker.controller;
-            navigator.serviceWorker.addEventListener('controllerchange', () => {
-                if (!hadController) { hadController = true; return; }
-                if (location.pathname.startsWith('/welcome')) return;
-                var last = parseInt(sessionStorage.getItem('sw-reload-at') || '0');
-                if (Date.now() - last < 10000) return;
-                sessionStorage.setItem('sw-reload-at', String(Date.now()));
-                location.reload();
-            });
             if (!location.pathname.startsWith('/welcome')) {
                 navigator.serviceWorker.register('/service-worker.js')
                     .then(reg => console.log('[SW] Registered:', reg.scope))

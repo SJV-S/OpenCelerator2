@@ -1,16 +1,18 @@
-// Online/Offline status indicator
-// Pings /api/health to detect actual server reachability (not just network adapter state)
+// Online/Offline status indicator + version update detection
+// Pings /api/health to detect server reachability and version changes
 
 import { TIMING_MS } from '../SCC/config.js';
 import { eventBus, EVENTS } from '../SCC/eventBus.js';
 import { api } from './client-api.js';
 
 let statusElement = null;
-let appVersion = null;
 let _serverReachable = true;    // optimistic until first ping
 let _pingIntervalId = null;
+let _updateVersion = null;      // non-null when server reports a newer version
+let _versionNoticeReported = false;
 
 const HEALTH_URL = '/api/health';
+const _pageVersion = document.querySelector('meta[name="app-version"]')?.content || null;
 
 /**
  * Check if the server is reachable (cached result from periodic ping)
@@ -20,7 +22,7 @@ export function isOnline() {
 }
 
 /**
- * Ping the server health endpoint
+ * Ping the server health endpoint and check for version updates
  */
 async function pingServer() {
     if (!navigator.onLine) {
@@ -39,6 +41,20 @@ async function pingServer() {
 
         clearTimeout(timeoutId);
         setReachable(response.ok);
+
+        if (response.ok) {
+            const data = await response.json();
+            if (_pageVersion && data.v && data.v !== _pageVersion) {
+                _updateVersion = data.v;
+                if (!_versionNoticeReported) {
+                    _versionNoticeReported = true;
+                    api('/api/version-notice', {
+                        method: 'POST',
+                        body: { comment: `${_pageVersion} → ${data.v}` },
+                    }).catch(() => {});
+                }
+            }
+        }
     } catch {
         setReachable(false);
     }
@@ -60,19 +76,19 @@ function setReachable(reachable) {
 }
 
 /**
- * Request version from service worker via MessageChannel
+ * Unregister SW, clear all caches, re-register, and reload
  */
-function fetchVersion() {
-    if (!navigator.serviceWorker) return;
-
-    navigator.serviceWorker.ready.then((registration) => {
-        const channel = new MessageChannel();
-        channel.port1.onmessage = (event) => {
-            appVersion = event.data.version;
-            updateStatus();
-        };
-        registration.active.postMessage({ type: 'GET_VERSION' }, [channel.port2]);
-    });
+async function performUpdate() {
+    if (!('serviceWorker' in navigator)) {
+        location.reload();
+        return;
+    }
+    const reg = await navigator.serviceWorker.getRegistration();
+    if (reg) await reg.unregister();
+    const keys = await caches.keys();
+    await Promise.all(keys.map(k => caches.delete(k)));
+    await navigator.serviceWorker.register('/service-worker.js');
+    location.reload();
 }
 
 /**
@@ -114,6 +130,10 @@ function createStatusElement() {
         document.body.appendChild(statusElement);
     }
 
+    statusElement.addEventListener('click', () => {
+        if (_updateVersion) performUpdate();
+    });
+
     return statusElement;
 }
 
@@ -123,19 +143,30 @@ function createStatusElement() {
 function updateStatus() {
     if (!statusElement) createStatusElement();
 
-    const prefix = appVersion ? `v${appVersion} · ` : '';
+    if (_updateVersion) {
+        statusElement.textContent = `update to v${_updateVersion}`;
+        statusElement.style.color = '#c2410c';
+        statusElement.style.backgroundColor = 'rgba(255, 237, 213, 0.9)';
+        statusElement.style.opacity = '1';
+        statusElement.style.pointerEvents = 'auto';
+        statusElement.style.cursor = 'pointer';
+        return;
+    }
+
+    const prefix = _pageVersion ? `v${_pageVersion} · ` : '';
 
     if (_serverReachable) {
         statusElement.textContent = `${prefix}online`;
         statusElement.style.color = '#059669';
         statusElement.style.backgroundColor = 'rgba(209, 250, 229, 0.9)';
-        statusElement.style.opacity = '1';
     } else {
         statusElement.textContent = `${prefix}offline`;
         statusElement.style.color = '#dc2626';
         statusElement.style.backgroundColor = 'rgba(254, 226, 226, 0.9)';
-        statusElement.style.opacity = '1';
     }
+    statusElement.style.opacity = '1';
+    statusElement.style.pointerEvents = 'none';
+    statusElement.style.cursor = 'default';
 }
 
 /**
@@ -145,14 +176,6 @@ function updateStatus() {
 export function initOnlineStatus() {
     createStatusElement();
     updateStatus();
-    fetchVersion();
-
-    navigator.serviceWorker?.addEventListener('message', (event) => {
-        if (event.data?.type === 'SW_VERSION') {
-            appVersion = event.data.version;
-            updateStatus();
-        }
-    });
 
     // Immediate first ping, then periodic
     pingServer();

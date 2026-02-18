@@ -14,6 +14,13 @@
 #   git push -u origin master
 
 cd "$(dirname "$0")/.."
+
+# Sync SW_VERSION from config.py APP_VERSION
+APP_VER=$(grep -oP "APP_VERSION = '\K[^']+" config.py)
+if [ -n "$APP_VER" ]; then
+    sed -i "s/const SW_VERSION = '.*'/const SW_VERSION = '$APP_VER'/" service-worker.js
+fi
+
 git add -A
 git commit -m "${1:-Update}"
 git push

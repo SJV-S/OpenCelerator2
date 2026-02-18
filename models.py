@@ -88,6 +88,7 @@ class RequestLog(db.Model):
     user_id = db.Column(db.String(64), nullable=True)
     chart_uuid = db.Column(db.String(36), nullable=True)
     bytes_uploaded = db.Column(db.Integer, nullable=True)  # total encrypted bytes written in this request
+    comment = db.Column(db.String(256), nullable=True)
 
 
 class AccountLink(db.Model):
@@ -111,11 +112,26 @@ class ChartTombstone(db.Model):
 
 
 
+def _migrate_columns(app):
+    """Add columns that may be missing from older schemas."""
+    migrations = [
+        ('request_logs', 'comment', 'VARCHAR(256)'),
+    ]
+    for table, column, col_type in migrations:
+        try:
+            db.session.execute(db.text(f'ALTER TABLE {table} ADD COLUMN {column} {col_type}'))
+            db.session.commit()
+            app.logger.info(f'Added column {table}.{column}')
+        except Exception:
+            db.session.rollback()  # already exists
+
+
 def init_db(app):
     """Initialize database with app context"""
     db.init_app(app)
     with app.app_context():
         db.create_all()
+        _migrate_columns(app)
 
         if 'sqlite' in app.config['SQLALCHEMY_DATABASE_URI']:
             db.session.execute(db.text('PRAGMA journal_mode=WAL'))
