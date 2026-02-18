@@ -68,11 +68,6 @@ def health():
     return jsonify(v=config.APP_VERSION), 200
 
 
-@app.route('/api/version-notice', methods=['POST'])
-@limiter.exempt
-def version_notice():
-    return '', 204
-
 
 # =============================================================================
 # HTML Routes

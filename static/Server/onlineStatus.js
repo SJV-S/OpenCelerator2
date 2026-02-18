@@ -1,5 +1,5 @@
-// Online/Offline status indicator + version update detection
-// Pings /api/health to detect server reachability and version changes
+// Online/Offline status indicator
+// Pings /api/health to detect server reachability
 
 import { TIMING_MS, APP_VERSION } from '../SCC/config.js';
 import { eventBus, EVENTS } from '../SCC/eventBus.js';
@@ -8,8 +8,6 @@ import { api } from './client-api.js';
 let statusElement = null;
 let _serverReachable = true;    // optimistic until first ping
 let _pingIntervalId = null;
-let _updateVersion = null;      // non-null when server reports a newer version
-let _versionNoticeReported = false;
 
 const HEALTH_URL = '/api/health';
 const _jsVersion = APP_VERSION;
@@ -22,7 +20,7 @@ export function isOnline() {
 }
 
 /**
- * Ping the server health endpoint and check for version updates
+ * Ping the server health endpoint
  */
 async function pingServer() {
     if (!navigator.onLine) {
@@ -41,21 +39,6 @@ async function pingServer() {
 
         clearTimeout(timeoutId);
         setReachable(response.ok);
-
-        if (response.ok) {
-            const data = await response.json();
-            if (_jsVersion && data.v && data.v !== _jsVersion) {
-                _updateVersion = data.v;
-                updateStatus();
-                if (!_versionNoticeReported) {
-                    _versionNoticeReported = true;
-                    api('/api/version-notice', {
-                        method: 'POST',
-                        body: { comment: `${_jsVersion} → ${data.v}` },
-                    }).catch(() => {});
-                }
-            }
-        }
     } catch {
         setReachable(false);
     }
@@ -74,22 +57,6 @@ function setReachable(reachable) {
         }
     }
     updateStatus();
-}
-
-/**
- * Unregister SW, clear all caches, re-register, and reload
- */
-async function performUpdate() {
-    if (!('serviceWorker' in navigator)) {
-        location.reload();
-        return;
-    }
-    const reg = await navigator.serviceWorker.getRegistration();
-    if (reg) await reg.unregister();
-    const keys = await caches.keys();
-    await Promise.all(keys.map(k => caches.delete(k)));
-    await navigator.serviceWorker.register('/service-worker.js');
-    location.reload();
 }
 
 /**
@@ -131,10 +98,6 @@ function createStatusElement() {
         document.body.appendChild(statusElement);
     }
 
-    statusElement.addEventListener('click', () => {
-        if (_updateVersion) performUpdate();
-    });
-
     return statusElement;
 }
 
@@ -143,16 +106,6 @@ function createStatusElement() {
  */
 function updateStatus() {
     if (!statusElement) createStatusElement();
-
-    if (_updateVersion) {
-        statusElement.textContent = `update to v${_updateVersion}`;
-        statusElement.style.color = '#c2410c';
-        statusElement.style.backgroundColor = 'rgba(255, 237, 213, 0.9)';
-        statusElement.style.opacity = '1';
-        statusElement.style.pointerEvents = 'auto';
-        statusElement.style.cursor = 'pointer';
-        return;
-    }
 
     const prefix = _jsVersion ? `v${_jsVersion} · ` : '';
 
@@ -166,8 +119,6 @@ function updateStatus() {
         statusElement.style.backgroundColor = 'rgba(254, 226, 226, 0.9)';
     }
     statusElement.style.opacity = '1';
-    statusElement.style.pointerEvents = 'none';
-    statusElement.style.cursor = 'default';
 }
 
 /**
