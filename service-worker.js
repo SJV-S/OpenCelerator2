@@ -7,7 +7,7 @@
 // Set to true during development to always fetch fresh (bypasses cache)
 const DEVELOPER_MODE = true;
 
-const SW_VERSION = '0.2.7';
+const SW_VERSION = '0.2.8';
 const CACHE_NAME = `scc-cache-v${SW_VERSION}`;
 
 // HTML pages to precache
@@ -155,7 +155,6 @@ self.addEventListener('install', (event) => {
                 await cache.addAll(PRECACHE_PAGES);
                 await cache.addAll(PRECACHE_STATIC);
             })
-            .then(() => self.skipWaiting())
             .catch(err => {
                 console.error(`[SW ${SW_VERSION}] Install failed:`, err);
             })

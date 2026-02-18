@@ -17,10 +17,11 @@ cd "$(dirname "$0")/.."
 
 
 
-# Sync SW_VERSION from config.py APP_VERSION
+# Sync SW_VERSION and APP_VERSION from config.py
 APP_VER=$(grep -oP "APP_VERSION = '\K[^']+" config.py)
 if [ -n "$APP_VER" ]; then
     sed -i "s/const SW_VERSION = '.*'/const SW_VERSION = '$APP_VER'/" service-worker.js
+    sed -i "s/export const APP_VERSION = '.*'/export const APP_VERSION = '$APP_VER'/" static/SCC/config.js
 fi
 
 git add -A

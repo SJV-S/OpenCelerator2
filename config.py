@@ -1,7 +1,7 @@
 import os
 
 DEVELOPER_MODE = True
-APP_VERSION = '0.2.7'
+APP_VERSION = '0.2.8'
 
 # --- Load .env file ---
 _env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
@@ -45,14 +45,9 @@ NEW_KEYS_PER_IP_PER_HOUR = 5  # legitimate users need one key; shared NAT might 
 
 
 # --- Service Worker ---
-if DEVELOPER_MODE:
-    SW_CACHE_HEADERS = {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0',
-    }
-else:
-    SW_CACHE_HEADERS = {'Cache-Control': 'max-age=3600'}  # Check for updates every 1 hour
+# Browsers bypass HTTP cache for SW update checks (always fetch from network).
+# no-store ensures proxies/CDNs don't cache it either.
+SW_CACHE_HEADERS = {'Cache-Control': 'no-store'}
 
 # --- WebSocket ---
 CORS_ALLOWED_ORIGINS = '*'

@@ -5,6 +5,9 @@
 // Mirror of DEVELOPER_MODE in service-worker.js (SW scope is isolated)
 export const DEVELOPER_MODE = true;
 
+// Synced from config.py APP_VERSION by push_to_my_gitea.sh (same as SW_VERSION)
+export const APP_VERSION = '0.2.8';
+
 // Series name constants (used as keys in chartState)
 export const CORRECTS = 'corrects';
 export const ERRORS = 'errors';

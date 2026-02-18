@@ -1,7 +1,7 @@
 // Online/Offline status indicator + version update detection
 // Pings /api/health to detect server reachability and version changes
 
-import { TIMING_MS } from '../SCC/config.js';
+import { TIMING_MS, APP_VERSION } from '../SCC/config.js';
 import { eventBus, EVENTS } from '../SCC/eventBus.js';
 import { api } from './client-api.js';
 
@@ -12,7 +12,7 @@ let _updateVersion = null;      // non-null when server reports a newer version
 let _versionNoticeReported = false;
 
 const HEALTH_URL = '/api/health';
-const _pageVersion = document.querySelector('meta[name="app-version"]')?.content || null;
+const _jsVersion = APP_VERSION;
 
 /**
  * Check if the server is reachable (cached result from periodic ping)
@@ -44,13 +44,14 @@ async function pingServer() {
 
         if (response.ok) {
             const data = await response.json();
-            if (_pageVersion && data.v && data.v !== _pageVersion) {
+            if (_jsVersion && data.v && data.v !== _jsVersion) {
                 _updateVersion = data.v;
+                updateStatus();
                 if (!_versionNoticeReported) {
                     _versionNoticeReported = true;
                     api('/api/version-notice', {
                         method: 'POST',
-                        body: { comment: `${_pageVersion} → ${data.v}` },
+                        body: { comment: `${_jsVersion} → ${data.v}` },
                     }).catch(() => {});
                 }
             }
@@ -153,7 +154,7 @@ function updateStatus() {
         return;
     }
 
-    const prefix = _pageVersion ? `v${_pageVersion} · ` : '';
+    const prefix = _jsVersion ? `v${_jsVersion} · ` : '';
 
     if (_serverReachable) {
         statusElement.textContent = `${prefix}online`;

@@ -2,10 +2,9 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-eval' 'sha256-eMeLGIkvOXByW95vM0yvYcfrI1dtFqJp8gfdN4GVFaM=' 'sha256-NZdS8LDQFZcsd1R+jWACEVjnsK7cLr9/TiQ2N7u7t3E='; style-src 'self' 'unsafe-inline'">
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-eval' 'sha256-eMeLGIkvOXByW95vM0yvYcfrI1dtFqJp8gfdN4GVFaM=' 'sha256-w0Ynd5FRoI+FK3w0OXYA0UTkS9ZytYgQH/ht1h+rmME='; style-src 'self' 'unsafe-inline'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#05c3de">
-    <meta name="app-version" content="{{ config.APP_VERSION }}">
     <title>{% block title %}Standard Change Chart{% endblock %}</title>
     <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
@@ -100,24 +99,6 @@
             window.location.href = '/welcome';
         };
 
-        // Force service worker update - unregisters, clears caches, re-registers.
-        window.swUpdate = async function() {
-            if (!('serviceWorker' in navigator)) {
-                console.log('[SW] Service workers not supported');
-                return;
-            }
-            var reg = await navigator.serviceWorker.getRegistration();
-            if (reg) {
-                await reg.unregister();
-                console.log('[SW] Unregistered');
-            }
-            var keys = await caches.keys();
-            await Promise.all(keys.map(k => caches.delete(k)));
-            console.log('[SW] Cleared ' + keys.length + ' cache(s)');
-            await navigator.serviceWorker.register('/service-worker.js');
-            console.log('[SW] Re-registered — reloading');
-            location.reload();
-        };
     </script>
     <script type="module" src="/static/Server/onlineStatus.js"></script>
     <script src="/static/SCC/pageFade.js"></script>
