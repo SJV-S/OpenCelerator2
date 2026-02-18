@@ -191,10 +191,10 @@ function formatMonthYear(date) {
 }
 
 /**
- * Parse a date safely as local date, handling both Date objects and strings.
+ * Parse a date safely as local date, handling Date objects, YYYY-MM-DD, and DD-Mon-YYYY strings.
  * Avoids timezone issues by using local date components.
  *
- * @param {Date|string} date - Date object or YYYY-MM-DD string
+ * @param {Date|string} date - Date object, YYYY-MM-DD string, or DD-Mon-YYYY string
  * @returns {Date} Local date at midnight
  */
 function parseLocalDate(date) {
@@ -206,6 +206,22 @@ function parseLocalDate(date) {
         const d = new Date(2000, month - 1, day);
         d.setFullYear(year);
         return d;
+    }
+    // DD-Mon-YYYY format (e.g., "18-Feb-2026")
+    if (typeof date === 'string') {
+        const monthNames = {Jan:0, Feb:1, Mar:2, Apr:3, May:4, Jun:5,
+                           Jul:6, Aug:7, Sep:8, Oct:9, Nov:10, Dec:11};
+        const match = date.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
+        if (match) {
+            const day = Number(match[1]);
+            const month = monthNames[match[2]];
+            const year = Number(match[3]);
+            if (month !== undefined) {
+                const d = new Date(2000, month, day);
+                d.setFullYear(year);
+                return d;
+            }
+        }
     }
     // Fallback - parse and normalize to local midnight
     // BUG INVESTIGATION: ISO strings with time component can shift dates across timezone boundaries
@@ -556,12 +572,22 @@ function adjustDateInput(inputId, offset) {
 }
 
 /**
- * Format a Date object as YYYY-MM-DD string for input fields.
- * Uses local date components to avoid timezone issues.
+ * Format a Date object as DD-Mon-YYYY string for display in input fields.
+ * @param {Date} date - Date to format
+ * @returns {string} Date string in DD-Mon-YYYY format (e.g., "18-Feb-2026")
+ */
+function formatDateInputValue(date) {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${date.getDate()}-${months[date.getMonth()]}-${date.getFullYear()}`;
+}
+
+/**
+ * Format a Date object as YYYY-MM-DD string for storage/metadata.
  * @param {Date} date - Date to format
  * @returns {string} Date string in YYYY-MM-DD format
  */
-function formatDateInputValue(date) {
+function formatDateISO(date) {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
@@ -772,6 +798,7 @@ export {
     updateChartDateLabels,
     formatDateDisplay,
     formatDateInputValue,
+    formatDateISO,
     formatMonthYear,
     updateDateDisplay,
     handleOtherDateChange,

@@ -4,12 +4,12 @@ import { setUserPreference, getUserPreferences, getDisplayName, setDisplayName, 
 import { downloadFile } from '/static/SCC/util/download.js';
 import { createAccountLink } from '/static/Server/accountLink.js';
 import { getStoredPassphrase } from '/static/Server/syncDevice.js';
-import { formatDateInputValue, nowUnixSeconds } from '/static/SCC/util/dates.js';
+import { formatDateISO, nowUnixSeconds } from '/static/SCC/util/dates.js';
 
 export async function performBackupExport() {
     const backup = await createBackupData();
     const json = JSON.stringify(backup);
-    const today = formatDateInputValue(new Date());
+    const today = formatDateISO(new Date());
     const name = backup.identity?.display_name
         ?.replaceAll(' ', '-')
         .replace(/[\/\\:*?"<>|]/g, '-');

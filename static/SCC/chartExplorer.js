@@ -29,12 +29,10 @@ const CHARTS_PER_PAGE = 20;
 
 function formatDate(timestamp) {
     if (!timestamp) return '-';
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const date = new Date(timestamp * 1000);
-    return date.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric'
-    });
+    return `${date.getDate()}-${months[date.getMonth()]}-${date.getFullYear()}`;
 }
 
 function formatChartType(chartType, minuteChart) {
