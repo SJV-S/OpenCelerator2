@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-eval' 'sha256-eMeLGIkvOXByW95vM0yvYcfrI1dtFqJp8gfdN4GVFaM=' 'sha256-2+c/PU2PX2CV/WlbfdadWaXm1mz1xqkufzGB5wedveg='; style-src 'self' 'unsafe-inline'">
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-eval' 'sha256-eMeLGIkvOXByW95vM0yvYcfrI1dtFqJp8gfdN4GVFaM=' 'sha256-KqTRC5u5Wfp84/KozsZssX1FTrXLVFGtJ5wY7VckyT4='; style-src 'self' 'unsafe-inline'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#05c3de">
     <title>{% block title %}Standard Change Chart{% endblock %}</title>
@@ -53,6 +53,7 @@
     <script>
         // Clean SW update — unregister, clear caches, re-register, reload
         function swUpdate() {
+            sessionStorage.setItem('sw-updating', '1');
             navigator.serviceWorker.getRegistration().then(function(reg) {
                 var p = reg ? reg.unregister() : Promise.resolve();
                 p.then(function() { return caches.keys(); })
@@ -68,6 +69,10 @@
                 navigator.serviceWorker.register('/service-worker.js')
                     .then(function(reg) {
                         console.log('[SW] Registered:', reg.scope);
+                        if (sessionStorage.getItem('sw-updating')) {
+                            sessionStorage.removeItem('sw-updating');
+                            return;
+                        }
                         if (reg.waiting) { swUpdate(); return; }
                         reg.addEventListener('updatefound', function() {
                             var w = reg.installing;
