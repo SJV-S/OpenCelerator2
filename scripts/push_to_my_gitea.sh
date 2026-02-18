@@ -15,6 +15,8 @@
 
 cd "$(dirname "$0")/.."
 
+
+
 # Sync SW_VERSION from config.py APP_VERSION
 APP_VER=$(grep -oP "APP_VERSION = '\K[^']+" config.py)
 if [ -n "$APP_VER" ]; then

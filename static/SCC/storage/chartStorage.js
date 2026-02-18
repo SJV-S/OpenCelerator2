@@ -454,7 +454,7 @@ function debouncedSaveToIndexedDB() {
 
 /**
  * Debounced server push for non-shared charts.
- * Resets on each call so the push only fires once editing settles for 60s.
+ * Resets on each call so the push only fires once editing settles for 30s.
  */
 function scheduleSyncPush(chartId) {
     if (syncPushTimeout) {
