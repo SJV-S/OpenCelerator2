@@ -237,7 +237,7 @@ function createLinesSection(scale = 1) {
     const lineTypes = [
         { key: 'aim', label: 'Count markers', icon: icons.aimDiagonal(scaledIconSize, false) },
         { key: 'phase', label: 'Event markers', icon: icons.phaseTextTop(scaledIconSize, false) },
-        { key: 'change', label: 'Change lines', icon: icons.scatterLine(scaledIconSize) },
+        { key: 'change', label: 'Trendlines', icon: icons.scatterLine(scaledIconSize) },
         { key: 'grid', label: 'Grid', icon: icons.grid(scaledIconSize) }
     ];
 
@@ -533,7 +533,7 @@ function init() {
     const modeToLineType = {
         [EVENTS.MODE_PHASE_ACTIVATE]: { key: 'phase', label: 'Event markers' },
         [EVENTS.MODE_AIM_ACTIVATE]:   { key: 'aim',   label: 'Count markers' },
-        [EVENTS.MODE_CEL_ACTIVATE]:   { key: 'change', label: 'Change lines' }
+        [EVENTS.MODE_CEL_ACTIVATE]:   { key: 'change', label: 'Trendlines' }
     };
 
     for (const [event, { key, label }] of Object.entries(modeToLineType)) {

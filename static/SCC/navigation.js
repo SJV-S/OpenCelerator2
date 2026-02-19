@@ -185,7 +185,7 @@ function toggleLineCategoryEdit(category, enabled, showToast = true) {
             phase: 'Event marker',
             aim: 'Count marker',
             cut: 'Cut line',
-            cel: 'Change line'
+            cel: 'Trendline'
         };
         createToast({
             message: `${categoryLabels[category]} editing ${enabled ? 'enabled' : 'disabled'}`,

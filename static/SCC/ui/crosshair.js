@@ -17,6 +17,7 @@
 
 import { chartState } from '../chartState.js';
 import { CORRECTS, ERRORS, LAYOUT, WINDOW_UNITS } from '../config.js';
+import { eventBus, EVENTS } from '../eventBus.js';
 import { dateToXPosition, xPositionToDate } from '../util/dates.js';
 import { formatValue } from '../util/format.js';
 import { getFirstConfig, isSeriesVisible } from '../series/traceStyles.js';
@@ -934,6 +935,9 @@ function findCelLinesAtX(xRounded, yLogValue) {
     for (const line of state.celLineCache) {
         if (xRounded < line.x0 || xRounded > line.x1) continue;
 
+        // Live visibility guard — cache may be stale after visibility toggles
+        if (!isSeriesVisible(line.seriesKey)) continue;
+
         const logY = line.slope * xRounded + line.intercept;
         const trendY = Math.pow(10, logY);
 
@@ -1139,6 +1143,29 @@ function formatSeriesName(seriesId) {
 }
 
 // =============================================================================
+// Visibility Change Handling
+// =============================================================================
+
+/**
+ * Rebuild cel line cache and re-evaluate current position after visibility changes.
+ * Called when series or line visibility toggles while crosshair is active.
+ */
+function refreshCelOverlays() {
+    if (!state.active) return;
+
+    buildCelLineCache();
+
+    // Re-evaluate cel data at current position
+    if (state.lastXRounded !== null && state.currentYPixel !== null && state.cache) {
+        const yLogValue = state.cache.yRange[1] - (state.currentYPixel - state.cache.plotTop) / state.cache.yScale;
+        state.currentCelData = findCelLinesAtX(state.lastXRounded, yLogValue);
+        updateInfoPanel(state.lastXRounded, yLogValue, state.currentTraceData, state.currentCelData);
+    }
+
+    drawCanvas();
+}
+
+// =============================================================================
 // Initialization
 // =============================================================================
 
@@ -1172,6 +1199,12 @@ function init() {
             deactivateCrosshair();
         }
     });
+
+    // Rebuild cel overlays when series visibility changes
+    eventBus.subscribe(EVENTS.SERIES_VISIBILITY_CHANGED, refreshCelOverlays, true);
+
+    // Rebuild cel overlays when line type visibility toggles (e.g. global change line toggle)
+    eventBus.subscribe(EVENTS.LINE_VISIBILITY_CHANGED, refreshCelOverlays, true);
 }
 
 export { init, activateCrosshair, deactivateCrosshair };

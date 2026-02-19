@@ -61,7 +61,7 @@ function createModal() {
     // Title
     const title = document.createElement('h2');
     title.className = 'text-lg font-semibold text-gray-700 mb-4 text-center';
-    title.textContent = 'Change Line Settings';
+    title.textContent = 'Trendline Settings';
 
     // --- Fit Method ---
     const fitRow = document.createElement('div');

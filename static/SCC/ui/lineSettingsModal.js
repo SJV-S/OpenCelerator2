@@ -16,7 +16,7 @@ import { getUserPreferences, setUserPreference } from '../../Server/init.js';
 const CATEGORY_LABELS = {
     phase: 'Event Markers',
     aim: 'Count Markers',
-    cel: 'Change Line'
+    cel: 'Trendline'
 };
 
 const STYLE_DEFAULTS = {
