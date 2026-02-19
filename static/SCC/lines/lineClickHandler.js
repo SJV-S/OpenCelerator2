@@ -24,6 +24,7 @@ import { showAimLineEditor } from '../ui/aimLineEditor.js';
 import { interpolateLinePoints } from '../util/lineInterpolation.js';
 import { getChartDiv } from '../util/dom.js';
 import { relayout, addTraces, deleteTraces } from '../util/plotlyWrapper.js';
+import { isSeriesVisible } from '../series/traceStyles.js';
 
 // Module-level state
 let clickHandlerAttached = false;
@@ -309,6 +310,9 @@ function setLineCategoryClickability(category, makeClickable) {
                 // Skip the settings object (it doesn't have an id property)
                 if (!celLine.id) return;
 
+                // Skip cel lines whose series is hidden
+                if (celLine.seriesKey && !isSeriesVisible(celLine.seriesKey)) return;
+
                 clickablePromise = clickablePromise
                     .then(() => useDelay ? delay(TRACE_DRAW_DELAY) : Promise.resolve())
                     .then(() => {
@@ -453,6 +457,42 @@ function init() {
 
     eventBus.subscribe(EVENTS.LINE_REMOVE_CLICKABLE, (data) => {
         removeLineClickable(data.lineName);
+    }, true);
+
+    // When series visibility changes while cel edit mode is active,
+    // add/remove clickable traces for affected cel lines
+    eventBus.subscribe(EVENTS.SERIES_VISIBILITY_CHANGED, (data) => {
+        if (!categoryEditState.cel || !chartState.CelLines) return;
+
+        const baseKey = data.seriesKey.substring(0, data.seriesKey.lastIndexOf('_'));
+        const seriesVisible = isSeriesVisible(baseKey);
+        const chartDiv = getChartDiv();
+        const yaxis = chartDiv._fullLayout?.yaxis;
+        if (!yaxis) return;
+
+        const isLogY = yaxis.type === 'log';
+
+        Object.values(chartState.CelLines).forEach(celLine => {
+            if (!celLine.id || celLine.seriesKey !== baseKey) return;
+
+            const lineName = `cel-${celLine.id}`;
+
+            if (seriesVisible) {
+                // Re-add clickable trace if not already present
+                const alreadyExists = chartDiv.data.some(
+                    t => t.meta?.type === 'clickableLine' && t.meta.lineName === lineName
+                );
+                if (!alreadyExists) {
+                    const x1 = dateToXPosition(celLine.date1);
+                    const x2 = dateToXPosition(celLine.date2);
+                    const points = [interpolateLinePoints(x1, celLine.y1, x2, celLine.y2, isLogY)];
+                    makeLineClickable({ lineName, points });
+                }
+            } else {
+                // Remove clickable trace for hidden series
+                removeLineClickable(lineName);
+            }
+        });
     }, true);
 }
 
