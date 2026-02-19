@@ -1053,7 +1053,7 @@ function updateInfoPanel(xRounded, yLogValue, traceData, celData) {
             if (!data) {
                 if (celHeadingKeys.has(key)) {
                     // Show as label-only heading (no data value)
-                    let displayName = formatSeriesName(seriesId);
+                    let displayName = formatSeriesName(baseKey);
                     if (displayName.length > 30) {
                         displayName = displayName.slice(0, 30) + '...';
                     }
