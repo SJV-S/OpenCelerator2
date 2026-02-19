@@ -20,7 +20,7 @@ import { CORRECTS, ERRORS, LAYOUT, WINDOW_UNITS } from '../config.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 import { dateToXPosition, xPositionToDate } from '../util/dates.js';
 import { formatValue } from '../util/format.js';
-import { getFirstConfig } from '../series/traceStyles.js';
+import { getFirstConfig, getConfig, getAggLabel } from '../series/traceStyles.js';
 import { getChartDiv } from '../util/dom.js';
 
 // =============================================================================
@@ -420,39 +420,10 @@ function buildCelLineCache() {
         const x0 = dateToXPosition(meta.date1);
         const x1 = dateToXPosition(meta.date2);
 
-        // Match this cel line to a specific (baseKey, aggId) pair
-        // by finding which trace's data best fits the cel line at its midpoint
-        const midX = Math.round((x0 + x1) / 2);
-        const midLogY = meta.slope * midX + meta.intercept;
-        let matchedBaseKey = null;
-        let matchedAggId = null;
-        let bestDist = Infinity;
-
-        for (const trace of chartDiv.data) {
-            if (!trace.meta || !trace.x || !trace.y) continue;
-            const { seriesName, aggId } = trace.meta;
-            if (seriesName !== meta.seriesKey) continue;
-
-            const { index, dist: xDist } = binarySearchClosest(trace.x, midX);
-            if (index < 0 || xDist > 0.5) continue;
-
-            const val = trace.y[index];
-            if (val == null || val <= 0) continue;
-
-            const dist = Math.abs(Math.log10(val) - midLogY);
-            if (dist < bestDist) {
-                bestDist = dist;
-                matchedBaseKey = seriesName;
-                matchedAggId = aggId;
-            }
-        }
-
         state.celLineCache.push({
             id: meta.id,
             seriesKey: meta.seriesKey,
             aggId: meta.aggId,
-            matchedBaseKey,
-            matchedAggId,
             x0, x1,
             slope: meta.slope,
             intercept: meta.intercept,
@@ -857,7 +828,7 @@ function findTraceDataAtX(xRounded) {
     for (const trace of traces) {
         if (!trace.meta) continue;
 
-        const { seriesName, aggId, onXAgg, acrossXAgg } = trace.meta;
+        const { seriesName, aggId, onXAgg, acrossXAgg, detrend } = trace.meta;
         if (!seriesName || seriesName.includes('FloorShadow')) continue;
 
         // Skip series the user has hidden via the legend
@@ -875,7 +846,7 @@ function findTraceDataAtX(xRounded) {
             if (value !== null && value !== undefined && !isNaN(value)) {
                 if (!result.get(seriesName)?.has(aggId)) {
                     if (!result.has(seriesName)) result.set(seriesName, new Map());
-                    result.get(seriesName).set(aggId, { seriesName, aggId, onXAgg, acrossXAgg, value });
+                    result.get(seriesName).set(aggId, { seriesName, aggId, onXAgg, acrossXAgg, detrend, value });
                 }
             }
         }
@@ -965,6 +936,7 @@ function findCelLinesAtX(xRounded, yLogValue) {
         candidates.push({
             id: line.id,
             seriesKey: line.seriesKey,
+            aggId: line.aggId,
             trendY,
             upperY,
             lowerY,
@@ -1034,20 +1006,8 @@ function updateInfoPanel(xRounded, yLogValue, traceData, celData) {
     const celHeadingKeys = new Map();
     if (celData) {
         for (const cel of celData) {
-            if (cel.matchedBaseKey) {
-                if (!celHeadingKeys.has(cel.matchedBaseKey)) celHeadingKeys.set(cel.matchedBaseKey, new Set());
-                celHeadingKeys.get(cel.matchedBaseKey).add(cel.matchedAggId);
-            } else {
-                // Fallback: use the first aggId for this base series
-                const aggMap = refs.seriesRows.get(cel.seriesKey);
-                if (aggMap) {
-                    const firstAggId = aggMap.keys().next().value;
-                    if (firstAggId !== undefined) {
-                        if (!celHeadingKeys.has(cel.seriesKey)) celHeadingKeys.set(cel.seriesKey, new Set());
-                        celHeadingKeys.get(cel.seriesKey).add(firstAggId);
-                    }
-                }
-            }
+            if (!celHeadingKeys.has(cel.seriesKey)) celHeadingKeys.set(cel.seriesKey, new Set());
+            celHeadingKeys.get(cel.seriesKey).add(cel.aggId);
         }
     }
 
@@ -1066,10 +1026,12 @@ function updateInfoPanel(xRounded, yLogValue, traceData, celData) {
 
             if (!data) {
                 if (celHeadingKeys.get(baseKey)?.has(aggId)) {
-                    // Show as label-only heading (no data value)
-                    let displayName = formatSeriesName(baseKey);
-                    if (displayName.length > 30) {
-                        displayName = displayName.slice(0, 30) + '...';
+                    // Show as label-only heading using the derived series' own name + agg label
+                    const aggConfig = getConfig(baseKey, aggId);
+                    const baseName = aggConfig?.seriesName || formatSeriesName(baseKey);
+                    let displayName = `${baseName} — ${aggConfig ? getAggLabel(aggConfig) : 'Raw'}`;
+                    if (displayName.length > 40) {
+                        displayName = displayName.slice(0, 40) + '...';
                     }
                     rowRefs.labelSpan.textContent = displayName;
                     rowRefs.labelSpan.style.color = markerColor;
@@ -1099,9 +1061,11 @@ function updateInfoPanel(xRounded, yLogValue, traceData, celData) {
             // Append aggregation info if not plain raw
             const onX = data.onXAgg || 'raw';
             const acrossX = data.acrossXAgg;
-            if (onX !== 'raw' || acrossX) {
+            const detrend = data.detrend;
+            if (onX !== 'raw' || acrossX || detrend) {
                 const parts = [];
                 if (onX !== 'raw') parts.push(onX);
+                if (detrend) parts.push(`${detrend.method} residuals`);
                 if (acrossX) {
                     const unit = WINDOW_UNITS[chartState.chartType]?.abbrev || 'x';
                     parts.push(`${acrossX.fn} ${unit}${acrossX.window}`);
@@ -1124,7 +1088,7 @@ function updateInfoPanel(xRounded, yLogValue, traceData, celData) {
             for (const cel of celData) {
                 const bounceLabels = BOUNCE_LABELS[cel.bounceEnvelope];
 
-                let anchorRow = refs.seriesRows.get(cel.matchedBaseKey)?.get(cel.matchedAggId)?.row;
+                let anchorRow = refs.seriesRows.get(cel.seriesKey)?.get(cel.aggId)?.row;
                 if (!anchorRow) {
                     const aggMap = refs.seriesRows.get(cel.seriesKey);
                     if (aggMap) {

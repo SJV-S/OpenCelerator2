@@ -925,5 +925,6 @@ export {
     getAvailableAggTypes,
     updateTimingSeriesVisibility,
     getFirstConfig,
+    getConfig,
     getAggLabel
 };
