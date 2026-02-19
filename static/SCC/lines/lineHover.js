@@ -14,7 +14,6 @@ import { formatCelerationLabel, formatDoublingTimeLabel } from '../util/fit_line
 import { getCelLineSettings } from '../ui/celSettingsModal.js';
 import { interpolateLinePoints } from '../util/lineInterpolation.js';
 import { deleteTraces, addTraces } from '../util/plotlyWrapper.js';
-import { isSeriesVisible } from '../series/traceStyles.js';
 import { getChartDiv } from '../util/dom.js';
 
 // Meta type for hover traces (distinct from clickableLine)
@@ -150,7 +149,9 @@ function buildAllHoverTraces() {
             if (!celLine.id) return; // Skip settings object
 
             // Same visibility rule as redrawCelLines in celLine.js
-            if (!celVisible || !isSeriesVisible(celLine.seriesKey)) return;
+            const fittedAgg = celLine.aggId;
+            const aggVisible = chartState.seriesVisibility[celLine.seriesKey]?.[fittedAgg] !== false;
+            if (!celVisible || !aggVisible) return;
 
             const lineName = `cel-${celLine.id}`;
             const label = buildCelHoverLabel(celLine);

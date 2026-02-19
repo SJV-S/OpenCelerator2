@@ -42,16 +42,13 @@ function getLegendItems() {
         if (!aggConfigs) return;
 
         Object.entries(aggConfigs).forEach(([aggId, config]) => {
-            const uniqueKey = `${seriesKey}_${aggId}`;
-
-            if (chartState.seriesVisibility[uniqueKey] === undefined) {
-                chartState.seriesVisibility[uniqueKey] = true;
+            if ((chartState.seriesVisibility[seriesKey] ??= {})[aggId] === undefined) {
+                chartState.seriesVisibility[seriesKey][aggId] = true;
             }
 
             items.push({
-                seriesKey: uniqueKey,
                 displayName: config.seriesName,
-                visible: chartState.seriesVisibility[uniqueKey],
+                visible: chartState.seriesVisibility[seriesKey][aggId],
                 config: config,
                 baseSeriesKey: seriesKey,
                 aggId: aggId,
@@ -70,16 +67,13 @@ function getLegendItems() {
         if (!hasIntegerData) return;
 
         Object.entries(aggConfigs).forEach(([aggId, config]) => {
-            const uniqueKey = `${miscId}_${aggId}`;
-
-            if (chartState.seriesVisibility[uniqueKey] === undefined) {
-                chartState.seriesVisibility[uniqueKey] = true;
+            if ((chartState.seriesVisibility[miscId] ??= {})[aggId] === undefined) {
+                chartState.seriesVisibility[miscId][aggId] = true;
             }
 
             items.push({
-                seriesKey: uniqueKey,
                 displayName: config.seriesName,
-                visible: chartState.seriesVisibility[uniqueKey],
+                visible: chartState.seriesVisibility[miscId][aggId],
                 config: config,
                 baseSeriesKey: miscId,
                 aggId: aggId,
@@ -178,7 +172,8 @@ function getMarkerSVG(seriesKey, config, scale = 1) {
 function createLegendItem(item, scale = 1) {
     const div = document.createElement('div');
     div.className = 'legend-item';
-    div.dataset.seriesKey = item.seriesKey;
+    div.dataset.baseKey = item.baseSeriesKey;
+    div.dataset.aggId = item.aggId;
 
     // Apply scaled styles
     div.style.gap = `${Math.round(4 * scale)}px`;
@@ -213,7 +208,7 @@ function createLegendItem(item, scale = 1) {
     div.appendChild(label);
 
     // Click handler to toggle visibility
-    div.addEventListener('click', () => toggleSeriesVisibility(item.seriesKey));
+    div.addEventListener('click', () => toggleSeriesVisibility(item.baseSeriesKey, item.aggId));
 
     // Apply hidden styling if not visible
     if (!item.visible) {
@@ -418,60 +413,53 @@ function renderCustomLegend() {
     container.style.display = chartState.legend.show ? 'flex' : 'none';
 
     // Re-apply hidden series after render (survives replot)
-    Object.entries(chartState.seriesVisibility).forEach(([key, visible]) => {
-        if (!visible) {
-            updatePlotlyTraceVisibility(key, false);
+    for (const [baseKey, aggMap] of Object.entries(chartState.seriesVisibility)) {
+        for (const [aggId, visible] of Object.entries(aggMap)) {
+            if (!visible) {
+                updatePlotlyTraceVisibility(baseKey, aggId, false);
+            }
         }
-    });
+    }
 }
 
 /**
  * Toggle visibility for a series
- * @param {string} seriesKey - Unique series identifier (series_aggId)
+ * @param {string} baseKey - Base series key (corrects, errors, timing, misc1, etc.)
+ * @param {string} aggId - Aggregation ID ("0", "1", etc.)
  */
-function toggleSeriesVisibility(seriesKey) {
-    // Toggle visibility state for THIS specific series_aggId combination
-    chartState.seriesVisibility[seriesKey] = !chartState.seriesVisibility[seriesKey];
+function toggleSeriesVisibility(baseKey, aggId) {
+    const visible = !(chartState.seriesVisibility[baseKey]?.[aggId]);
+    (chartState.seriesVisibility[baseKey] ??= {})[aggId] = visible;
 
     // Update legend item styling for this specific item only
-    const legendItem = document.querySelector(`.legend-item[data-series-key="${seriesKey}"]`);
+    const legendItem = document.querySelector(`.legend-item[data-base-key="${baseKey}"][data-agg-id="${aggId}"]`);
     if (legendItem) {
-        if (chartState.seriesVisibility[seriesKey]) {
-            legendItem.classList.remove('legend-item-hidden');
-        } else {
-            legendItem.classList.add('legend-item-hidden');
-        }
+        legendItem.classList.toggle('legend-item-hidden', !visible);
     }
 
-    // Tell Plotly to hide/show traces for this specific series_aggId
-    updatePlotlyTraceVisibility(seriesKey, chartState.seriesVisibility[seriesKey]);
+    // Tell Plotly to hide/show traces for this specific series+aggId
+    updatePlotlyTraceVisibility(baseKey, aggId, visible);
 
     // Emit event so state is persisted
-    eventBus.emit(EVENTS.SERIES_VISIBILITY_CHANGED, { seriesKey, visible: chartState.seriesVisibility[seriesKey] });
+    eventBus.emit(EVENTS.SERIES_VISIBILITY_CHANGED, { baseKey, aggId, visible });
 }
 
 /**
  * Update Plotly trace visibility (one-way command to Plotly)
- * @param {string} seriesKey - Unique series identifier (series_aggId)
+ * @param {string} baseKey - Base series key (corrects, errors, timing, misc1, etc.)
+ * @param {string} aggId - Aggregation ID ("0", "1", etc.)
  * @param {boolean} visible - Whether the series should be visible
  */
-function updatePlotlyTraceVisibility(seriesKey, visible) {
+function updatePlotlyTraceVisibility(baseKey, aggId, visible) {
     const chartDiv = getChartDiv();
     if (!chartDiv) return;
 
-    // Parse the unique key (e.g., "corrects_0" -> baseKey="corrects", aggId="0")
-    const underscoreIdx = seriesKey.lastIndexOf('_');
-    const baseKey = seriesKey.slice(0, underscoreIdx);
-    const aggId = seriesKey.slice(underscoreIdx + 1);
-
-    // baseKey is: 'corrects', 'errors', 'timing', or misc ID
-    const targetSeriesName = baseKey;
     const traceIndices = [];
 
     // Find all traces for this specific series AND aggregation ID
     chartDiv.data.forEach((trace, idx) => {
         if (trace.meta &&
-            trace.meta.seriesName === targetSeriesName &&
+            trace.meta.seriesName === baseKey &&
             trace.meta.aggId === aggId) {
             traceIndices.push(idx);
         }

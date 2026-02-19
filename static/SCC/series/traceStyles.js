@@ -92,18 +92,7 @@ function getFirstConfig(seriesName, isMisc) {
     return firstKey ? configs[firstKey] : null;
 }
 
-/**
- * Check if a data series has any visible aggregation type.
- * @param {string} seriesKey - The series key (corrects, errors, timing, misc1, etc.)
- * @returns {boolean} True if any aggregation type is visible
- */
-function isSeriesVisible(seriesKey) {
-    const visibility = chartState.seriesVisibility;
-    const prefix = seriesKey + '_';
-    const entries = Object.entries(visibility).filter(([key]) => key.startsWith(prefix));
-    if (entries.length === 0) return true;
-    return entries.some(([, visible]) => visible !== false);
-}
+
 
 function getAggCount(seriesName) {
     const configs = getSeriesConfigs(seriesName);
@@ -936,6 +925,5 @@ export {
     getAvailableAggTypes,
     updateTimingSeriesVisibility,
     getFirstConfig,
-    isSeriesVisible,
     getAggLabel
 };

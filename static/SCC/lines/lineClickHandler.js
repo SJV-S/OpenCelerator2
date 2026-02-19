@@ -24,7 +24,6 @@ import { showAimLineEditor } from '../ui/aimLineEditor.js';
 import { interpolateLinePoints } from '../util/lineInterpolation.js';
 import { getChartDiv } from '../util/dom.js';
 import { relayout, addTraces, deleteTraces } from '../util/plotlyWrapper.js';
-import { isSeriesVisible } from '../series/traceStyles.js';
 
 // Module-level state
 let clickHandlerAttached = false;
@@ -310,8 +309,11 @@ function setLineCategoryClickability(category, makeClickable) {
                 // Skip the settings object (it doesn't have an id property)
                 if (!celLine.id) return;
 
-                // Skip cel lines whose series is hidden
-                if (celLine.seriesKey && !isSeriesVisible(celLine.seriesKey)) return;
+                // Skip cel lines whose fitted aggregation is hidden
+                if (celLine.seriesKey) {
+                    const aggVisible = chartState.seriesVisibility[celLine.seriesKey]?.[celLine.aggId] !== false;
+                    if (!aggVisible) return;
+                }
 
                 clickablePromise = clickablePromise
                     .then(() => useDelay ? delay(TRACE_DRAW_DELAY) : Promise.resolve())
@@ -464,8 +466,7 @@ function init() {
     eventBus.subscribe(EVENTS.SERIES_VISIBILITY_CHANGED, (data) => {
         if (!categoryEditState.cel || !chartState.CelLines) return;
 
-        const baseKey = data.seriesKey.substring(0, data.seriesKey.lastIndexOf('_'));
-        const seriesVisible = isSeriesVisible(baseKey);
+        const baseKey = data.baseKey;
         const chartDiv = getChartDiv();
         const yaxis = chartDiv._fullLayout?.yaxis;
         if (!yaxis) return;
@@ -475,9 +476,11 @@ function init() {
         Object.values(chartState.CelLines).forEach(celLine => {
             if (!celLine.id || celLine.seriesKey !== baseKey) return;
 
+            const fittedAgg = celLine.aggId;
+            const aggVisible = chartState.seriesVisibility[baseKey]?.[fittedAgg] !== false;
             const lineName = `cel-${celLine.id}`;
 
-            if (seriesVisible) {
+            if (aggVisible) {
                 // Re-add clickable trace if not already present
                 const alreadyExists = chartDiv.data.some(
                     t => t.meta?.type === 'clickableLine' && t.meta.lineName === lineName
@@ -489,7 +492,7 @@ function init() {
                     makeLineClickable({ lineName, points });
                 }
             } else {
-                // Remove clickable trace for hidden series
+                // Remove clickable trace for hidden agg
                 removeLineClickable(lineName);
             }
         });

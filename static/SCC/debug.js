@@ -289,7 +289,8 @@ window.debugLegend = function() {
     if (container) {
         const items = container.querySelectorAll('.legend-item');
         const domItems = Array.from(items).map(el => ({
-            seriesKey: el.dataset.seriesKey || el.dataset.lineType || '?',
+            baseKey: el.dataset.baseKey || el.dataset.lineType || '?',
+            aggId: el.dataset.aggId || '',
             hidden: el.classList.contains('legend-item-hidden'),
             text: el.textContent.trim()
         }));

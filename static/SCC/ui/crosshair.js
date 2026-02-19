@@ -20,7 +20,7 @@ import { CORRECTS, ERRORS, LAYOUT, WINDOW_UNITS } from '../config.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 import { dateToXPosition, xPositionToDate } from '../util/dates.js';
 import { formatValue } from '../util/format.js';
-import { getFirstConfig, isSeriesVisible } from '../series/traceStyles.js';
+import { getFirstConfig } from '../series/traceStyles.js';
 import { getChartDiv } from '../util/dom.js';
 
 // =============================================================================
@@ -303,23 +303,22 @@ function buildSeriesConfigs() {
     state.elements.seriesConfigs.clear();
 
     // Collect unique series+aggId combinations from traces
-    const keysSeen = new Set();
-
+    // seriesConfigs: Map<baseKey, Map<aggId, {color, shape, size}>>
     for (const trace of chartDiv.data) {
         if (!trace.meta) continue;
         const { seriesName, aggId } = trace.meta;
         if (!seriesName || seriesName.includes('FloorShadow')) continue;
 
-        const compoundKey = `${seriesName}_${aggId}`;
-        if (keysSeen.has(compoundKey)) continue;
-        keysSeen.add(compoundKey);
+        if (state.elements.seriesConfigs.get(seriesName)?.has(aggId)) continue;
 
-        // Store marker config keyed by compound key (style from base series name)
         const styleKey = seriesName.startsWith('misc') ? 'misc' : seriesName;
         const style = MARKER_STYLES[styleKey] || MARKER_STYLES.misc;
         const size = getMarkerSize(seriesName);
 
-        state.elements.seriesConfigs.set(compoundKey, {
+        if (!state.elements.seriesConfigs.has(seriesName)) {
+            state.elements.seriesConfigs.set(seriesName, new Map());
+        }
+        state.elements.seriesConfigs.get(seriesName).set(aggId, {
             color: style.color,
             shape: style.shape,
             size: size
@@ -327,6 +326,7 @@ function buildSeriesConfigs() {
     }
 
     // Also create rows in series section for each series+aggId
+    // seriesRows: Map<baseKey, Map<aggId, {row, labelSpan, valueSpan}>>
     const refs = state.elements.infoPanelRefs;
     if (refs.seriesContainer) {
         // Remove existing rows (keep heading)
@@ -335,21 +335,26 @@ function buildSeriesConfigs() {
         if (heading) refs.seriesContainer.appendChild(heading);
         refs.seriesRows.clear();
 
-        for (const compoundKey of keysSeen) {
-            const row = document.createElement('div');
-            row.className = 'crosshair-row-stacked';
-            row.style.display = 'none';
+        for (const [seriesName, aggMap] of state.elements.seriesConfigs) {
+            for (const aggId of aggMap.keys()) {
+                const row = document.createElement('div');
+                row.className = 'crosshair-row-stacked';
+                row.style.display = 'none';
 
-            const labelSpan = document.createElement('span');
-            labelSpan.className = 'crosshair-label';
-            row.appendChild(labelSpan);
+                const labelSpan = document.createElement('span');
+                labelSpan.className = 'crosshair-label';
+                row.appendChild(labelSpan);
 
-            const valueSpan = document.createElement('span');
-            valueSpan.className = 'crosshair-value';
-            row.appendChild(valueSpan);
+                const valueSpan = document.createElement('span');
+                valueSpan.className = 'crosshair-value';
+                row.appendChild(valueSpan);
 
-            refs.seriesContainer.appendChild(row);
-            refs.seriesRows.set(compoundKey, { row, labelSpan, valueSpan });
+                refs.seriesContainer.appendChild(row);
+                if (!refs.seriesRows.has(seriesName)) {
+                    refs.seriesRows.set(seriesName, new Map());
+                }
+                refs.seriesRows.get(seriesName).set(aggId, { row, labelSpan, valueSpan });
+            }
         }
 
         // Re-append cel pool rows so they stay in the series container after rebuild
@@ -403,8 +408,9 @@ function buildCelLineCache() {
         // Skip if global change line visibility is off
         if (!globalVisible) continue;
 
-        // Skip if the parent series is hidden
-        if (!isSeriesVisible(meta.seriesKey)) continue;
+        // Skip if the fitted aggregation is hidden
+        const aggVisible = chartState.seriesVisibility[meta.seriesKey]?.[meta.aggId] !== false;
+        if (!aggVisible) continue;
 
         // Skip hidden shapes (per-line visibility)
         const shapeName = `cel-${meta.id}`;
@@ -414,11 +420,12 @@ function buildCelLineCache() {
         const x0 = dateToXPosition(meta.date1);
         const x1 = dateToXPosition(meta.date2);
 
-        // Match this cel line to a specific compound key (seriesName_aggId)
+        // Match this cel line to a specific (baseKey, aggId) pair
         // by finding which trace's data best fits the cel line at its midpoint
         const midX = Math.round((x0 + x1) / 2);
         const midLogY = meta.slope * midX + meta.intercept;
-        let matchedKey = null;
+        let matchedBaseKey = null;
+        let matchedAggId = null;
         let bestDist = Infinity;
 
         for (const trace of chartDiv.data) {
@@ -435,14 +442,17 @@ function buildCelLineCache() {
             const dist = Math.abs(Math.log10(val) - midLogY);
             if (dist < bestDist) {
                 bestDist = dist;
-                matchedKey = `${seriesName}_${aggId}`;
+                matchedBaseKey = seriesName;
+                matchedAggId = aggId;
             }
         }
 
         state.celLineCache.push({
             id: meta.id,
             seriesKey: meta.seriesKey,
-            matchedKey,
+            aggId: meta.aggId,
+            matchedBaseKey,
+            matchedAggId,
             x0, x1,
             slope: meta.slope,
             intercept: meta.intercept,
@@ -733,10 +743,11 @@ function drawCanvas() {
         const fullLayout = state.elements.chart._fullLayout;
         const xMarkerPixel = fullLayout.xaxis._offset + fullLayout.xaxis.l2p(state.lastXRounded);
 
-        for (const [key, data] of state.currentTraceData) {
+        for (const [seriesName, aggMap] of state.currentTraceData) {
+        for (const [aggId, data] of aggMap) {
             if (!data || data.value <= 0) continue;
 
-            const config = state.elements.seriesConfigs.get(key);
+            const config = state.elements.seriesConfigs.get(seriesName)?.get(aggId);
             if (!config) continue;
 
             // Calculate y pixel position using Plotly's axis mapping (log scale)
@@ -764,6 +775,7 @@ function drawCanvas() {
                 ctx.closePath();
                 ctx.fill();
             }
+        }
         }
 
         ctx.globalAlpha = 1;
@@ -833,7 +845,7 @@ function drawCanvas() {
 /**
  * Find data values for all traces at a given x position
  * Uses binary search for O(log n) per trace
- * @returns {Map} Map of seriesName -> { seriesName, aggId, onXAgg, acrossXAgg, value }
+ * @returns {Map} Map<baseKey, Map<aggId, { seriesName, aggId, onXAgg, acrossXAgg, value }>>
  */
 function findTraceDataAtX(xRounded) {
     const chartDiv = state.elements?.chart;
@@ -849,8 +861,7 @@ function findTraceDataAtX(xRounded) {
         if (!seriesName || seriesName.includes('FloorShadow')) continue;
 
         // Skip series the user has hidden via the legend
-        const visKey = `${seriesName}_${aggId}`;
-        if (chartState.seriesVisibility[visKey] === false) continue;
+        if (chartState.seriesVisibility[seriesName]?.[aggId] === false) continue;
 
         const xArray = trace.x;
         const yArray = trace.y;
@@ -862,10 +873,9 @@ function findTraceDataAtX(xRounded) {
         if (index >= 0 && dist <= 0.5) {
             const value = yArray[index];
             if (value !== null && value !== undefined && !isNaN(value)) {
-                // Key by series+aggId so each aggregation is tracked independently
-                const key = `${seriesName}_${aggId}`;
-                if (!result.has(key)) {
-                    result.set(key, { seriesName, aggId, onXAgg, acrossXAgg, value });
+                if (!result.get(seriesName)?.has(aggId)) {
+                    if (!result.has(seriesName)) result.set(seriesName, new Map());
+                    result.get(seriesName).set(aggId, { seriesName, aggId, onXAgg, acrossXAgg, value });
                 }
             }
         }
@@ -936,7 +946,8 @@ function findCelLinesAtX(xRounded, yLogValue) {
         if (xRounded < line.x0 || xRounded > line.x1) continue;
 
         // Live visibility guard — cache may be stale after visibility toggles
-        if (!isSeriesVisible(line.seriesKey)) continue;
+        const aggVisible = chartState.seriesVisibility[line.seriesKey]?.[line.aggId] !== false;
+        if (!aggVisible) continue;
 
         const logY = line.slope * xRounded + line.intercept;
         const trendY = Math.pow(10, logY);
@@ -1017,19 +1028,23 @@ function updateInfoPanel(xRounded, yLogValue, traceData, celData) {
     refs.xLabel.textContent = xRounded;
     refs.yLabel.textContent = formatValue(yValue);
 
-    // Build set of specific compound keys that need a heading row for cel lines,
+    // Build set of (baseKey, aggId) pairs that need a heading row for cel lines,
     // even when no trace data exists at this x (forecast zone)
-    const celHeadingKeys = new Set();
+    // celHeadingKeys: Map<baseKey, Set<aggId>>
+    const celHeadingKeys = new Map();
     if (celData) {
         for (const cel of celData) {
-            if (cel.matchedKey) {
-                celHeadingKeys.add(cel.matchedKey);
+            if (cel.matchedBaseKey) {
+                if (!celHeadingKeys.has(cel.matchedBaseKey)) celHeadingKeys.set(cel.matchedBaseKey, new Set());
+                celHeadingKeys.get(cel.matchedBaseKey).add(cel.matchedAggId);
             } else {
-                // Fallback: find the first series row key for this base series
-                for (const key of refs.seriesRows.keys()) {
-                    if (key.startsWith(cel.seriesKey + '_')) {
-                        celHeadingKeys.add(key);
-                        break;
+                // Fallback: use the first aggId for this base series
+                const aggMap = refs.seriesRows.get(cel.seriesKey);
+                if (aggMap) {
+                    const firstAggId = aggMap.keys().next().value;
+                    if (firstAggId !== undefined) {
+                        if (!celHeadingKeys.has(cel.seriesKey)) celHeadingKeys.set(cel.seriesKey, new Set());
+                        celHeadingKeys.get(cel.seriesKey).add(firstAggId);
                     }
                 }
             }
@@ -1038,12 +1053,11 @@ function updateInfoPanel(xRounded, yLogValue, traceData, celData) {
 
     // Series section - show/hide rows and update values
     if (refs.seriesRows) {
-        for (const [key, rowRefs] of refs.seriesRows) {
-            const data = traceData.get(key);
+        for (const [baseKey, aggMap] of refs.seriesRows) {
+        for (const [aggId, rowRefs] of aggMap) {
+            const data = traceData.get(baseKey)?.get(aggId);
 
             // Get actual marker fill color from chartState.traceStyles
-            const baseKey = key.substring(0, key.lastIndexOf('_'));
-            const aggId = key.substring(key.lastIndexOf('_') + 1);
             const isMisc = baseKey.startsWith('misc');
             const styles = isMisc
                 ? chartState.traceStyles.misc?.[baseKey]
@@ -1051,7 +1065,7 @@ function updateInfoPanel(xRounded, yLogValue, traceData, celData) {
             const markerColor = styles?.[aggId]?.markerColor || '';
 
             if (!data) {
-                if (celHeadingKeys.has(key)) {
+                if (celHeadingKeys.get(baseKey)?.has(aggId)) {
                     // Show as label-only heading (no data value)
                     let displayName = formatSeriesName(baseKey);
                     if (displayName.length > 30) {
@@ -1098,6 +1112,7 @@ function updateInfoPanel(xRounded, yLogValue, traceData, celData) {
             rowRefs.valueSpan.textContent = displayValue;
             rowRefs.row.style.display = '';
         }
+        }
     }
 
     // Change lines — position cel pool rows after their matching series rows
@@ -1109,10 +1124,12 @@ function updateInfoPanel(xRounded, yLogValue, traceData, celData) {
             for (const cel of celData) {
                 const bounceLabels = BOUNCE_LABELS[cel.bounceEnvelope];
 
-                let anchorRow = refs.seriesRows.get(cel.matchedKey)?.row;
+                let anchorRow = refs.seriesRows.get(cel.matchedBaseKey)?.get(cel.matchedAggId)?.row;
                 if (!anchorRow) {
-                    for (const [key, rowRefs] of refs.seriesRows) {
-                        if (key.startsWith(cel.seriesKey + '_')) { anchorRow = rowRefs.row; break; }
+                    const aggMap = refs.seriesRows.get(cel.seriesKey);
+                    if (aggMap) {
+                        const firstEntry = aggMap.values().next().value;
+                        if (firstEntry) anchorRow = firstEntry.row;
                     }
                 }
 

@@ -12,8 +12,10 @@
  *   2: Add collaborators array for edit-link recipients
  *   3: Remove CelLines.settings (moved to IDB user_preferences)
  *   4: Add detrend: null to all trace configs
+ *   5: Add aggId: "0" to all CelLines entries (trendlines track specific aggregation)
+ *   6: Convert flat seriesVisibility to nested { baseKey: { aggId: bool } }
  */
-export const CURRENT_SCHEMA_VERSION = 4;
+export const CURRENT_SCHEMA_VERSION = 6;
 
 // ============================================================================
 // Migration Functions
@@ -179,6 +181,64 @@ async function migrate_3_to_4(chart) {
     return modified;
 }
 
+/**
+ * Migration 4 → 5: Add aggId to all CelLines entries.
+ *
+ * Cel lines are fitted on a specific aggregation's data. Before this
+ * migration the aggId was implicit (always "0"). Now it's stored
+ * explicitly so trendlines can be fitted on any aggregation (raw,
+ * rolling window, residuals, etc.) and their visibility tracks the
+ * correct series+agg combination.
+ *
+ * Before: CelLines[id] = { seriesKey, ... }           (no aggId)
+ * After:  CelLines[id] = { seriesKey, aggId: "0", ... }
+ */
+async function migrate_4_to_5(chart) {
+    if (!chart.CelLines || typeof chart.CelLines !== 'object') return false;
+    let modified = false;
+    for (const entry of Object.values(chart.CelLines)) {
+        if (entry && typeof entry === 'object' && !('aggId' in entry)) {
+            entry.aggId = '0';
+            modified = true;
+        }
+    }
+    return modified;
+}
+
+/**
+ * Migration 5 → 6: Convert flat seriesVisibility to nested structure.
+ *
+ * Before: { "corrects_0": true, "misc1_2": false }
+ * After:  { corrects: { "0": true }, misc1: { "2": false } }
+ *
+ * Parses each key with lastIndexOf('_') — this is the last place that
+ * compound-key parsing ever runs.
+ */
+async function migrate_5_to_6(chart) {
+    if (!chart.seriesVisibility || typeof chart.seriesVisibility !== 'object') return false;
+
+    const flat = chart.seriesVisibility;
+    const keys = Object.keys(flat);
+    if (keys.length === 0) return false;
+
+    // Check if already nested (first value is an object, not a boolean)
+    const firstVal = flat[keys[0]];
+    if (firstVal !== null && typeof firstVal === 'object') return false;
+
+    const nested = {};
+    for (const [compoundKey, value] of Object.entries(flat)) {
+        const idx = compoundKey.lastIndexOf('_');
+        if (idx === -1) continue; // malformed — skip
+        const baseKey = compoundKey.slice(0, idx);
+        const aggId = compoundKey.slice(idx + 1);
+        if (!nested[baseKey]) nested[baseKey] = {};
+        nested[baseKey][aggId] = value;
+    }
+
+    chart.seriesVisibility = nested;
+    return true;
+}
+
 // ============================================================================
 // Migration Registry
 // ============================================================================
@@ -192,6 +252,8 @@ const migrations = [
     migrate_1_to_2,
     migrate_2_to_3,
     migrate_3_to_4,
+    migrate_4_to_5,
+    migrate_5_to_6,
 ];
 
 // ============================================================================

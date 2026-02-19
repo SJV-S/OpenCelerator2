@@ -18,7 +18,7 @@ import { CORRECTS, ERRORS, TIMING, LINE_DEFAULTS, COLORS, CHART_TYPE_CONFIG, WIN
 import { xPositionToDate, dateToXPosition, formatDateISO } from '../util/dates.js';
 import { fit, FIT_METHODS, BOUNCE_ENVELOPES, DEFAULT_FIT_METHOD, DEFAULT_BOUNCE_ENVELOPE, calculateBounceBounds, calculateBounceLines, formatCelerationLabel, formatDoublingTimeLabel } from '../util/fit_lines.js';
 import { eventBus, EVENTS } from '../eventBus.js';
-import { getFirstConfig, isSeriesVisible } from '../series/traceStyles.js';
+import { getFirstConfig, getAggLabel } from '../series/traceStyles.js';
 import { getPixelCoordinates } from '../util/plotCoordinates.js';
 import { getChartDiv } from '../util/dom.js';
 import { relayout } from '../util/plotlyWrapper.js';
@@ -35,16 +35,6 @@ function getCelLineColor(seriesKey) {
     if (seriesKey === ERRORS) return COLORS.TREND_ERRORS;
     if (seriesKey === TIMING) return COLORS.TREND_TIMING;
     return 'black'; // misc series
-}
-
-/**
- * Check if the primary (aggId "0") trace of a series is visible.
- * Cel lines are always fitted on aggId "0" data, so their visibility
- * should track that specific aggregation — not any companion rolling
- * window or residual trace that happens to share the same base series.
- */
-function isPrimaryAggVisible(seriesKey) {
-    return chartState.seriesVisibility[seriesKey + '_0'] !== false;
 }
 
 // Cel line drawing state (ephemeral UI state)
@@ -65,7 +55,8 @@ var celLineState = {
     previousDragMode: null,
     toastElement: null,
     seriesSelectionToast: null,
-    selectedSeriesKey: null
+    selectedSeriesKey: null,
+    selectedAggId: '0'        // Which aggregation to fit on
 };
 
 /**
@@ -236,48 +227,74 @@ function activateCelLineMode() {
 }
 
 /**
- * Get buttons for available data series
+ * Build per-aggregation buttons for a single base series.
+ * If there's only one agg, returns a single button with the series name.
+ * If there are multiple aggs, returns one button per visible aggregation
+ * with the agg label appended.
+ */
+function buildAggButtons(seriesKey, displayName) {
+    const isMisc = seriesKey.startsWith('misc');
+    const configs = isMisc
+        ? chartState.traceStyles.misc[seriesKey]
+        : chartState.traceStyles[seriesKey];
+    if (!configs) return [];
+
+    const aggEntries = Object.entries(configs);
+    const visibleEntries = aggEntries.filter(([aggId]) =>
+        chartState.seriesVisibility[seriesKey]?.[aggId] !== false
+    );
+    if (visibleEntries.length === 0) return [];
+
+    // Single aggregation — simple button, no suffix needed
+    if (aggEntries.length === 1) {
+        return [{
+            label: displayName,
+            onClick: () => selectSeriesAndEnableDrag(seriesKey, visibleEntries[0][0]),
+            type: 'primary'
+        }];
+    }
+
+    // Multiple aggregations — one button per visible agg with label suffix
+    return visibleEntries.map(([aggId, config]) => {
+        const suffix = getAggLabel(config);
+        return {
+            label: `${displayName} (${suffix})`,
+            onClick: () => selectSeriesAndEnableDrag(seriesKey, aggId),
+            type: 'primary'
+        };
+    });
+}
+
+/**
+ * Get buttons for available data series.
+ * When a series has multiple aggregations (raw + rolling window, residuals, etc.),
+ * each visible aggregation gets its own button so the user can choose which data
+ * to fit the trendline on.
  */
 function getAvailableSeriesButtons() {
     const buttons = [];
 
     // Check fixed series (use Number.isFinite to match customLegend data checks)
-    if (chartState.series.corrects && chartState.series.corrects.some(v => Number.isFinite(v)) && isSeriesVisible(CORRECTS)) {
+    if (chartState.series.corrects && chartState.series.corrects.some(v => Number.isFinite(v))) {
         const config = getFirstConfig(CORRECTS);
-        buttons.push({
-            label: config?.seriesName || 'Corrects',
-            onClick: () => selectSeriesAndEnableDrag(CORRECTS),
-            type: 'primary'
-        });
+        buttons.push(...buildAggButtons(CORRECTS, config?.seriesName || 'Corrects'));
     }
 
-    if (chartState.series.errors && chartState.series.errors.some(v => Number.isFinite(v)) && isSeriesVisible(ERRORS)) {
+    if (chartState.series.errors && chartState.series.errors.some(v => Number.isFinite(v))) {
         const config = getFirstConfig(ERRORS);
-        buttons.push({
-            label: config?.seriesName || 'Errors',
-            onClick: () => selectSeriesAndEnableDrag(ERRORS),
-            type: 'primary'
-        });
+        buttons.push(...buildAggButtons(ERRORS, config?.seriesName || 'Errors'));
     }
 
-    if (chartState.minuteChart && chartState.series.timing && chartState.series.timing.some(v => Number.isFinite(v)) && isSeriesVisible(TIMING)) {
+    if (chartState.minuteChart && chartState.series.timing && chartState.series.timing.some(v => Number.isFinite(v))) {
         const config = getFirstConfig(TIMING);
-        buttons.push({
-            label: config?.seriesName || 'Timing',
-            onClick: () => selectSeriesAndEnableDrag(TIMING),
-            type: 'primary'
-        });
+        buttons.push(...buildAggButtons(TIMING, config?.seriesName || 'Timing'));
     }
 
     // Check misc series
     Object.entries(chartState.series.misc).forEach(([miscId, data]) => {
-        if (data && data.some(v => Number.isFinite(v)) && isSeriesVisible(miscId)) {
+        if (data && data.some(v => Number.isFinite(v))) {
             const config = getFirstConfig(miscId);
-            buttons.push({
-                label: config?.seriesName || miscId,
-                onClick: () => selectSeriesAndEnableDrag(miscId),
-                type: 'primary'
-            });
+            buttons.push(...buildAggButtons(miscId, config?.seriesName || miscId));
         }
     });
 
@@ -286,9 +303,12 @@ function getAvailableSeriesButtons() {
 
 /**
  * Called when user selects a series from the toast buttons
+ * @param {string} seriesKey - Base series key (corrects, errors, misc1, etc.)
+ * @param {string} [aggId='0'] - Aggregation ID to fit on
  */
-function selectSeriesAndEnableDrag(seriesKey) {
+function selectSeriesAndEnableDrag(seriesKey, aggId) {
     celLineState.selectedSeriesKey = seriesKey;
+    celLineState.selectedAggId = aggId;
 
     // Remove series selection toast using stored reference
     if (celLineState.seriesSelectionToast) {
@@ -380,6 +400,7 @@ function deactivateCelLineMode() {
     celLineState.active = false;
     celLineState.isDragging = false;
     celLineState.selectedSeriesKey = null;
+    celLineState.selectedAggId = '0';
 
     if (celLineState.previousDragMode !== null) {
         relayout(chartDiv, { dragmode: celLineState.previousDragMode });
@@ -553,13 +574,14 @@ function handleCelLineTouchEnd(event, chartDiv) {
  */
 function finalizeCelLine() {
     const baseKey = celLineState.selectedSeriesKey;
+    const aggId = celLineState.selectedAggId;
 
     if (!baseKey) {
         deactivateCelLineMode();
         return;
     }
 
-    const data = getDataInRangeForSeries(celLineState.x1, celLineState.x2, baseKey);
+    const data = getDataInRangeForSeries(celLineState.x1, celLineState.x2, baseKey, aggId);
 
     if (!data || data.x.length < 5) {
         createToast({
@@ -703,7 +725,7 @@ function cleanupSeriesSelectionMode() {
     }
 }
 
-function getDataInRangeForSeries(x1, x2, baseKey) {
+function getDataInRangeForSeries(x1, x2, baseKey, aggId) {
     const chartDiv = getChartDiv();
 
     if (!chartDiv || !chartDiv.data) {
@@ -725,9 +747,8 @@ function getDataInRangeForSeries(x1, x2, baseKey) {
             continue;
         }
 
-        // Only use the primary agg config — avoid mixing raw data with
-        // rolling-window/smoothed traces of the same series.
-        if (trace.meta.aggId !== "0") {
+        // Only use traces matching the requested aggregation ID
+        if (trace.meta.aggId !== aggId) {
             continue;
         }
 
@@ -826,9 +847,11 @@ function handleCelLineConfirm(data, baseKey) {
     const date2Str = formatDateISO(date2);
 
     // Build metadata object
+    const aggId = celLineState.selectedAggId;
     const metadata = {
         id: lineId,
         seriesKey: baseKey,
+        aggId: aggId,
         date1: date1Str,
         y1: y1_display,
         date2: date2Str,
@@ -913,8 +936,9 @@ function redrawCelLines() {
 
         const elements = buildCelLineElements(metadata, chartDiv);
 
-        // Visible only if global change visibility AND the primary agg is on
-        const lineVisible = globalVisible && isPrimaryAggVisible(metadata.seriesKey);
+        // Visible only if global change visibility AND the fitted agg is on
+        const fittedAgg = metadata.aggId;
+        const lineVisible = globalVisible && chartState.seriesVisibility[metadata.seriesKey]?.[fittedAgg] !== false;
         if (!lineVisible) {
             elements.shapes.forEach(s => s.visible = false);
             elements.annotation.visible = false;
@@ -946,11 +970,12 @@ function setCelLineVisibility(visible) {
     const annotations = chartDiv.layout.annotations || [];
     let updated = false;
 
-    // Build a set of line IDs whose series is currently visible
+    // Build a set of line IDs whose fitted agg is currently visible
     const seriesVisibleById = new Map();
     if (visible) {
         for (const [id, entry] of Object.entries(chartState.CelLines)) {
-                seriesVisibleById.set(String(id), isPrimaryAggVisible(entry.seriesKey));
+            const fittedAgg = entry.aggId;
+            seriesVisibleById.set(String(id), chartState.seriesVisibility[entry.seriesKey]?.[fittedAgg] !== false);
         }
     }
 
@@ -983,21 +1008,25 @@ function setCelLineVisibility(visible) {
 
 /**
  * Update visibility of cel lines for a specific series.
- * @param {string} seriesKey - The series key that changed
- * @param {boolean} seriesVisible - Whether that series is now visible
+ * Each cel line tracks which aggId it was fitted on, so we check
+ * visibility per-line rather than assuming a single boolean for
+ * the whole base series.
+ * @param {string} seriesKey - The base series key that changed
  */
-function updateCelLineSeriesVisibility(seriesKey, seriesVisible) {
+function updateCelLineSeriesVisibility(seriesKey) {
     if (!chartState.lineVisibility.change) return; // global is off, nothing to toggle
 
     const chartDiv = getChartDiv();
     if (!chartDiv) return;
 
-    // Find cel line IDs that belong to this series
-    const affectedIds = [];
+    // Build a map of cel line ID → should-be-visible for this base series
+    const visibilityById = new Map();
     for (const [id, entry] of Object.entries(chartState.CelLines)) {
-        if (entry.seriesKey === seriesKey) affectedIds.push(String(id));
+        if (entry.seriesKey !== seriesKey) continue;
+        const fittedAgg = entry.aggId;
+        visibilityById.set(String(id), chartState.seriesVisibility[seriesKey]?.[fittedAgg] !== false);
     }
-    if (affectedIds.length === 0) return;
+    if (visibilityById.size === 0) return;
 
     const shapes = chartDiv.layout.shapes || [];
     const annotations = chartDiv.layout.annotations || [];
@@ -1006,9 +1035,9 @@ function updateCelLineSeriesVisibility(seriesKey, seriesVisible) {
     const updatedShapes = shapes.map(s => {
         if (s.name && s.name.startsWith('cel-')) {
             const lineId = s.name.replace('cel-', '').split('-')[0];
-            if (affectedIds.includes(lineId)) {
+            if (visibilityById.has(lineId)) {
                 updated = true;
-                return { ...s, visible: seriesVisible };
+                return { ...s, visible: visibilityById.get(lineId) };
             }
         }
         return s;
@@ -1017,9 +1046,9 @@ function updateCelLineSeriesVisibility(seriesKey, seriesVisible) {
     const updatedAnnotations = annotations.map(a => {
         if (a.name && a.name.startsWith('cel-')) {
             const lineId = a.name.replace('cel-', '').split('-')[0];
-            if (affectedIds.includes(lineId)) {
+            if (visibilityById.has(lineId)) {
                 updated = true;
-                return { ...a, visible: seriesVisible };
+                return { ...a, visible: visibilityById.get(lineId) };
             }
         }
         return a;
@@ -1063,10 +1092,8 @@ function init() {
     }, true);
 
     // Subscribe to series visibility changes - show/hide cel lines per series
-    // Emitted seriesKey is like "corrects_0"; extract base to match cel metadata
     eventBus.subscribe(EVENTS.SERIES_VISIBILITY_CHANGED, (data) => {
-        const baseKey = data.seriesKey.substring(0, data.seriesKey.lastIndexOf('_'));
-        updateCelLineSeriesVisibility(baseKey, isPrimaryAggVisible(baseKey));
+        updateCelLineSeriesVisibility(data.baseKey);
     }, true);
 }
 
