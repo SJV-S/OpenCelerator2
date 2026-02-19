@@ -39,11 +39,13 @@ app.register_blueprint(accounts_bp)
 # Middleware
 # =============================================================================
 
-# Security headers
+# Security headers + static file caching
 @app.after_request
-def set_security_headers(response):
+def set_headers(response):
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+    if request.path.startswith('/static/'):
+        response.headers['Cache-Control'] = 'max-age=3600, must-revalidate'
     return response
 
 # Telemetry — log every request
