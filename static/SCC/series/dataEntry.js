@@ -12,7 +12,7 @@
 import { chartState } from '../chartState.js';
 import { TIMING_MS, COLORS, CHART_MATH, MISSING } from '../config.js';
 import { eventBus, EVENTS } from '../eventBus.js';
-import { snapToChartBoundary, formatDateInputValue, xPositionToDate, dateToXPosition, parseLocalDate, dateToTimestamp } from '../util/dates.js';
+import { snapToChartBoundary, xPositionToDate, dateToXPosition, dateToTimestamp, adjustDateByChartUnit } from '../util/dates.js';
 import { relayout } from '../util/plotlyWrapper.js';
 import { getFirstConfig } from './traceStyles.js';
 import { getChartDiv, escapeHtml } from '../util/dom.js';
@@ -29,6 +29,40 @@ let dataTabActive = false;
 
 // Track whether line edit mode is active (disables click-to-set-date)
 let lineEditModeActive = false;
+
+// The selected entry date as a Date object, decoupled from the display
+let selectedEntryDate = null;
+
+const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+/**
+ * Update the entry-date display element with chart-type-appropriate formatting.
+ * Stores the Date object in the module variable for use by submitEntry().
+ *
+ * Display adapts to chart type, omitting components fixed by snapping:
+ * - Daily/Weekly: DD-Mon-YYYY (Weekly snaps to Monday, so specific date matters)
+ * - Monthly: Mon-YYYY (day is always 1st)
+ * - Yearly: YYYY (always Jan 1st)
+ *
+ * @param {Date} date - Snapped date to display and store
+ */
+function setEntryDate(date) {
+    selectedEntryDate = date;
+    const el = document.getElementById('entry-date');
+    if (!el) return;
+
+    const chartType = (chartState.chartType || 'Daily').toLowerCase();
+    switch (chartType) {
+        case 'yearly':
+            el.textContent = `${date.getFullYear()}`;
+            break;
+        case 'monthly':
+            el.textContent = `${MONTH_NAMES[date.getMonth()]}-${date.getFullYear()}`;
+            break;
+        default:
+            el.textContent = `${date.getDate()}-${MONTH_NAMES[date.getMonth()]}-${date.getFullYear()}`;
+    }
+}
 
 /**
  * Generate input fields for all active misc series
@@ -74,7 +108,8 @@ function generateMiscInputs() {
  * For non-minute charts: skips timing validation and uses timing of 1
  */
 function submitEntry() {
-    const entryDate = document.getElementById('entry-date').value;
+    if (!selectedEntryDate) return;
+
     const rawC = parseInt(document.getElementById('corrects').value);
     const corrects = isNaN(rawC) ? MISSING : rawC;
     const rawI = parseInt(document.getElementById('incorrects').value);
@@ -117,9 +152,9 @@ function submitEntry() {
 
     // Combine selected date with current time to create Unix timestamp
     const now = new Date();
-    const selectedDate = parseLocalDate(entryDate);
-    selectedDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
-    const timestamp = dateToTimestamp(selectedDate);
+    const dateForTimestamp = new Date(selectedEntryDate.getTime());
+    dateForTimestamp.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+    const timestamp = dateToTimestamp(dateForTimestamp);
 
     // Append data points to fixed series arrays
     chartState.series.xValues.push(timestamp);
@@ -232,24 +267,14 @@ async function removeEntryDateIndicator() {
 }
 
 /**
- * Emit entry date change event based on current input value.
+ * Emit entry date change event based on current selected date.
  * Snaps the date to appropriate boundary based on chart type first.
- * Uses snapToChartBoundary() from dates.js to enforce the date boundary policy.
  */
 function emitEntryDateChange() {
-    const entryDateInput = document.getElementById('entry-date');
-    if (entryDateInput && entryDateInput.value) {
-        // Snap the date to appropriate boundary for the chart type
-        const snappedDate = snapToChartBoundary(entryDateInput.value);
-        const snappedDateStr = formatDateInputValue(snappedDate);
-
-        // Update the input if the date was adjusted
-        if (snappedDateStr !== entryDateInput.value) {
-            entryDateInput.value = snappedDateStr;
-        }
-
-        eventBus.emit(EVENTS.COUNTER_ENTRY_DATE_CHANGED, { date: snappedDateStr });
-    }
+    if (!selectedEntryDate) return;
+    const snappedDate = snapToChartBoundary(selectedEntryDate);
+    setEntryDate(snappedDate);
+    eventBus.emit(EVENTS.COUNTER_ENTRY_DATE_CHANGED, { date: selectedEntryDate });
 }
 
 /**
@@ -338,42 +363,38 @@ function init() {
     eventBus.subscribe(EVENTS.CHART_CLICKED, (data) => {
         if (!dataTabActive || !chartState.startDate || lineEditModeActive) return;
 
-        // Convert x-position to date
+        // Convert x-position to date, snap to chart boundary
         const clickedDate = xPositionToDate(Math.round(data.x));
-        const dateStr = formatDateInputValue(clickedDate);
-
-        // Snap to chart boundary (e.g., Monday for weekly charts)
-        const snappedDate = snapToChartBoundary(dateStr);
-        const snappedDateStr = formatDateInputValue(snappedDate);
-
-        // Update the entry-date input
-        const entryDateInput = document.getElementById('entry-date');
-        if (entryDateInput) {
-            entryDateInput.value = snappedDateStr;
-            // Emit the date change event to update the indicator and load data
-            eventBus.emit(EVENTS.COUNTER_ENTRY_DATE_CHANGED, { date: snappedDateStr });
-        }
+        const snappedDate = snapToChartBoundary(clickedDate);
+        setEntryDate(snappedDate);
+        eventBus.emit(EVENTS.COUNTER_ENTRY_DATE_CHANGED, { date: selectedEntryDate });
     }, true);
 
-    // Set up entry-date input listeners
-    const entryDateInput = document.getElementById('entry-date');
-    if (entryDateInput) {
-        // Listen for direct input changes (calendar picker)
-        entryDateInput.addEventListener('change', emitEntryDateChange);
-    }
-
-    // Listen for arrow button clicks (they adjust the date, then we emit)
+    // Listen for arrow button clicks - adjust date and update display
     document.querySelectorAll('[data-action="adjust-date"]').forEach(button => {
         button.addEventListener('click', () => {
-            // Small delay to let the date input update first
-            setTimeout(emitEntryDateChange, 10);
+            if (!selectedEntryDate) return;
+            const offset = parseInt(button.dataset.offset);
+            const newDate = adjustDateByChartUnit(selectedEntryDate, offset);
+            setEntryDate(newDate);
+            eventBus.emit(EVENTS.COUNTER_ENTRY_DATE_CHANGED, { date: selectedEntryDate });
         });
     });
+}
+
+/**
+ * Get the currently selected entry date.
+ * @returns {Date|null}
+ */
+function getEntryDate() {
+    return selectedEntryDate;
 }
 
 export {
     submitEntry,
     setStartDate,
+    setEntryDate,
+    getEntryDate,
     generateMiscInputs,
     updateTimingVisibility,
     init

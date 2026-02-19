@@ -19,13 +19,14 @@ import { newPlot, relayout } from './util/plotlyWrapper.js';
 import {
     submitEntry,
     setStartDate,
+    setEntryDate,
     updateTimingVisibility,
     init as dataEntryInit
 } from './series/dataEntry.js';
 import { initializeSeriesNav } from './series/traceStyles.js';
 import { createToast, createConfirmToast } from './ui/toaster.js';
 import { init as replotInit } from './series/replot.js';
-import { alignStartDate, updateChartDateLabels, updateDateDisplay, adjustDateInput, initializeDateInput, updatePlotDateLabel } from './util/dates.js';
+import { alignStartDate, updateChartDateLabels, updateDateDisplay, getSnappedToday, updatePlotDateLabel } from './util/dates.js';
 import { initStartDateModal, initChartWindowControl, initChartHeightControl } from './ui/startDateModal.js';
 import { initLineSettingsModal } from './ui/lineSettingsModal.js';
 import { loadDataForDate, adjustTimestamp, updateCurrentEntry, deleteCurrentEntry, init as dataUpdateInit } from './series/dataUpdate.js';
@@ -178,8 +179,8 @@ function syncVisibilityState() {
  * Initialize date input fields
  */
 function initializeDateInputs() {
-    // Entry date input with today's date (shared between New and Previous sub-tabs)
-    initializeDateInput('entry-date');
+    // Entry date display with today's date (shared between New and Previous sub-tabs)
+    setEntryDate(getSnappedToday());
 
     // Update the "Plot Date" label based on chart type
     updatePlotDateLabel();
@@ -188,14 +189,6 @@ function initializeDateInputs() {
     initStartDateModal();
     initChartWindowControl();
     initChartHeightControl();
-}
-
-/**
- * Adjust the entry date by a number of days
- * @param {number} days - Number of days to adjust (positive or negative)
- */
-export function adjustDate(days) {
-    adjustDateInput('entry-date', days);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -310,14 +303,6 @@ export function setupEventListeners() {
     if (submitEntryBtn) {
         submitEntryBtn.addEventListener('click', submitEntry);
     }
-
-    // Date adjustment buttons
-    document.querySelectorAll('[data-action="adjust-date"]').forEach(button => {
-        button.addEventListener('click', (e) => {
-            const offset = parseInt(e.currentTarget.dataset.offset);
-            adjustDate(offset);
-        });
-    });
 
     // Data tab timestamp adjustment buttons
     document.querySelectorAll('[data-action="adjust-timestamp"]').forEach(button => {

@@ -544,12 +544,8 @@ function handleOtherDateChange() {
  * @param {string} inputId - ID of the date input element
  * @param {number} offset - Number of units to adjust (positive or negative)
  */
-function adjustDateInput(inputId, offset) {
-    const dateInput = document.getElementById(inputId);
-    if (!dateInput) return;
-
-    // Snap to boundary first to ensure valid starting point
-    const currentDate = snapToChartBoundary(dateInput.value);
+function adjustDateByChartUnit(date, offset) {
+    const currentDate = snapToChartBoundary(date);
     const chartType = (chartState.chartType || 'Daily').toLowerCase();
 
     switch (chartType) {
@@ -568,7 +564,7 @@ function adjustDateInput(inputId, offset) {
             break;
     }
 
-    dateInput.value = formatDateInputValue(currentDate);
+    return currentDate;
 }
 
 /**
@@ -595,15 +591,11 @@ function formatDateISO(date) {
 }
 
 /**
- * Initialize a date input field to today's date, snapped to chart boundary.
- * @param {string} inputId - ID of the date input element
+ * Get today's date snapped to the appropriate chart boundary.
+ * @returns {Date} Today's date snapped to chart boundary
  */
-function initializeDateInput(inputId) {
-    const dateInput = document.getElementById(inputId);
-    if (!dateInput) return;
-
-    const today = snapToChartBoundary(new Date());
-    dateInput.value = formatDateInputValue(today);
+function getSnappedToday() {
+    return snapToChartBoundary(new Date());
 }
 
 /**
@@ -802,8 +794,8 @@ export {
     formatMonthYear,
     updateDateDisplay,
     handleOtherDateChange,
-    adjustDateInput,
-    initializeDateInput,
+    adjustDateByChartUnit,
+    getSnappedToday,
     updatePlotDateLabel,
     getMondaysInMonth,
     formatYearDisplay,

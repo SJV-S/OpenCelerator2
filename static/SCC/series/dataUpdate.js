@@ -14,7 +14,8 @@ import { MISSING } from '../config.js';
 import { isMissing } from '../util/format.js';
 import { getFirstConfig } from './traceStyles.js';
 import { escapeHtml } from '../util/dom.js';
-import { parseLocalDate, dateToTimestamp } from '../util/dates.js';
+import { dateToTimestamp } from '../util/dates.js';
+import { getEntryDate } from './dataEntry.js';
 
 // Track current state
 let currentDataForDate = [];
@@ -24,10 +25,8 @@ let currentTimestampIndex = 0;
  * Load and display data for the selected date
  */
 export function loadDataForDate() {
-    const dateInput = document.getElementById('entry-date');
-    if (!dateInput) return;
-
-    const selectedDate = parseLocalDate(dateInput.value);
+    const selectedDate = getEntryDate();
+    if (!selectedDate) return;
 
     // Get start and end of the selected day (in seconds)
     const startOfDay = dateToTimestamp(selectedDate);
