@@ -7,7 +7,7 @@
 // Set to true during development to always fetch fresh (bypasses cache)
 const DEVELOPER_MODE = true;
 
-const SW_VERSION = '0.3.1';
+const SW_VERSION = '0.3.2';
 const CACHE_NAME = `scc-cache-v${SW_VERSION}`;
 
 // HTML pages to precache
@@ -149,14 +149,13 @@ function isChartPage(url) {
 self.addEventListener('install', (event) => {
     console.log(`[SW ${SW_VERSION}] Installing`);
 
+    // Bypass browser HTTP cache so precache always gets fresh files from server
+    const fresh = { cache: 'reload' };
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then(async (cache) => {
-                await cache.addAll(PRECACHE_PAGES);
-                await cache.addAll(PRECACHE_STATIC);
-            })
-            .catch(err => {
-                console.error(`[SW ${SW_VERSION}] Install failed:`, err);
+                await cache.addAll(PRECACHE_PAGES.map(url => new Request(url, fresh)));
+                await cache.addAll(PRECACHE_STATIC.map(url => new Request(url, fresh)));
             })
     );
 });
