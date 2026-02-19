@@ -146,22 +146,37 @@ function downloadTemplate() {
         ? 'Date,Corrects,Errors,Minutes,Prompts'
         : 'Date,Corrects,Errors,Prompts';
 
+    const dates = templateDates();
     const rows = isMinute
         ? [
-            '2024-01-15,45,3,1,5',
-            '2024-01-16,52,1,1,3',
-            '2024-01-17,,2,1,',
-            '2024-01-18,60,,1,4'
+            `${dates[0]},45,3,1,5`,
+            `${dates[1]},52,1,1,3`,
+            `${dates[2]},,2,1,`,
+            `${dates[3]},60,,1,4`
         ]
         : [
-            '2024-01-15,45,3,5',
-            '2024-01-16,52,1,3',
-            '2024-01-17,,2,',
-            '2024-01-18,60,,4'
+            `${dates[0]},45,3,5`,
+            `${dates[1]},52,1,3`,
+            `${dates[2]},,2,`,
+            `${dates[3]},60,,4`
         ];
 
     const csv = [headers, ...rows].join('\n');
     downloadFile(csv, 'scc-import-template.csv', 'text/csv');
+}
+
+function templateDates() {
+    const type = (chartState.chartType || 'Daily').toLowerCase();
+    switch (type) {
+        case 'weekly':
+            return ['2024-01-08', '2024-01-15', '2024-01-22', '2024-01-29'];
+        case 'monthly':
+            return ['2024-01-15', '2024-02-15', '2024-03-15', '2024-04-15'];
+        case 'yearly':
+            return ['2021-06-15', '2022-06-15', '2023-06-15', '2024-06-15'];
+        default: // daily
+            return ['2024-01-15', '2024-01-16', '2024-01-17', '2024-01-18'];
+    }
 }
 
 function buildAiPrompt() {
