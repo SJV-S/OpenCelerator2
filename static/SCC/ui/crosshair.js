@@ -1017,13 +1017,44 @@ function updateInfoPanel(xRounded, yLogValue, traceData, celData) {
     refs.xLabel.textContent = xRounded;
     refs.yLabel.textContent = formatValue(yValue);
 
+    // Build set of specific compound keys that need a heading row for cel lines,
+    // even when no trace data exists at this x (forecast zone)
+    const celHeadingKeys = new Set();
+    if (celData) {
+        for (const cel of celData) {
+            if (cel.matchedKey) {
+                celHeadingKeys.add(cel.matchedKey);
+            } else {
+                // Fallback: find the first series row key for this base series
+                for (const key of refs.seriesRows.keys()) {
+                    if (key.startsWith(cel.seriesKey + '_')) {
+                        celHeadingKeys.add(key);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
     // Series section - show/hide rows and update values
     if (refs.seriesRows) {
         for (const [key, rowRefs] of refs.seriesRows) {
             const data = traceData.get(key);
 
             if (!data) {
-                rowRefs.row.style.display = 'none';
+                if (celHeadingKeys.has(key)) {
+                    // Show as label-only heading (no data value)
+                    const baseKey = key.substring(0, key.lastIndexOf('_'));
+                    let displayName = formatSeriesName(baseKey || key);
+                    if (displayName.length > 30) {
+                        displayName = displayName.slice(0, 30) + '...';
+                    }
+                    rowRefs.labelSpan.textContent = displayName;
+                    rowRefs.valueSpan.textContent = '';
+                    rowRefs.row.style.display = '';
+                } else {
+                    rowRefs.row.style.display = 'none';
+                }
                 continue;
             }
 
