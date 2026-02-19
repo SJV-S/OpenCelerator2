@@ -37,6 +37,16 @@ function getCelLineColor(seriesKey) {
     return 'black'; // misc series
 }
 
+/**
+ * Check if the primary (aggId "0") trace of a series is visible.
+ * Cel lines are always fitted on aggId "0" data, so their visibility
+ * should track that specific aggregation — not any companion rolling
+ * window or residual trace that happens to share the same base series.
+ */
+function isPrimaryAggVisible(seriesKey) {
+    return chartState.seriesVisibility[seriesKey + '_0'] !== false;
+}
+
 // Cel line drawing state (ephemeral UI state)
 var celLineState = {
     active: false,
@@ -700,19 +710,6 @@ function getDataInRangeForSeries(x1, x2, baseKey) {
         return null;
     }
 
-    // Get display name for the target series
-    const targetDisplayName = getFirstConfig(baseKey)?.seriesName || baseKey;
-
-    // Build map of trace seriesNames to display names
-    const uniqueSeriesIds = [...new Set(chartDiv.data.filter(t => t.meta?.seriesName).map(t => t.meta.seriesName))];
-    const seriesWithNames = uniqueSeriesIds
-        .filter(id => !id.includes('FloorShadow'))
-        .map(id => {
-            const name = getFirstConfig(id)?.seriesName || id;
-            return name + ' (' + id + ')';
-        });
-
-    // baseKey is now consistent: 'corrects', 'errors', 'timing', or misc ID
     const targetSeriesName = baseKey;
     const xValues = [];
     const yValues = [];
@@ -725,6 +722,12 @@ function getDataInRangeForSeries(x1, x2, baseKey) {
         }
 
         if (trace.meta.seriesName !== targetSeriesName) {
+            continue;
+        }
+
+        // Only use the primary agg config — avoid mixing raw data with
+        // rolling-window/smoothed traces of the same series.
+        if (trace.meta.aggId !== "0") {
             continue;
         }
 
@@ -910,8 +913,8 @@ function redrawCelLines() {
 
         const elements = buildCelLineElements(metadata, chartDiv);
 
-        // Visible only if global change visibility AND this series are both on
-        const lineVisible = globalVisible && isSeriesVisible(metadata.seriesKey);
+        // Visible only if global change visibility AND the primary agg is on
+        const lineVisible = globalVisible && isPrimaryAggVisible(metadata.seriesKey);
         if (!lineVisible) {
             elements.shapes.forEach(s => s.visible = false);
             elements.annotation.visible = false;
@@ -947,7 +950,7 @@ function setCelLineVisibility(visible) {
     const seriesVisibleById = new Map();
     if (visible) {
         for (const [id, entry] of Object.entries(chartState.CelLines)) {
-                seriesVisibleById.set(String(id), isSeriesVisible(entry.seriesKey));
+                seriesVisibleById.set(String(id), isPrimaryAggVisible(entry.seriesKey));
         }
     }
 
@@ -1063,7 +1066,7 @@ function init() {
     // Emitted seriesKey is like "corrects_0"; extract base to match cel metadata
     eventBus.subscribe(EVENTS.SERIES_VISIBILITY_CHANGED, (data) => {
         const baseKey = data.seriesKey.substring(0, data.seriesKey.lastIndexOf('_'));
-        updateCelLineSeriesVisibility(baseKey, isSeriesVisible(baseKey));
+        updateCelLineSeriesVisibility(baseKey, isPrimaryAggVisible(baseKey));
     }, true);
 }
 

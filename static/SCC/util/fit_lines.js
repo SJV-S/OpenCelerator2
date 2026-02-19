@@ -457,6 +457,64 @@ export function calculateBounceLines(xPositions, slope, intercept, bounds) {
 }
 
 // ============================================================================
+// Detrend
+// ============================================================================
+
+/**
+ * Remove trend from series data, returning multiplicative residuals scaled
+ * by a center value. Operates in log-space using the existing fit infrastructure.
+ *
+ * Output: center * 10^residual — so the wave oscillates around `center` on the
+ * log chart (e.g. center=1000 puts the detrended series around the 1000 line).
+ *
+ * Points with y <= 0 or non-finite y are passed through unchanged (they can't
+ * be log-transformed). If the fit fails (< MIN_POINTS valid points), the input
+ * is returned unchanged.
+ *
+ * @param {number[]} xArr - X positions
+ * @param {number[]} yArr - Y values (linear scale, e.g. frequencies)
+ * @param {{method: string, center: number}|null|undefined} detrendConfig - Config object or falsy to skip
+ * @returns {{x: number[], y: number[]}} Detrended arrays (same length as input)
+ */
+export function detrend(xArr, yArr, detrendConfig) {
+    if (!detrendConfig?.method) return { x: xArr, y: yArr };
+
+    const { method, center = 1 } = detrendConfig;
+
+    // Separate valid (positive, finite) points from pass-through points
+    const validIndices = [];
+    const validX = [];
+    const validLogY = [];
+
+    for (let i = 0; i < yArr.length; i++) {
+        if (yArr[i] > 0 && Number.isFinite(yArr[i])) {
+            validIndices.push(i);
+            validX.push(xArr[i]);
+            validLogY.push(Math.log10(yArr[i]));
+        }
+    }
+
+    // Not enough valid points for fitting — return unchanged
+    if (validX.length < MIN_POINTS) return { x: xArr, y: yArr };
+
+    const result = fit(validX, validLogY, method);
+    if (!result) return { x: xArr, y: yArr };
+
+    const { slope, intercept } = result;
+
+    // Build output — detrended where valid, original where not
+    const outY = [...yArr];
+    for (let i = 0; i < validIndices.length; i++) {
+        const idx = validIndices[i];
+        const trendValue = slope * validX[i] + intercept;
+        const residual = validLogY[i] - trendValue;
+        outY[idx] = center * Math.pow(10, residual);
+    }
+
+    return { x: xArr, y: outY };
+}
+
+// ============================================================================
 // Celeration Label Formatting
 // ============================================================================
 

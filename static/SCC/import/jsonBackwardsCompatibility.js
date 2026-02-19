@@ -10,8 +10,10 @@
  *   0: Initial schema — traceStyles keyed by aggType string ("raw", "median", etc.)
  *   1: Counter-based traceStyles keys ("0", "1", ...) with explicit onXAgg / acrossXAgg
  *   2: Add collaborators array for edit-link recipients
+ *   3: Remove CelLines.settings (moved to IDB user_preferences)
+ *   4: Add detrend: null to all trace configs
  */
-export const CURRENT_SCHEMA_VERSION = 3;
+export const CURRENT_SCHEMA_VERSION = 4;
 
 // ============================================================================
 // Migration Functions
@@ -138,6 +140,45 @@ async function migrate_2_to_3(chart) {
     return true;
 }
 
+/**
+ * Migration 3 → 4: Add detrend: null to all trace configs.
+ *
+ * Before: trace configs have onXAgg + acrossXAgg only
+ * After:  trace configs also have detrend: null
+ */
+async function migrate_3_to_4(chart) {
+    let modified = false;
+    const traceStyles = chart.traceStyles;
+    if (!traceStyles) return modified;
+
+    function addDetrendToConfigs(configs) {
+        if (!configs || typeof configs !== 'object') return;
+        for (const aggId of Object.keys(configs)) {
+            const cfg = configs[aggId];
+            if (cfg && typeof cfg === 'object' && !('detrend' in cfg)) {
+                cfg.detrend = null;
+                modified = true;
+            }
+        }
+    }
+
+    // Fixed series
+    for (const seriesKey of ['corrects', 'errors', 'timing']) {
+        if (traceStyles[seriesKey]) {
+            addDetrendToConfigs(traceStyles[seriesKey]);
+        }
+    }
+
+    // Misc series (nested: misc[miscId][aggId])
+    if (traceStyles.misc && typeof traceStyles.misc === 'object') {
+        for (const miscId of Object.keys(traceStyles.misc)) {
+            addDetrendToConfigs(traceStyles.misc[miscId]);
+        }
+    }
+
+    return modified;
+}
+
 // ============================================================================
 // Migration Registry
 // ============================================================================
@@ -150,6 +191,7 @@ const migrations = [
     migrate_0_to_1,
     migrate_1_to_2,
     migrate_2_to_3,
+    migrate_3_to_4,
 ];
 
 // ============================================================================
