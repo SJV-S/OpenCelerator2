@@ -1041,15 +1041,24 @@ function updateInfoPanel(xRounded, yLogValue, traceData, celData) {
         for (const [key, rowRefs] of refs.seriesRows) {
             const data = traceData.get(key);
 
+            // Get actual marker fill color from chartState.traceStyles
+            const baseKey = key.substring(0, key.lastIndexOf('_'));
+            const aggId = key.substring(key.lastIndexOf('_') + 1);
+            const isMisc = baseKey.startsWith('misc');
+            const styles = isMisc
+                ? chartState.traceStyles.misc?.[baseKey]
+                : chartState.traceStyles?.[baseKey];
+            const markerColor = styles?.[aggId]?.markerColor || '';
+
             if (!data) {
                 if (celHeadingKeys.has(key)) {
                     // Show as label-only heading (no data value)
-                    const baseKey = key.substring(0, key.lastIndexOf('_'));
-                    let displayName = formatSeriesName(baseKey || key);
+                    let displayName = formatSeriesName(seriesId);
                     if (displayName.length > 30) {
                         displayName = displayName.slice(0, 30) + '...';
                     }
                     rowRefs.labelSpan.textContent = displayName;
+                    rowRefs.labelSpan.style.color = markerColor;
                     rowRefs.valueSpan.textContent = '';
                     rowRefs.row.style.display = '';
                 } else {
@@ -1063,6 +1072,7 @@ function updateInfoPanel(xRounded, yLogValue, traceData, celData) {
                 displayName = displayName.slice(0, 30) + '...';
             }
             rowRefs.labelSpan.textContent = displayName;
+            rowRefs.labelSpan.style.color = markerColor;
 
             // Format value - timing shows reciprocal
             let displayValue;
