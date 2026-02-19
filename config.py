@@ -1,7 +1,7 @@
 import os
 
 DEVELOPER_MODE = True
-APP_VERSION = '0.3.2'
+APP_VERSION = '0.3.3'
 
 # --- Load .env file ---
 _env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')

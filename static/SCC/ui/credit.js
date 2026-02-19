@@ -157,14 +157,14 @@ function openCreditEditDialog() {
         <div class="bg-white p-4 rounded-lg shadow-xl w-[98%] max-w-[1200px]" style="border: 2px solid ${CREDIT_COLOR}">
             <h3 class="m-0 mb-3 text-sm font-bold" style="color: ${CREDIT_COLOR}">Edit Credits</h3>
             <div class="flex flex-col gap-2">
-                <input type="text" id="credit-input-0"
-                       class="w-full p-1.5 text-xs border border-gray-300 rounded font-mono"
-                       maxlength="${MAX_CREDIT_LENGTH}"
-                       value="${escapeHtml(line0)}">
                 <input type="text" id="credit-input-1"
                        class="w-full p-1.5 text-xs border border-gray-300 rounded font-mono"
                        maxlength="${MAX_CREDIT_LENGTH}"
                        value="${escapeHtml(line1)}">
+                <input type="text" id="credit-input-0"
+                       class="w-full p-1.5 text-xs border border-gray-300 rounded font-mono"
+                       maxlength="${MAX_CREDIT_LENGTH}"
+                       value="${escapeHtml(line0)}">
             </div>
             <div class="flex gap-3 mt-4 justify-end">
                 <button id="credit-edit-cancel"
@@ -181,7 +181,7 @@ function openCreditEditDialog() {
     `;
 
     document.body.appendChild(overlay);
-    document.getElementById('credit-input-0').focus();
+    document.getElementById('credit-input-1').focus();
 
     const handleSave = () => {
         const c0 = document.getElementById('credit-input-0').value;
