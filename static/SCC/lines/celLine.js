@@ -376,6 +376,13 @@ function enableDragMode() {
         message: 'Drag to select range',
         buttons: [
             {
+                label: 'All data',
+                onClick: () => {
+                    finalizeAllData();
+                },
+                type: 'primary'
+            },
+            {
                 label: 'Cancel',
                 onClick: () => {
                     deactivateCelLineMode();
@@ -570,6 +577,31 @@ function handleCelLineTouchEnd(event, chartDiv) {
 }
 
 /**
+ * Finalize cel line creation using ALL data for the selected series (no x-range filter)
+ */
+function finalizeAllData() {
+    const baseKey = celLineState.selectedSeriesKey;
+    const aggId = celLineState.selectedAggId;
+
+    if (!baseKey) {
+        deactivateCelLineMode();
+        return;
+    }
+
+    const data = getAllDataForSeries(baseKey, aggId);
+
+    if (!data || data.x.length < 5) {
+        createToast({
+            message: `Need at least 5 data points. Found ${data ? data.x.length : 0}.`,
+            duration: 3000
+        });
+        return;
+    }
+
+    handleCelLineConfirm(data, baseKey);
+}
+
+/**
  * Finalize cel line creation using pre-selected series
  */
 function finalizeCelLine() {
@@ -723,6 +755,39 @@ function cleanupSeriesSelectionMode() {
         celLineState.seriesSelectionToast.remove();
         celLineState.seriesSelectionToast = null;
     }
+}
+
+/**
+ * Get ALL data for a series (no x-range filter).
+ * Same logic as getDataInRangeForSeries but collects every point.
+ */
+function getAllDataForSeries(baseKey, aggId) {
+    const chartDiv = getChartDiv();
+
+    if (!chartDiv || !chartDiv.data) {
+        return null;
+    }
+
+    const xValues = [];
+    const yValues = [];
+
+    for (let traceIdx = 0; traceIdx < chartDiv.data.length; traceIdx++) {
+        const trace = chartDiv.data[traceIdx];
+
+        if (!trace.x || !trace.y || !trace.meta) continue;
+        if (trace.meta.seriesName !== baseKey) continue;
+        if (trace.meta.aggId !== aggId) continue;
+
+        for (let i = 0; i < trace.x.length; i++) {
+            const y = trace.y[i];
+            if (y !== null && y !== undefined && !isNaN(y)) {
+                xValues.push(trace.x[i]);
+                yValues.push(y);
+            }
+        }
+    }
+
+    return { x: xValues, y: yValues };
 }
 
 function getDataInRangeForSeries(x1, x2, baseKey, aggId) {
