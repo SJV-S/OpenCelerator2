@@ -390,7 +390,7 @@ function enableDragMode() {
                 type: 'secondary'
             }
         ],
-        layout: 'horizontal',
+        layout: 'vertical-buttons',
         position: 'top-right'
     });
 
