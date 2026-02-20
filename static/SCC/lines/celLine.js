@@ -373,7 +373,7 @@ function enableDragMode() {
 
     // Show toast with instructions
     celLineState.toastElement = createToast({
-        message: 'Drag to select range',
+        message: 'Select all or drag to select slice',
         buttons: [
             {
                 label: 'All data',
