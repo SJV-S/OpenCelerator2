@@ -6,7 +6,7 @@
 export const DEVELOPER_MODE = true;
 
 // Synced from config.py APP_VERSION by push_to_my_gitea.sh (same as SW_VERSION)
-export const APP_VERSION = '0.4.2';
+export const APP_VERSION = '0.4.1';
 
 // Series name constants (used as keys in chartState)
 export const CORRECTS = 'corrects';
