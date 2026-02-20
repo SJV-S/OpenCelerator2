@@ -3,7 +3,7 @@ import time
 from flask import Blueprint, g, request, jsonify, current_app
 from models import db, Chart, ChartAccess, ChartTombstone
 from extensions import limiter, socketio
-from routes.helpers import valid_user_id, valid_uuid, decode_blob, encode_blob, ensure_identity
+from routes.helpers import valid_user_id, valid_uuid, decode_blob, encode_blob, ensure_identity, require_signature
 from routes.key_limits import check_key_rate, check_write_quotas
 from telemetry import _hash_ip
 import config
@@ -98,19 +98,29 @@ def sync():
         updated_at = min(upload['updated_at'], int(time.time()) + 300)
         signature = decode_blob(upload['signature']) if upload.get('signature') else None
 
+        # Verify signature on the encrypted blob
+        ok, err = require_signature(user_id, signature, chart_data)
+        if not ok:
+            current_app.logger.warning(f'[Sync] Signature check failed for {chart_uuid[:8]}…: {err}')
+            continue
+
         total_bytes += len(chart_data)
 
-        # Check if chart exists
         existing = db.session.get(Chart, chart_uuid)
 
         if existing:
-            # Update if newer
+            # Require ChartAccess to update existing charts
+            access = db.session.get(ChartAccess, (chart_uuid, user_id))
+            if not access:
+                current_app.logger.warning(f'[Sync] No access for {user_id[:8]}… on {chart_uuid[:8]}…')
+                continue
             if updated_at > existing.last_modified:
                 existing.data = chart_data
                 existing.last_modified = updated_at
                 existing.signature = signature
+            access.wrapped_key = wrapped_key
         else:
-            # Create new chart
+            # New chart — creator gets Chart + ChartAccess
             new_chart = Chart(
                 chart_uuid=chart_uuid,
                 data=chart_data,
@@ -119,19 +129,12 @@ def sync():
                 created_by=user_id
             )
             db.session.add(new_chart)
-
-        # Ensure user has access entry
-        access = db.session.get(ChartAccess, (chart_uuid, user_id))
-        if not access:
             access = ChartAccess(
                 chart_uuid=chart_uuid,
                 user_id=user_id,
                 wrapped_key=wrapped_key
             )
             db.session.add(access)
-        else:
-            # Update wrapped key if provided
-            access.wrapped_key = wrapped_key
 
     if total_bytes:
         g.bytes_uploaded = total_bytes

@@ -4,7 +4,7 @@ from base64 import b64decode
 from flask import Blueprint, g, request, jsonify, current_app
 from models import db, Chart, ChartAccess, ShareLink
 from extensions import limiter
-from routes.helpers import valid_user_id, valid_uuid, encode_blob, ensure_identity
+from routes.helpers import valid_user_id, valid_uuid, encode_blob, ensure_identity, require_signature
 from routes.key_limits import check_key_rate, check_write_quotas
 from telemetry import _hash_ip
 import config
@@ -56,12 +56,21 @@ def create_edit_link():
     signature_str = data.get('signature')
     signature_bytes = b64decode(signature_str) if signature_str else None
 
+    # Verify signature on the encrypted blob
+    ok, err = require_signature(user_id, signature_bytes, chart_data)
+    if not ok:
+        return jsonify({'error': err}), 403
+
+    # Owner-only: if chart exists, only the creator can create/modify share links
+    existing_chart = db.session.get(Chart, chart_uuid)
+    if existing_chart and existing_chart.created_by != user_id:
+        return jsonify({'error': 'Only chart owner can create share links'}), 403
+
     # Store/update chart
-    chart = db.session.get(Chart, chart_uuid)
-    if chart:
-        chart.data = chart_data
-        chart.last_modified = last_modified
-        chart.signature = signature_bytes
+    if existing_chart:
+        existing_chart.data = chart_data
+        existing_chart.last_modified = last_modified
+        existing_chart.signature = signature_bytes
     else:
         chart = Chart(chart_uuid=chart_uuid, data=chart_data, last_modified=last_modified,
                       signature=signature_bytes, created_by=user_id)
@@ -73,13 +82,16 @@ def create_edit_link():
         access = ChartAccess(chart_uuid=chart_uuid, user_id=user_id, wrapped_key=wrapped_key_bytes)
         db.session.add(access)
 
-    # Store share link wrapped key
+    # Store share link wrapped key + join token hash
+    join_token_hash = data.get('join_token_hash')
     share_link = db.session.get(ShareLink, chart_uuid)
     if share_link:
         share_link.wrapped_key = wrapped_share_bytes
         share_link.created_at = int(time.time())
+        share_link.join_token_hash = join_token_hash
     else:
-        share_link = ShareLink(chart_uuid=chart_uuid, wrapped_key=wrapped_share_bytes, created_at=int(time.time()))
+        share_link = ShareLink(chart_uuid=chart_uuid, wrapped_key=wrapped_share_bytes,
+                               created_at=int(time.time()), join_token_hash=join_token_hash)
         db.session.add(share_link)
 
     db.session.commit()
@@ -118,3 +130,56 @@ def get_shared_chart(chart_uuid):
         'updated_at': chart.last_modified,
         'signature': encode_blob(chart.signature) if chart.signature else None
     })
+
+
+@sharing_bp.route('/api/chart/<chart_uuid>/join', methods=['POST'])
+@limiter.limit(config.RATELIMIT_API_WRITE)
+def join_chart(chart_uuid):
+    """Collaborator joins a shared chart by proving knowledge of the share secret."""
+    if not valid_uuid(chart_uuid):
+        return jsonify({'error': 'Invalid format'}), 400
+
+    data = request.get_json()
+    user_id = data.get('user_id')
+    join_token = data.get('join_token')
+    wrapped_key = data.get('wrapped_key')
+
+    if not all([user_id, join_token, wrapped_key]):
+        return jsonify({'error': 'Missing required fields'}), 400
+    if not valid_user_id(user_id):
+        return jsonify({'error': 'Invalid format'}), 400
+
+    ip_hash = _hash_ip(request.remote_addr or '0.0.0.0')
+    ok, reason = ensure_identity(user_id, data.get('public_key'), ip_hash)
+    if not ok:
+        if reason == 'rate':
+            return jsonify({'error': 'Too many new accounts from this network; try again later'}), 429
+        return jsonify({'error': 'public_key required and must match user_id'}), 403
+
+    ok, msg = check_key_rate(user_id, is_write=True)
+    if not ok:
+        return jsonify({'error': msg}), 429
+
+    share_link = db.session.get(ShareLink, chart_uuid)
+    if not share_link:
+        return jsonify({'error': 'Share link not found or expired'}), 404
+
+    now = int(time.time())
+    if share_link.created_at + config.SHARE_LINK_TTL_SECONDS < now:
+        return jsonify({'error': 'Share link has expired'}), 404
+
+    if not share_link.join_token_hash:
+        return jsonify({'error': 'Share link does not support joining'}), 403
+    if join_token.lower() != share_link.join_token_hash.lower():
+        return jsonify({'error': 'Invalid join token'}), 403
+
+    wrapped_key_bytes = b64decode(wrapped_key) if isinstance(wrapped_key, str) else wrapped_key
+    access = db.session.get(ChartAccess, (chart_uuid, user_id))
+    if not access:
+        access = ChartAccess(chart_uuid=chart_uuid, user_id=user_id, wrapped_key=wrapped_key_bytes)
+        db.session.add(access)
+    else:
+        access.wrapped_key = wrapped_key_bytes
+
+    db.session.commit()
+    return jsonify({'success': True})

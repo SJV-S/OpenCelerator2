@@ -3,7 +3,7 @@ import time
 from flask import Blueprint, request, jsonify
 from models import db, Chart, ChartAccess, ChartTombstone
 from extensions import limiter
-from routes.helpers import valid_user_id, valid_uuid, ensure_identity
+from routes.helpers import valid_user_id, valid_uuid, decode_blob, ensure_identity, require_signature
 from routes.key_limits import check_key_rate
 from telemetry import _hash_ip
 import config
@@ -36,23 +36,29 @@ def delete_chart():
     if not ok:
         return jsonify({'error': msg}), 429
 
-    access = db.session.get(ChartAccess, (chart_uuid, user_id))
-    if not access:
-        return jsonify({'error': 'Not authorized'}), 403
+    # Verify signature (signed data = UTF-8 bytes of chart_uuid)
+    signature = decode_blob(data.get('signature')) if data.get('signature') else None
+    ok, err = require_signature(user_id, signature, chart_uuid.encode('utf-8'))
+    if not ok:
+        return jsonify({'error': err}), 403
 
-    # Delete chart (cascades to chart_access and share_links)
+    # Owner-only deletion
     chart = db.session.get(Chart, chart_uuid)
-    if chart:
-        # Create per-user tombstones before cascade deletes access entries
-        now = int(time.time())
-        access_entries = ChartAccess.query.filter_by(chart_uuid=chart_uuid).all()
-        for entry in access_entries:
-            db.session.add(ChartTombstone(
-                chart_uuid=chart_uuid, user_id=entry.user_id, deleted_at=now
-            ))
+    if not chart:
+        return jsonify({'success': True})
+    if chart.created_by != user_id:
+        return jsonify({'error': 'Only chart owner can delete'}), 403
 
-        db.session.delete(chart)
-        db.session.commit()
+    # Create per-user tombstones before cascade deletes access entries
+    now = int(time.time())
+    access_entries = ChartAccess.query.filter_by(chart_uuid=chart_uuid).all()
+    for entry in access_entries:
+        db.session.add(ChartTombstone(
+            chart_uuid=chart_uuid, user_id=entry.user_id, deleted_at=now
+        ))
+
+    db.session.delete(chart)
+    db.session.commit()
 
     return jsonify({'success': True})
 
@@ -81,6 +87,12 @@ def leave_chart():
     ok, msg = check_key_rate(user_id, is_write=True)
     if not ok:
         return jsonify({'error': msg}), 429
+
+    # Verify signature (signed data = UTF-8 bytes of chart_uuid)
+    signature = decode_blob(data.get('signature')) if data.get('signature') else None
+    ok, err = require_signature(user_id, signature, chart_uuid.encode('utf-8'))
+    if not ok:
+        return jsonify({'error': err}), 403
 
     access = db.session.get(ChartAccess, (chart_uuid, user_id))
     if access:

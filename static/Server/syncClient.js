@@ -435,6 +435,7 @@ async function _createShareLink(chartUuid, acceptingEdits) {
     const shareSecret = Array.from(crypto.getRandomValues(new Uint8Array(32)))
         .map(b => b.toString(16).padStart(2, '0')).join('');
     const shareKey = await deriveKey(shareSecret, chartUuid);
+    const joinTokenHash = await sha256(shareSecret);
 
     // Encrypt chart and wrap key for both user and share recipient
     const encryptedData = await encrypt(chartKey, chart);
@@ -452,7 +453,8 @@ async function _createShareLink(chartUuid, acceptingEdits) {
             wrapped_key: wrappedKeyForUser,
             wrapped_key_for_share: wrappedKeyForShare,
             last_modified: chart.lastModified || Math.floor(Date.now() / 1000),
-            signature
+            signature,
+            join_token_hash: joinTokenHash
         }
     });
     if (!response.ok) {
@@ -472,17 +474,19 @@ async function _createShareLink(chartUuid, acceptingEdits) {
 // ============================================================================
 
 export async function deleteChart(chartUuid) {
+    const signature = await sign(btoa(chartUuid), signingPrivateKey);
     const response = await api('/api/chart', {
         method: 'DELETE',
-        body: { chart_uuid: chartUuid, user_id: userId, public_key: signingPublicKeyB64 }
+        body: { chart_uuid: chartUuid, user_id: userId, public_key: signingPublicKeyB64, signature }
     });
     return response.ok;
 }
 
 export async function leaveChart(chartUuid) {
+    const signature = await sign(btoa(chartUuid), signingPrivateKey);
     const response = await api('/api/chart/leave', {
         method: 'DELETE',
-        body: { chart_uuid: chartUuid, user_id: userId, public_key: signingPublicKeyB64 }
+        body: { chart_uuid: chartUuid, user_id: userId, public_key: signingPublicKeyB64, signature }
     });
     return response.ok;
 }
@@ -492,6 +496,7 @@ export async function leaveChart(chartUuid) {
 // ============================================================================
 
 export async function joinSharedChart(chartUuid, shareSecret) {
+    // 1. Fetch shared chart data (public GET endpoint)
     const response = await api(`/api/chart/${chartUuid}/shared`);
     if (!response.ok) {
         const body = await response.json().catch(() => ({}));
@@ -499,6 +504,7 @@ export async function joinSharedChart(chartUuid, shareSecret) {
     }
     const { data, wrapped_key, updated_at, signature: signatureHex } = await response.json();
 
+    // 2. Decrypt with share-derived key
     const shareKey = await deriveKey(shareSecret, chartUuid);
     const chartKey = await unwrapKey(wrapped_key, shareKey);
     const chartKeyHex = Array.from(new Uint8Array(await crypto.subtle.exportKey('raw', chartKey)))
@@ -506,12 +512,30 @@ export async function joinSharedChart(chartUuid, shareSecret) {
 
     const chartData = await decrypt(chartKey, data);
 
-    // First join — no local chart for timestamp check
+    // 3. Verify pull (first join — no local chart)
     const verification = await verifyPull(data, signatureHex, chartData, null);
     if (!verification.accepted) {
         throw new Error(`Join rejected: ${verification.reason}`);
     }
 
+    // 4. Call join endpoint to create ChartAccess
+    const joinToken = await sha256(shareSecret);
+    const wrappedKeyForUser = await wrapKey(chartKey, userKey);
+    const joinResponse = await api(`/api/chart/${chartUuid}/join`, {
+        method: 'POST',
+        body: {
+            user_id: userId,
+            public_key: signingPublicKeyB64,
+            join_token: joinToken,
+            wrapped_key: wrappedKeyForUser
+        }
+    });
+    if (!joinResponse.ok) {
+        const body = await joinResponse.json().catch(() => ({}));
+        throw new Error(body.error || `Join failed: ${joinResponse.status}`);
+    }
+
+    // 5. Store locally
     chartData.id = chartUuid;
     chartData.chartKey = chartKeyHex;
     chartData.shared = true;

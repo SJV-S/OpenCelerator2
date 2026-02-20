@@ -68,6 +68,7 @@ class ShareLink(db.Model):
     chart_uuid = db.Column(db.String(36), db.ForeignKey('charts.chart_uuid'), primary_key=True)
     wrapped_key = db.Column(db.LargeBinary, nullable=False)  # chart_key wrapped with share-derived key
     created_at = db.Column(db.Integer, nullable=False)  # Unix seconds
+    join_token_hash = db.Column(db.String(64), nullable=True)  # SHA-256 hex of shareSecret
 
     chart = db.relationship('Chart', back_populates='share_link')
 
@@ -116,6 +117,7 @@ def _migrate_columns(app):
     """Add columns that may be missing from older schemas."""
     migrations = [
         ('request_logs', 'comment', 'VARCHAR(256)'),
+        ('share_links', 'join_token_hash', 'VARCHAR(64)'),
     ]
     for table, column, col_type in migrations:
         try:
