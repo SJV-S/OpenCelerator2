@@ -420,13 +420,26 @@ function buildCelLineCache() {
         const x0 = dateToXPosition(meta.date1);
         const x1 = dateToXPosition(meta.date2);
 
+        // Derive slope/intercept from stored endpoints in the current
+        // x-coordinate system. The metadata values were computed in the
+        // chart type active at creation time; if the chart type (or
+        // startDate) changed since then, those raw values are stale.
+        // The endpoint Y values are chart-type-independent, so
+        // recomputing here keeps the crosshair aligned with the
+        // Plotly shape, which also uses the endpoints directly.
+        const logY0 = Math.log10(meta.y1);
+        const logY1 = Math.log10(meta.y2);
+        const dx = x1 - x0;
+        const slope = dx !== 0 ? (logY1 - logY0) / dx : 0;
+        const intercept = logY0 - slope * x0;
+
         state.celLineCache.push({
             id: meta.id,
             seriesKey: meta.seriesKey,
             aggId: meta.aggId,
             x0, x1,
-            slope: meta.slope,
-            intercept: meta.intercept,
+            slope,
+            intercept,
             bounceUpperOffset: meta.bounceUpperOffset,
             bounceLowerOffset: meta.bounceLowerOffset,
             color: meta.style.color,

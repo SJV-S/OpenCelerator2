@@ -520,6 +520,11 @@ function init() {
         renderCustomLegend();
     });
 
+    // Re-render after Plotly finishes newPlot so legend positions use final layout dimensions
+    eventBus.subscribe(EVENTS.PLOTLY_NEWPLOT_COMPLETE, () => {
+        renderCustomLegend();
+    });
+
     // When a line drawing mode activates, ensure that line type is visible
     const modeToLineType = {
         [EVENTS.MODE_PHASE_ACTIVATE]: { key: 'phase', label: 'Event markers' },
