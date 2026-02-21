@@ -38,6 +38,7 @@ def create_edit_link():
         if reason == 'rate':
             g.log_comment = 'rate_limit: new_key_ip'
             return jsonify({'error': 'Too many new accounts from this network; try again later'}), 429
+        g.log_comment = 'bad_identity: public_key mismatch'
         return jsonify({'error': 'public_key required and must match user_id'}), 403
 
     # Per-key rate limit
@@ -67,6 +68,7 @@ def create_edit_link():
     # Owner-only: if chart exists, only the creator can create/modify share links
     existing_chart = db.session.get(Chart, chart_uuid)
     if existing_chart and existing_chart.created_by != user_id:
+        g.log_comment = 'non_owner: share attempt'
         return jsonify({'error': 'Only chart owner can create share links'}), 403
 
     # Store/update chart
@@ -158,6 +160,7 @@ def join_chart(chart_uuid):
         if reason == 'rate':
             g.log_comment = 'rate_limit: new_key_ip'
             return jsonify({'error': 'Too many new accounts from this network; try again later'}), 429
+        g.log_comment = 'bad_identity: public_key mismatch'
         return jsonify({'error': 'public_key required and must match user_id'}), 403
 
     ok, msg = check_key_rate(user_id, is_write=True)
@@ -176,6 +179,7 @@ def join_chart(chart_uuid):
     if not share_link.join_token_hash:
         return jsonify({'error': 'Share link does not support joining'}), 403
     if join_token.lower() != share_link.join_token_hash.lower():
+        g.log_comment = 'bad_join_token'
         return jsonify({'error': 'Invalid join token'}), 403
 
     wrapped_key_bytes = b64decode(wrapped_key) if isinstance(wrapped_key, str) else wrapped_key

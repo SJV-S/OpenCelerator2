@@ -30,6 +30,7 @@ def delete_chart():
         if reason == 'rate':
             g.log_comment = 'rate_limit: new_key_ip'
             return jsonify({'error': 'Too many new accounts from this network; try again later'}), 429
+        g.log_comment = 'bad_identity: public_key mismatch'
         return jsonify({'error': 'public_key required and must match user_id'}), 403
 
     # Per-key rate limit
@@ -50,6 +51,7 @@ def delete_chart():
     if not chart:
         return jsonify({'success': True})
     if chart.created_by != user_id:
+        g.log_comment = 'non_owner: delete attempt'
         return jsonify({'error': 'Only chart owner can delete'}), 403
 
     # Create per-user tombstones before cascade deletes access entries
@@ -85,6 +87,7 @@ def leave_chart():
         if reason == 'rate':
             g.log_comment = 'rate_limit: new_key_ip'
             return jsonify({'error': 'Too many new accounts from this network; try again later'}), 429
+        g.log_comment = 'bad_identity: public_key mismatch'
         return jsonify({'error': 'public_key required and must match user_id'}), 403
 
     # Per-key rate limit

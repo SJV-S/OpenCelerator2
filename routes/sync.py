@@ -66,6 +66,7 @@ def sync():
         if reason == 'rate':
             g.log_comment = 'rate_limit: new_key_ip'
             return jsonify({'error': 'Too many new accounts from this network; try again later'}), 429
+        g.log_comment = 'bad_identity: public_key mismatch'
         return jsonify({'error': 'public_key required and must match user_id'}), 403
 
     uploads = data.get('uploads', [])
@@ -117,6 +118,8 @@ def sync():
             access = db.session.get(ChartAccess, (chart_uuid, user_id))
             if not access:
                 current_app.logger.warning(f'[Sync] No access for {user_id[:8]}… on {chart_uuid[:8]}…')
+                if not hasattr(g, 'log_comment'):
+                    g.log_comment = 'no_access: upload without ChartAccess'
                 continue
             if updated_at > existing.last_modified:
                 existing.data = chart_data

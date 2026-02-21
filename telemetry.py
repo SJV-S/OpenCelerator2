@@ -1,6 +1,21 @@
 """
 Request telemetry — logs hashed IP, route, and available identifiers.
 Raw IPs are never stored; they are HMAC-SHA256 hashed before writing.
+
+Suspicious activity comments
+-----------------------------
+Routes set g.log_comment to annotate the RequestLog.comment column when
+a request fails a security check. Server-set comments take priority over
+client-provided ones. Current prefixes:
+
+  bad_sig: {err}                     Invalid/missing ECDSA signature
+  bad_identity: public_key mismatch  user_id does not match SHA-256(public_key)
+  rate_limit: new_key_ip             Too many new identities from one IP
+  rate_limit: {msg}                  Per-key request rate exceeded
+  no_access: upload without ChartAccess  Sync upload to a chart the user has no access to
+  non_owner: delete attempt          Non-owner trying to delete a chart
+  non_owner: share attempt           Non-owner trying to create a share link
+  bad_join_token                     Wrong share secret when joining a shared chart
 """
 
 import hmac
