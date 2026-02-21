@@ -1,6 +1,6 @@
 import time
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, g, request, jsonify
 from models import db, Chart, ChartAccess, ChartTombstone
 from extensions import limiter
 from routes.helpers import valid_user_id, valid_uuid, decode_blob, ensure_identity, require_signature
@@ -28,18 +28,21 @@ def delete_chart():
     ok, reason = ensure_identity(user_id, data.get('public_key'), ip_hash)
     if not ok:
         if reason == 'rate':
+            g.log_comment = 'rate_limit: new_key_ip'
             return jsonify({'error': 'Too many new accounts from this network; try again later'}), 429
         return jsonify({'error': 'public_key required and must match user_id'}), 403
 
     # Per-key rate limit
     ok, msg = check_key_rate(user_id, is_write=True)
     if not ok:
+        g.log_comment = f'rate_limit: {msg}'
         return jsonify({'error': msg}), 429
 
     # Verify signature (signed data = UTF-8 bytes of chart_uuid)
     signature = decode_blob(data.get('signature')) if data.get('signature') else None
     ok, err = require_signature(user_id, signature, chart_uuid.encode('utf-8'))
     if not ok:
+        g.log_comment = f'bad_sig: {err}'
         return jsonify({'error': err}), 403
 
     # Owner-only deletion
@@ -80,18 +83,21 @@ def leave_chart():
     ok, reason = ensure_identity(user_id, data.get('public_key'), ip_hash)
     if not ok:
         if reason == 'rate':
+            g.log_comment = 'rate_limit: new_key_ip'
             return jsonify({'error': 'Too many new accounts from this network; try again later'}), 429
         return jsonify({'error': 'public_key required and must match user_id'}), 403
 
     # Per-key rate limit
     ok, msg = check_key_rate(user_id, is_write=True)
     if not ok:
+        g.log_comment = f'rate_limit: {msg}'
         return jsonify({'error': msg}), 429
 
     # Verify signature (signed data = UTF-8 bytes of chart_uuid)
     signature = decode_blob(data.get('signature')) if data.get('signature') else None
     ok, err = require_signature(user_id, signature, chart_uuid.encode('utf-8'))
     if not ok:
+        g.log_comment = f'bad_sig: {err}'
         return jsonify({'error': err}), 403
 
     access = db.session.get(ChartAccess, (chart_uuid, user_id))

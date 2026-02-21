@@ -64,6 +64,7 @@ def sync():
     ok, reason = ensure_identity(user_id, data.get('public_key'), ip_hash)
     if not ok:
         if reason == 'rate':
+            g.log_comment = 'rate_limit: new_key_ip'
             return jsonify({'error': 'Too many new accounts from this network; try again later'}), 429
         return jsonify({'error': 'public_key required and must match user_id'}), 403
 
@@ -73,6 +74,7 @@ def sync():
     # Per-key rate limit
     ok, msg = check_key_rate(user_id, is_write=is_write)
     if not ok:
+        g.log_comment = f'rate_limit: {msg}'
         return jsonify({'error': msg}), 429
 
     # Per-key storage quota (only when uploading)
@@ -102,6 +104,8 @@ def sync():
         ok, err = require_signature(user_id, signature, chart_data)
         if not ok:
             current_app.logger.warning(f'[Sync] Signature check failed for {chart_uuid[:8]}…: {err}')
+            if not hasattr(g, 'log_comment'):
+                g.log_comment = f'bad_sig: {err}'
             continue
 
         total_bytes += len(chart_data)

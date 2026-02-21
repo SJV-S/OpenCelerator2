@@ -36,12 +36,14 @@ def create_edit_link():
     ok, reason = ensure_identity(user_id, data.get('public_key'), ip_hash)
     if not ok:
         if reason == 'rate':
+            g.log_comment = 'rate_limit: new_key_ip'
             return jsonify({'error': 'Too many new accounts from this network; try again later'}), 429
         return jsonify({'error': 'public_key required and must match user_id'}), 403
 
     # Per-key rate limit
     ok, msg = check_key_rate(user_id, is_write=True)
     if not ok:
+        g.log_comment = f'rate_limit: {msg}'
         return jsonify({'error': msg}), 429
 
     # Per-key storage quota
@@ -59,6 +61,7 @@ def create_edit_link():
     # Verify signature on the encrypted blob
     ok, err = require_signature(user_id, signature_bytes, chart_data)
     if not ok:
+        g.log_comment = f'bad_sig: {err}'
         return jsonify({'error': err}), 403
 
     # Owner-only: if chart exists, only the creator can create/modify share links
@@ -153,11 +156,13 @@ def join_chart(chart_uuid):
     ok, reason = ensure_identity(user_id, data.get('public_key'), ip_hash)
     if not ok:
         if reason == 'rate':
+            g.log_comment = 'rate_limit: new_key_ip'
             return jsonify({'error': 'Too many new accounts from this network; try again later'}), 429
         return jsonify({'error': 'public_key required and must match user_id'}), 403
 
     ok, msg = check_key_rate(user_id, is_write=True)
     if not ok:
+        g.log_comment = f'rate_limit: {msg}'
         return jsonify({'error': msg}), 429
 
     share_link = db.session.get(ShareLink, chart_uuid)
