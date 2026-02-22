@@ -114,6 +114,7 @@ def log_request(response):
             user_id=_extract_user_id(),
             chart_uuid=_extract_chart_uuid(),
             bytes_uploaded=getattr(g, 'bytes_uploaded', None),
+            bytes_downloaded=getattr(g, 'bytes_downloaded', None),
             comment=getattr(g, 'log_comment', None) or _extract_comment(),
         )
         db.session.add(entry)

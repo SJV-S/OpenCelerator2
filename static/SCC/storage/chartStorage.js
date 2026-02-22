@@ -4,7 +4,8 @@
  * Architecture:
  *   - All chart data in IndexedDB
  *   - No unsaved charts - user must name chart before seeing it
- *   - Auto-save on every STATE_MUTATING event
+ *   - Auto-save on every STATE_MUTATING and PRESENTATION event
+ *   - PRESENTATION events (visibility toggles) only sync to server for shared charts
  *
  * Flow:
  *   1. Menu page: "New Chart" → prompt name → createChart() → navigate to chart
@@ -425,8 +426,9 @@ export async function importChart(chartData) {
 
 /**
  * Debounced IndexedDB save - waits for activity to settle
+ * @param {boolean} [sync=true] - Whether to trigger server sync after save
  */
-function debouncedSaveToIndexedDB() {
+function debouncedSaveToIndexedDB(sync = true) {
     if (saveTimeout) {
         clearTimeout(saveTimeout);
     }
@@ -434,6 +436,7 @@ function debouncedSaveToIndexedDB() {
     saveTimeout = setTimeout(async () => {
         if (chartState.id) {
             await saveChart(chartState.id);
+            if (!sync) return;
             if (chartState.shared && isInitialized()) {
                 // Reconnect WebSocket if it dropped (e.g. after sleep/tab freeze)
                 if (!hasSocket()) {
@@ -487,6 +490,21 @@ function onStateMutation(save = true) {
     debouncedSaveToIndexedDB();
 }
 
+/**
+ * Handle presentation mutation (visibility toggles) - save locally, only sync shared charts.
+ * Non-shared charts skip server push since these are viewing preferences, not data changes.
+ * @param {boolean} save - When false, skip persistence (e.g. render-only events during init)
+ */
+function onPresentationMutation(save = true) {
+    if (!save) return;
+    if (!isChartOwner(chartState) && !chartState.acceptingEdits) return;
+    if (!chartState.id) {
+        console.warn('[Storage] No chart ID - chart should be created before mutations');
+        return;
+    }
+    debouncedSaveToIndexedDB(chartState.shared);
+}
+
 // ============================================================================
 // Push Queue - persists failed pushes for retry when back online
 // ============================================================================
@@ -525,12 +543,17 @@ async function drainPushQueue() {
 }
 
 /**
- * Subscribe to STATE_MUTATING category for auto-save
+ * Subscribe to event categories for auto-save
  */
 function subscribeToEvents() {
     // data?.save comes from the emit payload — emitters pass { save: false } to suppress persistence
     eventBus.subscribeToCategory(EVENT_CATEGORIES.STATE_MUTATING, ({ data }) => {
         onStateMutation(data?.save);
+    }, true);
+
+    // PRESENTATION events (visibility toggles): always save locally, only sync for shared charts
+    eventBus.subscribeToCategory(EVENT_CATEGORIES.PRESENTATION, ({ data }) => {
+        onPresentationMutation(data?.save);
     }, true);
 
     // Drain push queue on sync initialization (every page load) and server reconnect

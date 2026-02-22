@@ -89,6 +89,7 @@ class RequestLog(db.Model):
     user_id = db.Column(db.String(64), nullable=True)
     chart_uuid = db.Column(db.String(36), nullable=True)
     bytes_uploaded = db.Column(db.Integer, nullable=True)  # total encrypted bytes written in this request
+    bytes_downloaded = db.Column(db.Integer, nullable=True)  # total encrypted bytes sent in this request
     comment = db.Column(db.String(256), nullable=True)
 
 
@@ -118,6 +119,7 @@ def _migrate_columns(app):
     migrations = [
         ('request_logs', 'comment', 'VARCHAR(256)'),
         ('share_links', 'join_token_hash', 'VARCHAR(64)'),
+        ('request_logs', 'bytes_downloaded', 'INTEGER'),
     ]
     for table, column, col_type in migrations:
         try:

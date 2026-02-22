@@ -180,6 +180,11 @@ def sync():
                 'signature': encode_blob(chart.signature) if chart.signature else None
             })
 
+    total_downloaded = sum(len(chart.data) for chart, access in user_charts
+                          if chart.last_modified > local_manifest.get(chart.chart_uuid, 0))
+    if total_downloaded:
+        g.bytes_downloaded = total_downloaded
+
     # Get tombstones since last sync (scoped to this user)
     tombstones = ChartTombstone.query.filter(
         ChartTombstone.user_id == user_id,

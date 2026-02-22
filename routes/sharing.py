@@ -128,6 +128,8 @@ def get_shared_chart(chart_uuid):
             current_app.logger.info(f'[TTL] Removed {expired} expired share link(s)')
         return jsonify({'error': 'This link has expired or does not exist'}), 404
 
+    g.bytes_downloaded = len(chart.data)
+
     return jsonify({
         'chart_uuid': chart_uuid,
         'data': encode_blob(chart.data),
