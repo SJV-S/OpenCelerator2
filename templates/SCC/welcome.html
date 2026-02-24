@@ -6,17 +6,6 @@
 html, body {
     height: 100%;
 }
-.use-case-btn {
-    transition: all 0.15s ease;
-    cursor: pointer;
-}
-.use-case-btn:hover {
-    border-color: #6ad1e3;
-}
-.use-case-btn.selected {
-    border-color: #6ad1e3;
-    background: #f0fbfd;
-}
 .path-btn {
     transition: all 0.15s ease;
 }
@@ -66,24 +55,6 @@ html, body {
                 autocomplete="off"
                 maxlength="50"
             >
-        </div>
-
-        <div class="mb-14">
-            <p class="block text-sm font-medium text-gray-700 mb-3">How will you use the chart?</p>
-            <div class="space-y-3">
-                <label class="use-case-btn flex items-center px-4 py-3 border-2 border-gray-300 rounded-lg">
-                    <input type="radio" name="use-case" value="Business" class="hidden">
-                    <span class="text-gray-800">Business</span>
-                </label>
-                <label class="use-case-btn flex items-center px-4 py-3 border-2 border-gray-300 rounded-lg">
-                    <input type="radio" name="use-case" value="Teaching" class="hidden">
-                    <span class="text-gray-800">Teaching</span>
-                </label>
-                <label class="use-case-btn flex items-center px-4 py-3 border-2 border-gray-300 rounded-lg">
-                    <input type="radio" name="use-case" value="Both" class="hidden">
-                    <span class="text-gray-800">Both</span>
-                </label>
-            </div>
         </div>
 
         <button

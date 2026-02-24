@@ -5,6 +5,7 @@ import { downloadFile } from '/static/SCC/util/download.js';
 import { createAccountLink } from '/static/Server/accountLink.js';
 import { getStoredPassphrase } from '/static/Server/syncDevice.js';
 import { formatDateISO, nowUnixSeconds } from '/static/SCC/util/dates.js';
+import { getStatusText } from '/static/Server/onlineStatus.js';
 
 export async function performBackupExport() {
     const backup = await createBackupData();
@@ -68,6 +69,13 @@ async function openSettingsModal() {
     document.getElementById('settings-modal').classList.remove('hidden');
     document.getElementById('settings-modal').classList.add('flex');
     updateGenerateLinkBtn();
+
+    const statusEl = document.getElementById('settings-status');
+    if (statusEl) {
+        const { text, reachable } = getStatusText();
+        statusEl.textContent = text;
+        statusEl.style.color = reachable ? '#059669' : '#dc2626';
+    }
 }
 
 function resetAccountLinkUI() {

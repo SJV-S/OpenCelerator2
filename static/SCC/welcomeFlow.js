@@ -44,27 +44,18 @@ document.getElementById('back-from-import').addEventListener('click', () => {
 
 // --- Create new user (existing logic, unchanged) ---
 const nameInput = document.getElementById('display-name');
-const useCaseRadios = document.querySelectorAll('input[name="use-case"]');
 const getStartedBtn = document.getElementById('get-started-btn');
-const useCaseBtns = document.querySelectorAll('.use-case-btn');
 
 function updateReady() {
     const hasName = nameInput.value.trim().length > 0;
-    const hasUseCase = document.querySelector('input[name="use-case"]:checked');
-    getStartedBtn.disabled = !(hasName && hasUseCase);
+    getStartedBtn.disabled = !hasName;
 }
 
 nameInput.addEventListener('input', updateReady);
-useCaseRadios.forEach(r => r.addEventListener('change', () => {
-    useCaseBtns.forEach(btn => btn.classList.remove('selected'));
-    r.closest('.use-case-btn').classList.add('selected');
-    updateReady();
-}));
 
 getStartedBtn.addEventListener('click', async () => {
     const displayName = nameInput.value.trim();
-    const useCase = document.querySelector('input[name="use-case"]:checked')?.value;
-    if (!displayName || !useCase) return;
+    if (!displayName) return;
 
     getStartedBtn.disabled = true;
     getStartedBtn.textContent = 'Setting up...';
@@ -84,7 +75,7 @@ getStartedBtn.addEventListener('click', async () => {
     await db.put(STORE_NAME, passphrase, 'passphrase');
     await db.put(STORE_NAME, publicKeyB64, 'publicKey');
     await db.put(STORE_NAME, displayName, 'display_name');
-    await db.put(STORE_NAME, useCase, 'use_case');
+    await db.put(STORE_NAME, 'Both', 'use_case');
     await db.put(STORE_NAME, { syncAllChartsToServer: true }, 'user_preferences');
 
     window.location.href = '/';

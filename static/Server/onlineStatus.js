@@ -5,7 +5,6 @@ import { TIMING_MS, APP_VERSION } from '../SCC/config.js';
 import { eventBus, EVENTS } from '../SCC/eventBus.js';
 import { api } from './client-api.js';
 
-let statusElement = null;
 let _serverReachable = true;    // optimistic until first ping
 let _pingIntervalId = null;
 
@@ -17,6 +16,18 @@ const _jsVersion = APP_VERSION;
  */
 export function isOnline() {
     return _serverReachable;
+}
+
+/**
+ * Return the current status text and reachable flag.
+ * @returns {{ text: string, reachable: boolean }}
+ */
+export function getStatusText() {
+    const prefix = _jsVersion ? `v${_jsVersion} · ` : '';
+    return {
+        text: `${prefix}${_serverReachable ? 'online' : 'offline'}`,
+        reachable: _serverReachable,
+    };
 }
 
 /**
@@ -45,7 +56,7 @@ async function pingServer() {
 }
 
 /**
- * Update reachable state and refresh the indicator
+ * Update reachable state
  */
 function setReachable(reachable) {
     const changed = _serverReachable !== reachable;
@@ -56,102 +67,24 @@ function setReachable(reachable) {
             eventBus.emit(EVENTS.SYNC_SERVER_RECONNECTED);
         }
     }
-    updateStatus();
 }
 
-/**
- * Create and inject the status indicator element
- * Mounts inside .chart-menu-tabs (sidebar tab column) at the bottom,
- * or falls back to document.body for non-chart pages.
- */
-function createStatusElement() {
-    if (statusElement) return statusElement;
+// Self-initialize ping loop on import (no DOM element)
+pingServer();
+_pingIntervalId = setInterval(pingServer, TIMING_MS.HEALTH_PING_INTERVAL);
 
-    statusElement = document.createElement('div');
-    statusElement.id = 'online-status';
+window.addEventListener('offline', () => {
+    console.log('[Status] Browser reports offline');
+    setReachable(false);
+});
 
-    const tabsColumn = document.querySelector('.chart-menu-tabs');
-    if (tabsColumn) {
-        statusElement.style.cssText = `
-            margin-top: auto;
-            font-size: 11px;
-            font-family: "Open Sans", sans-serif;
-            padding: 6px 0;
-            text-align: center;
-            transition: opacity 0.3s, background-color 0.3s;
-            pointer-events: none;
-        `;
-        tabsColumn.appendChild(statusElement);
-    } else {
-        statusElement.style.cssText = `
-            position: fixed;
-            top: 12px;
-            right: 12px;
-            font-size: 11px;
-            font-family: "Open Sans", sans-serif;
-            padding: 4px 8px;
-            border-radius: 4px;
-            z-index: 9999;
-            transition: opacity 0.3s, background-color 0.3s;
-            pointer-events: none;
-        `;
-        document.body.appendChild(statusElement);
-    }
-
-    return statusElement;
-}
-
-/**
- * Update the status indicator display
- */
-function updateStatus() {
-    if (!statusElement) createStatusElement();
-
-    const prefix = _jsVersion ? `v${_jsVersion} · ` : '';
-
-    if (_serverReachable) {
-        statusElement.textContent = `${prefix}online`;
-        statusElement.style.color = '#059669';
-        statusElement.style.backgroundColor = 'rgba(209, 250, 229, 0.9)';
-    } else {
-        statusElement.textContent = `${prefix}offline`;
-        statusElement.style.color = '#dc2626';
-        statusElement.style.backgroundColor = 'rgba(254, 226, 226, 0.9)';
-    }
-    statusElement.style.opacity = '1';
-}
-
-/**
- * Initialize the online status indicator
- * Call this on page load
- */
-export function initOnlineStatus() {
-    createStatusElement();
-    updateStatus();
-
-    // Immediate first ping, then periodic
+window.addEventListener('online', () => {
+    console.log('[Status] Browser reports online — verifying');
     pingServer();
-    _pingIntervalId = setInterval(pingServer, TIMING_MS.HEALTH_PING_INTERVAL);
+});
 
-    // Browser offline → instant unreachable (no need to wait for ping)
-    window.addEventListener('offline', () => {
-        console.log('[Status] Browser reports offline');
-        setReachable(false);
-    });
-
-    // Browser online → verify with actual server ping
-    window.addEventListener('online', () => {
-        console.log('[Status] Browser reports online — verifying');
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
         pingServer();
-    });
-
-    // Tab becomes visible → refresh status (intervals throttled in background tabs)
-    document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') {
-            pingServer();
-        }
-    });
-}
-
-// Self-initialize on import
-initOnlineStatus();
+    }
+});
