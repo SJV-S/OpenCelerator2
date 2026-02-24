@@ -17,64 +17,159 @@ import { downloadFile } from '../util/download.js';
 import { getChartDiv } from '../util/dom.js';
 
 /**
- * Takes a screenshot of the Plotly chart and downloads it as PNG
- *
- * Data flow:
- * - Accesses the Plotly chart via DOM element with id 'chart'
- * - Uses Plotly.downloadImage() to export chart as PNG
- * - Triggers browser download with filename 'chart-screenshot.png'
+ * Load an Image element from a data URL.
+ * @param {string} src - data URL
+ * @returns {Promise<HTMLImageElement>}
  */
-function takeChartScreenshot() {
-    // Get the Plotly chart element
+function loadImage(src) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = src;
+    });
+}
+
+/**
+ * Build a standalone SVG data URL from the already-rendered #custom-legend DOM.
+ * Reads positions, markers, and labels directly via getBoundingClientRect().
+ * @param {HTMLElement} legendEl - The #custom-legend element
+ * @param {number} scale - Plotly export scale factor
+ * @returns {string} data:image/svg+xml data URL
+ */
+function buildLegendSvg(legendEl, scale) {
+    const legendRect = legendEl.getBoundingClientRect();
+    const w = Math.ceil(legendRect.width * scale);
+    const h = Math.ceil(legendRect.height * scale);
+
+    const style = getComputedStyle(legendEl);
+    const bg = style.backgroundColor || 'rgba(255,255,255,0.9)';
+    const border = style.borderColor || '#ccc';
+    const radius = parseFloat(style.borderRadius) * scale || 4 * scale;
+
+    let inner = `<rect x="0.5" y="0.5" width="${w - 1}" height="${h - 1}" rx="${radius}" ry="${radius}" fill="${bg}" stroke="${border}" stroke-width="${scale}"/>`;
+
+    // Only include data series items (skip .legend-line-item which is the hover-only lines section)
+    const items = legendEl.querySelectorAll('.legend-item:not(.legend-line-item)');
+    items.forEach(item => {
+        const itemRect = item.getBoundingClientRect();
+        const hidden = item.classList.contains('legend-item-hidden');
+
+        const markerEl = item.querySelector('.legend-marker svg');
+        const labelEl = item.querySelector('.legend-label');
+        if (!markerEl || !labelEl) return;
+
+        const markerRect = markerEl.getBoundingClientRect();
+        const labelRect = labelEl.getBoundingClientRect();
+
+        // Positions relative to legend container, scaled
+        const mx = (markerRect.left - legendRect.left) * scale;
+        const my = (markerRect.top - legendRect.top) * scale;
+        const mw = markerRect.width * scale;
+        const mh = markerRect.height * scale;
+
+        const lx = (labelRect.left - legendRect.left) * scale;
+        const ly = (labelRect.top - legendRect.top) * scale;
+        const fontSize = parseFloat(getComputedStyle(labelEl).fontSize) * scale;
+
+        const opacity = hidden ? ' opacity="0.5"' : '';
+
+        // Embed the marker SVG via <foreignObject> to preserve its internal rendering
+        const markerSvgHtml = markerEl.outerHTML.replace(/\n/g, '');
+        inner += `<g${opacity}>`;
+        inner += `<foreignObject x="${mx}" y="${my}" width="${mw}" height="${mh}">`
+            + `<body xmlns="http://www.w3.org/1999/xhtml" style="margin:0;padding:0;background:transparent;">`
+            + `<div style="width:${mw}px;height:${mh}px;display:flex;align-items:center;justify-content:center;">`
+            + markerSvgHtml
+            + `</div></body></foreignObject>`;
+
+        // Label text
+        const escapedText = labelEl.textContent.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        inner += `<text x="${lx}" y="${ly + fontSize * 0.85}" font-family="Arial, sans-serif" font-size="${fontSize}" fill="#000">${escapedText}</text>`;
+        inner += `</g>`;
+    });
+
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">${inner}</svg>`;
+    return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+}
+
+/**
+ * Takes a screenshot of the Plotly chart, compositing the custom legend overlay.
+ *
+ * Pipeline:
+ * 1. Plotly.toImage() → chart data URL
+ * 2. If legend visible → buildLegendSvg() from DOM → composite on offscreen canvas
+ * 3. canvas.toBlob() → downloadFile()
+ */
+async function takeChartScreenshot() {
     const chartElement = getChartDiv();
 
     if (!chartElement) {
-        createToast({
-            message: 'Chart not found',
-            duration: 2000,
-            position: 'top-right'
-        });
+        createToast({ message: 'Chart not found', duration: 2000, position: 'top-right' });
         return;
     }
 
-    // Check if Plotly is available
     if (typeof Plotly === 'undefined') {
-        createToast({
-            message: 'Plotly library not loaded',
-            duration: 2000,
-            position: 'top-right'
-        });
+        createToast({ message: 'Plotly library not loaded', duration: 2000, position: 'top-right' });
         return;
     }
 
-    // Use chartName from metadata if available, otherwise default to 'chart-screenshot'
-    const fileName = chartState.chartName || 'chart-screenshot';
-
-    // Get the chart's actual rendered dimensions to preserve aspect ratio
+    const fileName = (chartState.chartName || 'chart-screenshot') + '.png';
     const chartWidth = chartElement.layout.width || chartElement.offsetWidth;
     const chartHeight = chartElement.layout.height || chartElement.offsetHeight;
+    const scale = 3;
 
-    // Download chart as PNG using Plotly's built-in function
-    Plotly.downloadImage(chartElement, {
-        format: 'png',
-        width: chartWidth,
-        height: chartHeight,
-        scale: 3,
-        filename: fileName
-    }).then(() => {
-        createToast({
-            message: 'Screenshot downloaded',
-            duration: 2000,
-            position: 'top-right'
+    try {
+        // 1. Get chart as data URL
+        const chartDataUrl = await Plotly.toImage(chartElement, {
+            format: 'png',
+            width: chartWidth,
+            height: chartHeight,
+            scale
         });
-    }).catch((error) => {
+
+        // 2. Check if legend is visible and has items
+        const legendEl = document.getElementById('custom-legend');
+        const legendVisible = legendEl
+            && legendEl.style.display !== 'none'
+            && legendEl.querySelectorAll('.legend-item:not(.legend-line-item)').length > 0;
+
+        if (!legendVisible) {
+            // No legend — download chart image directly
+            const chartImg = await loadImage(chartDataUrl);
+            const canvas = document.createElement('canvas');
+            canvas.width = chartImg.width;
+            canvas.height = chartImg.height;
+            canvas.getContext('2d').drawImage(chartImg, 0, 0);
+            const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+            downloadFile(blob, fileName);
+        } else {
+            // 3. Composite chart + legend
+            const chartImg = await loadImage(chartDataUrl);
+            const canvas = document.createElement('canvas');
+            canvas.width = chartImg.width;
+            canvas.height = chartImg.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(chartImg, 0, 0);
+
+            // Build legend SVG from live DOM
+            const legendSvgUrl = buildLegendSvg(legendEl, scale);
+            const legendImg = await loadImage(legendSvgUrl);
+
+            // Position: legendEl uses style.left/top (px values set by customLegend.js)
+            const lx = parseFloat(legendEl.style.left) * scale;
+            const ly = parseFloat(legendEl.style.top) * scale;
+            ctx.drawImage(legendImg, lx, ly);
+
+            const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+            downloadFile(blob, fileName);
+        }
+
+        createToast({ message: 'Screenshot downloaded', duration: 2000, position: 'top-right' });
+    } catch (error) {
         console.error('Error taking screenshot:', error);
-        createToast({
-            message: 'Screenshot failed',
-            duration: 2000,
-            position: 'top-right'
-        });
-    });
+        createToast({ message: 'Screenshot failed', duration: 2000, position: 'top-right' });
+    }
 }
 
 /**
