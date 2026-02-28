@@ -67,7 +67,7 @@ function createChartRow(chart) {
     row.dataset.id = chart.id;
     row.dataset.tags = JSON.stringify(tags);
     row.innerHTML = `
-        <td class="py-3 pl-2">
+        <td class="select-col py-3 pl-2">
             <input type="checkbox" class="row-select accent-[#6ad1e3] w-4 h-4" data-id="${escapeHtml(chart.id)}">
         </td>
         <td class="py-3 pl-2 pr-3">
@@ -126,7 +126,7 @@ function createChartRow(chart) {
     creditsRow.className = 'credits-row';
     creditsRow.id = `credits-${chart.id}`;
     creditsRow.innerHTML = `
-        <td></td>
+        <td class="select-col"></td>
         <td></td>
         <td colspan="5" class="pb-4 pt-1">
             <div class="bg-gray-50 rounded-lg p-4 text-xs text-gray-600 font-mono leading-relaxed">
@@ -422,8 +422,6 @@ function exitSelectMode() {
         cb.checked = false;
         cb.closest('.table-row')?.classList.remove('selected');
     });
-    document.getElementById('select-all').checked = false;
-    document.getElementById('select-all').indeterminate = false;
     document.body.classList.remove('select-mode');
     document.getElementById('select-mode-btn').classList.remove('hidden');
     const controls = document.getElementById('bulk-controls');
@@ -434,16 +432,10 @@ function exitSelectMode() {
 function updateBulkControls() {
     const count = selectedChartIds.size;
     document.getElementById('bulk-count').textContent = `${count} selected`;
-
-    // Update select-all checkbox state
-    const selectAll = document.getElementById('select-all');
-    const visibleCheckboxes = document.querySelectorAll('.row-select');
-    const checkedCount = [...visibleCheckboxes].filter(cb => cb.checked).length;
-    selectAll.checked = visibleCheckboxes.length > 0 && checkedCount === visibleCheckboxes.length;
-    selectAll.indeterminate = checkedCount > 0 && checkedCount < visibleCheckboxes.length;
 }
 
 function openBulkDeleteModal() {
+    if (selectedChartIds.size === 0) return;
     const ids = [...selectedChartIds];
     const names = ids.map(id => {
         const chart = charts.find(c => c.id === id);
@@ -566,23 +558,6 @@ document.getElementById('delete-modal').addEventListener('click', (e) => {
         document.getElementById('delete-modal').classList.add('hidden');
         document.getElementById('delete-modal').classList.remove('flex');
     }
-});
-
-// Select-all checkbox
-document.getElementById('select-all').addEventListener('change', (e) => {
-    const checked = e.target.checked;
-    document.querySelectorAll('.row-select').forEach(cb => {
-        cb.checked = checked;
-        const row = cb.closest('.table-row');
-        if (checked) {
-            selectedChartIds.add(cb.dataset.id);
-            row.classList.add('selected');
-        } else {
-            selectedChartIds.delete(cb.dataset.id);
-            row.classList.remove('selected');
-        }
-    });
-    updateBulkControls();
 });
 
 // Select mode + bulk action handlers
