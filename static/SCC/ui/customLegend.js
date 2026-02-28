@@ -53,8 +53,7 @@ function getLegendItems() {
                 baseSeriesKey: seriesKey,
                 aggId: aggId,
                 onXAgg: config.onXAgg || 'raw',
-                acrossXAgg: config.acrossXAgg || null,
-                detrend: config.detrend || null
+                acrossXAgg: config.acrossXAgg || null
             });
         });
     });
@@ -78,8 +77,7 @@ function getLegendItems() {
                 baseSeriesKey: miscId,
                 aggId: aggId,
                 onXAgg: config.onXAgg || 'raw',
-                acrossXAgg: config.acrossXAgg || null,
-                detrend: config.detrend || null
+                acrossXAgg: config.acrossXAgg || null
             });
         });
     });
@@ -189,11 +187,9 @@ function createLegendItem(item, scale = 1) {
     let aggSuffix = '';
     const onX = item.onXAgg || 'raw';
     const acrossX = item.acrossXAgg;
-    const dt = item.detrend;
-    if (onX !== 'raw' || acrossX || dt) {
+    if (onX !== 'raw' || acrossX) {
         const parts = [];
         if (onX !== 'raw') parts.push(onX.charAt(0).toUpperCase() + onX.slice(1));
-        if (dt) parts.push(`${dt.method} residuals ${dt.center ?? 1}`);
         if (acrossX) {
             const unit = WINDOW_UNITS[chartState.chartType]?.abbrev || 'x';
             parts.push(`${acrossX.fn.charAt(0).toUpperCase() + acrossX.fn.slice(1)} ${unit}${acrossX.window}`);

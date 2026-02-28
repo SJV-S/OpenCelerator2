@@ -841,7 +841,7 @@ function findTraceDataAtX(xRounded) {
     for (const trace of traces) {
         if (!trace.meta) continue;
 
-        const { seriesName, aggId, onXAgg, acrossXAgg, detrend } = trace.meta;
+        const { seriesName, aggId, onXAgg, acrossXAgg } = trace.meta;
         if (!seriesName || seriesName.includes('FloorShadow')) continue;
 
         // Skip series the user has hidden via the legend
@@ -859,7 +859,7 @@ function findTraceDataAtX(xRounded) {
             if (value !== null && value !== undefined && !isNaN(value)) {
                 if (!result.get(seriesName)?.has(aggId)) {
                     if (!result.has(seriesName)) result.set(seriesName, new Map());
-                    result.get(seriesName).set(aggId, { seriesName, aggId, onXAgg, acrossXAgg, detrend, value });
+                    result.get(seriesName).set(aggId, { seriesName, aggId, onXAgg, acrossXAgg, value });
                 }
             }
         }
@@ -1074,11 +1074,9 @@ function updateInfoPanel(xRounded, yLogValue, traceData, celData) {
             // Append aggregation info if not plain raw
             const onX = data.onXAgg || 'raw';
             const acrossX = data.acrossXAgg;
-            const detrend = data.detrend;
-            if (onX !== 'raw' || acrossX || detrend) {
+            if (onX !== 'raw' || acrossX) {
                 const parts = [];
                 if (onX !== 'raw') parts.push(onX);
-                if (detrend) parts.push(`${detrend.method} residuals`);
                 if (acrossX) {
                     const unit = WINDOW_UNITS[chartState.chartType]?.abbrev || 'x';
                     parts.push(`${acrossX.fn} ${unit}${acrossX.window}`);

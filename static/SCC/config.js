@@ -6,7 +6,7 @@
 export const DEVELOPER_MODE = true;
 
 // Synced from config.py APP_VERSION by push_to_my_gitea.sh (same as SW_VERSION)
-export const APP_VERSION = '0.4.4';
+export const APP_VERSION = '0.4.5';
 
 // Series name constants (used as keys in chartState)
 export const CORRECTS = 'corrects';
@@ -386,8 +386,7 @@ export const defaultCorrectTraceConfig = Object.freeze({
     markerColor: 'black',
     markerEdgeColor: 'black',
     onXAgg: 'raw',
-    acrossXAgg: null,
-    detrend: null
+    acrossXAgg: null
 });
 
 export const defaultErrorTraceConfig = Object.freeze({
@@ -401,8 +400,7 @@ export const defaultErrorTraceConfig = Object.freeze({
     markerColor: 'black',
     markerEdgeColor: 'black',
     onXAgg: 'raw',
-    acrossXAgg: null,
-    detrend: null
+    acrossXAgg: null
 });
 
 export const defaultTimingTraceConfig = Object.freeze({
@@ -416,8 +414,7 @@ export const defaultTimingTraceConfig = Object.freeze({
     markerColor: 'black',
     markerEdgeColor: 'black',
     onXAgg: 'raw',
-    acrossXAgg: null,
-    detrend: null
+    acrossXAgg: null
 });
 
 // ============================================================================
@@ -467,8 +464,7 @@ export function createMiscTraceConfig(index) {
         markerColor: MISC_COLORS[index % MISC_COLORS.length],
         markerEdgeColor: 'black',
         onXAgg: 'raw',
-        acrossXAgg: null,
-        detrend: null
+        acrossXAgg: null
     };
 }
 

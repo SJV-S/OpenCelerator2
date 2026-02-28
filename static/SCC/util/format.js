@@ -17,7 +17,7 @@ export function formatValue(value) {
         return '—';
     }
     if (value >= 1000) {
-        return value.toFixed(0);
+        return Math.round(value).toLocaleString();
     }
     if (value >= 100) {
         return value.toFixed(1);

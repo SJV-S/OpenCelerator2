@@ -14,7 +14,6 @@ import { chartState } from '../chartState.js';
 import { CORRECTS, ERRORS, LIMITS, CHART_MATH, MISSING } from '../config.js';
 import { isMissing } from '../util/format.js';
 import { median, mean, min, max, first, last, sum, aggregateByX, rollingWindow } from '../util/agg.js';
-import { detrend } from '../util/fit_lines.js';
 
 const AUTO_AGG_THRESHOLD = LIMITS.AUTO_AGG_THRESHOLD;
 
@@ -396,10 +395,9 @@ function createTimingTraces(xPositions) {
     Object.entries(chartState.traceStyles.timing).forEach(([aggId, config]) => {
         const onXAgg = config.onXAgg || 'raw';
         const { x, y } = applyAggregation(xPositions, timingFrequencies, onXAgg);
-        const detrended = detrend(x, y, config.detrend);
-        const rolled = applyRollingWindow(detrended.x, detrended.y, config.acrossXAgg);
+        const rolled = applyRollingWindow(x, y, config.acrossXAgg);
         const trace = timingFloorTrace(rolled.x, rolled.y, config);
-        trace.meta = { seriesName: 'timing', aggId, onXAgg, acrossXAgg: config.acrossXAgg || null, detrend: config.detrend || null };
+        trace.meta = { seriesName: 'timing', aggId, onXAgg, acrossXAgg: config.acrossXAgg || null };
         timingTraces.push(trace);
     });
 
@@ -478,13 +476,12 @@ function createFrequencyTraces(xPositions, frequencies, timestampsToXPositions) 
             const onXAgg = config.onXAgg || 'raw';
             const { x, y, autoAggregated: aa } = applyAggregation(xPositions, frequencies.corrects, onXAgg);
             if (aa) autoAggregatedSeries.add(CORRECTS);
-            const detrended = detrend(x, y, config.detrend);
-            const rolled = applyRollingWindow(detrended.x, detrended.y, config.acrossXAgg);
+            const rolled = applyRollingWindow(x, y, config.acrossXAgg);
             const segments = createSegments(rolled.x, rolled.y, cutXPositions, 'corrects');
 
             segments.forEach(seg => {
                 const trace = correctsTrace(seg.x, seg.y, config);
-                trace.meta = { seriesName: seg.seriesName, aggId, onXAgg, acrossXAgg: config.acrossXAgg || null, detrend: config.detrend || null };
+                trace.meta = { seriesName: seg.seriesName, aggId, onXAgg, acrossXAgg: config.acrossXAgg || null };
                 dataTraces.push(trace);
             });
         });
@@ -496,13 +493,12 @@ function createFrequencyTraces(xPositions, frequencies, timestampsToXPositions) 
             const onXAgg = config.onXAgg || 'raw';
             const { x, y, autoAggregated: aa } = applyAggregation(xPositions, frequencies.errors, onXAgg);
             if (aa) autoAggregatedSeries.add(ERRORS);
-            const detrended = detrend(x, y, config.detrend);
-            const rolled = applyRollingWindow(detrended.x, detrended.y, config.acrossXAgg);
+            const rolled = applyRollingWindow(x, y, config.acrossXAgg);
             const segments = createSegments(rolled.x, rolled.y, cutXPositions, 'errors');
 
             segments.forEach(seg => {
                 const trace = errorTrace(seg.x, seg.y, config);
-                trace.meta = { seriesName: seg.seriesName, aggId, onXAgg, acrossXAgg: config.acrossXAgg || null, detrend: config.detrend || null };
+                trace.meta = { seriesName: seg.seriesName, aggId, onXAgg, acrossXAgg: config.acrossXAgg || null };
                 dataTraces.push(trace);
             });
         });
@@ -514,13 +510,12 @@ function createFrequencyTraces(xPositions, frequencies, timestampsToXPositions) 
             const onXAgg = config.onXAgg || 'raw';
             const { x, y, autoAggregated: aa } = applyAggregation(xPositions, frequencies.misc[miscId], onXAgg);
             if (aa) autoAggregatedSeries.add(miscId);
-            const detrended = detrend(x, y, config.detrend);
-            const rolled = applyRollingWindow(detrended.x, detrended.y, config.acrossXAgg);
+            const rolled = applyRollingWindow(x, y, config.acrossXAgg);
             const segments = createSegments(rolled.x, rolled.y, cutXPositions, miscId);
 
             segments.forEach(seg => {
                 const trace = miscTrace(seg.x, seg.y, config);
-                trace.meta = { seriesName: seg.seriesName, aggId, onXAgg, acrossXAgg: config.acrossXAgg || null, detrend: config.detrend || null };
+                trace.meta = { seriesName: seg.seriesName, aggId, onXAgg, acrossXAgg: config.acrossXAgg || null };
                 dataTraces.push(trace);
             });
         });

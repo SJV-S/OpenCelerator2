@@ -17,6 +17,7 @@ function updateTitle() {
 }
 
 let charts = [];
+const selectedChartIds = new Set();
 let chartToDelete = null;
 let chartToEditTags = null;
 let editingTags = [];
@@ -66,6 +67,9 @@ function createChartRow(chart) {
     row.dataset.id = chart.id;
     row.dataset.tags = JSON.stringify(tags);
     row.innerHTML = `
+        <td class="py-3 pl-2">
+            <input type="checkbox" class="row-select accent-[#6ad1e3] w-4 h-4" data-id="${escapeHtml(chart.id)}">
+        </td>
         <td class="py-3 pl-2 pr-3">
             ${hasCredits ? `
                 <button class="expand-btn text-gray-400 hover:text-gray-600 p-1" data-id="${escapeHtml(chart.id)}">
@@ -122,6 +126,7 @@ function createChartRow(chart) {
     creditsRow.className = 'credits-row';
     creditsRow.id = `credits-${chart.id}`;
     creditsRow.innerHTML = `
+        <td></td>
         <td></td>
         <td colspan="5" class="pb-4 pt-1">
             <div class="bg-gray-50 rounded-lg p-4 text-xs text-gray-600 font-mono leading-relaxed">
@@ -239,7 +244,7 @@ function attachRowListeners() {
     document.querySelectorAll('.table-row').forEach(row => {
         row.addEventListener('click', (e) => {
             // Don't toggle if clicking on interactive elements
-            if (e.target.closest('a, button')) return;
+            if (e.target.closest('a, button, .row-select')) return;
 
             const chartId = row.dataset.id;
             const expandBtn = row.querySelector('.expand-btn');
@@ -292,6 +297,24 @@ function attachRowListeners() {
             editingTags = chart ? [...(chart.tags || [])] : [];
             openTagsModal();
         });
+    });
+
+    // Row select checkboxes
+    document.querySelectorAll('.row-select').forEach(cb => {
+        const id = cb.dataset.id;
+        cb.checked = selectedChartIds.has(id);
+        cb.addEventListener('change', () => {
+            const row = cb.closest('.table-row');
+            if (cb.checked) {
+                selectedChartIds.add(id);
+                row.classList.add('selected');
+            } else {
+                selectedChartIds.delete(id);
+                row.classList.remove('selected');
+            }
+            updateBulkBar();
+        });
+        if (cb.checked) cb.closest('.table-row').classList.add('selected');
     });
 }
 
@@ -381,6 +404,69 @@ function checkBackupReminder() {
             setUserPreference('lastBackupTimestamp', Math.floor(Date.now() / 1000));
         }
     });
+}
+
+// Bulk selection helpers
+function updateBulkBar() {
+    const bar = document.getElementById('bulk-bar');
+    const count = selectedChartIds.size;
+    if (count === 0) {
+        bar.classList.add('hidden');
+    } else {
+        bar.classList.remove('hidden');
+        document.getElementById('bulk-count').textContent = `${count} chart${count > 1 ? 's' : ''} selected`;
+    }
+
+    // Update select-all checkbox state
+    const selectAll = document.getElementById('select-all');
+    const visibleCheckboxes = document.querySelectorAll('.row-select');
+    const checkedCount = [...visibleCheckboxes].filter(cb => cb.checked).length;
+    selectAll.checked = visibleCheckboxes.length > 0 && checkedCount === visibleCheckboxes.length;
+    selectAll.indeterminate = checkedCount > 0 && checkedCount < visibleCheckboxes.length;
+}
+
+function clearSelection() {
+    selectedChartIds.clear();
+    document.querySelectorAll('.row-select').forEach(cb => {
+        cb.checked = false;
+        cb.closest('.table-row')?.classList.remove('selected');
+    });
+    document.getElementById('select-all').checked = false;
+    document.getElementById('select-all').indeterminate = false;
+    document.getElementById('bulk-bar').classList.add('hidden');
+}
+
+function openBulkDeleteModal() {
+    const ids = [...selectedChartIds];
+    const names = ids.map(id => {
+        const chart = charts.find(c => c.id === id);
+        return chart?.chartName || 'Unnamed';
+    });
+
+    const messageEl = document.getElementById('bulk-delete-message');
+    if (names.length <= 5) {
+        messageEl.innerHTML = `Are you sure you want to delete these ${names.length} chart${names.length > 1 ? 's' : ''}?<br><ul class="mt-2 list-disc pl-5 text-sm">${names.map(n => `<li class="font-medium">${escapeHtml(n)}</li>`).join('')}</ul>`;
+    } else {
+        messageEl.textContent = `Are you sure you want to delete ${names.length} charts? This cannot be undone.`;
+    }
+
+    document.getElementById('bulk-delete-modal').classList.remove('hidden');
+    document.getElementById('bulk-delete-modal').classList.add('flex');
+}
+
+function closeBulkDeleteModal() {
+    document.getElementById('bulk-delete-modal').classList.add('hidden');
+    document.getElementById('bulk-delete-modal').classList.remove('flex');
+}
+
+async function confirmBulkDelete() {
+    const ids = [...selectedChartIds];
+    for (const id of ids) {
+        await deleteChart(id);
+    }
+    closeBulkDeleteModal();
+    clearSelection();
+    await loadCharts();
 }
 
 async function loadCharts() {
@@ -475,6 +561,34 @@ document.getElementById('delete-modal').addEventListener('click', (e) => {
     }
 });
 
+// Select-all checkbox
+document.getElementById('select-all').addEventListener('change', (e) => {
+    const checked = e.target.checked;
+    document.querySelectorAll('.row-select').forEach(cb => {
+        cb.checked = checked;
+        const row = cb.closest('.table-row');
+        if (checked) {
+            selectedChartIds.add(cb.dataset.id);
+            row.classList.add('selected');
+        } else {
+            selectedChartIds.delete(cb.dataset.id);
+            row.classList.remove('selected');
+        }
+    });
+    updateBulkBar();
+});
+
+// Bulk action bar handlers
+document.getElementById('bulk-clear').addEventListener('click', clearSelection);
+document.getElementById('bulk-delete-btn').addEventListener('click', openBulkDeleteModal);
+
+// Bulk delete modal handlers
+document.getElementById('confirm-bulk-delete').addEventListener('click', confirmBulkDelete);
+document.getElementById('cancel-bulk-delete').addEventListener('click', closeBulkDeleteModal);
+document.getElementById('bulk-delete-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'bulk-delete-modal') closeBulkDeleteModal();
+});
+
 // Tags modal handlers
 document.getElementById('cancel-tags').addEventListener('click', closeTagsModal);
 
@@ -506,6 +620,7 @@ document.getElementById('search-input').addEventListener('input', (e) => {
     clearTimeout(searchDebounceTimer);
     searchDebounceTimer = setTimeout(() => {
         searchQuery = e.target.value;
+        clearSelection();
         renderCharts(true);
     }, 200);
 });
@@ -519,6 +634,7 @@ document.querySelectorAll('input[name="search-mode"]').forEach(radio => {
         searchMode = e.target.value;
         localStorage.setItem('scc-search-mode', searchMode);
         if (searchQuery.trim()) {
+            clearSelection();
             renderCharts(true);
         }
     });
@@ -527,6 +643,7 @@ document.querySelectorAll('input[name="search-mode"]').forEach(radio => {
 // Filter shared toggle
 document.getElementById('filter-shared').addEventListener('change', (e) => {
     filterShared = e.target.checked;
+    clearSelection();
     renderCharts(true);
 });
 
@@ -534,12 +651,14 @@ document.getElementById('filter-shared').addEventListener('change', (e) => {
 document.getElementById('prev-page').addEventListener('click', () => {
     if (currentPage > 1) {
         currentPage--;
+        clearSelection();
         renderCharts();
     }
 });
 
 document.getElementById('next-page').addEventListener('click', () => {
     currentPage++;
+    clearSelection();
     renderCharts();
 });
 

@@ -11,7 +11,7 @@
  *   1: Counter-based traceStyles keys ("0", "1", ...) with explicit onXAgg / acrossXAgg
  *   2: Add collaborators array for edit-link recipients
  *   3: Remove CelLines.settings (moved to IDB user_preferences)
- *   4: Add detrend: null to all trace configs
+ *   4: Add detrend: null to all trace configs (feature later removed; property is now dead)
  *   5: Add aggId: "0" to all CelLines entries (trendlines track specific aggregation)
  *   6: Convert flat seriesVisibility to nested { baseKey: { aggId: bool } }
  */

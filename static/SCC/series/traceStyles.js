@@ -15,8 +15,6 @@ import { CORRECTS, ERRORS, TIMING, LIMITS, LINE_DEFAULTS, WINDOW_UNITS, defaultC
 import { getMiscSeriesIds, addMiscSeries, canAddMiscSeries, removeMiscSeries } from './miscSeries.js';
 import { createToast, createConfirmToast } from '../ui/toaster.js';
 import { eventBus, EVENTS } from '../eventBus.js';
-import { FIT_METHODS } from '../util/fit_lines.js';
-
 // ============================================================================
 // STATE
 // ============================================================================
@@ -124,9 +122,6 @@ function getAggLabel(config) {
     const onXLabel = onX.charAt(0).toUpperCase() + onX.slice(1);
 
     const parts = [];
-    if (config.detrend) {
-        parts.push(`${config.detrend.method} residuals ${config.detrend.center ?? 1}`);
-    }
     if (config.acrossXAgg) {
         const acrossXLabel = config.acrossXAgg.fn.charAt(0).toUpperCase() + config.acrossXAgg.fn.slice(1);
         const unit = WINDOW_UNITS[chartState.chartType]?.abbrev || 'x';
@@ -139,15 +134,11 @@ function getAggLabel(config) {
 /**
  * Check if a given onXAgg + acrossXAgg combination already exists for a series
  */
-function isDuplicateAgg(seriesName, onXAgg, acrossXAgg, detrend) {
+function isDuplicateAgg(seriesName, onXAgg, acrossXAgg) {
     const configs = getSeriesConfigs(seriesName);
     if (!configs) return false;
     return Object.values(configs).some(cfg => {
         if (cfg.onXAgg !== onXAgg) return false;
-        const cfgDetrend = cfg.detrend?.method || null;
-        const newDetrend = detrend?.method || null;
-        if (cfgDetrend !== newDetrend) return false;
-        if (cfgDetrend && (cfg.detrend?.center ?? 1) !== (detrend?.center ?? 1)) return false;
         if (!acrossXAgg && !cfg.acrossXAgg) return true;
         if (!acrossXAgg || !cfg.acrossXAgg) return false;
         return cfg.acrossXAgg.fn === acrossXAgg.fn && cfg.acrossXAgg.window === acrossXAgg.window;
@@ -308,28 +299,6 @@ function loadAddAggPanel(seriesName) {
             ).join('');
     }
 
-    // Populate detrend dropdown and wire center row visibility
-    const detrendSelect = document.getElementById('detrend-select');
-    const detrendCenterRow = document.getElementById('detrend-center-row');
-    if (detrendSelect) {
-        const trendMethods = Object.values(FIT_METHODS).filter(m =>
-            m !== FIT_METHODS.MEAN && m !== FIT_METHODS.MEDIAN
-        );
-        detrendSelect.innerHTML =
-            `<option value="none">None</option>` +
-            trendMethods.map(m =>
-                `<option value="${m}">${m}</option>`
-            ).join('');
-
-        const newDetrendSelect = detrendSelect.cloneNode(true);
-        detrendSelect.parentNode.replaceChild(newDetrendSelect, detrendSelect);
-        newDetrendSelect.addEventListener('change', () => {
-            if (detrendCenterRow) {
-                detrendCenterRow.style.display = newDetrendSelect.value === 'none' ? 'none' : '';
-            }
-        });
-    }
-
     // Hide window size row initially; set label and default value to match chart type
     const unitConfig = WINDOW_UNITS[chartState.chartType];
     if (windowSizeRow) {
@@ -340,9 +309,8 @@ function loadAddAggPanel(seriesName) {
         if (windowInput) windowInput.value = unitConfig?.defaultWindow || 7;
     }
 
-    // Rolling window + detrend rows: hidden entirely when on-x is "raw"
+    // Rolling window row: hidden entirely when on-x is "raw"
     const acrossXRow = document.getElementById('across-x-agg-row');
-    const detrendRow = document.getElementById('detrend-row');
 
     // Wire across-x change to show/hide window size
     let liveAcrossXSelect = acrossXSelect;
@@ -357,8 +325,7 @@ function loadAddAggPanel(seriesName) {
         });
     }
 
-    // Wire on-x change to hide rolling window + detrend controls when "raw" is selected
-    const liveDetrendSelect = document.getElementById('detrend-select');
+    // Wire on-x change to hide rolling window controls when "raw" is selected
     if (onXSelect) {
         const newOnX = onXSelect.cloneNode(true);
         onXSelect.parentNode.replaceChild(newOnX, onXSelect);
@@ -366,19 +333,13 @@ function loadAddAggPanel(seriesName) {
             if (newOnX.value === 'raw') {
                 if (liveAcrossXSelect) liveAcrossXSelect.value = 'none';
                 if (acrossXRow) acrossXRow.style.display = 'none';
-                if (detrendRow) detrendRow.style.display = 'none';
-                if (liveDetrendSelect) liveDetrendSelect.value = 'none';
-                if (detrendCenterRow) detrendCenterRow.style.display = 'none';
                 if (windowSizeRow) windowSizeRow.style.display = 'none';
             } else {
                 if (acrossXRow) acrossXRow.style.display = '';
-                if (detrendRow) detrendRow.style.display = '';
             }
         });
-        // Initial state: raw is selected by default → hide rolling window + detrend controls
+        // Initial state: raw is selected by default → hide rolling window controls
         if (acrossXRow) acrossXRow.style.display = 'none';
-        if (detrendRow) detrendRow.style.display = 'none';
-        if (detrendCenterRow) detrendCenterRow.style.display = 'none';
     }
 
     // Always show add button and hide empty message (duplicates are checked on click)
@@ -485,8 +446,7 @@ function applyConfig() {
         markerSymbol: document.getElementById('config-marker-symbol').value || 'circle',
         // Preserve aggregation properties from existing config
         onXAgg: existingConfig?.onXAgg || 'raw',
-        acrossXAgg: existingConfig?.acrossXAgg || null,
-        detrend: existingConfig?.detrend || null
+        acrossXAgg: existingConfig?.acrossXAgg || null
     };
 
     setConfig(seriesName, aggId, config);
@@ -661,10 +621,9 @@ function showNameSeriesModal() {
  * @param {string} seriesName - Series key
  * @param {string} onXAgg - Per-position aggregation type
  * @param {Object|null} acrossXAgg - Rolling window config { fn, window } or null
- * @param {Object|null} detrend - Detrend config { method } or null
  */
-function addAggregation(seriesName, onXAgg, acrossXAgg, detrend) {
-    if (isDuplicateAgg(seriesName, onXAgg, acrossXAgg, detrend)) {
+function addAggregation(seriesName, onXAgg, acrossXAgg) {
+    if (isDuplicateAgg(seriesName, onXAgg, acrossXAgg)) {
         createToast({ message: 'This aggregation combination already exists.', duration: 3000 });
         return;
     }
@@ -674,8 +633,7 @@ function addAggregation(seriesName, onXAgg, acrossXAgg, detrend) {
     const newConfig = {
         ...(firstConfig || {}),
         onXAgg,
-        acrossXAgg,
-        detrend
+        acrossXAgg
     };
 
     const newId = getNextAggId(seriesName);
@@ -823,7 +781,6 @@ function initializeSeriesNav() {
         const onXAgg = document.getElementById('on-x-agg-select')?.value;
         const acrossXVal = document.getElementById('across-x-agg-select')?.value;
         const windowSize = parseInt(document.getElementById('window-size-input')?.value) || 7;
-        const detrendVal = document.getElementById('detrend-select')?.value;
 
         if (!currentSeries || !onXAgg) return;
 
@@ -831,12 +788,7 @@ function initializeSeriesNav() {
             ? { fn: acrossXVal, window: Math.max(2, windowSize) }
             : null;
 
-        const detrendCenter = parseFloat(document.getElementById('detrend-center-input')?.value) || 1;
-        const detrend = (detrendVal && detrendVal !== 'none')
-            ? { method: detrendVal, center: detrendCenter }
-            : null;
-
-        addAggregation(currentSeries, onXAgg, acrossXAgg, detrend);
+        addAggregation(currentSeries, onXAgg, acrossXAgg);
     });
 
     // Set up heading name apply button
