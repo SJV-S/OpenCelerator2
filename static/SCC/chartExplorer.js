@@ -312,7 +312,7 @@ function attachRowListeners() {
                 selectedChartIds.delete(id);
                 row.classList.remove('selected');
             }
-            updateBulkBar();
+            updateBulkControls();
         });
         if (cb.checked) cb.closest('.table-row').classList.add('selected');
     });
@@ -407,25 +407,16 @@ function checkBackupReminder() {
 }
 
 // Bulk selection helpers
-function updateBulkBar() {
-    const bar = document.getElementById('bulk-bar');
-    const count = selectedChartIds.size;
-    if (count === 0) {
-        bar.classList.add('hidden');
-    } else {
-        bar.classList.remove('hidden');
-        document.getElementById('bulk-count').textContent = `${count} chart${count > 1 ? 's' : ''} selected`;
-    }
-
-    // Update select-all checkbox state
-    const selectAll = document.getElementById('select-all');
-    const visibleCheckboxes = document.querySelectorAll('.row-select');
-    const checkedCount = [...visibleCheckboxes].filter(cb => cb.checked).length;
-    selectAll.checked = visibleCheckboxes.length > 0 && checkedCount === visibleCheckboxes.length;
-    selectAll.indeterminate = checkedCount > 0 && checkedCount < visibleCheckboxes.length;
+function enterSelectMode() {
+    document.body.classList.add('select-mode');
+    document.getElementById('select-mode-btn').classList.add('hidden');
+    const controls = document.getElementById('bulk-controls');
+    controls.classList.remove('hidden');
+    controls.classList.add('flex');
+    updateBulkControls();
 }
 
-function clearSelection() {
+function exitSelectMode() {
     selectedChartIds.clear();
     document.querySelectorAll('.row-select').forEach(cb => {
         cb.checked = false;
@@ -433,7 +424,23 @@ function clearSelection() {
     });
     document.getElementById('select-all').checked = false;
     document.getElementById('select-all').indeterminate = false;
-    document.getElementById('bulk-bar').classList.add('hidden');
+    document.body.classList.remove('select-mode');
+    document.getElementById('select-mode-btn').classList.remove('hidden');
+    const controls = document.getElementById('bulk-controls');
+    controls.classList.add('hidden');
+    controls.classList.remove('flex');
+}
+
+function updateBulkControls() {
+    const count = selectedChartIds.size;
+    document.getElementById('bulk-count').textContent = `${count} selected`;
+
+    // Update select-all checkbox state
+    const selectAll = document.getElementById('select-all');
+    const visibleCheckboxes = document.querySelectorAll('.row-select');
+    const checkedCount = [...visibleCheckboxes].filter(cb => cb.checked).length;
+    selectAll.checked = visibleCheckboxes.length > 0 && checkedCount === visibleCheckboxes.length;
+    selectAll.indeterminate = checkedCount > 0 && checkedCount < visibleCheckboxes.length;
 }
 
 function openBulkDeleteModal() {
@@ -465,7 +472,7 @@ async function confirmBulkDelete() {
         await deleteChart(id);
     }
     closeBulkDeleteModal();
-    clearSelection();
+    exitSelectMode();
     await loadCharts();
 }
 
@@ -575,11 +582,12 @@ document.getElementById('select-all').addEventListener('change', (e) => {
             row.classList.remove('selected');
         }
     });
-    updateBulkBar();
+    updateBulkControls();
 });
 
-// Bulk action bar handlers
-document.getElementById('bulk-clear').addEventListener('click', clearSelection);
+// Select mode + bulk action handlers
+document.getElementById('select-mode-btn').addEventListener('click', enterSelectMode);
+document.getElementById('bulk-done-btn').addEventListener('click', exitSelectMode);
 document.getElementById('bulk-delete-btn').addEventListener('click', openBulkDeleteModal);
 
 // Bulk delete modal handlers
@@ -620,7 +628,7 @@ document.getElementById('search-input').addEventListener('input', (e) => {
     clearTimeout(searchDebounceTimer);
     searchDebounceTimer = setTimeout(() => {
         searchQuery = e.target.value;
-        clearSelection();
+        exitSelectMode();
         renderCharts(true);
     }, 200);
 });
@@ -634,7 +642,7 @@ document.querySelectorAll('input[name="search-mode"]').forEach(radio => {
         searchMode = e.target.value;
         localStorage.setItem('scc-search-mode', searchMode);
         if (searchQuery.trim()) {
-            clearSelection();
+            exitSelectMode();
             renderCharts(true);
         }
     });
@@ -651,7 +659,7 @@ document.getElementById('filter-shared').addEventListener('change', (e) => {
 document.getElementById('prev-page').addEventListener('click', () => {
     if (currentPage > 1) {
         currentPage--;
-        clearSelection();
+        exitSelectMode();
         renderCharts();
     }
 });
