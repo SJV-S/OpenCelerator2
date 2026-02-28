@@ -651,7 +651,7 @@ document.querySelectorAll('input[name="search-mode"]').forEach(radio => {
 // Filter shared toggle
 document.getElementById('filter-shared').addEventListener('change', (e) => {
     filterShared = e.target.checked;
-    clearSelection();
+    exitSelectMode();
     renderCharts(true);
 });
 
@@ -666,7 +666,7 @@ document.getElementById('prev-page').addEventListener('click', () => {
 
 document.getElementById('next-page').addEventListener('click', () => {
     currentPage++;
-    clearSelection();
+    exitSelectMode();
     renderCharts();
 });
 
