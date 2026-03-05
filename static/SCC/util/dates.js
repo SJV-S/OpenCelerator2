@@ -142,6 +142,22 @@ function getMondayCountInMonth(year, month) {
     return count;
 }
 
+/** Valid Monday x-positions for a Weekly chart (skips dead zones). */
+function getWeeklyMondayPositions(startDate, xmax) {
+    const baseMonth = getWeeklyBaseMonth(startDate);
+    const numMonths = Math.ceil((xmax + 5) / 5);
+    const positions = [];
+    for (let m = 0; m < numMonths; m++) {
+        const d = new Date(baseMonth.getFullYear(), baseMonth.getMonth() + m, 1);
+        const count = getMondayCountInMonth(d.getFullYear(), d.getMonth());
+        for (let i = 0; i < count; i++) {
+            const pos = m * 5 + i;
+            if (pos <= xmax) positions.push(pos);
+        }
+    }
+    return positions;
+}
+
 /** Current time as Unix seconds. */
 function nowUnixSeconds() {
     return Math.floor(Date.now() / 1000);
@@ -854,6 +870,7 @@ export {
     parseLocalDate,
     snapToChartBoundary,
     timestampsToXPositions,
+    getWeeklyMondayPositions,
     xPositionToDate,
     dateToXPosition,
     updateChartDateLabels,

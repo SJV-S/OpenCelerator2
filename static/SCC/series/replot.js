@@ -20,7 +20,8 @@ import {
 } from './tracePipeline.js';
 import { initializeAllSeriesInputs } from './traceStyles.js';
 import { LIMITS } from '../config.js';
-import { timestampsToXPositions, updateChartDateLabels } from '../util/dates.js';
+import { timestampsToXPositions, updateChartDateLabels, getWeeklyMondayPositions } from '../util/dates.js';
+import { CHART_TYPE_CONFIG } from '../config.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 
 /**
@@ -127,6 +128,22 @@ function refreshChart() {
     // Update date labels in chart annotations
     if (chartState.startDate) {
         updateChartDateLabels(chartDiv, chartState.startDate);
+    }
+
+    // Weekly: rebuild minor vertical grid to match actual dead zones
+    if ((chartState.chartType || '').toLowerCase() === 'weekly' && chartState.startDate) {
+        const gridTrace = chartDiv.data.find(t => t.name === 'grid-minor-vertical');
+        if (gridTrace) {
+            const cfg = CHART_TYPE_CONFIG.Weekly;
+            const positions = getWeeklyMondayPositions(chartState.startDate, chartState.chartCapacity);
+            const x = [], y = [];
+            for (const pos of positions) {
+                x.push(pos, pos, null);
+                y.push(cfg.yMin, cfg.yMax, null);
+            }
+            gridTrace.x = x;
+            gridTrace.y = y;
+        }
     }
 
     // Render legend without triggering auto-save (this fires on every chart open/refresh)

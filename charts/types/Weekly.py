@@ -287,17 +287,10 @@ class WeeklySCC:
             )
 
     def minor_vertical_grid(self):
-        """Minor vertical grid lines only at actual Monday positions (non-uniform) - trace-based for pan performance."""
-        x_vals = []
-        y_vals = []
-        for pos in self.monday_positions:
-            if pos <= self.xmax:
-                x_vals.extend([pos, pos, None])
-                y_vals.extend([self.ymin, self.ymax, None])
-
+        """Empty placeholder — Weekly minor vertical grid is built dynamically in JS to respect dead zones."""
         self.fig.add_trace(go.Scatter(
-            x=x_vals,
-            y=y_vals,
+            x=[],
+            y=[],
             mode='lines',
             line=dict(color=self.grid_color, width=self.grid_width * 0.5),
             hoverinfo='skip',
