@@ -447,10 +447,11 @@ function updateChartDateLabels(chartElement, startDate) {
             annotation.text = `<u>${formattedDate}</u>`;
 
         } else if (annotation.name.startsWith('month-label-')) {
-            // Weekly: monthly intervals
-            idx = parseInt(annotation.name.replace('month-label-', ''));
+            // Weekly: calculate date at this label's x-position.
+            // Each x-unit = 1 week, so annotation.x * 7 = days from startDate.
+            // This stays consistent with how data is plotted (floor(daysDiff/7)).
             currentDate = new Date(startDate);
-            currentDate.setMonth(startDate.getMonth() + idx);
+            currentDate.setDate(startDate.getDate() + Math.round(annotation.x * 7));
             formattedDate = formatMonthYear(currentDate);
             annotation.text = formattedDate;
 
