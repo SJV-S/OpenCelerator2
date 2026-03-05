@@ -287,6 +287,7 @@ function cutLine(xValue) {
 
     const xUpper = Math.ceil(xValue);
     const dateUpper = xPositionToDate(xUpper);
+    if (!dateUpper) return; // dead zone (Weekly 5-per-month gap)
     const lineId = Date.now();
 
     chartState.LineCuts[lineId] = {

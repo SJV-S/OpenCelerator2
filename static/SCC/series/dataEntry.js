@@ -365,6 +365,7 @@ function init() {
 
         // Convert x-position to date, snap to chart boundary
         const clickedDate = xPositionToDate(Math.round(data.x));
+        if (!clickedDate) return; // dead zone (Weekly 5-per-month gap)
         const snappedDate = snapToChartBoundary(clickedDate);
         setEntryDate(snappedDate);
         eventBus.emit(EVENTS.COUNTER_ENTRY_DATE_CHANGED, { date: selectedEntryDate });

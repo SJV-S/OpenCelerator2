@@ -908,6 +908,7 @@ function handleCelLineConfirm(data, baseKey) {
     // Store dates as YYYY-MM-DD strings to avoid timezone issues with ISO serialization
     const date1 = xPositionToDate(firstX);
     const date2 = xPositionToDate(lastX);
+    if (!date1 || !date2) return; // dead zone (Weekly 5-per-month gap)
     const date1Str = formatDateISO(date1);
     const date2Str = formatDateISO(date2);
 

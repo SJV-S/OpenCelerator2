@@ -34,16 +34,22 @@
  * Data points are grouped into bins based on chart type. All entries within
  * the same period share the same X-position, enabling aggregation.
  *
- * Chart Type | Bin Size   | X-Position Calculation        | startDate Alignment
- * -----------|------------|-------------------------------|---------------------
- * Daily      | 1 day      | daysDiff from startDate       | Previous Monday
- * Weekly     | 7 days     | floor(daysDiff / 7)           | Monday <= 1st of prev month
- * Monthly    | 1 month    | monthsDiff from startDate     | Jan 1 of previous year
- * Yearly     | 1 year     | yearsDiff from startDate      | Jan 1 of decade start
+ * Chart Type | Bin Size   | X-Position Calculation              | startDate Alignment
+ * -----------|------------|-------------------------------------|---------------------
+ * Daily      | 1 day      | daysDiff from startDate             | Previous Monday
+ * Weekly     | 1 week     | 5-per-month (monthOff*5 + sunIdx)   | Monday <= 1st of prev month
+ * Monthly    | 1 month    | monthsDiff from startDate           | Jan 1 of previous year
+ * Yearly     | 1 year     | yearsDiff from startDate            | Jan 1 of decade start
+ *
+ * WEEKLY 5-PER-MONTH: Each calendar month gets exactly 5 x-slots. Weeks are
+ * identified by their ending Sunday (matching Weekly.py get_sundays_for_months).
+ * Months with 4 Sundays leave slot 4 as a dead zone (no grid line, no data).
+ * Data dates are Monday-snapped per policy; the week-ending Sunday determines
+ * which month and slot the data maps to.
  *
  * CRITICAL: The startDate alignment ensures binning intervals align with the
  * date boundary policy. For Weekly charts, startDate is a Monday so that
- * 7-day bins correspond to actual calendar weeks (Mon-Sun, ISO 8601).
+ * bins correspond to actual calendar weeks (Mon-Sun, ISO 8601).
  *
  * Functions:
  * - parseLocalDate(): ALWAYS use this to parse dates from strings or clone Date objects
@@ -91,6 +97,59 @@ import { chartState } from '../chartState.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 import { createToast } from '../ui/toaster.js';
 import { relayout } from './plotlyWrapper.js';
+
+// =============================================================================
+// WEEKLY 5-PER-MONTH HELPERS
+// =============================================================================
+// The Weekly chart allocates exactly 5 x-slots per calendar month, matching
+// the Python template (Weekly.py get_sundays_for_months). Months with only
+// 4 Sundays leave slot 4 as a dead zone — no grid line, no valid data.
+//
+// Weeks are identified by their ending Sunday (W-SUN in the Python template).
+// Data is Monday-snapped per date policy, but maps to the same week.
+//
+// x = monthOffset * 5 + sundayIndex
+//   monthOffset = months from the base month
+//   sundayIndex = which Sunday within that month (0-indexed)
+//
+// Base month = month of (startDate + 6 days), since startDate for Weekly
+// is "Monday at or before 1st of [base month]".
+// =============================================================================
+
+/** 1st of the base month (month that label-0 represents). */
+function getWeeklyBaseMonth(startDate) {
+    const d = new Date(startDate);
+    d.setDate(d.getDate() + 6);
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+}
+
+/** First Sunday in a given month (0-indexed). */
+function getFirstSundayOfMonth(year, month) {
+    const d = new Date(year, month, 1);
+    const dayOfWeek = d.getDay(); // 0=Sun … 6=Sat
+    if (dayOfWeek !== 0) d.setDate(d.getDate() + (7 - dayOfWeek));
+    return d;
+}
+
+/** Number of Sundays in a given month (4 or 5). */
+function getSundayCountInMonth(year, month) {
+    const first = getFirstSundayOfMonth(year, month);
+    let count = 0;
+    const d = new Date(first);
+    while (d.getMonth() === month) {
+        count++;
+        d.setDate(d.getDate() + 7);
+    }
+    return count;
+}
+
+/** Sunday ending the ISO week that contains the given date. */
+function getSundayOfWeek(date) {
+    const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const dayOfWeek = d.getDay(); // 0=Sun, 1=Mon … 6=Sat
+    if (dayOfWeek !== 0) d.setDate(d.getDate() + (7 - dayOfWeek));
+    return d;
+}
 
 /** Current time as Unix seconds. */
 function nowUnixSeconds() {
@@ -343,9 +402,21 @@ function xPositionToDate(xPosition) {
 
     switch (chartType) {
         case 'weekly': {
-            const resultDate = new Date(startDate);
-            resultDate.setDate(startDate.getDate() + (xPosition * 7));
-            return resultDate;
+            // 5-per-month scheme: find the Sunday at this slot, return its Monday
+            const baseMonth = getWeeklyBaseMonth(startDate);
+            const monthOffset = Math.floor(xPosition / 5);
+            const sundayIndex = Math.round(xPosition - monthOffset * 5);
+            // Target month
+            const targetDate = new Date(baseMonth.getFullYear(), baseMonth.getMonth() + monthOffset, 1);
+            const firstSunday = getFirstSundayOfMonth(targetDate.getFullYear(), targetDate.getMonth());
+            const sunday = new Date(firstSunday);
+            sunday.setDate(firstSunday.getDate() + sundayIndex * 7);
+            // Dead zone: Sunday fell into the next month
+            if (sunday.getMonth() !== targetDate.getMonth()) return null;
+            // Return Monday of this week (Sunday - 6)
+            const monday = new Date(sunday);
+            monday.setDate(sunday.getDate() - 6);
+            return monday;
         }
         case 'monthly': {
             // Use first of month to avoid timezone boundary issues
@@ -397,8 +468,20 @@ function dateToXPosition(date) {
         case 'monthly':
             return (inputDate.getFullYear() - startDate.getFullYear()) * 12 +
                    (inputDate.getMonth() - startDate.getMonth());
-        case 'weekly':
-            return Math.floor(daysDiff / 7);
+        case 'weekly': {
+            // 5-per-month scheme: find the week-ending Sunday, then its slot
+            const sunday = getSundayOfWeek(inputDate);
+            const baseMonth = getWeeklyBaseMonth(startDate);
+            const monthOffset = (sunday.getFullYear() - baseMonth.getFullYear()) * 12
+                              + (sunday.getMonth() - baseMonth.getMonth());
+            const firstSunday = getFirstSundayOfMonth(sunday.getFullYear(), sunday.getMonth());
+            const sundayIndex = Math.round(
+                (Date.UTC(sunday.getFullYear(), sunday.getMonth(), sunday.getDate())
+               - Date.UTC(firstSunday.getFullYear(), firstSunday.getMonth(), firstSunday.getDate()))
+                / (7 * 24 * 60 * 60 * 1000)
+            );
+            return monthOffset * 5 + sundayIndex;
+        }
         case 'daily':
         default:
             return daysDiff;
@@ -447,11 +530,12 @@ function updateChartDateLabels(chartElement, startDate) {
             annotation.text = `<u>${formattedDate}</u>`;
 
         } else if (annotation.name.startsWith('month-label-')) {
-            // Weekly: calculate date at this label's x-position.
-            // Each x-unit = 1 week, so annotation.x * 7 = days from startDate.
-            // This stays consistent with how data is plotted (floor(daysDiff/7)).
-            currentDate = new Date(startDate);
-            currentDate.setDate(startDate.getDate() + Math.round(annotation.x * 7));
+            // Weekly 5-per-month: label N is centered in month N's 5-slot block.
+            // Use month index directly from the base month.
+            idx = parseInt(annotation.name.replace('month-label-', ''));
+            const baseDate = new Date(startDate);
+            baseDate.setDate(baseDate.getDate() + 6); // land in base month
+            currentDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + idx, 1);
             formattedDate = formatMonthYear(currentDate);
             annotation.text = formattedDate;
 
