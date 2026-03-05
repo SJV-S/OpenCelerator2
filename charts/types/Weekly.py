@@ -70,19 +70,19 @@ class WeeklySCC:
 
         self.fig = go.Figure()
 
-    def get_sundays_for_months(self, months):
-        """Calculate actual Sunday positions within each month."""
+    def get_mondays_for_months(self, months):
+        """Calculate actual Monday positions within each month."""
         result = {}
         index = 0
 
         for month in months:
             start_date = pd.to_datetime(month).normalize().replace(day=1)
-            sundays = pd.date_range(start_date, periods=31, freq='W-SUN')
-            sundays = [sunday for sunday in sundays if sunday.month == start_date.month]
+            mondays = pd.date_range(start_date, periods=31, freq='W-MON')
+            mondays = [monday for monday in mondays if monday.month == start_date.month]
 
             for i in range(5):
-                if i < len(sundays):
-                    result[index] = sundays[i]
+                if i < len(mondays):
+                    result[index] = mondays[i]
                 index += 1
 
         return result
@@ -101,23 +101,23 @@ class WeeklySCC:
             freq='MS'
         )
 
-        # Get Sunday positions
-        sunday_map = self.get_sundays_for_months(self.months)
-        self.date_to_pos = {v: k for k, v in sunday_map.items()}
+        # Get Monday positions
+        monday_map = self.get_mondays_for_months(self.months)
+        self.date_to_pos = {v: k for k, v in monday_map.items()}
         self.all_dates = [date for date in self.date_to_pos.keys()]
 
-        # Bottom x-axis ticks - only at actual Sunday positions
-        self.sunday_positions = sorted([k for k in self.date_to_pos.values()])
-        if self.xmax not in self.sunday_positions:
-            self.sunday_positions.append(self.xmax)
+        # Bottom x-axis ticks - only at actual Monday positions
+        self.monday_positions = sorted([k for k in self.date_to_pos.values()])
+        if self.xmax not in self.monday_positions:
+            self.monday_positions.append(self.xmax)
 
         # Month labels (e.g., "Jan\n26")
         self.month_labels = self.months.strftime("%b\n%y").tolist()
 
     def create_xaxis(self):
-        # Bottom x-axis: ticks at actual Sunday positions
+        # Bottom x-axis: ticks at actual Monday positions
         # Labels show cumulative week count (index), displayed at positions divisible by 10
-        tick_vals = self.sunday_positions
+        tick_vals = self.monday_positions
         tick_labels = []
         for idx, pos in enumerate(tick_vals):
             if pos % 10 == 0:
@@ -287,10 +287,10 @@ class WeeklySCC:
             )
 
     def minor_vertical_grid(self):
-        """Minor vertical grid lines only at actual Sunday positions (non-uniform) - trace-based for pan performance."""
+        """Minor vertical grid lines only at actual Monday positions (non-uniform) - trace-based for pan performance."""
         x_vals = []
         y_vals = []
-        for pos in self.sunday_positions:
+        for pos in self.monday_positions:
             if pos <= self.xmax:
                 x_vals.extend([pos, pos, None])
                 y_vals.extend([self.ymin, self.ymax, None])
