@@ -996,7 +996,7 @@ function updateInfoPanel(xRounded, yLogValue, traceData, celData) {
     const refs = state.elements?.infoPanelRefs;
     if (!refs) return;
 
-    // Date section
+    // Date section — null means dead zone (Weekly 5-per-month gap)
     const date = xPositionToDate(xRounded);
     if (date) {
         const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -1006,6 +1006,10 @@ function updateInfoPanel(xRounded, yLogValue, traceData, celData) {
         refs.dayLabel.textContent = `${dayNames[date.getDay()]} | ${date.getDate()}`;
         refs.monthLabel.textContent = `${monthNames[date.getMonth()]} | ${String(date.getMonth() + 1).padStart(2, '0')}`;
         refs.yearLabel.textContent = date.getFullYear();
+    } else {
+        refs.dayLabel.textContent = '';
+        refs.monthLabel.textContent = '';
+        refs.yearLabel.textContent = '';
     }
 
     // Cursor section
