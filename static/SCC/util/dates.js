@@ -388,12 +388,12 @@ function timestampsToXPositions(xValues) {
  * Convert a single x-position coordinate back to a date.
  * Reverses the binning done by timestampsToXPositions.
  * - Daily: X = day offset, returns that day
- * - Weekly: X = week offset, returns first day of that week
+ * - Weekly: X = 5-per-month slot, returns Monday of that week (null if dead zone)
  * - Monthly: X = month offset, returns first day of that month
  * - Yearly: X = year offset, returns first day of that year
  *
  * @param {number} xPosition - X-position coordinate
- * @returns {Date} Date object corresponding to the x-position
+ * @returns {Date|null} Date object corresponding to the x-position (null for Weekly dead zones)
  */
 function xPositionToDate(xPosition) {
     const chartType = (chartState.chartType || 'Daily').toLowerCase();
@@ -441,7 +441,7 @@ function xPositionToDate(xPosition) {
  * Convert a Date object to an x-position on the chart (inverse of xPositionToDate).
  * Uses chart-type-specific calculations matching timestampsToXPositions:
  * - Daily: X = day offset from startDate
- * - Weekly: X = floor(daysDiff / 7)
+ * - Weekly: X = 5-per-month slot (monthOffset*5 + sundayIndex)
  * - Monthly: X = month offset from startDate
  * - Yearly: X = year offset from startDate
  *
@@ -454,13 +454,6 @@ function dateToXPosition(date) {
     const chartType = (chartState.chartType || 'Daily').toLowerCase();
     const inputDate = parseLocalDate(date);
     const startDate = parseLocalDate(chartState.startDate);
-
-    // Calculate days difference (used by daily and weekly)
-    // Use Date.UTC to avoid DST causing off-by-one (spring-forward makes local
-    // midnight-to-midnight 23 hours, and Math.floor rounds that down)
-    const utcInput = Date.UTC(inputDate.getFullYear(), inputDate.getMonth(), inputDate.getDate());
-    const utcStart = Date.UTC(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
-    const daysDiff = Math.round((utcInput - utcStart) / (1000 * 60 * 60 * 24));
 
     switch (chartType) {
         case 'yearly':
@@ -483,8 +476,12 @@ function dateToXPosition(date) {
             return monthOffset * 5 + sundayIndex;
         }
         case 'daily':
-        default:
-            return daysDiff;
+        default: {
+            // DST-safe day arithmetic via Date.UTC normalization
+            const utcInput = Date.UTC(inputDate.getFullYear(), inputDate.getMonth(), inputDate.getDate());
+            const utcStart = Date.UTC(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+            return Math.round((utcInput - utcStart) / (1000 * 60 * 60 * 24));
+        }
     }
 }
 
