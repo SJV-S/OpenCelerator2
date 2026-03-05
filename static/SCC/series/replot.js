@@ -21,7 +21,6 @@ import {
 import { initializeAllSeriesInputs } from './traceStyles.js';
 import { LIMITS } from '../config.js';
 import { timestampsToXPositions, updateChartDateLabels, getWeeklyMondayPositions } from '../util/dates.js';
-import { CHART_TYPE_CONFIG } from '../config.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 
 /**
@@ -134,12 +133,14 @@ function refreshChart() {
     if ((chartState.chartType || '').toLowerCase() === 'weekly' && chartState.startDate) {
         const gridTrace = chartDiv.data.find(t => t.name === 'grid-minor-vertical');
         if (gridTrace) {
-            const cfg = CHART_TYPE_CONFIG.Weekly;
+            const yRange = chartDiv.layout.yaxis.range;
+            const yMin = Math.pow(10, yRange[0]);
+            const yMax = Math.pow(10, yRange[1]);
             const positions = getWeeklyMondayPositions(chartState.startDate, chartState.chartCapacity);
             const x = [], y = [];
             for (const pos of positions) {
                 x.push(pos, pos, null);
-                y.push(cfg.yMin, cfg.yMax, null);
+                y.push(yMin, yMax, null);
             }
             gridTrace.x = x;
             gridTrace.y = y;
