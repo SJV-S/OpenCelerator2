@@ -549,8 +549,12 @@ export function evaluatePowerLaw(x, fitResult) {
 
 /**
  * Generate an SVG path string for a power law curve (or its bounce offset).
- * Interpolates the curve at regular x intervals and emits M/L commands
- * with y-values in display (linear) scale for Plotly's log-y axis.
+ * Interpolates the curve at regular x intervals and emits M/L commands.
+ *
+ * IMPORTANT: Plotly's type:'path' with yref:'y' on a log axis expects
+ * y-coordinates in LOG SPACE (matching the axis range), unlike type:'line'
+ * which accepts linear values and converts internally. So we pass logY
+ * directly, not 10^logY.
  *
  * @param {number} x1 - Start x position
  * @param {number} x2 - End x position
@@ -566,9 +570,8 @@ export function generatePowerLawPath(x1, x2, fitResult, yOffset = 0, numPoints =
     for (let i = 0; i < numPoints; i++) {
         const x = x1 + i * step;
         const logY = evaluatePowerLaw(x, fitResult) + yOffset;
-        const y = Math.pow(10, logY);
         const cmd = i === 0 ? 'M' : 'L';
-        parts.push(`${cmd}${x},${y}`);
+        parts.push(`${cmd}${x},${logY}`);
     }
 
     return parts.join(' ');
