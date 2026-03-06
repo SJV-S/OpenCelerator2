@@ -26,6 +26,7 @@ sed -i "s|CORS_ALLOWED_ORIGINS = '\*'|CORS_ALLOWED_ORIGINS = ['$DOMAIN_URL']|" "
 sed -i 's/0.0.0.0:5002/127.0.0.1:5002/' "$TMP/scripts/run_production.sh"
 sed -i 's/"name": "Standard Change Chart"/"name": "OpenCelerator"/' "$TMP/static/manifest.json"
 sed -i 's/"short_name": "SCC"/"short_name": "OpenCelerator"/' "$TMP/static/manifest.json"
+sed -i 's/Setup for the Standard Change Chart/Setup for OpenCelerator/' "$TMP/templates/SCC/welcome.html"
 
 echo "[4/6] Deploying to server via tar+ssh..."
 tar czf - -C "$TMP" . | ssh "$VPS" "mkdir -p \"$VPS_PATH\" && tar xzf - -C \"$VPS_PATH\""
