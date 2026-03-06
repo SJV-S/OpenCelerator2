@@ -16,7 +16,7 @@ import { icons, applySvgCursor, restoreCursor } from '../ui/icons.js';
 import { chartState } from '../chartState.js';
 import { CORRECTS, ERRORS, TIMING, LINE_DEFAULTS, COLORS, CHART_TYPE_CONFIG, WINDOW_UNITS } from '../config.js';
 import { xPositionToDate, dateToXPosition, formatDateISO } from '../util/dates.js';
-import { fit, FIT_METHODS, BOUNCE_ENVELOPES, DEFAULT_FIT_METHOD, DEFAULT_BOUNCE_ENVELOPE, calculateBounceBounds, calculateBounceLines, formatCelerationLabel, formatDoublingTimeLabel } from '../util/fit_lines.js';
+import { fit, FIT_METHODS, BOUNCE_ENVELOPES, DEFAULT_FIT_METHOD, DEFAULT_BOUNCE_ENVELOPE, calculateBounceBounds, calculateBounceBoundsFromResiduals, calculateBounceLines, formatCelerationLabel, formatDoublingTimeLabel, formatPowerLawLabel, generatePowerLawPath, evaluatePowerLaw } from '../util/fit_lines.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 import { getFirstConfig, getAggLabel } from '../series/traceStyles.js';
 import { getPixelCoordinates } from '../util/plotCoordinates.js';
@@ -87,63 +87,114 @@ function buildCelLineElements(metadata, chartDiv) {
     const { color: celLineColor, width: celLineWidth, dash: celLineDash,
             bounceColor, bounceWidth, bounceDash } = metadata.style;
 
-    // Build shapes array - main trend line first
+    // Build shapes array
     const shapes = [];
+    const isPowerLaw = metadata.fitMethod === FIT_METHODS.POWER_LAW && metadata.powerLawParams;
 
-    // Main trend line
-    const mainShape = {
-        type: 'line',
-        x0: x1,
-        y0: metadata.y1,
-        x1: x2,
-        y1: metadata.y2,
-        xref: 'x',
-        yref: 'y',
-        name: lineName,
-        line: {
-            color: celLineColor,
-            width: celLineWidth,
-            dash: celLineDash
+    if (isPowerLaw) {
+        // Power law: curved path shape
+        const plParams = metadata.powerLawParams;
+        const fitResult = { slope: plParams.slope, intercept: plParams.intercept, xShift: plParams.xShift };
+
+        shapes.push({
+            type: 'path',
+            path: generatePowerLawPath(x1, x2, fitResult),
+            xref: 'x',
+            yref: 'y',
+            name: lineName,
+            line: {
+                color: celLineColor,
+                width: celLineWidth,
+                dash: celLineDash
+            }
+        });
+
+        // Upper bounce curve
+        if (metadata.bounceUpperOffset != null) {
+            shapes.push({
+                type: 'path',
+                path: generatePowerLawPath(x1, x2, fitResult, metadata.bounceUpperOffset),
+                xref: 'x',
+                yref: 'y',
+                name: `${lineName}-upper`,
+                line: {
+                    color: bounceColor,
+                    width: bounceWidth,
+                    dash: bounceDash
+                }
+            });
         }
-    };
-    shapes.push(mainShape);
 
-    // Upper bounce line (if exists in metadata)
-    if (metadata.bounceUpperY1 != null && metadata.bounceUpperY2 != null) {
+        // Lower bounce curve
+        if (metadata.bounceLowerOffset != null) {
+            shapes.push({
+                type: 'path',
+                path: generatePowerLawPath(x1, x2, fitResult, metadata.bounceLowerOffset),
+                xref: 'x',
+                yref: 'y',
+                name: `${lineName}-lower`,
+                line: {
+                    color: bounceColor,
+                    width: bounceWidth,
+                    dash: bounceDash
+                }
+            });
+        }
+    } else {
+        // Linear fit: straight line shapes
         shapes.push({
             type: 'line',
             x0: x1,
-            y0: metadata.bounceUpperY1,
+            y0: metadata.y1,
             x1: x2,
-            y1: metadata.bounceUpperY2,
+            y1: metadata.y2,
             xref: 'x',
             yref: 'y',
-            name: `${lineName}-upper`,
+            name: lineName,
             line: {
-                color: bounceColor,
-                width: bounceWidth,
-                dash: bounceDash
+                color: celLineColor,
+                width: celLineWidth,
+                dash: celLineDash
             }
         });
-    }
 
-    // Lower bounce line (if exists in metadata)
-    if (metadata.bounceLowerY1 != null && metadata.bounceLowerY2 != null) {
-        shapes.push({
-            type: 'line',
-            x0: x1,
-            y0: metadata.bounceLowerY1,
-            x1: x2,
-            y1: metadata.bounceLowerY2,
-            xref: 'x',
-            yref: 'y',
-            name: `${lineName}-lower`,
-            line: {
-                color: bounceColor,
-                width: bounceWidth,
-                dash: bounceDash
-            }
-        });
+        // Upper bounce line (if exists in metadata)
+        if (metadata.bounceUpperY1 != null && metadata.bounceUpperY2 != null) {
+            shapes.push({
+                type: 'line',
+                x0: x1,
+                y0: metadata.bounceUpperY1,
+                x1: x2,
+                y1: metadata.bounceUpperY2,
+                xref: 'x',
+                yref: 'y',
+                name: `${lineName}-upper`,
+                line: {
+                    color: bounceColor,
+                    width: bounceWidth,
+                    dash: bounceDash
+                }
+            });
+        }
+
+        // Lower bounce line (if exists in metadata)
+        if (metadata.bounceLowerY1 != null && metadata.bounceLowerY2 != null) {
+            shapes.push({
+                type: 'line',
+                x0: x1,
+                y0: metadata.bounceLowerY1,
+                x1: x2,
+                y1: metadata.bounceLowerY2,
+                xref: 'x',
+                yref: 'y',
+                name: `${lineName}-lower`,
+                line: {
+                    color: bounceColor,
+                    width: bounceWidth,
+                    dash: bounceDash
+                }
+            });
+        }
     }
 
     // Hover is handled by lineHover.js traces — no annotation needed for hover.
@@ -868,12 +919,19 @@ function handleCelLineConfirm(data, baseKey) {
         return;
     }
 
+    const isPowerLaw = fitResult.isPowerLaw;
     const firstX = filteredX[0];
     const dataLastX = filteredX[filteredX.length - 1];
     const lastX = dataLastX + forecast;  // Extend by forecast amount
 
-    const logY1 = fitResult.slope * firstX + fitResult.intercept;
-    const logY2 = fitResult.slope * lastX + fitResult.intercept;
+    let logY1, logY2;
+    if (isPowerLaw) {
+        logY1 = evaluatePowerLaw(firstX, fitResult);
+        logY2 = evaluatePowerLaw(lastX, fitResult);
+    } else {
+        logY1 = fitResult.slope * firstX + fitResult.intercept;
+        logY2 = fitResult.slope * lastX + fitResult.intercept;
+    }
     const y1_display = Math.pow(10, logY1);
     const y2_display = Math.pow(10, logY2);
 
@@ -881,19 +939,33 @@ function handleCelLineConfirm(data, baseKey) {
     const labelFormat = settings.labelFormat;
     const wu = WINDOW_UNITS[chartState.chartType];
     const unitName = wu ? wu.name.toLowerCase() : 'day';
-    const slopeLabel = labelFormat === 'doubling'
-        ? formatDoublingTimeLabel(fitResult.slope, config.unit, unitName)
-        : formatCelerationLabel(fitResult.slope, config.unit);
-    const labelText = `${fitMethod}: ${slopeLabel}`;
+
+    let labelText;
+    if (isPowerLaw) {
+        labelText = `Power law: ${formatPowerLawLabel(fitResult.slope)}`;
+    } else {
+        const slopeLabel = labelFormat === 'doubling'
+            ? formatDoublingTimeLabel(fitResult.slope, config.unit, unitName)
+            : formatCelerationLabel(fitResult.slope, config.unit);
+        labelText = `${fitMethod}: ${slopeLabel}`;
+    }
 
     // Calculate bounce bounds if envelope is enabled
-    const bounceBounds = calculateBounceBounds(filteredLogY, filteredX, fitResult.slope, fitResult.intercept, bounceEnvelope);
+    // For power law, compute residuals against the power law curve
+    let bounceBounds;
+    if (isPowerLaw) {
+        const predictedLogY = filteredX.map(xi => evaluatePowerLaw(xi, fitResult));
+        const residuals = filteredLogY.map((yi, i) => yi - predictedLogY[i]);
+        bounceBounds = calculateBounceBoundsFromResiduals(residuals, bounceEnvelope);
+    } else {
+        bounceBounds = calculateBounceBounds(filteredLogY, filteredX, fitResult.slope, fitResult.intercept, bounceEnvelope);
+    }
 
-    // Calculate bounce line Y values
+    // Calculate bounce line Y values (for straight lines only; power law uses offsets directly)
     let bounceUpperY1 = null, bounceUpperY2 = null;
     let bounceLowerY1 = null, bounceLowerY2 = null;
 
-    if (bounceBounds) {
+    if (bounceBounds && !isPowerLaw) {
         const bounceLines = calculateBounceLines([firstX, lastX], fitResult.slope, fitResult.intercept, bounceBounds);
         if (bounceLines) {
             bounceUpperY1 = bounceLines.upperY[0];
@@ -933,6 +1005,7 @@ function handleCelLineConfirm(data, baseKey) {
         bounceLowerY2: bounceLowerY2,
         bounceUpperOffset: bounceBounds ? bounceBounds.upper : null,
         bounceLowerOffset: bounceBounds ? bounceBounds.lower : null,
+        powerLawParams: isPowerLaw ? { slope: fitResult.slope, intercept: fitResult.intercept, xShift: fitResult.xShift } : null,
         text: labelText,
         style: {
             color: getCelLineColor(baseKey),

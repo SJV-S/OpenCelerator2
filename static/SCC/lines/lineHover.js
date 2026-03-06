@@ -10,7 +10,7 @@ import { chartState } from '../chartState.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 import { dateToXPosition } from '../util/dates.js';
 import { CHART_TYPE_CONFIG, WINDOW_UNITS } from '../config.js';
-import { formatCelerationLabel, formatDoublingTimeLabel } from '../util/fit_lines.js';
+import { formatCelerationLabel, formatDoublingTimeLabel, formatPowerLawLabel, FIT_METHODS, evaluatePowerLaw } from '../util/fit_lines.js';
 import { getCelLineSettings } from '../ui/celSettingsModal.js';
 import { interpolateLinePoints } from '../util/lineInterpolation.js';
 import { deleteTraces, addTraces } from '../util/plotlyWrapper.js';
@@ -18,6 +18,30 @@ import { getChartDiv } from '../util/dom.js';
 
 // Meta type for hover traces (distinct from clickableLine)
 const HOVER_TRACE_TYPE = 'hoverLine';
+
+/**
+ * Interpolate points along a power law curve for hover detection.
+ * @param {number} x1 - Start x position
+ * @param {number} x2 - End x position
+ * @param {Object} fitResult - { slope, intercept, xShift }
+ * @param {number} [yOffset=0] - Vertical offset in log-space (for bounce lines)
+ * @returns {{ x: number[], y: number[] }}
+ */
+function interpolatePowerLawPoints(x1, x2, fitResult, yOffset = 0) {
+    const numPoints = Math.max(50, Math.ceil(x2 - x1) + 1);
+    const step = (x2 - x1) / (numPoints - 1);
+    const xArray = [];
+    const yArray = [];
+
+    for (let i = 0; i < numPoints; i++) {
+        const x = x1 + i * step;
+        const logY = evaluatePowerLaw(x, fitResult) + yOffset;
+        xArray.push(x);
+        yArray.push(Math.pow(10, logY));
+    }
+
+    return { x: xArray, y: yArray };
+}
 
 /**
  * Removes all hover traces from the chart
@@ -68,16 +92,21 @@ function createHoverTrace(points, lineName, label, color) {
  */
 function buildCelHoverLabel(celLine) {
     // Build label from raw fields — never rely on celLine.text for format
-    const config = CHART_TYPE_CONFIG[chartState.chartType] || CHART_TYPE_CONFIG.Daily;
-    const { labelFormat } = getCelLineSettings();
-    const wu = WINDOW_UNITS[chartState.chartType];
-    const unitName = wu ? wu.name.toLowerCase() : 'day';
-    const slope = labelFormat === 'doubling'
-        ? formatDoublingTimeLabel(celLine.slope, config.unit, unitName)
-        : formatCelerationLabel(celLine.slope, config.unit);
     const fitMethod = celLine.fitMethod || 'Unknown';
 
-    let lines = [`${fitMethod}: ${slope}`];
+    let lines;
+    if (fitMethod === FIT_METHODS.POWER_LAW) {
+        lines = [`Power law: ${formatPowerLawLabel(celLine.slope)}`];
+    } else {
+        const config = CHART_TYPE_CONFIG[chartState.chartType] || CHART_TYPE_CONFIG.Daily;
+        const { labelFormat } = getCelLineSettings();
+        const wu = WINDOW_UNITS[chartState.chartType];
+        const unitName = wu ? wu.name.toLowerCase() : 'day';
+        const slope = labelFormat === 'doubling'
+            ? formatDoublingTimeLabel(celLine.slope, config.unit, unitName)
+            : formatCelerationLabel(celLine.slope, config.unit);
+        lines = [`${fitMethod}: ${slope}`];
+    }
 
     // Derive bounce spread if bounce lines exist
     let upperOffset = celLine.bounceUpperOffset;
@@ -160,20 +189,38 @@ function buildAllHoverTraces() {
             const x1 = dateToXPosition(celLine.date1);
             const x2 = dateToXPosition(celLine.date2);
 
-            // Main trend line
-            const points = interpolateLinePoints(x1, celLine.y1, x2, celLine.y2, isLogY);
-            traces.push(createHoverTrace(points, lineName, label, color));
+            const isPowerLaw = celLine.fitMethod === FIT_METHODS.POWER_LAW && celLine.powerLawParams;
 
-            // Upper bounce — same label
-            if (celLine.bounceUpperY1 != null && celLine.bounceUpperY2 != null) {
-                const upperPoints = interpolateLinePoints(x1, celLine.bounceUpperY1, x2, celLine.bounceUpperY2, isLogY);
-                traces.push(createHoverTrace(upperPoints, `${lineName}-upper`, label, color));
-            }
+            if (isPowerLaw) {
+                const plp = celLine.powerLawParams;
+                const fitResult = { slope: plp.slope, intercept: plp.intercept, xShift: plp.xShift };
+                const points = interpolatePowerLawPoints(x1, x2, fitResult);
+                traces.push(createHoverTrace(points, lineName, label, color));
 
-            // Lower bounce — same label
-            if (celLine.bounceLowerY1 != null && celLine.bounceLowerY2 != null) {
-                const lowerPoints = interpolateLinePoints(x1, celLine.bounceLowerY1, x2, celLine.bounceLowerY2, isLogY);
-                traces.push(createHoverTrace(lowerPoints, `${lineName}-lower`, label, color));
+                if (celLine.bounceUpperOffset != null) {
+                    const upperPoints = interpolatePowerLawPoints(x1, x2, fitResult, celLine.bounceUpperOffset);
+                    traces.push(createHoverTrace(upperPoints, `${lineName}-upper`, label, color));
+                }
+                if (celLine.bounceLowerOffset != null) {
+                    const lowerPoints = interpolatePowerLawPoints(x1, x2, fitResult, celLine.bounceLowerOffset);
+                    traces.push(createHoverTrace(lowerPoints, `${lineName}-lower`, label, color));
+                }
+            } else {
+                // Main trend line
+                const points = interpolateLinePoints(x1, celLine.y1, x2, celLine.y2, isLogY);
+                traces.push(createHoverTrace(points, lineName, label, color));
+
+                // Upper bounce — same label
+                if (celLine.bounceUpperY1 != null && celLine.bounceUpperY2 != null) {
+                    const upperPoints = interpolateLinePoints(x1, celLine.bounceUpperY1, x2, celLine.bounceUpperY2, isLogY);
+                    traces.push(createHoverTrace(upperPoints, `${lineName}-upper`, label, color));
+                }
+
+                // Lower bounce — same label
+                if (celLine.bounceLowerY1 != null && celLine.bounceLowerY2 != null) {
+                    const lowerPoints = interpolateLinePoints(x1, celLine.bounceLowerY1, x2, celLine.bounceLowerY2, isLogY);
+                    traces.push(createHoverTrace(lowerPoints, `${lineName}-lower`, label, color));
+                }
             }
         });
     }

@@ -73,7 +73,7 @@ function createModal() {
 
     fitMethodSelect = document.createElement('select');
     fitMethodSelect.className = 'w-full px-3 py-2 lg:px-2 lg:py-1 text-sm border-2 border-gray-300 rounded focus:outline-none focus:border-[#6ad1e3] transition-colors bg-white';
-    const fitOptions = ['Theil-Sen', 'Least-squares', 'Quarter-intersect', 'Split-middle-line', 'Mean', 'Median'];
+    const fitOptions = ['Theil-Sen', 'Least-squares', 'Quarter-intersect', 'Split-middle-line', 'Mean', 'Median', 'Power law'];
     fitOptions.forEach(opt => {
         const option = document.createElement('option');
         option.value = opt;

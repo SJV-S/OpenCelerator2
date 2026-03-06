@@ -22,6 +22,7 @@ import { showCelLineEditor } from '../ui/celLineEditor.js';
 import { showPhaseLineEditor } from '../ui/phaseLineEditor.js';
 import { showAimLineEditor } from '../ui/aimLineEditor.js';
 import { interpolateLinePoints } from '../util/lineInterpolation.js';
+import { FIT_METHODS, evaluatePowerLaw } from '../util/fit_lines.js';
 import { getChartDiv } from '../util/dom.js';
 import { relayout, addTraces, deleteTraces } from '../util/plotlyWrapper.js';
 
@@ -322,7 +323,23 @@ function setLineCategoryClickability(category, makeClickable) {
                         const x1 = dateToXPosition(celLine.date1);
                         const x2 = dateToXPosition(celLine.date2);
 
-                        const points = [interpolateLinePoints(x1, celLine.y1, x2, celLine.y2, isLogY)];
+                        let points;
+                        const isPL = celLine.fitMethod === FIT_METHODS.POWER_LAW && celLine.powerLawParams;
+                        if (isPL) {
+                            const plp = celLine.powerLawParams;
+                            const fitResult = { slope: plp.slope, intercept: plp.intercept, xShift: plp.xShift };
+                            const numPts = Math.max(50, Math.ceil(x2 - x1) + 1);
+                            const step = (x2 - x1) / (numPts - 1);
+                            const xArr = [], yArr = [];
+                            for (let i = 0; i < numPts; i++) {
+                                const xv = x1 + i * step;
+                                xArr.push(xv);
+                                yArr.push(Math.pow(10, evaluatePowerLaw(xv, fitResult)));
+                            }
+                            points = [{ x: xArr, y: yArr }];
+                        } else {
+                            points = [interpolateLinePoints(x1, celLine.y1, x2, celLine.y2, isLogY)];
+                        }
 
                         return makeLineClickable({
                             lineName: `cel-${celLine.id}`,

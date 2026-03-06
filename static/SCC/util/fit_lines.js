@@ -30,7 +30,8 @@ export const FIT_METHODS = Object.freeze({
     QUARTER_INTERSECT: 'Quarter-intersect',
     SPLIT_MIDDLE_LINE: 'Split-middle-line',
     MEAN: 'Mean',
-    MEDIAN: 'Median'
+    MEDIAN: 'Median',
+    POWER_LAW: 'Power law'
 });
 
 export const BOUNCE_ENVELOPES = Object.freeze({
@@ -327,6 +328,45 @@ export function medianFit(x, y) {
     return { slope: 0, intercept: medianY };
 }
 
+/**
+ * Power law fit via least-squares regression in log-log space.
+ * Fits logY = b * log10(x_shifted) + a, where x_shifted = x - x_min + 1
+ * to avoid log(0). The scaling exponent b is the slope in log-log space.
+ *
+ * Currently uses least-squares only. The same log-transform approach could be
+ * applied to Theil-Sen, quarter-intersect, or split-middle-line if desired —
+ * just pass log10(x_shifted) as the x-values to any of those fit functions.
+ *
+ * @param {number[]} x - Array of x coordinates (chart positions)
+ * @param {number[]} y - Array of y coordinates (already in log10 space)
+ * @returns {{slope: number, intercept: number, xShift: number, isPowerLaw: true}|null}
+ */
+export function powerLawFit(x, y) {
+    if (x.length !== y.length) {
+        console.error('x and y arrays must have same length');
+        return null;
+    }
+
+    const n = x.length;
+    if (n < MIN_POINTS) {
+        return null;
+    }
+
+    const xMin = Math.min(...x);
+    const xShift = xMin - 1; // so shifted minimum = 1, log10(1) = 0
+    const logX = x.map(xi => Math.log10(xi - xShift));
+
+    const result = leastSquaresFit(logX, y);
+    if (!result) return null;
+
+    return {
+        slope: result.slope,
+        intercept: result.intercept,
+        xShift,
+        isPowerLaw: true
+    };
+}
+
 // ============================================================================
 // Main Fit Dispatcher
 // ============================================================================
@@ -353,6 +393,8 @@ export function fit(x, y, method = DEFAULT_FIT_METHOD) {
             return meanFit(x, y);
         case FIT_METHODS.MEDIAN:
             return medianFit(x, y);
+        case FIT_METHODS.POWER_LAW:
+            return powerLawFit(x, y);
         default:
             console.warn(`Unknown fit method: ${method}, using ${DEFAULT_FIT_METHOD}`);
             return theilSenFit(x, y);
@@ -432,6 +474,39 @@ export function calculateBounceBounds(yLog, x, slope, intercept, envelope = DEFA
 }
 
 /**
+ * Calculate bounce bounds from pre-computed residuals.
+ * Used by power law fits where residuals are computed against the curve
+ * rather than a straight line.
+ *
+ * @param {number[]} residuals - Pre-computed residuals in log-space
+ * @param {string} envelope - Bounce envelope type (from BOUNCE_ENVELOPES)
+ * @returns {{upper: number, lower: number}|null} Bounds or null if no envelope
+ */
+export function calculateBounceBoundsFromResiduals(residuals, envelope = DEFAULT_BOUNCE_ENVELOPE) {
+    if (envelope === BOUNCE_ENVELOPES.NONE) return null;
+    if (!residuals || residuals.length === 0) return null;
+
+    switch (envelope) {
+        case BOUNCE_ENVELOPES.PERCENTILE_5_95:
+            return { upper: percentile(residuals, 95), lower: percentile(residuals, 5) };
+        case BOUNCE_ENVELOPES.INTERQUARTILE:
+            return { upper: percentile(residuals, 75), lower: percentile(residuals, 25) };
+        case BOUNCE_ENVELOPES.STD_DEV: {
+            const m = mean(residuals);
+            const s = standardDeviation(residuals);
+            return { upper: m + s, lower: m - s };
+        }
+        case BOUNCE_ENVELOPES.CONFIDENCE_90: {
+            const m = mean(residuals);
+            const se = standardDeviation(residuals) / Math.sqrt(residuals.length);
+            return { upper: m + 1.645 * se, lower: m - 1.645 * se };
+        }
+        default:
+            return null;
+    }
+}
+
+/**
  * Calculate bounce line y-values for given x positions
  *
  * @param {number[]} xPositions - X positions to calculate bounce lines at
@@ -454,6 +529,49 @@ export function calculateBounceLines(xPositions, slope, intercept, bounds) {
     const lowerY = logLower.map(v => Math.pow(10, v));
 
     return { upperY, lowerY };
+}
+
+// ============================================================================
+// Power Law Curve Helpers
+// ============================================================================
+
+/**
+ * Evaluate a power law fit at a given x position.
+ * Returns logY = slope * log10(x - xShift) + intercept
+ *
+ * @param {number} x - X position (chart coordinate)
+ * @param {Object} fitResult - Result from powerLawFit (must have slope, intercept, xShift)
+ * @returns {number} logY value
+ */
+export function evaluatePowerLaw(x, fitResult) {
+    return fitResult.slope * Math.log10(x - fitResult.xShift) + fitResult.intercept;
+}
+
+/**
+ * Generate an SVG path string for a power law curve (or its bounce offset).
+ * Interpolates the curve at regular x intervals and emits M/L commands
+ * with y-values in display (linear) scale for Plotly's log-y axis.
+ *
+ * @param {number} x1 - Start x position
+ * @param {number} x2 - End x position
+ * @param {Object} fitResult - Result from powerLawFit
+ * @param {number} [yOffset=0] - Vertical offset in log-space (for bounce lines)
+ * @param {number} [numPoints=100] - Number of interpolation points
+ * @returns {string} SVG path string (e.g. "M 0,1.5 L 1,2.3 L 2,3.1 ...")
+ */
+export function generatePowerLawPath(x1, x2, fitResult, yOffset = 0, numPoints = 100) {
+    const step = (x2 - x1) / (numPoints - 1);
+    const parts = [];
+
+    for (let i = 0; i < numPoints; i++) {
+        const x = x1 + i * step;
+        const logY = evaluatePowerLaw(x, fitResult) + yOffset;
+        const y = Math.pow(10, logY);
+        const cmd = i === 0 ? 'M' : 'L';
+        parts.push(`${cmd}${x},${y}`);
+    }
+
+    return parts.join(' ');
 }
 
 // ============================================================================
@@ -489,6 +607,16 @@ export function formatCelerationLabel(slope, unit) {
  * @param {string} unitName - Human-readable x-position unit name (e.g. "day", "year")
  * @returns {string} Formatted label like "3.5 days to ×2" or "7.2 years to ÷2"
  */
+/**
+ * Format power law scaling exponent as a display label
+ *
+ * @param {number} slope - Scaling exponent (slope in log-log space)
+ * @returns {string} Formatted label like "b=3.70"
+ */
+export function formatPowerLawLabel(slope) {
+    return `b=${slope.toFixed(2)}`;
+}
+
 export function formatDoublingTimeLabel(slope, unit, unitName) {
     if (slope === 0) {
         return 'no change';
