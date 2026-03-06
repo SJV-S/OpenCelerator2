@@ -549,29 +549,37 @@ export function evaluatePowerLaw(x, fitResult) {
 
 /**
  * Generate an SVG path string for a power law curve (or its bounce offset).
- * Interpolates the curve at regular x intervals and emits M/L commands.
  *
- * IMPORTANT: Plotly's type:'path' with yref:'y' on a log axis expects
- * y-coordinates in LOG SPACE (matching the axis range), unlike type:'line'
- * which accepts linear values and converts internally. So we pass logY
- * directly, not 10^logY.
+ * Uses log-spaced x interpolation: points are evenly spaced in log10(x_shifted)
+ * space, then converted back to x space. This clusters points near the start
+ * of the curve where curvature is highest (log10 changes fastest near 1),
+ * preventing the coarse straight-line segments that cause visual "tails."
+ *
+ * Y values are in data space (linear) — Plotly's type:'path' with yref:'y'
+ * applies the axis log transform internally, same as type:'line'.
  *
  * @param {number} x1 - Start x position
  * @param {number} x2 - End x position
- * @param {Object} fitResult - Result from powerLawFit
+ * @param {Object} fitResult - Result from powerLawFit (must have slope, intercept, xShift)
  * @param {number} [yOffset=0] - Vertical offset in log-space (for bounce lines)
- * @param {number} [numPoints=100] - Number of interpolation points
- * @returns {string} SVG path string (e.g. "M 0,1.5 L 1,2.3 L 2,3.1 ...")
+ * @param {number} [numPoints=200] - Number of interpolation points
+ * @returns {string} SVG path string
  */
-export function generatePowerLawPath(x1, x2, fitResult, yOffset = 0, numPoints = 100) {
-    const step = (x2 - x1) / (numPoints - 1);
+export function generatePowerLawPath(x1, x2, fitResult, yOffset = 0, numPoints = 200) {
     const parts = [];
 
+    // Interpolate in log10(x_shifted) space for even visual spacing
+    const logXStart = Math.log10(x1 - fitResult.xShift);
+    const logXEnd = Math.log10(x2 - fitResult.xShift);
+    const logStep = (logXEnd - logXStart) / (numPoints - 1);
+
     for (let i = 0; i < numPoints; i++) {
-        const x = x1 + i * step;
-        const logY = evaluatePowerLaw(x, fitResult) + yOffset;
+        const logXShifted = logXStart + i * logStep;
+        const x = Math.pow(10, logXShifted) + fitResult.xShift;
+        const logY = fitResult.slope * logXShifted + fitResult.intercept + yOffset;
+        const y = Math.pow(10, logY);
         const cmd = i === 0 ? 'M' : 'L';
-        parts.push(`${cmd}${x},${logY}`);
+        parts.push(`${cmd}${x},${y}`);
     }
 
     return parts.join(' ');
