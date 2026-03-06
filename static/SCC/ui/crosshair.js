@@ -22,6 +22,7 @@ import { dateToXPosition, xPositionToDate } from '../util/dates.js';
 import { formatValue } from '../util/format.js';
 import { getFirstConfig, getConfig, getAggLabel } from '../series/traceStyles.js';
 import { getChartDiv } from '../util/dom.js';
+import { FIT_METHODS, evaluatePowerLaw } from '../util/fit_lines.js';
 
 // =============================================================================
 // State
@@ -420,18 +421,30 @@ function buildCelLineCache() {
         const x0 = dateToXPosition(meta.date1);
         const x1 = dateToXPosition(meta.date2);
 
-        // Derive slope/intercept from stored endpoints in the current
-        // x-coordinate system. The metadata values were computed in the
-        // chart type active at creation time; if the chart type (or
-        // startDate) changed since then, those raw values are stale.
-        // The endpoint Y values are chart-type-independent, so
-        // recomputing here keeps the crosshair aligned with the
-        // Plotly shape, which also uses the endpoints directly.
-        const logY0 = Math.log10(meta.y1);
-        const logY1 = Math.log10(meta.y2);
-        const dx = x1 - x0;
-        const slope = dx !== 0 ? (logY1 - logY0) / dx : 0;
-        const intercept = logY0 - slope * x0;
+        const isPowerLaw = meta.fitMethod === FIT_METHODS.POWER_LAW && meta.powerLawParams;
+
+        let slope, intercept, powerLawParams;
+        if (isPowerLaw) {
+            // Power law: store params for evaluatePowerLaw()
+            const plp = meta.powerLawParams;
+            powerLawParams = { slope: plp.slope, intercept: plp.intercept, xShift: plp.xShift };
+            slope = null;
+            intercept = null;
+        } else {
+            // Linear: derive slope/intercept from stored endpoints in the
+            // current x-coordinate system. The metadata values were computed
+            // in the chart type active at creation time; if the chart type
+            // (or startDate) changed since then, those raw values are stale.
+            // The endpoint Y values are chart-type-independent, so
+            // recomputing here keeps the crosshair aligned with the
+            // Plotly shape, which also uses the endpoints directly.
+            const logY0 = Math.log10(meta.y1);
+            const logY1 = Math.log10(meta.y2);
+            const dx = x1 - x0;
+            slope = dx !== 0 ? (logY1 - logY0) / dx : 0;
+            intercept = logY0 - slope * x0;
+            powerLawParams = null;
+        }
 
         state.celLineCache.push({
             id: meta.id,
@@ -440,6 +453,7 @@ function buildCelLineCache() {
             x0, x1,
             slope,
             intercept,
+            powerLawParams,
             bounceUpperOffset: meta.bounceUpperOffset,
             bounceLowerOffset: meta.bounceLowerOffset,
             color: meta.style.color,
@@ -933,7 +947,9 @@ function findCelLinesAtX(xRounded, yLogValue) {
         const aggVisible = chartState.seriesVisibility[line.seriesKey]?.[line.aggId] !== false;
         if (!aggVisible) continue;
 
-        const logY = line.slope * xRounded + line.intercept;
+        const logY = line.powerLawParams
+            ? evaluatePowerLaw(xRounded, line.powerLawParams)
+            : line.slope * xRounded + line.intercept;
         const trendY = Math.pow(10, logY);
 
         let upperY = null;

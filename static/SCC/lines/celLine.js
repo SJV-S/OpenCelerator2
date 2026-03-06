@@ -920,8 +920,8 @@ function handleCelLineConfirm(data, baseKey) {
     }
 
     const isPowerLaw = fitResult.isPowerLaw;
-    const firstX = filteredX[0];
-    const dataLastX = filteredX[filteredX.length - 1];
+    const firstX = isPowerLaw ? Math.min(...filteredX) : filteredX[0];
+    const dataLastX = isPowerLaw ? Math.max(...filteredX) : filteredX[filteredX.length - 1];
     const lastX = dataLastX + forecast;  // Extend by forecast amount
 
     let logY1, logY2;
