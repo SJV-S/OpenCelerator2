@@ -94,7 +94,7 @@ function buildCelLineElements(metadata, chartDiv) {
     if (isPowerLaw) {
         // Power law: curved path shape
         const plParams = metadata.powerLawParams;
-        const fitResult = { slope: plParams.slope, intercept: plParams.intercept, xShift: plParams.xShift };
+        const fitResult = { slope: plParams.slope, intercept: plParams.intercept };
 
         shapes.push({
             type: 'path',
@@ -1005,7 +1005,7 @@ function handleCelLineConfirm(data, baseKey) {
         bounceLowerY2: bounceLowerY2,
         bounceUpperOffset: bounceBounds ? bounceBounds.upper : null,
         bounceLowerOffset: bounceBounds ? bounceBounds.lower : null,
-        powerLawParams: isPowerLaw ? { slope: fitResult.slope, intercept: fitResult.intercept, xShift: fitResult.xShift } : null,
+        powerLawParams: isPowerLaw ? { slope: fitResult.slope, intercept: fitResult.intercept } : null,
         text: labelText,
         style: {
             color: getCelLineColor(baseKey),

@@ -427,7 +427,7 @@ function buildCelLineCache() {
         if (isPowerLaw) {
             // Power law: store params for evaluatePowerLaw()
             const plp = meta.powerLawParams;
-            powerLawParams = { slope: plp.slope, intercept: plp.intercept, xShift: plp.xShift };
+            powerLawParams = { slope: plp.slope, intercept: plp.intercept };
             slope = null;
             intercept = null;
         } else {

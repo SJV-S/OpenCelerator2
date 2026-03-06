@@ -23,7 +23,7 @@ const HOVER_TRACE_TYPE = 'hoverLine';
  * Interpolate points along a power law curve for hover detection.
  * @param {number} x1 - Start x position
  * @param {number} x2 - End x position
- * @param {Object} fitResult - { slope, intercept, xShift }
+ * @param {Object} fitResult - { slope, intercept }
  * @param {number} [yOffset=0] - Vertical offset in log-space (for bounce lines)
  * @returns {{ x: number[], y: number[] }}
  */
@@ -193,7 +193,7 @@ function buildAllHoverTraces() {
 
             if (isPowerLaw) {
                 const plp = celLine.powerLawParams;
-                const fitResult = { slope: plp.slope, intercept: plp.intercept, xShift: plp.xShift };
+                const fitResult = { slope: plp.slope, intercept: plp.intercept };
                 const points = interpolatePowerLawPoints(x1, x2, fitResult);
                 traces.push(createHoverTrace(points, lineName, label, color));
 

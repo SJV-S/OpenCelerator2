@@ -330,16 +330,20 @@ export function medianFit(x, y) {
 
 /**
  * Power law fit via least-squares regression in log-log space.
- * Fits logY = b * log10(x_shifted) + a, where x_shifted = x - x_min + 1
- * to avoid log(0). The scaling exponent b is the slope in log-log space.
+ * Fits logY = b * log10(x) + a directly on the raw chart x-positions.
+ * The scaling exponent b is the slope in log-log space.
+ *
+ * Points with x <= 0 are filtered out (log10 undefined). The singularity
+ * stays at x=0, which is far from any real data since chart x-positions
+ * are positive offsets from startDate.
  *
  * Currently uses least-squares only. The same log-transform approach could be
  * applied to Theil-Sen, quarter-intersect, or split-middle-line if desired —
- * just pass log10(x_shifted) as the x-values to any of those fit functions.
+ * just pass log10(x) as the x-values to any of those fit functions.
  *
- * @param {number[]} x - Array of x coordinates (chart positions)
+ * @param {number[]} x - Array of x coordinates (chart positions, must be > 0)
  * @param {number[]} y - Array of y coordinates (already in log10 space)
- * @returns {{slope: number, intercept: number, xShift: number, isPowerLaw: true}|null}
+ * @returns {{slope: number, intercept: number, isPowerLaw: true}|null}
  */
 export function powerLawFit(x, y) {
     if (x.length !== y.length) {
@@ -347,22 +351,28 @@ export function powerLawFit(x, y) {
         return null;
     }
 
-    const n = x.length;
-    if (n < MIN_POINTS) {
+    // Filter out x <= 0 (log10 undefined)
+    const filteredX = [];
+    const filteredY = [];
+    for (let i = 0; i < x.length; i++) {
+        if (x[i] > 0) {
+            filteredX.push(x[i]);
+            filteredY.push(y[i]);
+        }
+    }
+
+    if (filteredX.length < MIN_POINTS) {
         return null;
     }
 
-    const xMin = Math.min(...x);
-    const xShift = xMin - 1; // so shifted minimum = 1, log10(1) = 0
-    const logX = x.map(xi => Math.log10(xi - xShift));
+    const logX = filteredX.map(xi => Math.log10(xi));
 
-    const result = leastSquaresFit(logX, y);
+    const result = leastSquaresFit(logX, filteredY);
     if (!result) return null;
 
     return {
         slope: result.slope,
         intercept: result.intercept,
-        xShift,
         isPowerLaw: true
     };
 }
@@ -537,30 +547,30 @@ export function calculateBounceLines(xPositions, slope, intercept, bounds) {
 
 /**
  * Evaluate a power law fit at a given x position.
- * Returns logY = slope * log10(x - xShift) + intercept
+ * Returns logY = slope * log10(x) + intercept
  *
- * @param {number} x - X position (chart coordinate)
- * @param {Object} fitResult - Result from powerLawFit (must have slope, intercept, xShift)
+ * @param {number} x - X position (chart coordinate, must be > 0)
+ * @param {Object} fitResult - Result from powerLawFit (must have slope, intercept)
  * @returns {number} logY value
  */
 export function evaluatePowerLaw(x, fitResult) {
-    return fitResult.slope * Math.log10(x - fitResult.xShift) + fitResult.intercept;
+    return fitResult.slope * Math.log10(x) + fitResult.intercept;
 }
 
 /**
  * Generate an SVG path string for a power law curve (or its bounce offset).
  *
- * Uses log-spaced x interpolation: points are evenly spaced in log10(x_shifted)
+ * Uses log-spaced x interpolation: points are evenly spaced in log10(x)
  * space, then converted back to x space. This clusters points near the start
- * of the curve where curvature is highest (log10 changes fastest near 1),
- * preventing the coarse straight-line segments that cause visual "tails."
+ * of the curve where curvature is highest (log10 changes fastest near small x),
+ * preventing the coarse straight-line segments that cause visual artifacts.
  *
  * Y values are in data space (linear) — Plotly's type:'path' with yref:'y'
  * applies the axis log transform internally, same as type:'line'.
  *
- * @param {number} x1 - Start x position
+ * @param {number} x1 - Start x position (must be > 0)
  * @param {number} x2 - End x position
- * @param {Object} fitResult - Result from powerLawFit (must have slope, intercept, xShift)
+ * @param {Object} fitResult - Result from powerLawFit (must have slope, intercept)
  * @param {number} [yOffset=0] - Vertical offset in log-space (for bounce lines)
  * @param {number} [numPoints=200] - Number of interpolation points
  * @returns {string} SVG path string
@@ -568,15 +578,15 @@ export function evaluatePowerLaw(x, fitResult) {
 export function generatePowerLawPath(x1, x2, fitResult, yOffset = 0, numPoints = 200) {
     const parts = [];
 
-    // Interpolate in log10(x_shifted) space for even visual spacing
-    const logXStart = Math.log10(x1 - fitResult.xShift);
-    const logXEnd = Math.log10(x2 - fitResult.xShift);
+    // Interpolate in log10(x) space for even visual spacing
+    const logXStart = Math.log10(x1);
+    const logXEnd = Math.log10(x2);
     const logStep = (logXEnd - logXStart) / (numPoints - 1);
 
     for (let i = 0; i < numPoints; i++) {
-        const logXShifted = logXStart + i * logStep;
-        const x = Math.pow(10, logXShifted) + fitResult.xShift;
-        const logY = fitResult.slope * logXShifted + fitResult.intercept + yOffset;
+        const logX = logXStart + i * logStep;
+        const x = Math.pow(10, logX);
+        const logY = fitResult.slope * logX + fitResult.intercept + yOffset;
         const y = Math.pow(10, logY);
         const cmd = i === 0 ? 'M' : 'L';
         parts.push(`${cmd}${x},${y}`);

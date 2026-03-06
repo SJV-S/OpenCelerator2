@@ -51,8 +51,11 @@ def set_headers(response):
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['X-Frame-Options'] = 'SAMEORIGIN'
     if request.path.startswith('/static/'):
-        # 24 hours — extend when the app is considered more stable
-        response.headers['Cache-Control'] = 'max-age=86400, must-revalidate'
+        if config.DEVELOPER_MODE:
+            response.headers['Cache-Control'] = 'no-cache'
+        else:
+            # 24 hours — extend when the app is considered more stable
+            response.headers['Cache-Control'] = 'max-age=86400, must-revalidate'
     return response
 
 # Telemetry — log every request

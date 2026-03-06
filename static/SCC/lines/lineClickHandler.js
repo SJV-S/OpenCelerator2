@@ -327,7 +327,7 @@ function setLineCategoryClickability(category, makeClickable) {
                         const isPL = celLine.fitMethod === FIT_METHODS.POWER_LAW && celLine.powerLawParams;
                         if (isPL) {
                             const plp = celLine.powerLawParams;
-                            const fitResult = { slope: plp.slope, intercept: plp.intercept, xShift: plp.xShift };
+                            const fitResult = { slope: plp.slope, intercept: plp.intercept };
                             const numPts = Math.max(50, Math.ceil(x2 - x1) + 1);
                             const step = (x2 - x1) / (numPts - 1);
                             const xArr = [], yArr = [];
@@ -505,7 +505,22 @@ function init() {
                 if (!alreadyExists) {
                     const x1 = dateToXPosition(celLine.date1);
                     const x2 = dateToXPosition(celLine.date2);
-                    const points = [interpolateLinePoints(x1, celLine.y1, x2, celLine.y2, isLogY)];
+                    let points;
+                    const isPL = celLine.fitMethod === FIT_METHODS.POWER_LAW && celLine.powerLawParams;
+                    if (isPL) {
+                        const fitResult = { slope: celLine.powerLawParams.slope, intercept: celLine.powerLawParams.intercept };
+                        const numPts = Math.max(50, Math.ceil(x2 - x1) + 1);
+                        const step = (x2 - x1) / (numPts - 1);
+                        const xArr = [], yArr = [];
+                        for (let j = 0; j < numPts; j++) {
+                            const xv = x1 + j * step;
+                            xArr.push(xv);
+                            yArr.push(Math.pow(10, evaluatePowerLaw(xv, fitResult)));
+                        }
+                        points = [{ x: xArr, y: yArr }];
+                    } else {
+                        points = [interpolateLinePoints(x1, celLine.y1, x2, celLine.y2, isLogY)];
+                    }
                     makeLineClickable({ lineName, points });
                 }
             } else {
