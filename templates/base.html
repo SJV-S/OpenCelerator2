@@ -5,7 +5,7 @@
     <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-eval' 'sha256-eMeLGIkvOXByW95vM0yvYcfrI1dtFqJp8gfdN4GVFaM=' 'sha256-F3vN9izgi//DF+vqN4tNcCAWeKH1UYEls1XApnPB7Oo='; style-src 'self' 'unsafe-inline'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#05c3de">
-    <title>{% block title %}Standard Change Chart{% endblock %}</title>
+    <title>{% block title %}{{ app_name }}{% endblock %}</title>
     <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
     <link href="{{ url_for('static', filename='SCC/css/fonts.css') }}" rel="stylesheet">

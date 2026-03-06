@@ -15,6 +15,12 @@ app.config['MAX_CONTENT_LENGTH'] = config.MAX_CONTENT_LENGTH
 app.config['RATELIMIT_DEFAULT'] = config.RATELIMIT_DEFAULT
 app.config['RATELIMIT_STORAGE_URI'] = config.RATELIMIT_STORAGE_URI
 app.config['APP_VERSION'] = config.APP_VERSION
+app.config['APP_NAME'] = config.APP_NAME
+
+
+@app.context_processor
+def inject_app_name():
+    return dict(app_name=config.APP_NAME)
 
 # Initialize extensions with app
 socketio.init_app(app, cors_allowed_origins=config.CORS_ALLOWED_ORIGINS)

@@ -2,6 +2,7 @@ import os
 
 DEVELOPER_MODE = True
 APP_VERSION = '0.4.6'
+APP_NAME = 'Standard Change Chart'
 
 # --- Load .env file ---
 _env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
