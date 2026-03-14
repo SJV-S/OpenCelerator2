@@ -14,8 +14,9 @@
  *   4: Add detrend: null to all trace configs (feature later removed; property is now dead)
  *   5: Add aggId: "0" to all CelLines entries (trendlines track specific aggregation)
  *   6: Convert flat seriesVisibility to nested { baseKey: { aggId: bool } }
+ *   7: CelLines: move slope/intercept/powerLawParams into fitParams; add fitDefaults to chart
  */
-export const CURRENT_SCHEMA_VERSION = 6;
+export const CURRENT_SCHEMA_VERSION = 7;
 
 // ============================================================================
 // Migration Functions
@@ -239,6 +240,56 @@ async function migrate_5_to_6(chart) {
     return true;
 }
 
+/**
+ * Migration 6 → 7: Restructure CelLines to use fitParams and add fitDefaults.
+ *
+ * Per-line changes:
+ *   - Move top-level slope/intercept into fitParams: { slope, intercept }
+ *   - For power law lines, merge powerLawParams into fitParams (adding origin if present)
+ *   - Remove old top-level slope, intercept, powerLawParams fields
+ *
+ * Chart-level:
+ *   - Add fitDefaults: {} (chart-level defaults keyed by fit method)
+ */
+async function migrate_6_to_7(chart) {
+    let modified = false;
+
+    // Add fitDefaults if missing
+    if (!chart.fitDefaults) {
+        chart.fitDefaults = {};
+        modified = true;
+    }
+
+    // Migrate CelLines entries
+    if (chart.CelLines && typeof chart.CelLines === 'object') {
+        for (const entry of Object.values(chart.CelLines)) {
+            if (!entry || typeof entry !== 'object') continue;
+            if ('fitParams' in entry) continue; // already migrated
+
+            const isPowerLaw = entry.fitMethod === 'Power law' && entry.powerLawParams;
+
+            if (isPowerLaw) {
+                entry.fitParams = {
+                    slope: entry.powerLawParams.slope,
+                    intercept: entry.powerLawParams.intercept
+                };
+            } else {
+                entry.fitParams = {
+                    slope: entry.slope,
+                    intercept: entry.intercept
+                };
+            }
+
+            delete entry.slope;
+            delete entry.intercept;
+            delete entry.powerLawParams;
+            modified = true;
+        }
+    }
+
+    return modified;
+}
+
 // ============================================================================
 // Migration Registry
 // ============================================================================
@@ -254,6 +305,7 @@ const migrations = [
     migrate_3_to_4,
     migrate_4_to_5,
     migrate_5_to_6,
+    migrate_6_to_7,
 ];
 
 // ============================================================================

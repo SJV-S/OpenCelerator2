@@ -16,7 +16,7 @@ import { icons, applySvgCursor, restoreCursor } from '../ui/icons.js';
 import { chartState } from '../chartState.js';
 import { CORRECTS, ERRORS, TIMING, LINE_DEFAULTS, COLORS, CHART_TYPE_CONFIG, WINDOW_UNITS } from '../config.js';
 import { xPositionToDate, dateToXPosition, formatDateISO } from '../util/dates.js';
-import { fit, FIT_METHODS, BOUNCE_ENVELOPES, DEFAULT_FIT_METHOD, DEFAULT_BOUNCE_ENVELOPE, calculateBounceBounds, calculateBounceBoundsFromResiduals, calculateBounceLines, formatCelerationLabel, formatDoublingTimeLabel, formatPowerLawLabel, generatePowerLawPath, evaluatePowerLaw } from '../util/fit_lines.js';
+import { fit, FIT_METHODS, BOUNCE_ENVELOPES, DEFAULT_FIT_METHOD, DEFAULT_BOUNCE_ENVELOPE, calculateBounceBounds, calculateBounceBoundsFromResiduals, calculateBounceLines, formatCelerationLabel, formatDoublingTimeLabel, formatPowerLawLabel, generatePowerLawPath, evaluatePowerLaw, parseOriginToUtc } from '../util/fit_lines.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 import { getFirstConfig, getAggLabel } from '../series/traceStyles.js';
 import { getPixelCoordinates } from '../util/plotCoordinates.js';
@@ -89,16 +89,17 @@ function buildCelLineElements(metadata, chartDiv) {
 
     // Build shapes array
     const shapes = [];
-    const isPowerLaw = metadata.fitMethod === FIT_METHODS.POWER_LAW && metadata.powerLawParams;
+    const fp = metadata.fitParams;
+    const isPowerLaw = metadata.fitMethod === FIT_METHODS.POWER_LAW && fp.origin;
 
     if (isPowerLaw) {
         // Power law: curved path shape
-        const plParams = metadata.powerLawParams;
-        const fitResult = { slope: plParams.slope, intercept: plParams.intercept };
+        const fitResult = { slope: fp.slope, intercept: fp.intercept };
+        const originUtc = parseOriginToUtc(fp.origin);
 
         shapes.push({
             type: 'path',
-            path: generatePowerLawPath(x1, x2, fitResult),
+            path: generatePowerLawPath(x1, x2, fitResult, 0, originUtc),
             xref: 'x',
             yref: 'y',
             name: lineName,
@@ -113,7 +114,7 @@ function buildCelLineElements(metadata, chartDiv) {
         if (metadata.bounceUpperOffset != null) {
             shapes.push({
                 type: 'path',
-                path: generatePowerLawPath(x1, x2, fitResult, metadata.bounceUpperOffset),
+                path: generatePowerLawPath(x1, x2, fitResult, metadata.bounceUpperOffset, originUtc),
                 xref: 'x',
                 yref: 'y',
                 name: `${lineName}-upper`,
@@ -129,7 +130,7 @@ function buildCelLineElements(metadata, chartDiv) {
         if (metadata.bounceLowerOffset != null) {
             shapes.push({
                 type: 'path',
-                path: generatePowerLawPath(x1, x2, fitResult, metadata.bounceLowerOffset),
+                path: generatePowerLawPath(x1, x2, fitResult, metadata.bounceLowerOffset, originUtc),
                 xref: 'x',
                 yref: 'y',
                 name: `${lineName}-lower`,
@@ -911,7 +912,14 @@ function handleCelLineConfirm(data, baseKey) {
     const bounceEnvelope = settings.bounceEnvelope;
     const forecast = settings.forecast;
 
-    const fitResult = fit(filteredX, filteredLogY, fitMethod);
+    // For power law, use chart-level override if set, otherwise startDate
+    const plDefaults = chartState.fitDefaults['Power law'];
+    const originISO = (plDefaults && plDefaults.origin)
+        ? plDefaults.origin
+        : formatDateISO(chartState.startDate);
+    const originUtc = parseOriginToUtc(originISO);
+
+    const fitResult = fit(filteredX, filteredLogY, fitMethod, { originUtc });
 
     if (!fitResult) {
         alert('Could not calculate trend line.');
@@ -926,8 +934,8 @@ function handleCelLineConfirm(data, baseKey) {
 
     let logY1, logY2;
     if (isPowerLaw) {
-        logY1 = evaluatePowerLaw(firstX, fitResult);
-        logY2 = evaluatePowerLaw(lastX, fitResult);
+        logY1 = evaluatePowerLaw(firstX, fitResult, originUtc);
+        logY2 = evaluatePowerLaw(lastX, fitResult, originUtc);
     } else {
         logY1 = fitResult.slope * firstX + fitResult.intercept;
         logY2 = fitResult.slope * lastX + fitResult.intercept;
@@ -954,7 +962,7 @@ function handleCelLineConfirm(data, baseKey) {
     // For power law, compute residuals against the power law curve
     let bounceBounds;
     if (isPowerLaw) {
-        const predictedLogY = filteredX.map(xi => evaluatePowerLaw(xi, fitResult));
+        const predictedLogY = filteredX.map(xi => evaluatePowerLaw(xi, fitResult, originUtc));
         const residuals = filteredLogY.map((yi, i) => yi - predictedLogY[i]);
         bounceBounds = calculateBounceBoundsFromResiduals(residuals, bounceEnvelope);
     } else {
@@ -986,6 +994,13 @@ function handleCelLineConfirm(data, baseKey) {
 
     // Build metadata object
     const aggId = celLineState.selectedAggId;
+
+    // Build fitParams — structure depends on fit method
+    const fitParams = { slope: fitResult.slope, intercept: fitResult.intercept };
+    if (isPowerLaw) {
+        fitParams.origin = originISO;
+    }
+
     const metadata = {
         id: lineId,
         seriesKey: baseKey,
@@ -994,8 +1009,7 @@ function handleCelLineConfirm(data, baseKey) {
         y1: y1_display,
         date2: date2Str,
         y2: y2_display,
-        slope: fitResult.slope,
-        intercept: fitResult.intercept,
+        fitParams: fitParams,
         fitMethod: fitMethod,
         bounceEnvelope: bounceEnvelope,
         forecast: forecast,
@@ -1005,7 +1019,6 @@ function handleCelLineConfirm(data, baseKey) {
         bounceLowerY2: bounceLowerY2,
         bounceUpperOffset: bounceBounds ? bounceBounds.upper : null,
         bounceLowerOffset: bounceBounds ? bounceBounds.lower : null,
-        powerLawParams: isPowerLaw ? { slope: fitResult.slope, intercept: fitResult.intercept } : null,
         text: labelText,
         style: {
             color: getCelLineColor(baseKey),

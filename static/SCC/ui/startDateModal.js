@@ -481,6 +481,7 @@ export function hideModal() {
 export function initStartDateModal() {
     const btn = document.getElementById('start-date-btn');
     if (btn) {
+        btn.removeEventListener('click', showStartDateModal);
         btn.addEventListener('click', showStartDateModal);
     }
 }
@@ -520,6 +521,10 @@ function adjustSettingsChartWindow(delta) {
     }
 }
 
+const handleWindowDec = () => adjustSettingsChartWindow(-1);
+const handleWindowInc = () => adjustSettingsChartWindow(1);
+let chartWindowSubscribed = false;
+
 export function initChartWindowControl() {
     chartWindowEl = document.getElementById('chart-window-value');
     const decBtn = document.getElementById('chart-window-dec');
@@ -534,13 +539,22 @@ export function initChartWindowControl() {
     }
 
     if (chartWindowEl) updateChartWindowDisplay();
-    if (decBtn) decBtn.addEventListener('click', () => adjustSettingsChartWindow(-1));
-    if (incBtn) incBtn.addEventListener('click', () => adjustSettingsChartWindow(1));
+    if (decBtn) {
+        decBtn.removeEventListener('click', handleWindowDec);
+        decBtn.addEventListener('click', handleWindowDec);
+    }
+    if (incBtn) {
+        incBtn.removeEventListener('click', handleWindowInc);
+        incBtn.addEventListener('click', handleWindowInc);
+    }
 
-    // Update display when chart window changes from any source
-    eventBus.subscribe(EVENTS.CHART_WINDOW_CHANGED, (newValue) => {
-        updateChartWindowDisplay(newValue);
-    }, true);
+    // Update display when chart window changes from any source (subscribe once)
+    if (!chartWindowSubscribed) {
+        chartWindowSubscribed = true;
+        eventBus.subscribe(EVENTS.CHART_WINDOW_CHANGED, (newValue) => {
+            updateChartWindowDisplay(newValue);
+        }, true);
+    }
 }
 
 /**
@@ -664,6 +678,9 @@ function adjustChartHeight(delta) {
     }
 }
 
+const handleDecClick = () => adjustChartHeight(-1);
+const handleIncClick = () => adjustChartHeight(1);
+
 export function initChartHeightControl() {
     chartHeightEl = document.getElementById('chart-height-value');
     maxHeight = window.innerHeight;
@@ -672,6 +689,12 @@ export function initChartHeightControl() {
 
     if (chartHeightEl) updateChartHeightDisplay();
     updateHeightButtons();
-    if (decBtn) decBtn.addEventListener('click', () => adjustChartHeight(-1));
-    if (incBtn) incBtn.addEventListener('click', () => adjustChartHeight(1));
+    if (decBtn) {
+        decBtn.removeEventListener('click', handleDecClick);
+        decBtn.addEventListener('click', handleDecClick);
+    }
+    if (incBtn) {
+        incBtn.removeEventListener('click', handleIncClick);
+        incBtn.addEventListener('click', handleIncClick);
+    }
 }

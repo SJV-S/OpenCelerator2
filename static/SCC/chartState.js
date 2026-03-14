@@ -69,6 +69,7 @@ export const chartState = {
     PhaseLines: {},
     AimLines: {},
     CelLines: {},  // Individual lines stored by ID: { [lineId]: metadata, ... }
+    fitDefaults: {},  // Chart-level defaults keyed by fit method: { 'Power law': { origin: '2009-01-03' } }
 
     // Line visibility (by type)
     lineVisibility: {

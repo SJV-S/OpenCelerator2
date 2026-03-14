@@ -327,6 +327,11 @@ function setupMappingControls() {
     coreDropdowns.forEach(dropdown => {
         if (dropdown) {
             dropdown.addEventListener('change', () => {
+                // When the date column changes, re-populate data dropdowns
+                // so columns no longer needed as dates become available
+                if (dropdown === elements.mapDate) {
+                    repopulateDataDropdowns();
+                }
                 updateDropdownOptions();
                 updateDropdownStyles();
                 validateMapping();
@@ -362,13 +367,8 @@ function populateMappingDropdowns(data) {
     // Date dropdown - prioritize detected date columns
     populateDropdown(elements.mapDate, columns, dateColumns, 'Select');
 
-    // Non-date dropdowns should never show date columns
-    const nonDateColumns = columns.filter(c => !dateColumns.includes(c));
-
-    // Numeric dropdowns - prioritize detected numeric columns, exclude date columns
-    populateDropdown(elements.mapCorrects, nonDateColumns, numericColumns, 'Select');
-    populateDropdown(elements.mapErrors, nonDateColumns, numericColumns, 'Select');
-    populateDropdown(elements.mapTiming, nonDateColumns, numericColumns, 'Select');
+    // Populate data dropdowns excluding the selected date column
+    repopulateDataDropdowns();
 
     // Auto-select if only one date column detected
     if (dateColumns.length === 1) {
@@ -384,6 +384,35 @@ function populateMappingDropdowns(data) {
     updateDropdownOptions();
     updateDropdownStyles();
     validateMapping();
+}
+
+/**
+ * Re-populate corrects/errors/timing dropdowns, excluding only the
+ * currently selected date column. Preserves existing selections.
+ */
+function repopulateDataDropdowns() {
+    if (!currentFileData) return;
+
+    const { columns, numericColumns } = currentFileData;
+    const selectedDate = elements.mapDate?.value;
+    const available = selectedDate
+        ? columns.filter(c => c !== selectedDate)
+        : columns;
+
+    const dataDropdowns = [elements.mapCorrects, elements.mapErrors, elements.mapTiming];
+    for (const dropdown of dataDropdowns) {
+        if (!dropdown) continue;
+        const prev = dropdown.value;
+        populateDropdown(dropdown, available, numericColumns, 'Select');
+        if (prev && available.includes(prev)) dropdown.value = prev;
+    }
+
+    // Re-populate existing misc dropdowns too
+    document.querySelectorAll('.import-misc-select').forEach(select => {
+        const prev = select.value;
+        populateDropdown(select, available, [], 'Select');
+        if (prev && available.includes(prev)) select.value = prev;
+    });
 }
 
 function populateDropdown(select, allColumns, priorityColumns, placeholder) {
@@ -508,11 +537,12 @@ function addMiscColumn() {
     select.className = 'import-mapping-select import-misc-select';
     select.id = `import-map-${miscId}`;
 
-    // Populate with non-date columns (no priority for misc)
-    const nonDateColumns = currentFileData.columns.filter(
-        c => !currentFileData.dateColumns.includes(c)
-    );
-    populateDropdown(select, nonDateColumns, [], 'Select');
+    // Populate with all columns except the selected date column
+    const selectedDate = elements.mapDate?.value;
+    const available = selectedDate
+        ? currentFileData.columns.filter(c => c !== selectedDate)
+        : currentFileData.columns;
+    populateDropdown(select, available, [], 'Select');
 
     select.addEventListener('change', () => {
         updateDropdownOptions();

@@ -181,6 +181,20 @@ export function detectColumnTypes(rows) {
 }
 
 /**
+ * Check if a value looks like a standalone year (4-digit integer, ≤2200).
+ * Upper bound matches parseDate's existing year ceiling.
+ * Works for both number and string types.
+ * @param {*} value
+ * @returns {boolean}
+ */
+function isYearValue(value) {
+    const num = typeof value === 'number' ? value
+        : (typeof value === 'string' && /^\d{4}$/.test(value.trim())) ? +value.trim()
+        : null;
+    return num !== null && Number.isInteger(num) && num >= 1000 && num <= 2200;
+}
+
+/**
  * Classify a single column by examining sampled values.
  *
  * Per-value priority chain (mirrors D3/pandas/readr):
@@ -192,6 +206,10 @@ export function detectColumnTypes(rows) {
  *      b. matches strict date pattern        → date
  *      c. otherwise                          → other
  *
+ * Post-pass: if ≥70% of non-empty values are 4-digit years (1000–2200),
+ * override to date. A single 4-digit number could be a count, but a whole
+ * column of them is almost certainly years.
+ *
  * @param {object[]} sample - Sampled rows
  * @param {string} col - Column name
  * @returns {{type: 'date'|'numeric'|'other', confidence: number}}
@@ -199,6 +217,7 @@ export function detectColumnTypes(rows) {
 function classifyColumn(sample, col) {
     let dateCount = 0;
     let numericCount = 0;
+    let yearCount = 0;
     let total = 0;
 
     for (const row of sample) {
@@ -206,6 +225,9 @@ function classifyColumn(sample, col) {
 
         if (value == null || value === '') continue;
         total++;
+
+        // Track year candidates across all types
+        if (isYearValue(value)) yearCount++;
 
         // Date objects from cellDates: true — the primary, unambiguous signal
         if (value instanceof Date) {
@@ -242,6 +264,10 @@ function classifyColumn(sample, col) {
     }
 
     if (total === 0) return { type: 'other', confidence: 0 };
+
+    // Year-only column override: if most values are 4-digit years, classify as date
+    const yearRatio = yearCount / total;
+    if (yearRatio >= DATE_THRESHOLD) return { type: 'date', confidence: yearRatio };
 
     const dateRatio = dateCount / total;
     const numericRatio = numericCount / total;
@@ -379,6 +405,12 @@ function parseDate(value) {
     if (isNaN(value.getTime())) return null;
     if (value.getFullYear() > 2200) return null;
     return Math.floor(value.getTime() / 1000);
+  }
+
+  // 4-digit year → January 1st of that year (number or string)
+  if (isYearValue(value)) {
+    const year = typeof value === 'number' ? value : +String(value).trim();
+    return Math.floor(new Date(year, 0, 1).getTime() / 1000);
   }
 
   // Handle numeric values as Excel serial dates.

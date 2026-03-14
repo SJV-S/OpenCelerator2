@@ -10,6 +10,7 @@ import { WINDOW_UNITS } from '../config.js';
 import { setupModalClose } from './modalHelpers.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 import { getUserPreferences, setUserPreference } from '../../Server/init.js';
+import { formatDateInputValue, parseLocalDate } from '../util/dates.js';
 
 let modalOverlay = null;
 
@@ -19,6 +20,8 @@ let bounceEnvelopeSelect = null;
 let forecastInput = null;
 let forecastUnitSpan = null;
 let labelFormatSelect = null;
+let originRow = null;
+let originInput = null;
 
 const CEL_DEFAULTS = {
     fitMethod: 'Theil-Sen',
@@ -84,11 +87,46 @@ function createModal() {
     fitMethodSelect.addEventListener('change', (e) => {
         persistSetting('fitMethod', e.target.value);
         e.target.blur();
+        updateOriginVisibility();
         eventBus.emit(EVENTS.LINE_CEL_SETTINGS_CHANGED);
     });
 
     fitRow.appendChild(fitLabel);
     fitRow.appendChild(fitMethodSelect);
+
+    // --- Power Law Origin ---
+    originRow = document.createElement('div');
+    originRow.className = 'mb-3';
+
+    const originLabel = document.createElement('label');
+    originLabel.className = 'block text-sm text-gray-500 mb-1';
+    originLabel.textContent = 'Power Law Origin';
+
+    originInput = document.createElement('input');
+    originInput.type = 'text';
+    originInput.placeholder = 'e.g. 3-Jan-2009';
+    originInput.className = 'w-full px-3 py-2 lg:px-2 lg:py-1 text-sm border-2 border-gray-300 rounded focus:outline-none focus:border-[#6ad1e3] transition-colors bg-white';
+
+    originInput.addEventListener('change', (e) => {
+        const parsed = parseLocalDate(e.target.value);
+        if (isNaN(parsed.getTime())) {
+            e.target.value = '';
+            return;
+        }
+        const iso = `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
+        e.target.value = formatDateInputValue(parsed);
+
+        if (!chartState.fitDefaults['Power law']) {
+            chartState.fitDefaults['Power law'] = {};
+        }
+        chartState.fitDefaults['Power law'].origin = iso;
+
+        e.target.blur();
+        eventBus.emit(EVENTS.LINE_CEL_SETTINGS_CHANGED);
+    });
+
+    originRow.appendChild(originLabel);
+    originRow.appendChild(originInput);
 
     // --- Bounce Envelope ---
     const bounceRow = document.createElement('div');
@@ -190,6 +228,7 @@ function createModal() {
     // Assemble
     content.appendChild(title);
     content.appendChild(fitRow);
+    content.appendChild(originRow);
     content.appendChild(bounceRow);
     content.appendChild(forecastRow);
     content.appendChild(labelFormatRow);
@@ -199,6 +238,14 @@ function createModal() {
     setupModalClose(modalOverlay, hideModal);
 
     document.body.appendChild(modalOverlay);
+}
+
+/**
+ * Show/hide the origin row based on fit method
+ */
+function updateOriginVisibility() {
+    if (!originRow) return;
+    originRow.style.display = fitMethodSelect.value === 'Power law' ? '' : 'none';
 }
 
 /**
@@ -212,6 +259,17 @@ function syncValues() {
     labelFormatSelect.value = settings.labelFormat;
     const wu = WINDOW_UNITS[chartState.chartType];
     forecastUnitSpan.textContent = wu ? wu.name.toLowerCase() + 's' : 'days';
+
+    // Sync origin: show override if set, otherwise show startDate as default
+    const plDefaults = chartState.fitDefaults['Power law'];
+    if (plDefaults && plDefaults.origin) {
+        originInput.value = formatDateInputValue(parseLocalDate(plDefaults.origin));
+    } else if (chartState.startDate) {
+        originInput.value = formatDateInputValue(parseLocalDate(chartState.startDate));
+    } else {
+        originInput.value = '';
+    }
+    updateOriginVisibility();
 }
 
 /**

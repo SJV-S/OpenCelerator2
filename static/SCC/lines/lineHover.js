@@ -10,7 +10,7 @@ import { chartState } from '../chartState.js';
 import { eventBus, EVENTS } from '../eventBus.js';
 import { dateToXPosition } from '../util/dates.js';
 import { CHART_TYPE_CONFIG, WINDOW_UNITS } from '../config.js';
-import { formatCelerationLabel, formatDoublingTimeLabel, formatPowerLawLabel, FIT_METHODS, evaluatePowerLaw } from '../util/fit_lines.js';
+import { formatCelerationLabel, formatDoublingTimeLabel, formatPowerLawLabel, FIT_METHODS, evaluatePowerLaw, parseOriginToUtc } from '../util/fit_lines.js';
 import { getCelLineSettings } from '../ui/celSettingsModal.js';
 import { interpolateLinePoints } from '../util/lineInterpolation.js';
 import { deleteTraces, addTraces } from '../util/plotlyWrapper.js';
@@ -27,7 +27,7 @@ const HOVER_TRACE_TYPE = 'hoverLine';
  * @param {number} [yOffset=0] - Vertical offset in log-space (for bounce lines)
  * @returns {{ x: number[], y: number[] }}
  */
-function interpolatePowerLawPoints(x1, x2, fitResult, yOffset = 0) {
+function interpolatePowerLawPoints(x1, x2, fitResult, yOffset = 0, originUtc) {
     const numPoints = Math.max(50, Math.ceil(x2 - x1) + 1);
     const step = (x2 - x1) / (numPoints - 1);
     const xArray = [];
@@ -35,7 +35,7 @@ function interpolatePowerLawPoints(x1, x2, fitResult, yOffset = 0) {
 
     for (let i = 0; i < numPoints; i++) {
         const x = x1 + i * step;
-        const logY = evaluatePowerLaw(x, fitResult) + yOffset;
+        const logY = evaluatePowerLaw(x, fitResult, originUtc) + yOffset;
         xArray.push(x);
         yArray.push(Math.pow(10, logY));
     }
@@ -94,17 +94,18 @@ function buildCelHoverLabel(celLine) {
     // Build label from raw fields — never rely on celLine.text for format
     const fitMethod = celLine.fitMethod || 'Unknown';
 
+    const fp = celLine.fitParams;
     let lines;
     if (fitMethod === FIT_METHODS.POWER_LAW) {
-        lines = [`Power law: ${formatPowerLawLabel(celLine.slope)}`];
+        lines = [`Power law: ${formatPowerLawLabel(fp.slope)}`];
     } else {
         const config = CHART_TYPE_CONFIG[chartState.chartType] || CHART_TYPE_CONFIG.Daily;
         const { labelFormat } = getCelLineSettings();
         const wu = WINDOW_UNITS[chartState.chartType];
         const unitName = wu ? wu.name.toLowerCase() : 'day';
         const slope = labelFormat === 'doubling'
-            ? formatDoublingTimeLabel(celLine.slope, config.unit, unitName)
-            : formatCelerationLabel(celLine.slope, config.unit);
+            ? formatDoublingTimeLabel(fp.slope, config.unit, unitName)
+            : formatCelerationLabel(fp.slope, config.unit);
         lines = [`${fitMethod}: ${slope}`];
     }
 
@@ -189,20 +190,21 @@ function buildAllHoverTraces() {
             const x1 = dateToXPosition(celLine.date1);
             const x2 = dateToXPosition(celLine.date2);
 
-            const isPowerLaw = celLine.fitMethod === FIT_METHODS.POWER_LAW && celLine.powerLawParams;
+            const fp = celLine.fitParams;
+            const isPowerLaw = celLine.fitMethod === FIT_METHODS.POWER_LAW && fp.origin;
 
             if (isPowerLaw) {
-                const plp = celLine.powerLawParams;
-                const fitResult = { slope: plp.slope, intercept: plp.intercept };
-                const points = interpolatePowerLawPoints(x1, x2, fitResult);
+                const fitResult = { slope: fp.slope, intercept: fp.intercept };
+                const originUtc = parseOriginToUtc(fp.origin);
+                const points = interpolatePowerLawPoints(x1, x2, fitResult, 0, originUtc);
                 traces.push(createHoverTrace(points, lineName, label, color));
 
                 if (celLine.bounceUpperOffset != null) {
-                    const upperPoints = interpolatePowerLawPoints(x1, x2, fitResult, celLine.bounceUpperOffset);
+                    const upperPoints = interpolatePowerLawPoints(x1, x2, fitResult, celLine.bounceUpperOffset, originUtc);
                     traces.push(createHoverTrace(upperPoints, `${lineName}-upper`, label, color));
                 }
                 if (celLine.bounceLowerOffset != null) {
-                    const lowerPoints = interpolatePowerLawPoints(x1, x2, fitResult, celLine.bounceLowerOffset);
+                    const lowerPoints = interpolatePowerLawPoints(x1, x2, fitResult, celLine.bounceLowerOffset, originUtc);
                     traces.push(createHoverTrace(lowerPoints, `${lineName}-lower`, label, color));
                 }
             } else {

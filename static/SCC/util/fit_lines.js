@@ -20,6 +20,31 @@
  * Input y-values should already be transformed: yLog = Math.log10(y)
  */
 
+import { xPositionToDate, parseLocalDate } from './dates.js';
+
+/**
+ * Convert a chart x-position to days since a given origin date.
+ * @param {number} xPos - Chart x-position
+ * @param {number} originUtc - Origin date as UTC ms (from Date.UTC())
+ * @returns {number|null} Days since origin, or null if conversion fails
+ */
+function xPosToDaysSinceOrigin(xPos, originUtc) {
+    const date = xPositionToDate(xPos);
+    if (!date) return null;
+    const utcDate = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+    return (utcDate - originUtc) / 86400000;
+}
+
+/**
+ * Parse an ISO date string to a UTC ms value for use as power law origin.
+ * @param {string} originISO - ISO date string (e.g. '2009-01-03')
+ * @returns {number} UTC milliseconds
+ */
+export function parseOriginToUtc(originISO) {
+    const d = parseLocalDate(originISO);
+    return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
 // ============================================================================
 // Fit Method Constants
 // ============================================================================
@@ -343,31 +368,33 @@ export function medianFit(x, y) {
  *
  * @param {number[]} x - Array of x coordinates (chart positions, must be > 0)
  * @param {number[]} y - Array of y coordinates (already in log10 space)
+ * @param {number} originUtc - Origin date as UTC ms for days-since-origin conversion
  * @returns {{slope: number, intercept: number, isPowerLaw: true}|null}
  */
-export function powerLawFit(x, y) {
+export function powerLawFit(x, y, originUtc) {
     if (x.length !== y.length) {
         console.error('x and y arrays must have same length');
         return null;
     }
 
-    // Filter out x <= 0 (log10 undefined)
-    const filteredX = [];
+    // Convert chart x-positions to days since power law origin
+    const daysX = [];
     const filteredY = [];
     for (let i = 0; i < x.length; i++) {
-        if (x[i] > 0) {
-            filteredX.push(x[i]);
+        const days = xPosToDaysSinceOrigin(x[i], originUtc);
+        if (days && days > 0) {
+            daysX.push(days);
             filteredY.push(y[i]);
         }
     }
 
-    if (filteredX.length < MIN_POINTS) {
+    if (daysX.length < MIN_POINTS) {
         return null;
     }
 
-    const logX = filteredX.map(xi => Math.log10(xi));
+    const logX = daysX.map(d => Math.log10(d));
 
-    const result = leastSquaresFit(logX, filteredY);
+    const result = theilSenFit(logX, filteredY);
     if (!result) return null;
 
     return {
@@ -387,9 +414,11 @@ export function powerLawFit(x, y) {
  * @param {number[]} x - Array of x coordinates
  * @param {number[]} y - Array of y coordinates (in log-space)
  * @param {string} method - Fit method name (from FIT_METHODS)
+ * @param {Object} [options] - Method-specific options
+ * @param {number} [options.originUtc] - Origin as UTC ms (required for Power law)
  * @returns {{slope: number, intercept: number}|null} Fit parameters or null
  */
-export function fit(x, y, method = DEFAULT_FIT_METHOD) {
+export function fit(x, y, method = DEFAULT_FIT_METHOD, options = {}) {
     switch (method) {
         case FIT_METHODS.THEIL_SEN:
             return theilSenFit(x, y);
@@ -404,7 +433,7 @@ export function fit(x, y, method = DEFAULT_FIT_METHOD) {
         case FIT_METHODS.MEDIAN:
             return medianFit(x, y);
         case FIT_METHODS.POWER_LAW:
-            return powerLawFit(x, y);
+            return powerLawFit(x, y, options.originUtc);
         default:
             console.warn(`Unknown fit method: ${method}, using ${DEFAULT_FIT_METHOD}`);
             return theilSenFit(x, y);
@@ -551,10 +580,12 @@ export function calculateBounceLines(xPositions, slope, intercept, bounds) {
  *
  * @param {number} x - X position (chart coordinate, must be > 0)
  * @param {Object} fitResult - Result from powerLawFit (must have slope, intercept)
+ * @param {number} originUtc - Origin date as UTC ms
  * @returns {number} logY value
  */
-export function evaluatePowerLaw(x, fitResult) {
-    return fitResult.slope * Math.log10(x) + fitResult.intercept;
+export function evaluatePowerLaw(x, fitResult, originUtc) {
+    const days = xPosToDaysSinceOrigin(x, originUtc);
+    return fitResult.slope * Math.log10(days) + fitResult.intercept;
 }
 
 /**
@@ -572,24 +603,27 @@ export function evaluatePowerLaw(x, fitResult) {
  * @param {number} x2 - End x position
  * @param {Object} fitResult - Result from powerLawFit (must have slope, intercept)
  * @param {number} [yOffset=0] - Vertical offset in log-space (for bounce lines)
+ * @param {number} originUtc - Origin date as UTC ms
  * @param {number} [numPoints=200] - Number of interpolation points
  * @returns {string} SVG path string
  */
-export function generatePowerLawPath(x1, x2, fitResult, yOffset = 0, numPoints = 200) {
+export function generatePowerLawPath(x1, x2, fitResult, yOffset = 0, originUtc, numPoints = 200) {
     const parts = [];
 
-    // Interpolate in log10(x) space for even visual spacing
-    const logXStart = Math.log10(x1);
-    const logXEnd = Math.log10(x2);
-    const logStep = (logXEnd - logXStart) / (numPoints - 1);
+    // Convert endpoints to days since origin
+    const days1 = xPosToDaysSinceOrigin(x1, originUtc);
+    const days2 = xPosToDaysSinceOrigin(x2, originUtc);
 
+    // Interpolate linearly in chart x-space (arithmetic x-axis)
     for (let i = 0; i < numPoints; i++) {
-        const logX = logXStart + i * logStep;
-        const x = Math.pow(10, logX);
-        const logY = fitResult.slope * logX + fitResult.intercept + yOffset;
+        const t = i / (numPoints - 1);
+        const chartX = x1 + t * (x2 - x1);
+        const days = days1 + t * (days2 - days1);
+        const logDays = Math.log10(days);
+        const logY = fitResult.slope * logDays + fitResult.intercept + yOffset;
         const y = Math.pow(10, logY);
         const cmd = i === 0 ? 'M' : 'L';
-        parts.push(`${cmd}${x},${y}`);
+        parts.push(`${cmd}${chartX},${y}`);
     }
 
     return parts.join(' ');

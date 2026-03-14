@@ -22,7 +22,7 @@ import { showCelLineEditor } from '../ui/celLineEditor.js';
 import { showPhaseLineEditor } from '../ui/phaseLineEditor.js';
 import { showAimLineEditor } from '../ui/aimLineEditor.js';
 import { interpolateLinePoints } from '../util/lineInterpolation.js';
-import { FIT_METHODS, evaluatePowerLaw } from '../util/fit_lines.js';
+import { FIT_METHODS, evaluatePowerLaw, parseOriginToUtc } from '../util/fit_lines.js';
 import { getChartDiv } from '../util/dom.js';
 import { relayout, addTraces, deleteTraces } from '../util/plotlyWrapper.js';
 
@@ -324,17 +324,18 @@ function setLineCategoryClickability(category, makeClickable) {
                         const x2 = dateToXPosition(celLine.date2);
 
                         let points;
-                        const isPL = celLine.fitMethod === FIT_METHODS.POWER_LAW && celLine.powerLawParams;
+                        const fp = celLine.fitParams;
+                        const isPL = celLine.fitMethod === FIT_METHODS.POWER_LAW && fp.origin;
                         if (isPL) {
-                            const plp = celLine.powerLawParams;
-                            const fitResult = { slope: plp.slope, intercept: plp.intercept };
+                            const fitResult = { slope: fp.slope, intercept: fp.intercept };
+                            const originUtc = parseOriginToUtc(fp.origin);
                             const numPts = Math.max(50, Math.ceil(x2 - x1) + 1);
                             const step = (x2 - x1) / (numPts - 1);
                             const xArr = [], yArr = [];
                             for (let i = 0; i < numPts; i++) {
                                 const xv = x1 + i * step;
                                 xArr.push(xv);
-                                yArr.push(Math.pow(10, evaluatePowerLaw(xv, fitResult)));
+                                yArr.push(Math.pow(10, evaluatePowerLaw(xv, fitResult, originUtc)));
                             }
                             points = [{ x: xArr, y: yArr }];
                         } else {
@@ -506,16 +507,18 @@ function init() {
                     const x1 = dateToXPosition(celLine.date1);
                     const x2 = dateToXPosition(celLine.date2);
                     let points;
-                    const isPL = celLine.fitMethod === FIT_METHODS.POWER_LAW && celLine.powerLawParams;
+                    const fp2 = celLine.fitParams;
+                    const isPL = celLine.fitMethod === FIT_METHODS.POWER_LAW && fp2.origin;
                     if (isPL) {
-                        const fitResult = { slope: celLine.powerLawParams.slope, intercept: celLine.powerLawParams.intercept };
+                        const fitResult = { slope: fp2.slope, intercept: fp2.intercept };
+                        const originUtc = parseOriginToUtc(fp2.origin);
                         const numPts = Math.max(50, Math.ceil(x2 - x1) + 1);
                         const step = (x2 - x1) / (numPts - 1);
                         const xArr = [], yArr = [];
                         for (let j = 0; j < numPts; j++) {
                             const xv = x1 + j * step;
                             xArr.push(xv);
-                            yArr.push(Math.pow(10, evaluatePowerLaw(xv, fitResult)));
+                            yArr.push(Math.pow(10, evaluatePowerLaw(xv, fitResult, originUtc)));
                         }
                         points = [{ x: xArr, y: yArr }];
                     } else {

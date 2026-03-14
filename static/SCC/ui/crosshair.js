@@ -22,7 +22,7 @@ import { dateToXPosition, xPositionToDate } from '../util/dates.js';
 import { formatValue } from '../util/format.js';
 import { getFirstConfig, getConfig, getAggLabel } from '../series/traceStyles.js';
 import { getChartDiv } from '../util/dom.js';
-import { FIT_METHODS, evaluatePowerLaw } from '../util/fit_lines.js';
+import { FIT_METHODS, evaluatePowerLaw, parseOriginToUtc } from '../util/fit_lines.js';
 
 // =============================================================================
 // State
@@ -421,15 +421,15 @@ function buildCelLineCache() {
         const x0 = dateToXPosition(meta.date1);
         const x1 = dateToXPosition(meta.date2);
 
-        const isPowerLaw = meta.fitMethod === FIT_METHODS.POWER_LAW && meta.powerLawParams;
+        const fp = meta.fitParams;
+        const isPowerLaw = meta.fitMethod === FIT_METHODS.POWER_LAW && fp.origin;
 
-        let slope, intercept, powerLawParams;
+        let slope, intercept, originUtc;
         if (isPowerLaw) {
             // Power law: store params for evaluatePowerLaw()
-            const plp = meta.powerLawParams;
-            powerLawParams = { slope: plp.slope, intercept: plp.intercept };
             slope = null;
             intercept = null;
+            originUtc = parseOriginToUtc(fp.origin);
         } else {
             // Linear: derive slope/intercept from stored endpoints in the
             // current x-coordinate system. The metadata values were computed
@@ -443,7 +443,7 @@ function buildCelLineCache() {
             const dx = x1 - x0;
             slope = dx !== 0 ? (logY1 - logY0) / dx : 0;
             intercept = logY0 - slope * x0;
-            powerLawParams = null;
+            originUtc = null;
         }
 
         state.celLineCache.push({
@@ -453,7 +453,8 @@ function buildCelLineCache() {
             x0, x1,
             slope,
             intercept,
-            powerLawParams,
+            fitParams: fp,
+            originUtc,
             bounceUpperOffset: meta.bounceUpperOffset,
             bounceLowerOffset: meta.bounceLowerOffset,
             color: meta.style.color,
@@ -779,61 +780,6 @@ function drawCanvas() {
         ctx.globalAlpha = 1;
     }
 
-    // Draw diamond markers at cel line values
-    if (state.currentCelData && state.currentCelData.length > 0 && state.lastXRounded !== null) {
-        const fullLayout = state.elements.chart._fullLayout;
-        const xMarkerPixel = fullLayout.xaxis._offset + fullLayout.xaxis.l2p(state.lastXRounded);
-        const CEL_MARKER_OPACITY = 0.7;
-        const CEL_COLOR = '#a855f7';
-        const CEL_DIAMOND_HALF = 6;
-        const CEL_BOUNCE_HALF = 4;
-
-        for (const cel of state.currentCelData) {
-            // Trend diamond
-            if (cel.trendY > 0) {
-                const yPx = fullLayout.yaxis._offset + fullLayout.yaxis.l2p(Math.log10(cel.trendY));
-                ctx.globalAlpha = CEL_MARKER_OPACITY;
-                ctx.fillStyle = CEL_COLOR;
-                ctx.beginPath();
-                ctx.moveTo(xMarkerPixel, yPx - CEL_DIAMOND_HALF);
-                ctx.lineTo(xMarkerPixel + CEL_DIAMOND_HALF, yPx);
-                ctx.lineTo(xMarkerPixel, yPx + CEL_DIAMOND_HALF);
-                ctx.lineTo(xMarkerPixel - CEL_DIAMOND_HALF, yPx);
-                ctx.closePath();
-                ctx.fill();
-            }
-
-            // Upper bounce diamond (smaller)
-            if (cel.upperY != null && cel.upperY > 0) {
-                const yPx = fullLayout.yaxis._offset + fullLayout.yaxis.l2p(Math.log10(cel.upperY));
-                ctx.globalAlpha = CEL_MARKER_OPACITY;
-                ctx.fillStyle = CEL_COLOR;
-                ctx.beginPath();
-                ctx.moveTo(xMarkerPixel, yPx - CEL_BOUNCE_HALF);
-                ctx.lineTo(xMarkerPixel + CEL_BOUNCE_HALF, yPx);
-                ctx.lineTo(xMarkerPixel, yPx + CEL_BOUNCE_HALF);
-                ctx.lineTo(xMarkerPixel - CEL_BOUNCE_HALF, yPx);
-                ctx.closePath();
-                ctx.fill();
-            }
-
-            // Lower bounce diamond (smaller)
-            if (cel.lowerY != null && cel.lowerY > 0) {
-                const yPx = fullLayout.yaxis._offset + fullLayout.yaxis.l2p(Math.log10(cel.lowerY));
-                ctx.globalAlpha = CEL_MARKER_OPACITY;
-                ctx.fillStyle = CEL_COLOR;
-                ctx.beginPath();
-                ctx.moveTo(xMarkerPixel, yPx - CEL_BOUNCE_HALF);
-                ctx.lineTo(xMarkerPixel + CEL_BOUNCE_HALF, yPx);
-                ctx.lineTo(xMarkerPixel, yPx + CEL_BOUNCE_HALF);
-                ctx.lineTo(xMarkerPixel - CEL_BOUNCE_HALF, yPx);
-                ctx.closePath();
-                ctx.fill();
-            }
-        }
-
-        ctx.globalAlpha = 1;
-    }
 }
 
 // =============================================================================
@@ -947,8 +893,8 @@ function findCelLinesAtX(xRounded, yLogValue) {
         const aggVisible = chartState.seriesVisibility[line.seriesKey]?.[line.aggId] !== false;
         if (!aggVisible) continue;
 
-        const logY = line.powerLawParams
-            ? evaluatePowerLaw(xRounded, line.powerLawParams)
+        const logY = line.originUtc
+            ? evaluatePowerLaw(xRounded, line.fitParams, line.originUtc)
             : line.slope * xRounded + line.intercept;
         const trendY = Math.pow(10, logY);
 
