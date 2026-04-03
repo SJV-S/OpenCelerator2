@@ -121,6 +121,7 @@ def _migrate_columns(app):
         ('share_links', 'join_token_hash', 'VARCHAR(64)'),
         ('request_logs', 'bytes_downloaded', 'INTEGER'),
         ('request_logs', 'bytes_uploaded', 'INTEGER'),
+        ('charts', 'created_by', 'VARCHAR(64)'),
     ]
     for table, column, col_type in migrations:
         try:
