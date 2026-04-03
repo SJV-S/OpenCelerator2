@@ -259,6 +259,45 @@ Plus Plotly.js as a peer dependency (same as TC2 uses it today).
 
 ---
 
+## First Implementation Attempt — What Went Wrong
+
+`engine.js` was created and the files were copied to the flashcard app. The facade API was correct. But the underlying refactor described above was not completed properly, leaving a class of silent bugs throughout the pipeline.
+
+### The pattern: fake dependency injection
+
+Functions were given `state = chartState` signatures to look like they support passing local state:
+
+```javascript
+export function calculateFrequencies(sort = (arr) => arr, state = chartState) { ... }
+```
+
+But the function bodies were not updated — they still read from `chartState` directly:
+
+```javascript
+function dateToXPosition(date, state = chartState) {
+    const chartType = (chartState.chartType || 'Daily').toLowerCase();  // ← ignores `state`
+    const startDate = parseLocalDate(chartState.startDate);             // ← ignores `state`
+}
+```
+
+This means `engine.js` could pass a local state object all the way down the call chain, but the state would be silently discarded partway through — with no error and no indication anything was wrong.
+
+### Affected functions
+
+- **`dates.dateToXPosition()`** — accepts `state`, ignores it entirely in the body. Since `timestampsToXPositions()` calls this internally, x-position calculation always reads the global singleton regardless of what was passed in.
+- **`tracePipeline` functions** — signatures accept `state`, but the global `chartState` import remains active and some reads still target it directly.
+- **`resize-chart.resizeChartByHeight()`** — no state parameter at all. Reads `chartState.id` and `chartState.chartWindow` unconditionally.
+
+### Consequence
+
+For a single chart on an otherwise empty page the implementation works fine. The global `chartState` happens to contain the right values. But the isolation promised by `engine.js` does not actually exist — any scenario with multiple chart instances, or a host app that also writes to `chartState`, will produce wrong x-positions and layout calculations with no visible error.
+
+### What the refactor actually requires
+
+Adding a `state` parameter to a function signature is not the refactor. The refactor is replacing every `chartState.foo` reference inside the function body with `state.foo`. Both steps are required.
+
+---
+
 ## Open Questions
 
 - **Line overlays**: Should the library API support adding phase/aim/celeration lines programmatically, or is that TC2-application-only? The flashcard app may want celeration trend lines without the interactive drawing UI.

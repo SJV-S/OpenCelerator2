@@ -81,6 +81,13 @@ function deserializeChart(data) {
     }
     chartState._createdAt = data._createdAt;
     chartState.startDate = deserializeDate(chartState.startDate);
+    if (chartState.LineCuts) {
+        for (const cut of Object.values(chartState.LineCuts)) {
+            if (cut.date && !(cut.date instanceof Date)) {
+                cut.date = new Date(cut.date);
+            }
+        }
+    }
 }
 
 // ============================================================================

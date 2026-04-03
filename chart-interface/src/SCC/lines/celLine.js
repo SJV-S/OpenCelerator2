@@ -1,0 +1,1252 @@
+/**
+ * Cel Line Mode - Place change/celeration lines on data series
+ *
+ * UX Flow:
+ * 1. User clicks "add change line" button
+ * 2. Toast shows buttons for available data series
+ * 3. User clicks a series button
+ * 4. Cursor changes to celeration icon, user drags to select range
+ * 5. Line is created using Theil-Sen regression on selected data
+ *
+ * Emits events instead of calling peer modules directly.
+ */
+
+import { createToast } from '../ui/toaster.js';
+import { icons, applySvgCursor, restoreCursor } from '../ui/icons.js';
+import { chartState } from '../chartState.js';
+import { CORRECTS, ERRORS, TIMING, LINE_DEFAULTS, COLORS, CHART_TYPE_CONFIG, WINDOW_UNITS } from '../config.js';
+import { xPositionToDate, dateToXPosition, formatDateISO } from '../util/dates.js';
+import { fit, FIT_METHODS, BOUNCE_ENVELOPES, DEFAULT_FIT_METHOD, DEFAULT_BOUNCE_ENVELOPE, calculateBounceBounds, calculateBounceBoundsFromResiduals, calculateBounceLines, formatCelerationLabel, formatDoublingTimeLabel, formatPowerLawLabel, generatePowerLawPath, evaluatePowerLaw, parseOriginToUtc } from '../util/fit_lines.js';
+import { eventBus, EVENTS } from '../eventBus.js';
+import { getFirstConfig, getAggLabel } from '../series/traceStyles.js';
+import { getPixelCoordinates } from '../util/plotCoordinates.js';
+import { getChartDiv } from '../util/dom.js';
+import { relayout } from '../util/plotlyWrapper.js';
+import { getCelLineSettings } from '../ui/celSettingsModal.js';
+
+/**
+ * Get the cel line color for a data series.
+ * Simple fixed colors: green for corrects, red for errors, orange for timing, black for misc
+ * @param {string} seriesKey - The series key (corrects, errors, timing, misc1, etc.)
+ * @returns {string} The color to use for the cel line
+ */
+function getCelLineColor(seriesKey) {
+    if (seriesKey === CORRECTS) return COLORS.TREND_CORRECTS;
+    if (seriesKey === ERRORS) return COLORS.TREND_ERRORS;
+    if (seriesKey === TIMING) return COLORS.TREND_TIMING;
+    return 'black'; // misc series
+}
+
+// Cel line drawing state (ephemeral UI state)
+var celLineState = {
+    active: false,
+    isDragging: false,
+    mouseDownHandler: null,
+    mouseMoveHandler: null,
+    mouseUpHandler: null,
+    touchStartHandler: null,
+    touchMoveHandler: null,
+    touchEndHandler: null,
+    guideHandler: null,
+    x1: null,
+    x2: null,
+    x1Pixel: null,  // Starting pixel position for DOM overlay
+    shadeShape: null,
+    previousDragMode: null,
+    toastElement: null,
+    seriesSelectionToast: null,
+    selectedSeriesKey: null,
+    selectedAggId: '0'        // Which aggregation to fit on
+};
+
+/**
+ * Builds the shapes and annotation objects for a cel line.
+ * Used by both initial draw (handleCelLineConfirm) and redraw (redrawCelLines).
+ *
+ * @param {Object} metadata - Cel line metadata
+ * @param {number} metadata.id - Unique line ID
+ * @param {string} metadata.seriesKey - Series key (corrects, errors, timing, misc1, etc.)
+ * @param {Date|string} metadata.date1 - Start date
+ * @param {number} metadata.y1 - Start y value (display scale)
+ * @param {Date|string} metadata.date2 - End date
+ * @param {number} metadata.y2 - End y value (display scale)
+ * @param {number|null} metadata.bounceUpperY1 - Upper bounce line start y (if envelope enabled)
+ * @param {number|null} metadata.bounceUpperY2 - Upper bounce line end y
+ * @param {number|null} metadata.bounceLowerY1 - Lower bounce line start y
+ * @param {number|null} metadata.bounceLowerY2 - Lower bounce line end y
+ * @param {string} metadata.text - Label text (celeration value)
+ * @param {HTMLElement} chartDiv - Chart container element
+ * @returns {Object} { shapes: [main, upperBounce?, lowerBounce?], annotation }
+ */
+function buildCelLineElements(metadata, chartDiv) {
+    const lineName = `cel-${metadata.id}`;
+    const x1 = dateToXPosition(metadata.date1);
+    const x2 = dateToXPosition(metadata.date2);
+
+    // Per-line style (concrete values set at creation, backfilled by compat script)
+    const { color: celLineColor, width: celLineWidth, dash: celLineDash,
+            bounceColor, bounceWidth, bounceDash } = metadata.style;
+
+    // Build shapes array
+    const shapes = [];
+    const fp = metadata.fitParams;
+    const isPowerLaw = metadata.fitMethod === FIT_METHODS.POWER_LAW && fp.origin;
+
+    if (isPowerLaw) {
+        // Power law: curved path shape
+        const fitResult = { slope: fp.slope, intercept: fp.intercept };
+        const originUtc = parseOriginToUtc(fp.origin);
+
+        shapes.push({
+            type: 'path',
+            path: generatePowerLawPath(x1, x2, fitResult, 0, originUtc),
+            xref: 'x',
+            yref: 'y',
+            name: lineName,
+            line: {
+                color: celLineColor,
+                width: celLineWidth,
+                dash: celLineDash
+            }
+        });
+
+        // Upper bounce curve
+        if (metadata.bounceUpperOffset != null) {
+            shapes.push({
+                type: 'path',
+                path: generatePowerLawPath(x1, x2, fitResult, metadata.bounceUpperOffset, originUtc),
+                xref: 'x',
+                yref: 'y',
+                name: `${lineName}-upper`,
+                line: {
+                    color: bounceColor,
+                    width: bounceWidth,
+                    dash: bounceDash
+                }
+            });
+        }
+
+        // Lower bounce curve
+        if (metadata.bounceLowerOffset != null) {
+            shapes.push({
+                type: 'path',
+                path: generatePowerLawPath(x1, x2, fitResult, metadata.bounceLowerOffset, originUtc),
+                xref: 'x',
+                yref: 'y',
+                name: `${lineName}-lower`,
+                line: {
+                    color: bounceColor,
+                    width: bounceWidth,
+                    dash: bounceDash
+                }
+            });
+        }
+    } else {
+        // Linear fit: straight line shapes
+        shapes.push({
+            type: 'line',
+            x0: x1,
+            y0: metadata.y1,
+            x1: x2,
+            y1: metadata.y2,
+            xref: 'x',
+            yref: 'y',
+            name: lineName,
+            line: {
+                color: celLineColor,
+                width: celLineWidth,
+                dash: celLineDash
+            }
+        });
+
+        // Upper bounce line (if exists in metadata)
+        if (metadata.bounceUpperY1 != null && metadata.bounceUpperY2 != null) {
+            shapes.push({
+                type: 'line',
+                x0: x1,
+                y0: metadata.bounceUpperY1,
+                x1: x2,
+                y1: metadata.bounceUpperY2,
+                xref: 'x',
+                yref: 'y',
+                name: `${lineName}-upper`,
+                line: {
+                    color: bounceColor,
+                    width: bounceWidth,
+                    dash: bounceDash
+                }
+            });
+        }
+
+        // Lower bounce line (if exists in metadata)
+        if (metadata.bounceLowerY1 != null && metadata.bounceLowerY2 != null) {
+            shapes.push({
+                type: 'line',
+                x0: x1,
+                y0: metadata.bounceLowerY1,
+                x1: x2,
+                y1: metadata.bounceLowerY2,
+                xref: 'x',
+                yref: 'y',
+                name: `${lineName}-lower`,
+                line: {
+                    color: bounceColor,
+                    width: bounceWidth,
+                    dash: bounceDash
+                }
+            });
+        }
+    }
+
+    // Hover is handled by lineHover.js traces — no annotation needed for hover.
+    // Annotation kept only as a named placeholder for redraw/visibility filtering.
+    const centerX = (x1 + x2) / 2;
+    const logY1 = Math.log10(metadata.y1);
+    const logY2 = Math.log10(metadata.y2);
+    const centerLogY = (logY1 + logY2) / 2;
+
+    const annotation = {
+        x: centerX,
+        y: centerLogY,
+        xref: 'x',
+        yref: 'y',
+        text: '',
+        showarrow: false,
+        font: { color: 'rgba(0,0,0,0)', size: 1 },
+        bgcolor: 'rgba(0,0,0,0)',
+        bordercolor: 'rgba(0,0,0,0)',
+        borderwidth: 0,
+        borderpad: 0,
+        xanchor: 'center',
+        yanchor: 'middle',
+        name: lineName
+    };
+
+    return { shapes, annotation };
+}
+
+/**
+ * Activates cel line mode
+ * Step 1: Show toast with buttons for available data series
+ */
+function activateCelLineMode() {
+
+    const chartDiv = getChartDiv();
+    if (!chartDiv) {
+        console.error('Chart div not found');
+        return;
+    }
+
+    if (celLineState.active) {
+        deactivateCelLineMode();
+        return;
+    }
+
+    // Emit event to deactivate other modes
+    eventBus.emit(EVENTS.MODE_ALL_DEACTIVATE);
+
+    celLineState.active = true;
+    celLineState.selectedSeriesKey = null;
+
+    // Build buttons for available series
+    const seriesButtons = getAvailableSeriesButtons();
+
+    if (seriesButtons.length === 0) {
+        createToast({
+            message: 'No data series available',
+            duration: 2000
+        });
+        celLineState.active = false;
+        return;
+    }
+
+    // Add cancel button
+    seriesButtons.push({
+        label: 'Cancel',
+        onClick: () => {
+            deactivateCelLineMode();
+        },
+        type: 'secondary'
+    });
+
+    // Show toast with series buttons
+    celLineState.seriesSelectionToast = createToast({
+        message: 'Select series:',
+        buttons: seriesButtons,
+        layout: 'vertical-buttons'
+    });
+
+}
+
+/**
+ * Build per-aggregation buttons for a single base series.
+ * If there's only one agg, returns a single button with the series name.
+ * If there are multiple aggs, returns one button per visible aggregation
+ * with the agg label appended.
+ */
+function buildAggButtons(seriesKey, displayName) {
+    const isMisc = seriesKey.startsWith('misc');
+    const configs = isMisc
+        ? chartState.traceStyles.misc[seriesKey]
+        : chartState.traceStyles[seriesKey];
+    if (!configs) return [];
+
+    const aggEntries = Object.entries(configs);
+    const visibleEntries = aggEntries.filter(([aggId]) =>
+        chartState.seriesVisibility[seriesKey]?.[aggId] !== false
+    );
+    if (visibleEntries.length === 0) return [];
+
+    // Single aggregation — simple button, no suffix needed
+    if (aggEntries.length === 1) {
+        return [{
+            label: displayName,
+            onClick: () => selectSeriesAndEnableDrag(seriesKey, visibleEntries[0][0]),
+            type: 'primary'
+        }];
+    }
+
+    // Multiple aggregations — one button per visible agg with label suffix
+    return visibleEntries.map(([aggId, config]) => {
+        const suffix = getAggLabel(config);
+        return {
+            label: `${displayName} (${suffix})`,
+            onClick: () => selectSeriesAndEnableDrag(seriesKey, aggId),
+            type: 'primary'
+        };
+    });
+}
+
+/**
+ * Get buttons for available data series.
+ * When a series has multiple aggregations (raw + rolling window, residuals, etc.),
+ * each visible aggregation gets its own button so the user can choose which data
+ * to fit the trendline on.
+ */
+function getAvailableSeriesButtons() {
+    const buttons = [];
+
+    // Check fixed series (use Number.isFinite to match customLegend data checks)
+    if (chartState.series.corrects && chartState.series.corrects.some(v => Number.isFinite(v))) {
+        const config = getFirstConfig(CORRECTS);
+        buttons.push(...buildAggButtons(CORRECTS, config?.seriesName || 'Corrects'));
+    }
+
+    if (chartState.series.errors && chartState.series.errors.some(v => Number.isFinite(v))) {
+        const config = getFirstConfig(ERRORS);
+        buttons.push(...buildAggButtons(ERRORS, config?.seriesName || 'Errors'));
+    }
+
+    if (chartState.minuteChart && chartState.series.timing && chartState.series.timing.some(v => Number.isFinite(v))) {
+        const config = getFirstConfig(TIMING);
+        buttons.push(...buildAggButtons(TIMING, config?.seriesName || 'Timing'));
+    }
+
+    // Check misc series
+    Object.entries(chartState.series.misc).forEach(([miscId, data]) => {
+        if (data && data.some(v => Number.isFinite(v))) {
+            const config = getFirstConfig(miscId);
+            buttons.push(...buildAggButtons(miscId, config?.seriesName || miscId));
+        }
+    });
+
+    return buttons;
+}
+
+/**
+ * Called when user selects a series from the toast buttons
+ * @param {string} seriesKey - Base series key (corrects, errors, misc1, etc.)
+ * @param {string} [aggId='0'] - Aggregation ID to fit on
+ */
+function selectSeriesAndEnableDrag(seriesKey, aggId) {
+    celLineState.selectedSeriesKey = seriesKey;
+    celLineState.selectedAggId = aggId;
+
+    // Remove series selection toast using stored reference
+    if (celLineState.seriesSelectionToast) {
+        celLineState.seriesSelectionToast.remove();
+        celLineState.seriesSelectionToast = null;
+    }
+
+    // Enable drag mode
+    enableDragMode();
+}
+
+/**
+ * Called after user selects a series - enables drag mode
+ */
+function enableDragMode() {
+    const chartDiv = getChartDiv();
+    if (!chartDiv) return;
+
+    celLineState.previousDragMode = chartDiv.layout.dragmode;
+    relayout(chartDiv, { dragmode: false });
+
+    applySvgCursor(chartDiv, icons.scatterLine, {size: 32, hotspotX: 16, hotspotY: 16});
+
+    celLineState.mouseDownHandler = function(event) {
+        handleCelLineMouseDown(event, chartDiv);
+    };
+
+    celLineState.mouseMoveHandler = function(event) {
+        handleCelLineMouseMove(event, chartDiv);
+    };
+
+    celLineState.mouseUpHandler = function(event) {
+        handleCelLineMouseUp(event, chartDiv);
+    };
+
+    celLineState.touchStartHandler = function(event) {
+        handleCelLineTouchStart(event, chartDiv);
+    };
+
+    celLineState.touchMoveHandler = function(event) {
+        handleCelLineTouchMove(event, chartDiv);
+    };
+
+    celLineState.touchEndHandler = function(event) {
+        handleCelLineTouchEnd(event, chartDiv);
+    };
+
+    // Guide line follows cursor before dragging starts
+    celLineState.guideHandler = function(event) {
+        if (!celLineState.isDragging) {
+            const coords = getPixelCoordinates(event, chartDiv, { snapPixel: true });
+            if (coords) {
+                // Use fast DOM overlay instead of Plotly
+                updateGuideLineOverlay(coords.xPixel);
+            }
+        }
+    };
+
+    chartDiv.addEventListener('mousemove', celLineState.guideHandler);
+    chartDiv.addEventListener('mousedown', celLineState.mouseDownHandler);
+    chartDiv.addEventListener('touchstart', celLineState.touchStartHandler, { passive: false });
+
+    // Show toast with instructions
+    celLineState.toastElement = createToast({
+        message: 'Select all or drag to select slice',
+        buttons: [
+            {
+                label: 'All data',
+                onClick: () => {
+                    finalizeAllData();
+                },
+                type: 'primary'
+            },
+            {
+                label: 'Cancel',
+                onClick: () => {
+                    deactivateCelLineMode();
+                },
+                type: 'secondary'
+            }
+        ],
+        layout: 'vertical-buttons',
+        position: 'top-right'
+    });
+
+}
+
+/**
+ * Deactivates cel line mode
+ */
+function deactivateCelLineMode() {
+
+    const chartDiv = getChartDiv();
+    if (!chartDiv) return;
+
+    celLineState.active = false;
+    celLineState.isDragging = false;
+    celLineState.selectedSeriesKey = null;
+    celLineState.selectedAggId = '0';
+
+    if (celLineState.previousDragMode !== null) {
+        relayout(chartDiv, { dragmode: celLineState.previousDragMode });
+        celLineState.previousDragMode = null;
+    }
+
+    restoreCursor(chartDiv);
+
+    if (celLineState.mouseDownHandler) {
+        chartDiv.removeEventListener('mousedown', celLineState.mouseDownHandler);
+        celLineState.mouseDownHandler = null;
+    }
+
+    if (celLineState.touchStartHandler) {
+        chartDiv.removeEventListener('touchstart', celLineState.touchStartHandler);
+        celLineState.touchStartHandler = null;
+    }
+
+    if (celLineState.mouseMoveHandler) {
+        document.removeEventListener('mousemove', celLineState.mouseMoveHandler);
+        celLineState.mouseMoveHandler = null;
+    }
+
+    if (celLineState.mouseUpHandler) {
+        document.removeEventListener('mouseup', celLineState.mouseUpHandler);
+        celLineState.mouseUpHandler = null;
+    }
+
+    if (celLineState.touchMoveHandler) {
+        document.removeEventListener('touchmove', celLineState.touchMoveHandler);
+        celLineState.touchMoveHandler = null;
+    }
+
+    if (celLineState.touchEndHandler) {
+        document.removeEventListener('touchend', celLineState.touchEndHandler);
+        celLineState.touchEndHandler = null;
+    }
+
+    if (celLineState.guideHandler) {
+        chartDiv.removeEventListener('mousemove', celLineState.guideHandler);
+        celLineState.guideHandler = null;
+    }
+
+    removeOverlays();
+    cleanupSeriesSelectionMode();
+
+    celLineState.x1 = null;
+    celLineState.x2 = null;
+    celLineState.x1Pixel = null;
+    celLineState.shadeShape = null;
+
+}
+
+function handleCelLineMouseDown(event, chartDiv) {
+    if (event.target.closest('#cel-drag-toast')) {
+        return;
+    }
+
+    const coords = getPixelCoordinates(event, chartDiv, { snapPixel: true });
+    if (!coords) return;
+
+    celLineState.isDragging = true;
+    celLineState.x1 = coords.x;
+    celLineState.x2 = coords.x;
+    celLineState.x1Pixel = coords.xPixel;
+
+    document.addEventListener('mousemove', celLineState.mouseMoveHandler);
+    document.addEventListener('mouseup', celLineState.mouseUpHandler);
+
+}
+
+function handleCelLineMouseMove(event, chartDiv) {
+    if (!celLineState.isDragging) return;
+
+    const coords = getPixelCoordinates(event, chartDiv, { snapPixel: true });
+    if (!coords) return;
+
+    if (coords.x > celLineState.x1) {
+        celLineState.x2 = coords.x;
+        // Use fast DOM overlays instead of Plotly
+        updateShadeOverlay(celLineState.x1Pixel, coords.xPixel);
+        updateGuideLineOverlay(coords.xPixel);
+    }
+}
+
+function handleCelLineMouseUp(event, chartDiv) {
+    if (!celLineState.isDragging) return;
+
+    celLineState.isDragging = false;
+
+    document.removeEventListener('mousemove', celLineState.mouseMoveHandler);
+    document.removeEventListener('mouseup', celLineState.mouseUpHandler);
+
+    // Remove DOM overlays
+    removeOverlays();
+
+    if (celLineState.x2 && celLineState.x2 > celLineState.x1) {
+        // Use pre-selected series to create the line
+        finalizeCelLine();
+    } else {
+        celLineState.x1 = null;
+        celLineState.x2 = null;
+        celLineState.x1Pixel = null;
+    }
+}
+
+function handleCelLineTouchStart(event, chartDiv) {
+    event.preventDefault();
+
+    if (event.target.closest('#cel-drag-toast')) {
+        return;
+    }
+
+    if (event.touches.length === 1) {
+        const touch = event.touches[0];
+        const coords = getPixelCoordinates(touch, chartDiv, { snapPixel: true });
+        if (!coords) return;
+
+        celLineState.isDragging = true;
+        celLineState.x1 = coords.x;
+        celLineState.x2 = coords.x;
+        celLineState.x1Pixel = coords.xPixel;
+
+        document.addEventListener('touchmove', celLineState.touchMoveHandler, { passive: false });
+        document.addEventListener('touchend', celLineState.touchEndHandler);
+    }
+}
+
+function handleCelLineTouchMove(event, chartDiv) {
+    event.preventDefault();
+
+    if (!celLineState.isDragging) return;
+
+    if (event.touches.length === 1) {
+        const touch = event.touches[0];
+        const coords = getPixelCoordinates(touch, chartDiv, { snapPixel: true });
+        if (!coords) return;
+
+        if (coords.x > celLineState.x1) {
+            celLineState.x2 = coords.x;
+            // Use fast DOM overlays instead of Plotly
+            updateShadeOverlay(celLineState.x1Pixel, coords.xPixel);
+            updateGuideLineOverlay(coords.xPixel);
+        }
+    }
+}
+
+function handleCelLineTouchEnd(event, chartDiv) {
+    if (!celLineState.isDragging) return;
+
+    celLineState.isDragging = false;
+
+    document.removeEventListener('touchmove', celLineState.touchMoveHandler);
+    document.removeEventListener('touchend', celLineState.touchEndHandler);
+
+    // Remove DOM overlays
+    removeOverlays();
+
+    if (celLineState.x2 && celLineState.x2 > celLineState.x1) {
+        // Use pre-selected series to create the line
+        finalizeCelLine();
+    } else {
+        celLineState.x1 = null;
+        celLineState.x2 = null;
+        celLineState.x1Pixel = null;
+    }
+}
+
+/**
+ * Finalize cel line creation using ALL data for the selected series (no x-range filter)
+ */
+function finalizeAllData() {
+    const baseKey = celLineState.selectedSeriesKey;
+    const aggId = celLineState.selectedAggId;
+
+    if (!baseKey) {
+        deactivateCelLineMode();
+        return;
+    }
+
+    const data = getAllDataForSeries(baseKey, aggId);
+
+    if (!data || data.x.length < 5) {
+        createToast({
+            message: `Need at least 5 data points. Found ${data ? data.x.length : 0}.`,
+            duration: 3000
+        });
+        return;
+    }
+
+    handleCelLineConfirm(data, baseKey);
+}
+
+/**
+ * Finalize cel line creation using pre-selected series
+ */
+function finalizeCelLine() {
+    const baseKey = celLineState.selectedSeriesKey;
+    const aggId = celLineState.selectedAggId;
+
+    if (!baseKey) {
+        deactivateCelLineMode();
+        return;
+    }
+
+    const data = getDataInRangeForSeries(celLineState.x1, celLineState.x2, baseKey, aggId);
+
+    if (!data || data.x.length < 5) {
+        createToast({
+            message: `Need at least 5 data points. Found ${data ? data.x.length : 0}.`,
+            duration: 3000
+        });
+        removeOverlays();
+        celLineState.x1 = null;
+        celLineState.x2 = null;
+        celLineState.x1Pixel = null;
+        // Stay in drag mode so user can try again
+        return;
+    }
+
+    handleCelLineConfirm(data, baseKey);
+}
+
+// ============================================
+// DOM Overlay Functions (fast, no Plotly calls)
+// ============================================
+
+/**
+ * Get or create the overlay container for cel line preview elements
+ */
+function getOrCreateOverlayContainer() {
+    const chartDiv = getChartDiv();
+    if (!chartDiv) return null;
+
+    let container = document.getElementById('celline-overlay');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'celline-overlay';
+        container.style.cssText = `
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 50;
+        `;
+
+        // Shade rectangle
+        const shade = document.createElement('div');
+        shade.id = 'celline-shade-overlay';
+        shade.style.cssText = `
+            position: absolute;
+            background: rgba(128, 128, 128, 0.3);
+            display: none;
+        `;
+
+        // Vertical guide line
+        const guide = document.createElement('div');
+        guide.id = 'celline-guide-overlay';
+        guide.style.cssText = `
+            position: absolute;
+            width: 3px;
+            background: rgba(147, 51, 234, 0.25);
+            display: none;
+        `;
+
+        container.appendChild(shade);
+        container.appendChild(guide);
+        chartDiv.appendChild(container);
+    }
+
+    return {
+        container,
+        shade: document.getElementById('celline-shade-overlay'),
+        guide: document.getElementById('celline-guide-overlay')
+    };
+}
+
+/**
+ * Update the DOM shade overlay position (no Plotly calls)
+ */
+function updateShadeOverlay(x1Pixel, x2Pixel) {
+    const chartDiv = getChartDiv();
+    if (!chartDiv?.layout) return;
+
+    const overlays = getOrCreateOverlayContainer();
+    if (!overlays) return;
+
+    const layout = chartDiv.layout;
+    const rect = chartDiv.getBoundingClientRect();
+    const plotTop = layout.margin.t;
+    const plotBottom = rect.height - layout.margin.b;
+    const plotHeight = plotBottom - plotTop;
+
+    const left = Math.min(x1Pixel, x2Pixel);
+    const width = Math.abs(x2Pixel - x1Pixel);
+
+    overlays.shade.style.left = `${left}px`;
+    overlays.shade.style.top = `${plotTop}px`;
+    overlays.shade.style.width = `${width}px`;
+    overlays.shade.style.height = `${plotHeight}px`;
+    overlays.shade.style.display = 'block';
+}
+
+/**
+ * Update the DOM guide line overlay position (no Plotly calls)
+ */
+function updateGuideLineOverlay(xPixel) {
+    const chartDiv = getChartDiv();
+    if (!chartDiv?.layout) return;
+
+    const overlays = getOrCreateOverlayContainer();
+    if (!overlays) return;
+
+    const layout = chartDiv.layout;
+    const rect = chartDiv.getBoundingClientRect();
+    const plotTop = layout.margin.t;
+    const plotBottom = rect.height - layout.margin.b;
+    const plotHeight = plotBottom - plotTop;
+
+    overlays.guide.style.left = `${xPixel - 1}px`;  // Center the 3px line
+    overlays.guide.style.top = `${plotTop}px`;
+    overlays.guide.style.height = `${plotHeight}px`;
+    overlays.guide.style.display = 'block';
+}
+
+/**
+ * Remove the DOM overlays
+ */
+function removeOverlays() {
+    const container = document.getElementById('celline-overlay');
+    if (container) {
+        container.remove();
+    }
+}
+
+
+function cleanupSeriesSelectionMode() {
+    if (celLineState.toastElement) {
+        celLineState.toastElement.remove();
+        celLineState.toastElement = null;
+    }
+    if (celLineState.seriesSelectionToast) {
+        celLineState.seriesSelectionToast.remove();
+        celLineState.seriesSelectionToast = null;
+    }
+}
+
+/**
+ * Get ALL data for a series (no x-range filter).
+ * Same logic as getDataInRangeForSeries but collects every point.
+ */
+function getAllDataForSeries(baseKey, aggId) {
+    const chartDiv = getChartDiv();
+
+    if (!chartDiv || !chartDiv.data) {
+        return null;
+    }
+
+    const xValues = [];
+    const yValues = [];
+
+    for (let traceIdx = 0; traceIdx < chartDiv.data.length; traceIdx++) {
+        const trace = chartDiv.data[traceIdx];
+
+        if (!trace.x || !trace.y || !trace.meta) continue;
+        if (trace.meta.seriesName !== baseKey) continue;
+        if (trace.meta.aggId !== aggId) continue;
+
+        for (let i = 0; i < trace.x.length; i++) {
+            const y = trace.y[i];
+            if (y !== null && y !== undefined && !isNaN(y)) {
+                xValues.push(trace.x[i]);
+                yValues.push(y);
+            }
+        }
+    }
+
+    return { x: xValues, y: yValues };
+}
+
+function getDataInRangeForSeries(x1, x2, baseKey, aggId) {
+    const chartDiv = getChartDiv();
+
+    if (!chartDiv || !chartDiv.data) {
+        return null;
+    }
+
+    const targetSeriesName = baseKey;
+    const xValues = [];
+    const yValues = [];
+
+    for (let traceIdx = 0; traceIdx < chartDiv.data.length; traceIdx++) {
+        const trace = chartDiv.data[traceIdx];
+
+        if (!trace.x || !trace.y || !trace.meta) {
+            continue;
+        }
+
+        if (trace.meta.seriesName !== targetSeriesName) {
+            continue;
+        }
+
+        // Only use traces matching the requested aggregation ID
+        if (trace.meta.aggId !== aggId) {
+            continue;
+        }
+
+        for (let i = 0; i < trace.x.length; i++) {
+            const x = trace.x[i];
+            const y = trace.y[i];
+
+            if (x >= x1 && x <= x2 && y !== null && y !== undefined && !isNaN(y)) {
+                xValues.push(x);
+                yValues.push(y);
+            }
+        }
+    }
+
+    return { x: xValues, y: yValues };
+}
+
+function handleCelLineConfirm(data, baseKey) {
+    const chartDiv = getChartDiv();
+    if (!chartDiv) {
+        return;
+    }
+
+    const validPairs = [];
+    for (let i = 0; i < data.x.length; i++) {
+        const y = data.y[i];
+        if (y > 0 && isFinite(y)) {
+            validPairs.push({ x: data.x[i], y: y, logY: Math.log10(y) });
+        }
+    }
+
+    if (validPairs.length < 5) {
+        alert(`Need at least 5 valid data points. Found only ${validPairs.length}.`);
+        handleCelLineCancel();
+        return;
+    }
+
+    const filteredX = validPairs.map(p => p.x);
+    const filteredLogY = validPairs.map(p => p.logY);
+
+    // Get fit settings from user preferences
+    const settings = getCelLineSettings();
+    const fitMethod = settings.fitMethod;
+    const bounceEnvelope = settings.bounceEnvelope;
+    const forecast = settings.forecast;
+
+    // For power law, use chart-level override if set, otherwise startDate
+    const plDefaults = chartState.fitDefaults['Power law'];
+    const originISO = (plDefaults && plDefaults.origin)
+        ? plDefaults.origin
+        : formatDateISO(chartState.startDate);
+    const originUtc = parseOriginToUtc(originISO);
+
+    const fitResult = fit(filteredX, filteredLogY, fitMethod, { originUtc });
+
+    if (!fitResult) {
+        alert('Could not calculate trend line.');
+        handleCelLineCancel();
+        return;
+    }
+
+    const isPowerLaw = fitResult.isPowerLaw;
+    const firstX = isPowerLaw ? Math.min(...filteredX) : filteredX[0];
+    const dataLastX = isPowerLaw ? Math.max(...filteredX) : filteredX[filteredX.length - 1];
+    const lastX = dataLastX + forecast;  // Extend by forecast amount
+
+    let logY1, logY2;
+    if (isPowerLaw) {
+        logY1 = evaluatePowerLaw(firstX, fitResult, originUtc);
+        logY2 = evaluatePowerLaw(lastX, fitResult, originUtc);
+    } else {
+        logY1 = fitResult.slope * firstX + fitResult.intercept;
+        logY2 = fitResult.slope * lastX + fitResult.intercept;
+    }
+    const y1_display = Math.pow(10, logY1);
+    const y2_display = Math.pow(10, logY2);
+
+    const config = CHART_TYPE_CONFIG[chartState.chartType] || CHART_TYPE_CONFIG.Daily;
+    const labelFormat = settings.labelFormat;
+    const wu = WINDOW_UNITS[chartState.chartType];
+    const unitName = wu ? wu.name.toLowerCase() : 'day';
+
+    let labelText;
+    if (isPowerLaw) {
+        labelText = `Power law: ${formatPowerLawLabel(fitResult.slope)}`;
+    } else {
+        const slopeLabel = labelFormat === 'doubling'
+            ? formatDoublingTimeLabel(fitResult.slope, config.unit, unitName)
+            : formatCelerationLabel(fitResult.slope, config.unit);
+        labelText = `${fitMethod}: ${slopeLabel}`;
+    }
+
+    // Calculate bounce bounds if envelope is enabled
+    // For power law, compute residuals against the power law curve
+    let bounceBounds;
+    if (isPowerLaw) {
+        const predictedLogY = filteredX.map(xi => evaluatePowerLaw(xi, fitResult, originUtc));
+        const residuals = filteredLogY.map((yi, i) => yi - predictedLogY[i]);
+        bounceBounds = calculateBounceBoundsFromResiduals(residuals, bounceEnvelope);
+    } else {
+        bounceBounds = calculateBounceBounds(filteredLogY, filteredX, fitResult.slope, fitResult.intercept, bounceEnvelope);
+    }
+
+    // Calculate bounce line Y values (for straight lines only; power law uses offsets directly)
+    let bounceUpperY1 = null, bounceUpperY2 = null;
+    let bounceLowerY1 = null, bounceLowerY2 = null;
+
+    if (bounceBounds && !isPowerLaw) {
+        const bounceLines = calculateBounceLines([firstX, lastX], fitResult.slope, fitResult.intercept, bounceBounds);
+        if (bounceLines) {
+            bounceUpperY1 = bounceLines.upperY[0];
+            bounceUpperY2 = bounceLines.upperY[1];
+            bounceLowerY1 = bounceLines.lowerY[0];
+            bounceLowerY2 = bounceLines.lowerY[1];
+        }
+    }
+
+    const lineId = Date.now();
+
+    // Store dates as YYYY-MM-DD strings to avoid timezone issues with ISO serialization
+    const date1 = xPositionToDate(firstX);
+    const date2 = xPositionToDate(lastX);
+    if (!date1 || !date2) return; // dead zone (Weekly 5-per-month gap)
+    const date1Str = formatDateISO(date1);
+    const date2Str = formatDateISO(date2);
+
+    // Build metadata object
+    const aggId = celLineState.selectedAggId;
+
+    // Build fitParams — structure depends on fit method
+    const fitParams = { slope: fitResult.slope, intercept: fitResult.intercept };
+    if (isPowerLaw) {
+        fitParams.origin = originISO;
+    }
+
+    const metadata = {
+        id: lineId,
+        seriesKey: baseKey,
+        aggId: aggId,
+        date1: date1Str,
+        y1: y1_display,
+        date2: date2Str,
+        y2: y2_display,
+        fitParams: fitParams,
+        fitMethod: fitMethod,
+        bounceEnvelope: bounceEnvelope,
+        forecast: forecast,
+        bounceUpperY1: bounceUpperY1,
+        bounceUpperY2: bounceUpperY2,
+        bounceLowerY1: bounceLowerY1,
+        bounceLowerY2: bounceLowerY2,
+        bounceUpperOffset: bounceBounds ? bounceBounds.upper : null,
+        bounceLowerOffset: bounceBounds ? bounceBounds.lower : null,
+        text: labelText,
+        style: {
+            color: getCelLineColor(baseKey),
+            width: LINE_DEFAULTS.TREND_WIDTH,
+            dash: 'solid',
+            bounceColor: getCelLineColor(baseKey),
+            bounceWidth: 1,
+            bounceDash: 'dot'
+        },
+        shapeIndices: [],
+        annotationIndex: null
+    };
+
+    // Use builder to get shapes and annotation
+    const elements = buildCelLineElements(metadata, chartDiv);
+
+    const currentShapes = chartDiv.layout.shapes || [];
+    const currentAnnotations = chartDiv.layout.annotations || [];
+    const shapeIndex = currentShapes.length;
+    const annotationIndex = currentAnnotations.length;
+
+    relayout(chartDiv, {
+        shapes: [...currentShapes, ...elements.shapes],
+        annotations: [...currentAnnotations, elements.annotation]
+    }).catch(err => {
+        console.error('[CEL DEBUG] Plotly.relayout FAILED:', err);
+    });
+
+    // Update shape indices in metadata
+    metadata.shapeIndices = elements.shapes.map((_, i) => shapeIndex + i);
+    metadata.annotationIndex = annotationIndex;
+
+    chartState.CelLines[lineId] = metadata;
+    eventBus.emit(EVENTS.LINE_CEL_SAVED, { lineId, metadata });
+
+    removeOverlays();
+    cleanupSeriesSelectionMode();
+    deactivateCelLineMode();
+}
+
+function handleCelLineCancel() {
+    removeOverlays();
+    cleanupSeriesSelectionMode();
+
+    celLineState.x1 = null;
+    celLineState.x2 = null;
+    celLineState.x1Pixel = null;
+}
+
+function redrawCelLines() {
+    const chartDiv = getChartDiv();
+    if (!chartDiv) return;
+
+    const currentShapes = chartDiv.layout.shapes || [];
+    const currentAnnotations = chartDiv.layout.annotations || [];
+
+    const nonCelShapes = currentShapes.filter(s => !s.name || !s.name.startsWith('cel-'));
+    const nonCelAnnotations = currentAnnotations.filter(a => !a.name || !a.name.startsWith('cel-'));
+
+    const celShapes = [];
+    const celAnnotations = [];
+
+    // Rebuild shapes and annotations from chartState using the builder
+    const globalVisible = chartState.lineVisibility.change;
+    Object.values(chartState.CelLines).forEach(entry => {
+        const metadata = entry;
+
+        const elements = buildCelLineElements(metadata, chartDiv);
+
+        // Visible only if global change visibility AND the fitted agg is on
+        const fittedAgg = metadata.aggId;
+        const lineVisible = globalVisible && chartState.seriesVisibility[metadata.seriesKey]?.[fittedAgg] !== false;
+        if (!lineVisible) {
+            elements.shapes.forEach(s => s.visible = false);
+            elements.annotation.visible = false;
+        }
+
+        // Add shapes
+        celShapes.push(...elements.shapes);
+
+        // Add annotation
+        celAnnotations.push(elements.annotation);
+    });
+
+    relayout(chartDiv, {
+        shapes: [...nonCelShapes, ...celShapes],
+        annotations: [...nonCelAnnotations, ...celAnnotations]
+    });
+}
+
+/**
+ * Toggle visibility of all cel (celeration/change) lines.
+ * When showing, each line also requires its series to be visible.
+ * @param {boolean} visible - Whether cel lines should be globally visible
+ */
+function setCelLineVisibility(visible) {
+    const chartDiv = getChartDiv();
+    if (!chartDiv) return;
+
+    const shapes = chartDiv.layout.shapes || [];
+    const annotations = chartDiv.layout.annotations || [];
+    let updated = false;
+
+    // Build a set of line IDs whose fitted agg is currently visible
+    const seriesVisibleById = new Map();
+    if (visible) {
+        for (const [id, entry] of Object.entries(chartState.CelLines)) {
+            const fittedAgg = entry.aggId;
+            seriesVisibleById.set(String(id), chartState.seriesVisibility[entry.seriesKey]?.[fittedAgg] !== false);
+        }
+    }
+
+    // Update shapes with names starting with 'cel-'
+    const updatedShapes = shapes.map(s => {
+        if (s.name && s.name.startsWith('cel-')) {
+            updated = true;
+            const lineId = s.name.replace('cel-', '').split('-')[0];
+            const show = visible && (seriesVisibleById.get(lineId) !== false);
+            return { ...s, visible: show };
+        }
+        return s;
+    });
+
+    // Update annotations with names starting with 'cel-'
+    const updatedAnnotations = annotations.map(a => {
+        if (a.name && a.name.startsWith('cel-')) {
+            updated = true;
+            const lineId = a.name.replace('cel-', '').split('-')[0];
+            const show = visible && (seriesVisibleById.get(lineId) !== false);
+            return { ...a, visible: show };
+        }
+        return a;
+    });
+
+    if (updated) {
+        relayout(chartDiv, { shapes: updatedShapes, annotations: updatedAnnotations });
+    }
+}
+
+/**
+ * Update visibility of cel lines for a specific series.
+ * Each cel line tracks which aggId it was fitted on, so we check
+ * visibility per-line rather than assuming a single boolean for
+ * the whole base series.
+ * @param {string} seriesKey - The base series key that changed
+ */
+function updateCelLineSeriesVisibility(seriesKey) {
+    if (!chartState.lineVisibility.change) return; // global is off, nothing to toggle
+
+    const chartDiv = getChartDiv();
+    if (!chartDiv) return;
+
+    // Build a map of cel line ID → should-be-visible for this base series
+    const visibilityById = new Map();
+    for (const [id, entry] of Object.entries(chartState.CelLines)) {
+        if (entry.seriesKey !== seriesKey) continue;
+        const fittedAgg = entry.aggId;
+        visibilityById.set(String(id), chartState.seriesVisibility[seriesKey]?.[fittedAgg] !== false);
+    }
+    if (visibilityById.size === 0) return;
+
+    const shapes = chartDiv.layout.shapes || [];
+    const annotations = chartDiv.layout.annotations || [];
+    let updated = false;
+
+    const updatedShapes = shapes.map(s => {
+        if (s.name && s.name.startsWith('cel-')) {
+            const lineId = s.name.replace('cel-', '').split('-')[0];
+            if (visibilityById.has(lineId)) {
+                updated = true;
+                return { ...s, visible: visibilityById.get(lineId) };
+            }
+        }
+        return s;
+    });
+
+    const updatedAnnotations = annotations.map(a => {
+        if (a.name && a.name.startsWith('cel-')) {
+            const lineId = a.name.replace('cel-', '').split('-')[0];
+            if (visibilityById.has(lineId)) {
+                updated = true;
+                return { ...a, visible: visibilityById.get(lineId) };
+            }
+        }
+        return a;
+    });
+
+    if (updated) {
+        relayout(chartDiv, { shapes: updatedShapes, annotations: updatedAnnotations });
+    }
+}
+
+/**
+ * Initialize subscriptions for this module
+ */
+function init() {
+    // Subscribe to mode activation events from navigation
+    eventBus.subscribe(EVENTS.MODE_CEL_ACTIVATE, () => {
+        activateCelLineMode();
+    });
+
+    eventBus.subscribe(EVENTS.MODE_ALL_DEACTIVATE, () => {
+        if (celLineState.active) {
+            deactivateCelLineMode();
+        }
+    });
+
+    // Redraw cel lines after chart replot completes
+    eventBus.subscribe(EVENTS.DATA_CHART_REPLOT_COMPLETE, () => {
+        redrawCelLines();
+    });
+
+    // Redraw cel lines when a line's style is edited
+    eventBus.subscribe(EVENTS.LINE_CEL_STYLE_CHANGED, () => {
+        redrawCelLines();
+    });
+
+    // Subscribe to line visibility changes from legend ('change' = cel lines)
+    eventBus.subscribe(EVENTS.LINE_VISIBILITY_CHANGED, (data) => {
+        if (data.lineType === 'change') {
+            setCelLineVisibility(data.visible);
+        }
+    }, true);
+
+    // Subscribe to series visibility changes - show/hide cel lines per series
+    eventBus.subscribe(EVENTS.SERIES_VISIBILITY_CHANGED, (data) => {
+        updateCelLineSeriesVisibility(data.baseKey);
+    }, true);
+}
+
+export { activateCelLineMode, deactivateCelLineMode, init };

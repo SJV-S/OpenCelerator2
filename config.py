@@ -1,7 +1,7 @@
 import os
 
 DEVELOPER_MODE = True
-APP_VERSION = '0.4.9'
+APP_VERSION = '0.4.10'
 APP_NAME = 'Standard Change Chart'
 
 # --- Load .env file ---

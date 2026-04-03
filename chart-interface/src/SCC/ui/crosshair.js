@@ -1,0 +1,1209 @@
+/**
+ * Crosshair Module - Cursor tracking and data display
+ *
+ * When user holds Shift and moves mouse over chart:
+ * 1. Crosshair lines (gray dashed) track cursor position
+ * 2. Data markers appear on data points at current x-position
+ * 3. Info panel shows date, cursor coordinates, and series values
+ *
+ * Architecture:
+ * - Canvas-based rendering for crosshair lines and data markers
+ * - Tier 1 (per-frame): Crosshair line drawing
+ * - Tier 2 (per-x-change): Data lookup, marker drawing, info panel updates
+ *
+ * Note: Large datasets (20k+ points) may cause performance issues due to
+ * Plotly's internal O(n) operations, not this module. Aggregating data helps.
+ */
+
+import { chartState } from '../chartState.js';
+import { CORRECTS, ERRORS, LAYOUT, WINDOW_UNITS } from '../config.js';
+import { eventBus, EVENTS } from '../eventBus.js';
+import { dateToXPosition, xPositionToDate } from '../util/dates.js';
+import { formatValue } from '../util/format.js';
+import { getFirstConfig, getConfig, getAggLabel } from '../series/traceStyles.js';
+import { getChartDiv } from '../util/dom.js';
+import { FIT_METHODS, evaluatePowerLaw, parseOriginToUtc } from '../util/fit_lines.js';
+
+// =============================================================================
+// State
+// =============================================================================
+
+const state = {
+    active: false,
+    shiftHeld: false,
+    domReady: false,
+    lastXRounded: null,
+    rafPending: null,
+    lastEvent: null,
+    previousActiveTab: null,
+
+    // Handler references for cleanup
+    mouseMoveHandler: null,
+    beforeHoverHandler: null,
+    relayoutHandler: null,
+
+    // Cached geometry (rebuilt on activate/relayout)
+    cache: null,
+
+    // DOM references (created once, reused)
+    elements: null,
+
+    // Trace data from last x-change lookup
+    currentTraceData: null,
+
+    // Cel line data from last x-change lookup
+    celLineCache: null,
+    currentCelData: null,
+
+    // Current cursor position for redraw
+    currentXPixel: null,
+    currentYPixel: null,
+
+    // Timestamp guard for cache rebuilds (prevents rapid-fire from relayout events)
+    lastCacheRebuild: 0
+};
+
+// =============================================================================
+// Marker style configuration
+// =============================================================================
+
+const MARKER_STYLES = {
+    corrects: { color: '#22c55e', shape: 'circle', sizeMultiplier: 1.0 },
+    errors: { color: '#ef4444', shape: 'circle', sizeMultiplier: 0.54 },
+    timing: { color: '#a855f7', shape: 'triangle-down', sizeMultiplier: 0.30 },
+    misc: { color: '#f97316', shape: 'square', sizeMultiplier: 1.3 }
+};
+
+const MARKER_PADDING = 8;
+const MARKER_OPACITY = 0.4;
+
+// Bounce envelope → upper/lower display labels
+const BOUNCE_LABELS = {
+    '5-95 percentile':        { upper: '95th pctl', lower: '5th pctl' },
+    'Interquartile range':    { upper: '75th pctl', lower: '25th pctl' },
+    'Standard deviation':     { upper: '+1 SD',     lower: '-1 SD' },
+    '90% confidence interval':{ upper: '95% CI',    lower: '5% CI' }
+};
+
+// Dashed line pattern
+const DASH_PATTERN = [4, 4];
+const LINE_COLOR = 'gray';
+
+// =============================================================================
+// Cache Management
+// =============================================================================
+
+/**
+ * Rebuild the geometry cache from current chart layout
+ * Called on: activate, resize, relayout
+ * @param {boolean} force - If true, bypass the timestamp guard (used for activation)
+ */
+function rebuildCache(force = false) {
+    // Timestamp guard: prevent rapid-fire rebuilds from relayout events
+    // (max once per 100ms unless forced)
+    const now = performance.now();
+    if (!force && now - state.lastCacheRebuild < 100) return;
+    state.lastCacheRebuild = now;
+
+    const chartDiv = state.elements?.chart;
+    if (!chartDiv || !chartDiv.layout) return;
+
+    const rect = chartDiv.getBoundingClientRect();
+    const layout = chartDiv.layout;
+    const margin = layout.margin || { l: 0, r: 0, t: 0, b: 0 };
+
+    const plotWidth = rect.width - margin.l - margin.r;
+    const plotHeight = rect.height - margin.t - margin.b;
+    const xRange = layout.xaxis?.range || [0, 100];
+    const yRange = layout.yaxis?.range || [0, 3];
+
+    state.cache = {
+        rect,
+        plotLeft: margin.l,
+        plotTop: margin.t,
+        plotWidth,
+        plotHeight,
+        plotBottom: margin.t + plotHeight,
+        plotRight: margin.l + plotWidth,
+        xRange,
+        yRange,
+        xScale: plotWidth / (xRange[1] - xRange[0]),
+        yScale: plotHeight / (yRange[1] - yRange[0])
+    };
+
+    // Resize canvas to match chart dimensions
+    const canvas = state.elements?.canvas;
+    if (canvas) {
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        canvas.style.width = `${rect.width}px`;
+        canvas.style.height = `${rect.height}px`;
+
+        const ctx = state.elements.ctx;
+        if (ctx) {
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        }
+    }
+}
+
+// =============================================================================
+// DOM Element Creation (run once at first activation)
+// =============================================================================
+
+/**
+ * Build all DOM elements needed by the module
+ * Called lazily on first activation when chart div exists
+ */
+function buildDOMElements() {
+    const chartDiv = getChartDiv();
+    if (!chartDiv) return false;
+
+    state.elements = {
+        chart: chartDiv,
+        eventOverlay: null,
+        canvas: null,
+        ctx: null,
+        infoPanel: null,
+        infoPanelRefs: {},
+        seriesConfigs: new Map()
+    };
+
+    // Event overlay - captures mouse events when active
+    const eventOverlay = document.createElement('div');
+    eventOverlay.id = 'crosshair-event-overlay';
+    eventOverlay.style.cssText = `
+        position: absolute;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        pointer-events: none;
+        z-index: 100;
+    `;
+    chartDiv.appendChild(eventOverlay);
+    state.elements.eventOverlay = eventOverlay;
+
+    // Canvas for crosshair lines and markers
+    const canvas = document.createElement('canvas');
+    canvas.id = 'crosshair-canvas';
+    canvas.style.cssText = `
+        position: absolute;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        pointer-events: none;
+        z-index: 50;
+    `;
+    chartDiv.appendChild(canvas);
+    state.elements.canvas = canvas;
+    state.elements.ctx = canvas.getContext('2d');
+
+    // Build info panel structure
+    buildInfoPanel();
+
+    state.domReady = true;
+    return true;
+}
+
+/**
+ * Build the info panel DOM structure with pre-created text nodes
+ */
+function buildInfoPanel() {
+    const infoContent = document.getElementById('crosshair-info');
+    if (!infoContent) return;
+
+    state.elements.infoPanel = infoContent;
+    infoContent.style.fontSize = LAYOUT.CROSSHAIR_FONT_SIZE;
+    infoContent.innerHTML = '';
+
+    const refs = state.elements.infoPanelRefs;
+
+    // Top grid: Date + Cursor side-by-side
+    const topGrid = document.createElement('div');
+    topGrid.className = 'crosshair-top-grid';
+
+    const dateSection = createSection('Date');
+    refs.dayLabel = createRow(dateSection, 'Day:');
+    refs.monthLabel = createRow(dateSection, 'Month:');
+    refs.yearLabel = createRow(dateSection, 'Year:');
+    topGrid.appendChild(dateSection);
+
+    const divider = document.createElement('div');
+    divider.className = 'crosshair-divider';
+    topGrid.appendChild(divider);
+
+    const cursorSection = createSection('Cursor');
+    refs.xLabel = createRow(cursorSection, 'x:');
+    refs.yLabel = createRow(cursorSection, 'y:');
+    topGrid.appendChild(cursorSection);
+
+    infoContent.appendChild(topGrid);
+
+    // Series section
+    const seriesSection = createSection('Series');
+    seriesSection.id = 'crosshair-series-section';
+    refs.seriesContainer = seriesSection;
+    refs.seriesRows = new Map();
+    infoContent.appendChild(seriesSection);
+
+    // Pre-create a pool of cel row elements (9 rows = 3 lines × 3 values max)
+    // Appended to series container; repositioned dynamically in updateInfoPanel
+    refs.celRowPool = [];
+    for (let i = 0; i < 9; i++) {
+        const row = document.createElement('div');
+        row.className = 'crosshair-row-stacked crosshair-cel-row';
+        row.style.display = 'none';
+
+        const labelSpan = document.createElement('span');
+        labelSpan.className = 'crosshair-label';
+        row.appendChild(labelSpan);
+
+        const valueSpan = document.createElement('span');
+        valueSpan.className = 'crosshair-value';
+        row.appendChild(valueSpan);
+
+        refs.seriesContainer.appendChild(row);
+        refs.celRowPool.push({ row, labelSpan, valueSpan });
+    }
+}
+
+function createSection(heading) {
+    const section = document.createElement('div');
+    section.className = 'crosshair-section';
+
+    const h = document.createElement('div');
+    h.className = 'crosshair-heading';
+    h.textContent = heading;
+    section.appendChild(h);
+
+    return section;
+}
+
+function createRow(parent, label) {
+    const row = document.createElement('div');
+    row.className = 'crosshair-row';
+
+    const labelSpan = document.createElement('span');
+    labelSpan.className = 'crosshair-label';
+    labelSpan.textContent = label;
+    row.appendChild(labelSpan);
+
+    const valueSpan = document.createElement('span');
+    valueSpan.className = 'crosshair-value';
+    row.appendChild(valueSpan);
+
+    parent.appendChild(row);
+    return valueSpan;
+}
+
+/**
+ * Build series config cache for marker rendering
+ */
+function buildSeriesConfigs() {
+    const chartDiv = state.elements?.chart;
+    if (!chartDiv?.data) return;
+
+    state.elements.seriesConfigs.clear();
+
+    // Collect unique series+aggId combinations from traces
+    // seriesConfigs: Map<baseKey, Map<aggId, {color, shape, size}>>
+    for (const trace of chartDiv.data) {
+        if (!trace.meta) continue;
+        const { seriesName, aggId } = trace.meta;
+        if (!seriesName || seriesName.includes('FloorShadow')) continue;
+
+        if (state.elements.seriesConfigs.get(seriesName)?.has(aggId)) continue;
+
+        const styleKey = seriesName.startsWith('misc') ? 'misc' : seriesName;
+        const style = MARKER_STYLES[styleKey] || MARKER_STYLES.misc;
+        const size = getMarkerSize(seriesName);
+
+        if (!state.elements.seriesConfigs.has(seriesName)) {
+            state.elements.seriesConfigs.set(seriesName, new Map());
+        }
+        state.elements.seriesConfigs.get(seriesName).set(aggId, {
+            color: style.color,
+            shape: style.shape,
+            size: size
+        });
+    }
+
+    // Also create rows in series section for each series+aggId
+    // seriesRows: Map<baseKey, Map<aggId, {row, labelSpan, valueSpan}>>
+    const refs = state.elements.infoPanelRefs;
+    if (refs.seriesContainer) {
+        // Remove existing rows (keep heading)
+        const heading = refs.seriesContainer.querySelector('.crosshair-heading');
+        refs.seriesContainer.innerHTML = '';
+        if (heading) refs.seriesContainer.appendChild(heading);
+        refs.seriesRows.clear();
+
+        for (const [seriesName, aggMap] of state.elements.seriesConfigs) {
+            for (const aggId of aggMap.keys()) {
+                const row = document.createElement('div');
+                row.className = 'crosshair-row-stacked';
+                row.style.display = 'none';
+
+                const labelSpan = document.createElement('span');
+                labelSpan.className = 'crosshair-label';
+                row.appendChild(labelSpan);
+
+                const valueSpan = document.createElement('span');
+                valueSpan.className = 'crosshair-value';
+                row.appendChild(valueSpan);
+
+                refs.seriesContainer.appendChild(row);
+                if (!refs.seriesRows.has(seriesName)) {
+                    refs.seriesRows.set(seriesName, new Map());
+                }
+                refs.seriesRows.get(seriesName).set(aggId, { row, labelSpan, valueSpan });
+            }
+        }
+
+        // Re-append cel pool rows so they stay in the series container after rebuild
+        if (refs.celRowPool) {
+            for (const poolEntry of refs.celRowPool) {
+                refs.seriesContainer.appendChild(poolEntry.row);
+            }
+        }
+    }
+}
+
+function getMarkerSize(seriesId) {
+    let chartSize;
+    let style;
+    const config = getFirstConfig(seriesId);
+
+    if (seriesId === CORRECTS) {
+        chartSize = config?.markerSize ?? 8;
+        style = MARKER_STYLES.corrects;
+    } else if (seriesId === ERRORS) {
+        chartSize = config?.markerSize ?? 20;
+        style = MARKER_STYLES.errors;
+    } else if (seriesId === 'timing') {
+        chartSize = config?.markerSize ?? 30;
+        style = MARKER_STYLES.timing;
+    } else if (seriesId.startsWith('misc')) {
+        chartSize = config?.markerSize ?? 8;
+        style = MARKER_STYLES.misc;
+    } else {
+        chartSize = 8;
+        style = MARKER_STYLES.misc;
+    }
+
+    return (chartSize * style.sizeMultiplier) + MARKER_PADDING;
+}
+
+/**
+ * Build cache of visible cel line data for crosshair evaluation
+ * Converts dates to x-positions once, avoiding per-frame work
+ */
+function buildCelLineCache() {
+    state.celLineCache = [];
+    const chartDiv = state.elements?.chart;
+    if (!chartDiv) return;
+
+    const globalVisible = chartState.lineVisibility?.change !== false;
+
+    for (const [id, meta] of Object.entries(chartState.CelLines)) {
+        if (id === 'settings') continue;
+
+        // Skip if global change line visibility is off
+        if (!globalVisible) continue;
+
+        // Skip if the fitted aggregation is hidden
+        const aggVisible = chartState.seriesVisibility[meta.seriesKey]?.[meta.aggId] !== false;
+        if (!aggVisible) continue;
+
+        // Skip hidden shapes (per-line visibility)
+        const shapeName = `cel-${meta.id}`;
+        const shape = (chartDiv.layout.shapes || []).find(s => s.name === shapeName);
+        if (shape && shape.visible === false) continue;
+
+        const x0 = dateToXPosition(meta.date1);
+        const x1 = dateToXPosition(meta.date2);
+
+        const fp = meta.fitParams;
+        const isPowerLaw = meta.fitMethod === FIT_METHODS.POWER_LAW && fp.origin;
+
+        let slope, intercept, originUtc;
+        if (isPowerLaw) {
+            // Power law: store params for evaluatePowerLaw()
+            slope = null;
+            intercept = null;
+            originUtc = parseOriginToUtc(fp.origin);
+        } else {
+            // Linear: derive slope/intercept from stored endpoints in the
+            // current x-coordinate system. The metadata values were computed
+            // in the chart type active at creation time; if the chart type
+            // (or startDate) changed since then, those raw values are stale.
+            // The endpoint Y values are chart-type-independent, so
+            // recomputing here keeps the crosshair aligned with the
+            // Plotly shape, which also uses the endpoints directly.
+            const logY0 = Math.log10(meta.y1);
+            const logY1 = Math.log10(meta.y2);
+            const dx = x1 - x0;
+            slope = dx !== 0 ? (logY1 - logY0) / dx : 0;
+            intercept = logY0 - slope * x0;
+            originUtc = null;
+        }
+
+        state.celLineCache.push({
+            id: meta.id,
+            seriesKey: meta.seriesKey,
+            aggId: meta.aggId,
+            x0, x1,
+            slope,
+            intercept,
+            fitParams: fp,
+            originUtc,
+            bounceUpperOffset: meta.bounceUpperOffset,
+            bounceLowerOffset: meta.bounceLowerOffset,
+            color: meta.style.color,
+            bounceColor: meta.style.bounceColor,
+            fitMethod: meta.fitMethod,
+            bounceEnvelope: meta.bounceEnvelope,
+            text: meta.text
+        });
+    }
+}
+
+// =============================================================================
+// Activation / Deactivation
+// =============================================================================
+
+function activateCrosshair() {
+    if (state.active) return;
+
+    // Lazy DOM initialization
+    if (!state.domReady) {
+        if (!buildDOMElements()) return;
+    }
+
+    state.active = true;
+
+    // Rebuild geometry cache (forced - always rebuild on activation)
+    rebuildCache(true);
+
+    // Rebuild series configs in case traces changed
+    buildSeriesConfigs();
+
+    // Rebuild cel line cache for crosshair evaluation
+    buildCelLineCache();
+
+    const chartDiv = state.elements.chart;
+
+    // Block Plotly's hover computation
+    state.beforeHoverHandler = () => false;
+    chartDiv.on('plotly_beforehover', state.beforeHoverHandler);
+
+    // Disable Plotly's drag layer to prevent element-level listeners
+    const dragLayer = chartDiv.querySelector('.nsewdrag');
+    if (dragLayer) dragLayer.style.pointerEvents = 'none';
+
+    // Enable event capture on overlay
+    state.elements.eventOverlay.style.pointerEvents = 'auto';
+
+    // Attach mousemove handler
+    state.mouseMoveHandler = handleMouseMove;
+    state.elements.eventOverlay.addEventListener('mousemove', state.mouseMoveHandler);
+
+    // Attach relayout handler
+    state.relayoutHandler = () => {
+        rebuildCache();
+        if (state.currentXPixel !== null) {
+            drawCanvas();
+        }
+    };
+    chartDiv.on('plotly_relayout', state.relayoutHandler);
+
+    // Store current sidebar tab for restoration
+    const activeTab = document.querySelector('.chart-menu-tab-pane.active');
+    if (activeTab) {
+        state.previousActiveTab = activeTab.id;
+    }
+
+    // Hide tabs and show crosshair content
+    const tabs = document.querySelector('.chart-menu-tabs');
+    if (tabs) tabs.style.display = 'none';
+
+    document.querySelectorAll('.chart-menu-tab-pane').forEach(pane => {
+        pane.classList.remove('active');
+    });
+
+    const crosshairContent = document.getElementById('crosshair-content');
+    if (crosshairContent) {
+        crosshairContent.classList.add('active');
+    }
+
+    // Show counter overlay on mobile if hidden
+    const counterOverlay = document.getElementById('counter-overlay');
+    if (counterOverlay && counterOverlay.style.display === 'none') {
+        counterOverlay.style.display = 'flex';
+    }
+}
+
+function deactivateCrosshair() {
+    if (!state.active) return;
+
+    state.active = false;
+    state.lastXRounded = null;
+    state.currentXPixel = null;
+    state.currentYPixel = null;
+    state.currentTraceData = null;
+    state.celLineCache = null;
+    state.currentCelData = null;
+
+    // Cancel pending RAF
+    if (state.rafPending) {
+        cancelAnimationFrame(state.rafPending);
+        state.rafPending = null;
+    }
+    state.lastEvent = null;
+
+    const chartDiv = state.elements?.chart;
+
+    // Remove beforehover handler
+    if (chartDiv && state.beforeHoverHandler) {
+        chartDiv.removeListener('plotly_beforehover', state.beforeHoverHandler);
+        state.beforeHoverHandler = null;
+    }
+
+    // Restore Plotly's drag layer
+    if (chartDiv) {
+        const dragLayer = chartDiv.querySelector('.nsewdrag');
+        if (dragLayer) dragLayer.style.pointerEvents = '';
+    }
+
+    // Remove relayout handler
+    if (chartDiv && state.relayoutHandler) {
+        chartDiv.removeListener('plotly_relayout', state.relayoutHandler);
+        state.relayoutHandler = null;
+    }
+
+    // Disable event capture
+    if (state.elements?.eventOverlay) {
+        if (state.mouseMoveHandler) {
+            state.elements.eventOverlay.removeEventListener('mousemove', state.mouseMoveHandler);
+        }
+        state.elements.eventOverlay.style.pointerEvents = 'none';
+    }
+    state.mouseMoveHandler = null;
+
+    // Clear canvas
+    const ctx = state.elements?.ctx;
+    const canvas = state.elements?.canvas;
+    if (ctx && canvas) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    // Hide crosshair content
+    const crosshairContent = document.getElementById('crosshair-content');
+    if (crosshairContent) {
+        crosshairContent.classList.remove('active');
+    }
+
+    // Restore tabs
+    const tabs = document.querySelector('.chart-menu-tabs');
+    if (tabs) tabs.style.display = '';
+
+    // Restore previous active tab
+    if (state.previousActiveTab) {
+        const previousPane = document.getElementById(state.previousActiveTab);
+        if (previousPane) {
+            previousPane.classList.add('active');
+        }
+
+        const tabName = state.previousActiveTab.replace('-content', '');
+        const tabButton = document.querySelector(`[data-tab="${tabName}"]`);
+        if (tabButton) {
+            tabButton.classList.add('active');
+        }
+    }
+}
+
+// =============================================================================
+// Mouse Movement Pipeline
+// =============================================================================
+
+function handleMouseMove(event) {
+    // CRITICAL: Stop propagation to prevent Plotly's document-level
+    // mousemove listeners (dragElement system) from running O(n) hover detection
+    event.stopPropagation();
+    event.preventDefault();
+
+    state.lastEvent = event;
+
+    if (!state.rafPending) {
+        state.rafPending = requestAnimationFrame(processFrame);
+    }
+}
+
+/**
+ * RAF callback - Tier 1 (per-frame) and conditionally Tier 2 (per-x-change)
+ */
+function processFrame() {
+    state.rafPending = null;
+
+    const event = state.lastEvent;
+    if (!event || !state.cache) return;
+
+    const cache = state.cache;
+
+    // Read cursor position (no layout forcing)
+    const xPixel = event.clientX - cache.rect.left;
+    const yPixel = event.clientY - cache.rect.top;
+
+    // Boundary check
+    if (xPixel < cache.plotLeft || xPixel > cache.plotRight ||
+        yPixel < cache.plotTop || yPixel > cache.plotBottom) {
+        // Outside plot area - clear canvas
+        const ctx = state.elements?.ctx;
+        const canvas = state.elements?.canvas;
+        if (ctx && canvas) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+        state.currentXPixel = null;
+        state.currentYPixel = null;
+        return;
+    }
+
+    // Store current position
+    state.currentXPixel = xPixel;
+    state.currentYPixel = yPixel;
+
+    // Compute data values from pixel position
+    const xValue = cache.xRange[0] + (xPixel - cache.plotLeft) / cache.xScale;
+    const yLogValue = cache.yRange[1] - (yPixel - cache.plotTop) / cache.yScale;
+
+    // --- Tier 2: Only run when x changes (data lookup, date, series) ---
+    const xRounded = Math.round(xValue);
+    if (xRounded !== state.lastXRounded) {
+        state.lastXRounded = xRounded;
+
+        const traceData = findTraceDataAtX(xRounded);
+        state.currentTraceData = traceData;
+
+        const celData = findCelLinesAtX(xRounded, yLogValue);
+        state.currentCelData = celData;
+
+        updateInfoPanel(xRounded, yLogValue, traceData, celData);
+    }
+
+    // --- Tier 1: Cursor y-value updates every frame ---
+    updateCursorY(yLogValue);
+
+    // --- Tier 1: Draw crosshair and markers ---
+    drawCanvas();
+}
+
+/**
+ * Draw crosshair lines and markers on canvas
+ */
+function drawCanvas() {
+    const ctx = state.elements?.ctx;
+    const canvas = state.elements?.canvas;
+    if (!ctx || !canvas || !state.cache) return;
+
+    const cache = state.cache;
+    const xPixel = state.currentXPixel;
+    const yPixel = state.currentYPixel;
+
+    if (xPixel === null || yPixel === null) return;
+
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw dashed crosshair lines
+    ctx.strokeStyle = LINE_COLOR;
+    ctx.lineWidth = 1;
+    ctx.setLineDash(DASH_PATTERN);
+
+    // Vertical line - snapped to rounded x position (matches info panel)
+    // Uses Plotly's internal axis mapping for pixel-perfect gridline alignment
+    const xaxis = state.elements.chart._fullLayout.xaxis;
+    const xSnapped = state.lastXRounded !== null
+        ? xaxis._offset + xaxis.l2p(state.lastXRounded)
+        : xPixel;
+    ctx.beginPath();
+    ctx.moveTo(xSnapped, cache.plotTop);
+    ctx.lineTo(xSnapped, cache.plotBottom);
+    ctx.stroke();
+
+    // Horizontal line
+    ctx.beginPath();
+    ctx.moveTo(cache.plotLeft, yPixel);
+    ctx.lineTo(cache.plotRight, yPixel);
+    ctx.stroke();
+
+    // Reset line dash for markers
+    ctx.setLineDash([]);
+
+    // Draw markers at data points
+    if (state.currentTraceData && state.lastXRounded !== null) {
+        const fullLayout = state.elements.chart._fullLayout;
+        const xMarkerPixel = fullLayout.xaxis._offset + fullLayout.xaxis.l2p(state.lastXRounded);
+
+        for (const [seriesName, aggMap] of state.currentTraceData) {
+        for (const [aggId, data] of aggMap) {
+            if (!data || data.value <= 0) continue;
+
+            const config = state.elements.seriesConfigs.get(seriesName)?.get(aggId);
+            if (!config) continue;
+
+            // Calculate y pixel position using Plotly's axis mapping (log scale)
+            const yLog = Math.log10(data.value);
+            const yMarkerPixel = fullLayout.yaxis._offset + fullLayout.yaxis.l2p(yLog);
+
+            // Draw marker
+            ctx.globalAlpha = MARKER_OPACITY;
+            ctx.fillStyle = config.color;
+
+            const size = config.size;
+            const halfSize = size / 2;
+
+            if (config.shape === 'circle') {
+                ctx.beginPath();
+                ctx.arc(xMarkerPixel, yMarkerPixel, halfSize, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (config.shape === 'square') {
+                ctx.fillRect(xMarkerPixel - halfSize, yMarkerPixel - halfSize, size, size);
+            } else if (config.shape === 'triangle-down') {
+                ctx.beginPath();
+                ctx.moveTo(xMarkerPixel, yMarkerPixel + halfSize);
+                ctx.lineTo(xMarkerPixel - halfSize, yMarkerPixel - halfSize);
+                ctx.lineTo(xMarkerPixel + halfSize, yMarkerPixel - halfSize);
+                ctx.closePath();
+                ctx.fill();
+            }
+        }
+        }
+
+        ctx.globalAlpha = 1;
+    }
+
+}
+
+// =============================================================================
+// Data Lookup (Binary Search)
+// =============================================================================
+
+/**
+ * Find data values for all traces at a given x position
+ * Uses binary search for O(log n) per trace
+ * @returns {Map} Map<baseKey, Map<aggId, { seriesName, aggId, onXAgg, acrossXAgg, value }>>
+ */
+function findTraceDataAtX(xRounded) {
+    const chartDiv = state.elements?.chart;
+    if (!chartDiv?.data) return new Map();
+
+    const traces = chartDiv.data;
+    const result = new Map();
+
+    for (const trace of traces) {
+        if (!trace.meta) continue;
+
+        const { seriesName, aggId, onXAgg, acrossXAgg } = trace.meta;
+        if (!seriesName || seriesName.includes('FloorShadow')) continue;
+
+        // Skip series the user has hidden via the legend
+        if (chartState.seriesVisibility[seriesName]?.[aggId] === false) continue;
+
+        const xArray = trace.x;
+        const yArray = trace.y;
+        if (!xArray || !yArray || xArray.length === 0) continue;
+
+        // Binary search for closest x
+        const { index, dist } = binarySearchClosest(xArray, xRounded);
+
+        if (index >= 0 && dist <= 0.5) {
+            const value = yArray[index];
+            if (value !== null && value !== undefined && !isNaN(value)) {
+                if (!result.get(seriesName)?.has(aggId)) {
+                    if (!result.has(seriesName)) result.set(seriesName, new Map());
+                    result.get(seriesName).set(aggId, { seriesName, aggId, onXAgg, acrossXAgg, value });
+                }
+            }
+        }
+    }
+
+    return result;
+}
+
+/**
+ * Binary search for closest value in sorted array
+ * @returns {{ index: number, dist: number }}
+ */
+function binarySearchClosest(arr, target) {
+    if (!arr || arr.length === 0) return { index: -1, dist: Infinity };
+
+    let lo = 0;
+    let hi = arr.length - 1;
+
+    // Handle edge cases
+    if (target <= arr[0]) return { index: 0, dist: Math.abs(arr[0] - target) };
+    if (target >= arr[hi]) return { index: hi, dist: Math.abs(arr[hi] - target) };
+
+    // Binary search for insertion point
+    while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (arr[mid] < target) {
+            lo = mid + 1;
+        } else {
+            hi = mid;
+        }
+    }
+
+    // Compare lo and lo-1 to find closest
+    let bestIdx = lo;
+    let bestDist = Math.abs(arr[lo] - target);
+
+    if (lo > 0) {
+        const prevDist = Math.abs(arr[lo - 1] - target);
+        if (prevDist < bestDist) {
+            bestIdx = lo - 1;
+            bestDist = prevDist;
+        }
+    }
+
+    return { index: bestIdx, dist: bestDist };
+}
+
+// =============================================================================
+// Cel Line Evaluation
+// =============================================================================
+
+/**
+ * Find cel lines that intersect the current x position and compute their Y values.
+ * When multiple cel lines for the same series overlap, keep only the one whose
+ * trend value is closest to the cursor's y position (in log space).
+ *
+ * @param {number} xRounded - Rounded x position
+ * @param {number} yLogValue - Cursor y in log10 space
+ * @returns {Array} Array of { id, seriesKey, trendY, upperY, lowerY, color, bounceColor, text }
+ */
+function findCelLinesAtX(xRounded, yLogValue) {
+    if (!state.celLineCache || state.celLineCache.length === 0) return [];
+
+    // Evaluate all matching cel lines
+    const candidates = [];
+
+    for (const line of state.celLineCache) {
+        if (xRounded < line.x0 || xRounded > line.x1) continue;
+
+        // Live visibility guard — cache may be stale after visibility toggles
+        const aggVisible = chartState.seriesVisibility[line.seriesKey]?.[line.aggId] !== false;
+        if (!aggVisible) continue;
+
+        const logY = line.originUtc
+            ? evaluatePowerLaw(xRounded, line.fitParams, line.originUtc)
+            : line.slope * xRounded + line.intercept;
+        const trendY = Math.pow(10, logY);
+
+        let upperY = null;
+        let lowerY = null;
+
+        if (line.bounceUpperOffset != null) {
+            upperY = Math.pow(10, logY + line.bounceUpperOffset);
+        }
+        if (line.bounceLowerOffset != null) {
+            lowerY = Math.pow(10, logY + line.bounceLowerOffset);
+        }
+
+        candidates.push({
+            id: line.id,
+            seriesKey: line.seriesKey,
+            aggId: line.aggId,
+            trendY,
+            upperY,
+            lowerY,
+            color: line.color,
+            bounceColor: line.bounceColor,
+            fitMethod: line.fitMethod,
+            bounceEnvelope: line.bounceEnvelope,
+            text: line.text,
+            _logDist: Math.abs(logY - yLogValue)
+        });
+    }
+
+    // Group by seriesKey, keep only nearest per series
+    const bySeriesKey = new Map();
+    for (const c of candidates) {
+        const existing = bySeriesKey.get(c.seriesKey);
+        if (!existing || c._logDist < existing._logDist) {
+            bySeriesKey.set(c.seriesKey, c);
+        }
+    }
+
+    return Array.from(bySeriesKey.values());
+}
+
+// =============================================================================
+// Info Panel Updates
+// =============================================================================
+
+/**
+ * Update cursor y-value in info panel (runs every frame)
+ */
+function updateCursorY(yLogValue) {
+    const refs = state.elements?.infoPanelRefs;
+    if (!refs?.yLabel) return;
+    const yValue = Math.pow(10, yLogValue);
+    refs.yLabel.textContent = formatValue(yValue);
+}
+
+/**
+ * Update info panel with data at current position
+ * Uses textContent only - no innerHTML
+ */
+function updateInfoPanel(xRounded, yLogValue, traceData, celData) {
+    const refs = state.elements?.infoPanelRefs;
+    if (!refs) return;
+
+    // Date section — null means dead zone (Weekly 5-per-month gap)
+    const date = xPositionToDate(xRounded);
+    if (date) {
+        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                           'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+        refs.dayLabel.textContent = `${dayNames[date.getDay()]} | ${date.getDate()}`;
+        refs.monthLabel.textContent = `${monthNames[date.getMonth()]} | ${String(date.getMonth() + 1).padStart(2, '0')}`;
+        refs.yearLabel.textContent = date.getFullYear();
+    } else {
+        refs.dayLabel.textContent = '';
+        refs.monthLabel.textContent = '';
+        refs.yearLabel.textContent = '';
+    }
+
+    // Cursor section
+    const yValue = Math.pow(10, yLogValue);
+    refs.xLabel.textContent = xRounded;
+    refs.yLabel.textContent = formatValue(yValue);
+
+    // Build set of (baseKey, aggId) pairs that need a heading row for cel lines,
+    // even when no trace data exists at this x (forecast zone)
+    // celHeadingKeys: Map<baseKey, Set<aggId>>
+    const celHeadingKeys = new Map();
+    if (celData) {
+        for (const cel of celData) {
+            if (!celHeadingKeys.has(cel.seriesKey)) celHeadingKeys.set(cel.seriesKey, new Set());
+            celHeadingKeys.get(cel.seriesKey).add(cel.aggId);
+        }
+    }
+
+    // Series section - show/hide rows and update values
+    if (refs.seriesRows) {
+        for (const [baseKey, aggMap] of refs.seriesRows) {
+        for (const [aggId, rowRefs] of aggMap) {
+            const data = traceData.get(baseKey)?.get(aggId);
+
+            // Get actual marker fill color from chartState.traceStyles
+            const isMisc = baseKey.startsWith('misc');
+            const styles = isMisc
+                ? chartState.traceStyles.misc?.[baseKey]
+                : chartState.traceStyles?.[baseKey];
+            const markerColor = styles?.[aggId]?.markerColor || '';
+
+            if (!data) {
+                if (celHeadingKeys.get(baseKey)?.has(aggId)) {
+                    // Show as label-only heading using the derived series' own name + agg label
+                    const aggConfig = getConfig(baseKey, aggId);
+                    const baseName = aggConfig?.seriesName || formatSeriesName(baseKey);
+                    let displayName = `${baseName} — ${aggConfig ? getAggLabel(aggConfig) : 'Raw'}`;
+                    if (displayName.length > 40) {
+                        displayName = displayName.slice(0, 40) + '...';
+                    }
+                    rowRefs.labelSpan.textContent = displayName;
+                    rowRefs.labelSpan.style.color = markerColor;
+                    rowRefs.valueSpan.textContent = '';
+                    rowRefs.row.style.display = '';
+                } else {
+                    rowRefs.row.style.display = 'none';
+                }
+                continue;
+            }
+
+            let displayName = formatSeriesName(data.seriesName);
+            if (displayName.length > 30) {
+                displayName = displayName.slice(0, 30) + '...';
+            }
+            rowRefs.labelSpan.textContent = displayName;
+            rowRefs.labelSpan.style.color = markerColor;
+
+            // Format value - timing shows reciprocal
+            let displayValue;
+            if (data.seriesName === 'timing') {
+                displayValue = formatValue(1 / data.value);
+            } else {
+                displayValue = formatValue(data.value);
+            }
+
+            // Append aggregation info if not plain raw
+            const onX = data.onXAgg || 'raw';
+            const acrossX = data.acrossXAgg;
+            if (onX !== 'raw' || acrossX) {
+                const parts = [];
+                if (onX !== 'raw') parts.push(onX);
+                if (acrossX) {
+                    const unit = WINDOW_UNITS[chartState.chartType]?.abbrev || 'x';
+                    parts.push(`${acrossX.fn} ${unit}${acrossX.window}`);
+                }
+                displayValue += ` (${parts.join(', ')})`;
+            }
+
+            rowRefs.valueSpan.textContent = displayValue;
+            rowRefs.row.style.display = '';
+        }
+        }
+    }
+
+    // Change lines — position cel pool rows after their matching series rows
+    if (refs.celRowPool) {
+        let rowIdx = 0;
+        const pool = refs.celRowPool;
+
+        if (celData && celData.length > 0) {
+            for (const cel of celData) {
+                const bounceLabels = BOUNCE_LABELS[cel.bounceEnvelope];
+
+                let anchorRow = refs.seriesRows.get(cel.seriesKey)?.get(cel.aggId)?.row;
+                if (!anchorRow) {
+                    const aggMap = refs.seriesRows.get(cel.seriesKey);
+                    if (aggMap) {
+                        const firstEntry = aggMap.values().next().value;
+                        if (firstEntry) anchorRow = firstEntry.row;
+                    }
+                }
+
+                // Collect the cel rows for this line so we can insert them in order
+                const celRows = [];
+
+                // Trend row
+                if (rowIdx < pool.length) {
+                    const r = pool[rowIdx++];
+                    r.labelSpan.textContent = cel.fitMethod;
+                    r.valueSpan.textContent = formatValue(cel.trendY);
+                    r.row.style.display = '';
+                    celRows.push(r.row);
+                }
+
+                // Upper bounce row
+                if (cel.upperY != null && rowIdx < pool.length) {
+                    const r = pool[rowIdx++];
+                    r.labelSpan.textContent = bounceLabels?.upper || 'Upper';
+                    r.valueSpan.textContent = formatValue(cel.upperY);
+                    r.row.style.display = '';
+                    celRows.push(r.row);
+                }
+
+                // Lower bounce row
+                if (cel.lowerY != null && rowIdx < pool.length) {
+                    const r = pool[rowIdx++];
+                    r.labelSpan.textContent = bounceLabels?.lower || 'Lower';
+                    r.valueSpan.textContent = formatValue(cel.lowerY);
+                    r.row.style.display = '';
+                    celRows.push(r.row);
+                }
+
+                // Insert cel rows right after the anchor series row
+                if (anchorRow) {
+                    let insertBefore = anchorRow.nextSibling;
+                    for (const celRow of celRows) {
+                        refs.seriesContainer.insertBefore(celRow, insertBefore);
+                        insertBefore = celRow.nextSibling;
+                    }
+                }
+            }
+        }
+
+        // Hide unused pool rows
+        for (let i = rowIdx; i < pool.length; i++) {
+            pool[i].row.style.display = 'none';
+        }
+    }
+}
+
+/**
+ * Get display name for a series from chartState
+ */
+function formatSeriesName(seriesId) {
+    const config = getFirstConfig(seriesId);
+
+    if (config?.seriesName) {
+        return config.seriesName;
+    }
+
+    // Fallback
+    const fallback = {
+        corrects: 'Correct',
+        errors: 'Incorrect',
+        timing: 'Timing'
+    };
+    return fallback[seriesId] || seriesId;
+}
+
+// =============================================================================
+// Visibility Change Handling
+// =============================================================================
+
+/**
+ * Rebuild cel line cache and re-evaluate current position after visibility changes.
+ * Called when series or line visibility toggles while crosshair is active.
+ */
+function refreshCelOverlays() {
+    if (!state.active) return;
+
+    buildCelLineCache();
+
+    // Re-evaluate cel data at current position
+    if (state.lastXRounded !== null && state.currentYPixel !== null && state.cache) {
+        const yLogValue = state.cache.yRange[1] - (state.currentYPixel - state.cache.plotTop) / state.cache.yScale;
+        state.currentCelData = findCelLinesAtX(state.lastXRounded, yLogValue);
+        updateInfoPanel(state.lastXRounded, yLogValue, state.currentTraceData, state.currentCelData);
+    }
+
+    drawCanvas();
+}
+
+// =============================================================================
+// Initialization
+// =============================================================================
+
+function init() {
+    // Keydown - mark Shift held (activation deferred until mouse moves)
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Shift' && !state.shiftHeld) {
+            state.shiftHeld = true;
+        }
+    });
+
+    // Mousemove - activate crosshair if Shift is held and not yet active
+    document.addEventListener('mousemove', () => {
+        if (state.shiftHeld && !state.active) {
+            activateCrosshair();
+        }
+    });
+
+    // Keyup - deactivate on Shift release
+    document.addEventListener('keyup', (event) => {
+        if (event.key === 'Shift') {
+            state.shiftHeld = false;
+            deactivateCrosshair();
+        }
+    });
+
+    // Window blur - deactivate (handles alt-tab while Shift held)
+    window.addEventListener('blur', () => {
+        if (state.shiftHeld) {
+            state.shiftHeld = false;
+            deactivateCrosshair();
+        }
+    });
+
+    // Rebuild cel overlays when series visibility changes
+    eventBus.subscribe(EVENTS.SERIES_VISIBILITY_CHANGED, refreshCelOverlays, true);
+
+    // Rebuild cel overlays when line type visibility toggles (e.g. global change line toggle)
+    eventBus.subscribe(EVENTS.LINE_VISIBILITY_CHANGED, refreshCelOverlays, true);
+}
+
+export { init, activateCrosshair, deactivateCrosshair };

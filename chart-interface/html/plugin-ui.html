@@ -1,0 +1,408 @@
+<!-- SCC Chart Plugin UI
+     Assembled from TC2 templates with Jinja stripped.
+     Tabs: Lines, Series, Settings, Share (export only).
+     Inject this HTML into a container div via SCCChart constructor.
+-->
+
+<!-- Chart area -->
+<div id="chart-area">
+    <!-- Fullscreen toggle - visible on hover -->
+    <button id="fullscreen-toggle" data-icon="fullscreenExpand" title="Toggle fullscreen (Shift+F)"></button>
+
+    <!-- Pan slider - horizontally centered above chart, visible on hover -->
+    <div id="pan-slider-container">
+        <input type="range" id="pan-slider" class="w-[600px] h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+    </div>
+
+    <!-- Chart container -->
+    <div id="chart-container">
+        <div id="chart" style="position: relative;">
+            <div id="custom-legend" style="display: none;"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Menu hint tooltip -->
+<div id="menu-hint" style="
+    position: absolute;
+    bottom: 10%;
+    left: 50%;
+    transform: translateX(-50%);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    opacity: 0;
+    transition: opacity 0.3s;
+    z-index: 9999;
+">
+    <svg id="menu-hint-arrow-up" width="24" height="24" viewBox="0 0 24 24" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));">
+        <path d="M12 4 L20 12 L16 12 L16 20 L8 20 L8 12 L4 12 Z" fill="white" stroke="black" stroke-width="2"/>
+    </svg>
+    <svg id="menu-hint-arrow-down" width="24" height="24" viewBox="0 0 24 24" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2)); display: none;">
+        <path d="M12 20 L20 12 L16 12 L16 4 L8 4 L8 12 L4 12 Z" fill="white" stroke="black" stroke-width="2"/>
+    </svg>
+    <div style="
+        margin-top: 8px;
+        background-color: white;
+        border: 2px solid black;
+        border-radius: 6px;
+        padding: 8px 16px;
+        font-size: 13px;
+        color: #374151;
+        font-weight: 500;
+        white-space: nowrap;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    " id="menu-hint-text"></div>
+</div>
+
+<!-- Menu overlay -->
+<div id="counter-overlay" style="display: none; position: absolute; top: 0; left: 0; background-color: white; z-index: 1000; flex-direction: row;">
+    <!-- Tabs -->
+    <div class="chart-menu-tabs">
+        <button class="chart-menu-tab-btn active" data-tab="lines">Lines</button>
+        <button class="chart-menu-tab-btn" data-tab="series">Series</button>
+        <button class="chart-menu-tab-btn" data-tab="chart">Settings</button>
+        <button class="chart-menu-tab-btn" data-tab="share">Share</button>
+    </div>
+
+    <!-- Tab Content -->
+    <div id="chart-menu-content" class="chart-menu-content menu-loading page-fade">
+
+        <!-- Lines Tab -->
+        <div id="lines-content" class="chart-menu-tab-pane active">
+            <div class="chart-menu-tab-inner flex flex-col h-full">
+                <div class="chart-menu-icon-group">
+
+                    <!-- Phase Category -->
+                    <div class="chart-menu-icon-category">
+                        <h2>Event markers<button class="line-settings-gear" data-icon="otherGear" data-settings-target="phase" title="Event marker settings"></button></h2>
+                        <div class="chart-menu-icon-group-row">
+                            <button class="chart-menu-icon-btn" data-action="phase-text-top" data-icon="phaseTextTop"></button>
+                            <button class="chart-menu-icon-btn" data-action="phase-text-bottom" data-icon="phaseTextBottom"></button>
+                        </div>
+                    </div>
+
+                    <!-- Aim Category -->
+                    <div class="chart-menu-icon-category">
+                        <h2>Count markers<button class="line-settings-gear" data-icon="otherGear" data-settings-target="aim" title="Count marker settings"></button></h2>
+                        <div class="chart-menu-icon-group-row">
+                            <button class="chart-menu-icon-btn" data-action="aim-diagonal" data-icon="aimDiagonal"></button>
+                            <button class="chart-menu-icon-btn" data-action="aim-horizontal" data-icon="aimHorizontal"></button>
+                        </div>
+                    </div>
+
+                    <!-- Cut + Celeration row -->
+                    <div class="chart-menu-icon-group-row">
+                        <div class="chart-menu-icon-category">
+                            <h2>Cut series line</h2>
+                            <button class="chart-menu-icon-btn" data-action="other-scissors" data-icon="otherScissors"></button>
+                        </div>
+                        <div class="chart-menu-icon-category">
+                            <h2>Add trendline<button class="line-settings-gear" data-icon="otherGear" data-settings-target="cel" title="Trendline settings"></button></h2>
+                            <button class="chart-menu-icon-btn" data-action="other-celeration" data-icon="scatterLine"></button>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Per-Category Edit Toggles -->
+                <div class="mt-auto pt-4 border-t border-gray-200">
+                    <p class="text-xs text-gray-500 text-center mb-2">Edit mode</p>
+                    <div class="grid grid-cols-2 gap-x-4 gap-y-2 px-3">
+                        <label class="inline-flex items-center justify-between cursor-pointer">
+                            <span class="text-xs text-gray-600">Event</span>
+                            <input type="checkbox" data-edit-category="phase" class="sr-only peer">
+                            <div class="relative w-8 h-4 bg-gray-300 rounded-full peer peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-4"></div>
+                        </label>
+                        <label class="inline-flex items-center justify-between cursor-pointer">
+                            <span class="text-xs text-gray-600">Count</span>
+                            <input type="checkbox" data-edit-category="aim" class="sr-only peer">
+                            <div class="relative w-8 h-4 bg-gray-300 rounded-full peer peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-4"></div>
+                        </label>
+                        <label class="inline-flex items-center justify-between cursor-pointer">
+                            <span class="text-xs text-gray-600">Cut</span>
+                            <input type="checkbox" data-edit-category="cut" class="sr-only peer">
+                            <div class="relative w-8 h-4 bg-gray-300 rounded-full peer peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-4"></div>
+                        </label>
+                        <label class="inline-flex items-center justify-between cursor-pointer">
+                            <span class="text-xs text-gray-600">Trend</span>
+                            <input type="checkbox" data-edit-category="cel" class="sr-only peer">
+                            <div class="relative w-8 h-4 bg-gray-300 rounded-full peer peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-4"></div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Series Tab -->
+        <div id="series-content" class="chart-menu-tab-pane">
+            <div class="series-tab-layout">
+                <div class="series-subtabs" id="series-tab-container">
+                    <div id="series-flat-list"></div>
+                    <button class="series-row add-series-btn" data-action="add-misc-series" title="Add new data series">
+                        <span class="series-name">Add Series</span>
+                        <span class="series-icon">
+                            <svg class="plus-icon always-visible" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                        </span>
+                    </button>
+                </div>
+
+                <div class="series-content">
+                    <div id="add-agg-panel" class="series-config-panel" style="display: none;">
+                        <h2 id="add-agg-series-name" class="text-sm font-bold text-gray-800 mb-4"></h2>
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Display Name</label>
+                                <input type="text" id="heading-series-name" class="w-full px-3 py-2 border-2 border-gray-300 rounded focus:outline-none">
+                            </div>
+                            <button id="apply-heading-name-btn" class="w-full px-6 py-2 bg-[#6ad1e3] text-white font-semibold rounded hover:opacity-90 active:opacity-80 transition-colors">Apply</button>
+                        </div>
+
+                        <hr class="border-gray-300 my-6">
+
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Per-Position (on X)</label>
+                                <select id="on-x-agg-select" class="w-full px-3 py-2 border-2 border-gray-300 rounded focus:outline-none"></select>
+                            </div>
+                            <div id="across-x-agg-row">
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Rolling Window (across X)</label>
+                                <select id="across-x-agg-select" class="w-full px-3 py-2 border-2 border-gray-300 rounded focus:outline-none"></select>
+                            </div>
+                            <div id="window-size-row" style="display: none;">
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Window Size</label>
+                                <input type="number" id="window-size-input" class="w-full px-3 py-2 border-2 border-gray-300 rounded focus:outline-none" min="2" value="7">
+                            </div>
+                            <button id="confirm-add-agg-btn" class="w-full px-6 py-2 bg-gray-700 text-white font-semibold rounded hover:opacity-90 active:opacity-80 transition-colors">Add</button>
+                        </div>
+                        <p id="add-agg-empty-msg" class="text-sm text-gray-500 mt-3" style="display: none;"></p>
+                        <button id="delete-series-btn" class="w-full px-6 py-2 mt-6 bg-red-500 text-white font-semibold rounded hover:opacity-90 active:opacity-80 transition-colors" style="display: none;">Delete Series</button>
+                    </div>
+
+                    <div id="series-config-panel" class="series-config-panel">
+                        <div id="agg-config-form" class="space-y-3">
+                            <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide pt-2 pb-1 border-b border-gray-300">Line</div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Style</label>
+                                <select id="config-line-dash" class="w-full px-3 py-2 border-2 border-gray-300 rounded focus:outline-none">
+                                    <option value="none">None</option>
+                                    <option value="solid">Solid</option>
+                                    <option value="dash">Dash</option>
+                                    <option value="dot">Dot</option>
+                                    <option value="longdash">Long Dash</option>
+                                    <option value="dashdot">Dash Dot</option>
+                                    <option value="longdashdot">Long Dash Dot</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Width</label>
+                                <input type="number" id="config-line-width" class="w-full px-3 py-2 border-2 border-gray-300 rounded focus:outline-none" step="0.1" min="0" max="10">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Color</label>
+                                <input type="color" id="config-line-color" class="w-full h-10 px-1 py-1 border-2 border-gray-300 rounded focus:outline-none cursor-pointer">
+                            </div>
+
+                            <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide pt-2 pb-1 border-b border-gray-300">Marker</div>
+                            <div id="marker-symbol-row">
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Symbol</label>
+                                <select id="config-marker-symbol" class="w-full px-3 py-2 border-2 border-gray-300 rounded focus:outline-none">
+                                    <option value="none">None</option>
+                                    <option value="circle">Circle</option>
+                                    <option value="square">Square</option>
+                                    <option value="diamond">Diamond</option>
+                                    <option value="cross">Cross</option>
+                                    <option value="x">X</option>
+                                    <option value="triangle-up">Triangle Up</option>
+                                    <option value="triangle-down">Triangle Down</option>
+                                    <option value="star">Star</option>
+                                    <option value="hexagon">Hexagon</option>
+                                    <option value="pentagon">Pentagon</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Size</label>
+                                <input type="number" id="config-marker-size" class="w-full px-3 py-2 border-2 border-gray-300 rounded focus:outline-none" min="1" max="50">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Color</label>
+                                <input type="color" id="config-marker-color" class="w-full h-10 px-1 py-1 border-2 border-gray-300 rounded focus:outline-none cursor-pointer">
+                            </div>
+                            <div id="marker-edge-color-row">
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Edge Color</label>
+                                <input type="color" id="config-marker-edge-color" class="w-full h-10 px-1 py-1 border-2 border-gray-300 rounded focus:outline-none cursor-pointer">
+                            </div>
+
+                            <div class="border-b border-gray-300 mt-4 mb-2"></div>
+                        </div>
+
+                        <div class="flex flex-col gap-3 mt-4">
+                            <button id="apply-config-btn" class="w-full px-6 py-2 bg-[#6ad1e3] text-white font-semibold rounded hover:opacity-90 active:opacity-80 transition-colors">Apply</button>
+                            <button id="reset-config-btn" class="w-full px-6 py-2 bg-gray-400 text-white font-semibold rounded hover:opacity-90 active:opacity-80 transition-colors">Reset</button>
+                            <button id="remove-series-btn" class="w-full px-6 py-2 text-white font-semibold rounded hover:opacity-90 active:opacity-80 transition-colors" style="display: none;">Remove</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Tab -->
+        <div id="chart-content" class="chart-menu-tab-pane">
+            <div class="chart-menu-tab-inner">
+                <div class="mb-8 lg:mb-4">
+                    <label class="block text-sm font-semibold text-gray-600 mb-2 lg:mb-1 text-center" for="chart-name">Chart Name</label>
+                    <div class="flex items-center gap-2 max-w-md lg:max-w-full mx-auto">
+                        <input type="text" id="chart-name" placeholder="Unnamed" class="flex-1 px-4 py-3 lg:px-2 lg:py-2 text-lg lg:text-base border-2 border-gray-300 rounded focus:outline-none focus:border-[#6ad1e3] transition-colors text-center">
+                    </div>
+                </div>
+
+                <div id="chart-type-section" class="mb-4 lg:mb-3 border-t border-gray-300 pt-4 lg:pt-3">
+                    <label class="block text-sm font-semibold text-gray-600 mb-2 lg:mb-1 text-center" for="chart-type-select">Chart Type</label>
+                    <div class="flex justify-center">
+                        <select id="chart-type-select" class="px-3 py-2 lg:px-2 lg:py-1 text-sm border-2 border-gray-300 rounded focus:outline-none focus:border-[#6ad1e3] transition-colors bg-white text-center">
+                            <option value="Daily">Daily</option>
+                            <option value="Weekly">Weekly</option>
+                            <option value="Monthly">Monthly</option>
+                            <option value="Yearly">Yearly</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mb-4 lg:mb-3 border-t border-gray-300 pt-4 lg:pt-3">
+                    <div class="mb-4 lg:mb-3">
+                        <button type="button" id="start-date-btn" class="w-full py-3 lg:py-2 px-4 bg-white border-2 border-gray-300 rounded hover:bg-gray-50 active:bg-gray-100 transition-colors text-sm font-semibold text-gray-600">
+                            Start Date
+                        </button>
+                    </div>
+
+                    <label id="chart-window-label" class="block text-sm font-semibold text-gray-600 mb-2 lg:mb-1 text-center">Chart Window</label>
+                    <div class="flex items-center justify-center gap-3">
+                        <button type="button" id="chart-window-dec" class="w-10 h-10 flex items-center justify-center border-2 border-gray-300 rounded hover:bg-gray-100 active:bg-gray-200 transition-colors">
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M12 4L6 10L12 16" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
+                        <div id="chart-window-value" class="w-16 h-10 flex items-center justify-center border-2 border-gray-300 rounded text-base font-medium bg-white"></div>
+                        <button type="button" id="chart-window-inc" class="w-10 h-10 flex items-center justify-center border-2 border-gray-300 rounded hover:bg-gray-100 active:bg-gray-200 transition-colors">
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M8 4L14 10L8 16" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <label class="block text-sm font-semibold text-gray-600 mb-2 lg:mb-1 mt-4 lg:mt-3 text-center">Chart Height in Pixels</label>
+                    <div class="flex items-center justify-center gap-3">
+                        <button type="button" id="chart-height-dec" class="w-10 h-10 flex items-center justify-center border-2 border-gray-300 rounded hover:bg-gray-100 active:bg-gray-200 transition-colors">
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M4 10H16" stroke="black" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                        </button>
+                        <div id="chart-height-value" class="w-16 h-10 flex items-center justify-center border-2 border-gray-300 rounded text-base font-medium bg-white"></div>
+                        <button type="button" id="chart-height-inc" class="w-10 h-10 flex items-center justify-center border-2 border-gray-300 rounded hover:bg-gray-100 active:bg-gray-200 transition-colors">
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M10 4V16M4 10H16" stroke="black" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mb-4 lg:mb-3 border-t border-gray-300 pt-4 lg:pt-3">
+                    <label class="block text-sm font-semibold text-gray-600 mb-3 lg:mb-2 text-center">Grid</label>
+                    <div class="flex items-center justify-between mb-3">
+                        <label class="text-sm text-gray-500">Date Lines</label>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="grid-date-lines-toggle" class="sr-only peer" checked>
+                            <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#6ad1e3]"></div>
+                        </label>
+                    </div>
+                    <div class="flex items-center justify-between mb-3">
+                        <label class="text-sm text-gray-500">Count Lines</label>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="grid-count-lines-toggle" class="sr-only peer" checked>
+                            <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#6ad1e3]"></div>
+                        </label>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <label class="text-sm text-gray-500">Minor Grid</label>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="grid-minor-toggle" class="sr-only peer" checked>
+                            <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#6ad1e3]"></div>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-4 lg:mb-3 border-t border-gray-300 pt-4 lg:pt-3 hidden md:block">
+                    <label class="block text-sm font-semibold text-gray-600 mb-3 lg:mb-2 text-center">Celeration Fan</label>
+                    <div class="flex items-center justify-center">
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="fan-toggle" class="sr-only peer" checked>
+                            <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#6ad1e3]"></div>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-4 lg:mb-3">
+                    <label class="block text-sm font-semibold text-gray-600 mb-3 lg:mb-2 text-center">Place Zeros Below Floor</label>
+                    <div class="flex items-center justify-center">
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="place-zeros-below-floor-toggle" class="sr-only peer" checked>
+                            <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#6ad1e3]"></div>
+                        </label>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-gray-600 mb-3 lg:mb-2 text-center">Legend</label>
+                    <div class="flex items-center justify-center gap-4 lg:gap-3">
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="legend-toggle" class="sr-only peer" checked>
+                            <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#6ad1e3]"></div>
+                        </label>
+                        <select id="legend-position" class="px-3 py-2 lg:px-2 lg:py-1 text-sm border-2 border-gray-300 rounded focus:outline-none focus:border-[#6ad1e3] transition-colors bg-white disabled:bg-gray-100 disabled:text-gray-400 disabled:bg-gray-200 disabled:cursor-not-allowed">
+                            <option value="top-right">Top Right</option>
+                            <option value="top-left">Top Left</option>
+                            <option value="bottom-right">Bottom Right</option>
+                            <option value="bottom-left">Bottom Left</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mt-4 lg:mt-3 border-t border-gray-300 pt-4 lg:pt-3">
+                    <button type="button" id="reset-settings-btn" class="w-full py-3 lg:py-2 px-4 bg-gray-400 text-white font-semibold rounded hover:bg-gray-500 active:bg-gray-600 transition-colors text-sm">
+                        Reset to Defaults
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Share Tab (export only) -->
+        <div id="share-content" class="chart-menu-tab-pane">
+            <div class="chart-menu-tab-inner">
+                <div class="chart-menu-icon-group">
+                    <div class="chart-menu-icon-category" id="screenshot-btn">
+                        <h2>Screenshot</h2>
+                        <div class="chart-menu-icon-btn" id="camera-icon"></div>
+                    </div>
+
+                    <div class="chart-menu-icon-category" id="csv-export-btn">
+                        <h2>Export data</h2>
+                        <div class="chart-menu-icon-btn" id="csv-icon"></div>
+                    </div>
+
+                    <div class="chart-menu-icon-category" id="json-export-btn">
+                        <h2>Export file</h2>
+                        <div class="chart-menu-icon-btn" id="json-icon"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Crosshair info panel -->
+        <div id="crosshair-content" class="chart-menu-tab-pane">
+            <div class="crosshair-panel">
+                <div id="crosshair-info" class="crosshair-info"></div>
+            </div>
+        </div>
+
+    </div>
+</div>

@@ -464,7 +464,11 @@ function createFrequencyTraces(xPositions, frequencies, timestampsToXPositions) 
     // Get cut x-positions if any cuts exist
     let cutXPositions = [];
     if (chartState.LineCuts && Object.keys(chartState.LineCuts).length > 0) {
-        const cutTimestamps = Object.values(chartState.LineCuts).map(cut => Math.floor(cut.date.getTime() / 1000));
+        const cutTimestamps = Object.values(chartState.LineCuts).map(cut => {
+            if (typeof cut.date === 'number') return cut.date;
+            if (cut.date instanceof Date) return Math.floor(cut.date.getTime() / 1000);
+            return Math.floor(new Date(cut.date).getTime() / 1000); // ISO string after JSON round-trip
+        });
         cutXPositions = timestampsToXPositions(cutTimestamps).map(x => x - 0.5);
         cutXPositions.sort((a, b) => a - b);
     }
