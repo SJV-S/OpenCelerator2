@@ -118,10 +118,13 @@ def _migrate_columns(app):
     """Add columns that may be missing from older schemas."""
     migrations = [
         ('request_logs', 'comment', 'VARCHAR(256)'),
-        ('share_links', 'join_token_hash', 'VARCHAR(64)'),
+        ('request_logs', 'chart_uuid', 'VARCHAR(36)'),
         ('request_logs', 'bytes_downloaded', 'INTEGER'),
         ('request_logs', 'bytes_uploaded', 'INTEGER'),
+        ('share_links', 'join_token_hash', 'VARCHAR(64)'),
         ('charts', 'created_by', 'VARCHAR(64)'),
+        ('charts', 'signature', 'BLOB'),
+        ('chart_tombstones', 'user_id', 'VARCHAR(64)'),
     ]
     for table, column, col_type in migrations:
         try:
