@@ -265,13 +265,11 @@ function formatMonthYear(date) {
  */
 function parseLocalDate(date) {
     if (date instanceof Date) {
-        return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        return createDate(date.getFullYear(), date.getMonth(), date.getDate());
     }
     if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
         const [year, month, day] = date.split('-').map(Number);
-        const d = new Date(2000, month - 1, day);
-        d.setFullYear(year);
-        return d;
+        return createDate(year, month - 1, day);
     }
     // DD-Mon-YYYY format (e.g., "18-Feb-2026")
     if (typeof date === 'string') {
@@ -283,17 +281,14 @@ function parseLocalDate(date) {
             const month = monthNames[match[2]];
             const year = Number(match[3]);
             if (month !== undefined) {
-                const d = new Date(2000, month, day);
-                d.setFullYear(year);
-                return d;
+                return createDate(year, month, day);
             }
         }
     }
     // Fallback - parse and normalize to local midnight
     // BUG INVESTIGATION: ISO strings with time component can shift dates across timezone boundaries
     const d = new Date(date);
-    const result = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-    return result;
+    return createDate(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
 /**
@@ -713,14 +708,10 @@ function updatePlotDateLabel() {
  */
 function getMondaysInMonth(year, month) {
     const mondays = [];
-    const tempDate = new Date(2000, month, 0);
-    tempDate.setFullYear(year);
-    const lastDay = tempDate.getDate();
+    const lastDay = createDate(year, month, 0).getDate();
 
     for (let day = 1; day <= lastDay; day++) {
-        const date = new Date(2000, month - 1, day);
-        date.setFullYear(year);
-        if (date.getDay() === 1) {
+        if (createDate(year, month - 1, day).getDay() === 1) {
             mondays.push(day);
         }
     }
@@ -771,9 +762,10 @@ function parseYearInput(input) {
  * @returns {Date} Date object
  */
 function createDate(year, month, day) {
-    const date = new Date(2000, month, day);
-    date.setFullYear(year);
-    return date;
+    const d = new Date(year, month, day);
+    // new Date() treats years 0-99 as 1900+year; correct that with setFullYear
+    if (year >= 0 && year <= 99) d.setFullYear(year);
+    return d;
 }
 
 /**

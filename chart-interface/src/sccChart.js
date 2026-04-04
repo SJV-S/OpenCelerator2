@@ -116,11 +116,33 @@ export class SCCChart {
     loadData(data) {
         const migrated = { ...data };
         migrateChart(migrated);
+        const prevChartType = chartState.chartType;
+        const prevMinuteChart = chartState.minuteChart;
         Object.assign(chartState, migrated);
         if (typeof chartState.startDate === 'string') {
             chartState.startDate = deserializeDate(chartState.startDate);
         }
-        eventBus.emit(EVENTS.DATA_CHART_REFRESH);
+
+        const templateChanged = chartState.chartType !== prevChartType ||
+                                chartState.minuteChart !== prevMinuteChart;
+
+        if (templateChanged) {
+            // Full re-init required: DATA_CHART_REFRESH only replots data traces
+            // on the existing template. A different chart type needs a new template.
+            // initializeChart() calls newPlot with the correct template and emits
+            // DATA_CHART_REFRESH internally.
+            initializeChart();
+            // Sync the chart-type selector to the newly loaded type.
+            const chartTypeSelect = this._container.querySelector('#chart-type-select');
+            if (chartTypeSelect) chartTypeSelect.value = chartState.chartType;
+        } else {
+            eventBus.emit(EVENTS.DATA_CHART_REFRESH);
+            // Sync the chart-type selector (handles same-type deck switches too,
+            // in case the selector was left on a stale value from a previous deck).
+            const chartTypeSelect = this._container.querySelector('#chart-type-select');
+            if (chartTypeSelect) chartTypeSelect.value = chartState.chartType;
+        }
+
         // DATA_CHART_REFRESH updates data traces but not the x-axis range.
         // Emit CHART_WINDOW_CHANGED so applyChartWindow() syncs the rendered
         // chart window to chartState.chartWindow (which was just set above).

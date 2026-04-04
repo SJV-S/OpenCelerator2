@@ -337,6 +337,7 @@ export function setupEventListeners() {
                     chartState.chartWindow = chartState.chartCapacity / 2;
                     // Re-init chart in place (no page reload in plugin context)
                     initializeChart();
+                    eventBus.emit(EVENTS.CHART_TYPE_CHANGED, { chartType: newType });
                 },
                 onNo: () => {
                     chartTypeSelect.value = chartState.chartType;
