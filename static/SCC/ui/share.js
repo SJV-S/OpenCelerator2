@@ -286,21 +286,13 @@ function exportDataToCSV() {
 }
 
 /**
- * Handles share link option click - generates link and copies to clipboard
+ * Generates a share link of the given type and copies it to clipboard.
  * @param {string} type - 'view' or 'edit'
  */
 async function handleShareLinkClick(type) {
     if (!isChartOwner(chartState) && !chartState.acceptingEdits) return;
 
     if (!chartState.shared && !isSyncEnabled()) return;
-
-    const viewStatus = document.getElementById('share-view-status');
-    const editStatus = document.getElementById('share-edit-status');
-    const status = type === 'view' ? viewStatus : editStatus;
-
-    // Hide both statuses first
-    viewStatus?.classList.add('invisible');
-    editStatus?.classList.add('invisible');
 
     if (!chartState.id) {
         createToast({ message: 'Save chart first', duration: 2000, position: 'top-right' });
@@ -339,12 +331,37 @@ async function handleShareLinkClick(type) {
 
         await navigator.clipboard.writeText(url);
 
-        status?.classList.remove('invisible');
-        setTimeout(() => status?.classList.add('invisible'), 3000);
+        createToast({ message: 'Link copied', duration: 2000, position: 'top-right' });
     } catch (error) {
         console.error('Share link error:', error);
         createToast({ message: 'Failed to create link', duration: 2000, position: 'top-right' });
     }
+}
+
+/**
+ * Handles click on the Share link button — prompts the user to choose view-only or edit.
+ */
+function handleShareBtnClick() {
+    if (!isChartOwner(chartState) && !chartState.acceptingEdits) return;
+    if (!chartState.shared && !isSyncEnabled()) return;
+
+    createToast({
+        message: 'Allow edits or view only?',
+        buttons: [
+            {
+                label: 'Allow edits',
+                onClick: () => handleShareLinkClick('edit'),
+                type: 'secondary'
+            },
+            {
+                label: 'View only',
+                onClick: () => handleShareLinkClick('view'),
+                type: 'secondary'
+            }
+        ],
+        layout: 'vertical',
+        position: 'top-right'
+    });
 }
 
 /**
@@ -455,32 +472,16 @@ function initializeShareTab() {
         csvIconElement.innerHTML = icons.csvExportSvgIcon();
     }
 
-    // Inject share link icons
-    const viewLinkIcon = document.getElementById('view-link-icon');
-    if (viewLinkIcon) {
-        viewLinkIcon.style.position = 'relative';
-        viewLinkIcon.innerHTML = `
-            ${icons.shareLink()}
-            <span style="position: absolute; top: -4px; right: -4px; width: 24px; height: 24px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,0.2);">
-                ${icons.lockSolid(16)}
-            </span>
-        `;
+    // Inject share link icon
+    const shareLinkIcon = document.getElementById('share-link-icon');
+    if (shareLinkIcon) {
+        shareLinkIcon.innerHTML = icons.shareLink();
     }
 
-    const editLinkIcon = document.getElementById('edit-link-icon');
-    if (editLinkIcon) {
-        editLinkIcon.innerHTML = icons.shareLink();
-    }
-
-    // Attach share link click handlers
-    const shareViewBtn = document.getElementById('share-view-btn');
-    if (shareViewBtn) {
-        shareViewBtn.addEventListener('click', () => handleShareLinkClick('view'));
-    }
-
-    const shareEditBtn = document.getElementById('share-edit-btn');
-    if (shareEditBtn) {
-        shareEditBtn.addEventListener('click', () => handleShareLinkClick('edit'));
+    // Attach share link click handler
+    const shareLinkBtn = document.getElementById('share-link-btn');
+    if (shareLinkBtn) {
+        shareLinkBtn.addEventListener('click', handleShareBtnClick);
     }
 
     const screenshotBtn = document.getElementById('screenshot-btn');
@@ -547,25 +548,24 @@ function initializeShareTab() {
                 }
             }
         }
-        const shareBtns = [document.getElementById('share-view-btn'), document.getElementById('share-edit-btn')];
+        const shareLinkBtnEl = document.getElementById('share-link-btn');
         const syncOff = !chartState.shared && !isSyncEnabled();
         const viewOnly = !owner && !chartState.acceptingEdits;
-        for (const el of shareBtns) {
-            if (!el) continue;
+        if (shareLinkBtnEl) {
             if (viewOnly) {
-                el.style.opacity = '0.45';
-                el.style.cursor = 'not-allowed';
-                el.title = chartState.ownerName
+                shareLinkBtnEl.style.opacity = '0.45';
+                shareLinkBtnEl.style.cursor = 'not-allowed';
+                shareLinkBtnEl.title = chartState.ownerName
                     ? `${chartState.ownerName} owns this chart (view only)`
                     : 'Someone else owns this chart (view only)';
             } else if (syncOff) {
-                el.style.opacity = '0.45';
-                el.style.cursor = 'not-allowed';
-                el.title = 'Enable "Sync Across Devices" in the Chart Explorer settings to use share links.';
+                shareLinkBtnEl.style.opacity = '0.45';
+                shareLinkBtnEl.style.cursor = 'not-allowed';
+                shareLinkBtnEl.title = 'Enable "Sync Across Devices" in the Chart Explorer settings to use share links.';
             } else {
-                el.style.opacity = '';
-                el.style.cursor = '';
-                el.title = '';
+                shareLinkBtnEl.style.opacity = '';
+                shareLinkBtnEl.style.cursor = '';
+                shareLinkBtnEl.title = '';
             }
         }
     }, true);
