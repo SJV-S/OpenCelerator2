@@ -136,3 +136,65 @@ if (this.chartHandle) {
 `runModuleInits()` is called unconditionally in the constructor. Each module init registers `eventBus.subscribe()` calls. The event bus has no mechanism to scope subscriptions to an instance or to clean them up on `destroy()`. Fixing this properly would require either scoping the event bus per instance (breaking the singleton) or tracking all subscriptions and unregistering them in `destroy()`.
 
 ---
+
+## 2026-04-07 — Celeration fan inconsistent in plugin context: not draggable, labels missing, sometimes invisible
+
+### Symptom
+
+The celeration fan behaves incorrectly in the FL-Flash2 consumer. Three related symptoms, each occurring to varying degrees depending on how the chart was initialized:
+
+- The fan is sometimes entirely invisible on first load.
+- The rate labels (×16, ×4, ×2, etc.) are not shown even when the fan lines are visible.
+- The fan is not draggable — hovering over it does not trigger the grab cursor, and clicking and dragging does nothing.
+
+All three behaviors work correctly in TC2's standalone app.
+
+### Root cause — fan positions computed from container dimensions at render time
+
+The celeration fan's position and all element coordinates are computed in `generateFanElements()` (`src/SCC/ui/celerationFan.js`) using `layout.width`, `layout.height`, and `layout.margin.*`. These values are set by `resizeChartByHeight()` in `initializeChart()`, which reads the container dimensions via `chartContainer.clientWidth` and `chartContainer.clientHeight`.
+
+In the plugin context, `new SCCChart()` and its internal `initializeChart()` may be called while the chart's container element is not yet visible in the DOM — for example, if the Charts tab is not the active tab when the first deck is loaded. Hidden elements return `clientWidth = 0` and `clientHeight = 0`. When these are 0:
+
+- `resizeChartByHeight()` sets `layout.width` and `layout.height` to 0 or near-0.
+- `generateFanElements()` computes fan paper coordinates using these values:
+  - `plotWidth = layout.width - layout.margin.l - layout.margin.r` → near 0 or negative
+  - `pxPerDataUnit`, `lineLength`, `fanOffsetPx` all derived from this → NaN or 0
+  - All `toPaper()` calls produce `x = NaN, y = NaN` or result from divide-by-zero
+- Plotly silently ignores shapes and annotations with NaN coordinates — the entire fan disappears.
+
+When the container becomes visible later (the Charts tab is opened), no re-render is triggered, so the fan remains absent for the session unless `initializeChart()` is called again (which only happens on chart-type change or fullscreen toggle).
+
+This also explains the occasional visibility — if the Charts tab happens to be the active tab when `new SCCChart()` is first called, the container has correct dimensions and the fan renders normally.
+
+### Root cause — label clipping from insufficient margin
+
+Even when the fan is rendered at non-zero dimensions, the rate labels (annotations) may be missing while the lines are visible. The fan is intentionally positioned outside the plot area in the margin space. The margin expansion that creates room for the fan is performed inside `resizeChartByHeight()`. If the container dimensions are partially wrong (e.g., some but not all margin values are computed correctly), the label positions in paper space may fall outside Plotly's SVG viewport bounds and get clipped.
+
+The labels use `xref: 'paper', yref: 'paper'` with coordinates outside the [0, 1] range (negative x for minute charts, x > 1 for count charts). Plotly renders these into the SVG margin area only when the chart was initially drawn with sufficient margin for those coordinates. If the margin at `newPlot` time was too small (due to bad initial dimensions), the labels are clipped even after the chart is later resized.
+
+### Root cause — drag hit detection fails when fan is mispositioned
+
+The fan drag system (`initFanDrag()`) works by detecting mouse position in paper coordinates and comparing it to the `fan-hitarea` shape's stored `x0, y0, x1, y1` values in `layout.shapes`. Both the mouse conversion (`pixelToPaper()`) and the stored hit area use the same paper coordinate system, so they should agree when the chart is correctly initialized.
+
+When the fan was initialized at 0 dimensions (NaN positions), the `fan-hitarea` shape either has NaN coordinates or is absent from the layout. The `isPointOnFan()` function finds no valid hit area and returns false for every mouse position. The drag handler in `handleMouseDown()` never activates — no grab cursor, no drag starts, fails silently.
+
+If the fan was initialized correctly but the chart is subsequently resized (e.g., via `applyChartWindow()`), the fan's paper-space coordinates remain stable — they are defined in paper space, not pixel space — so drag should continue to work after a resize. The drag failure is specific to the bad-dimensions-at-init path.
+
+### Why this doesn't affect TC2 standalone
+
+In TC2, the chart is always rendered into a full-page layout that is visible from the very first render. `clientWidth` and `clientHeight` are always valid when `initializeChart()` is called. There is no tab-switching or deferred visibility.
+
+### What is not yet confirmed
+
+- Exactly when in the FL-Flash2 lifecycle `new SCCChart()` is called relative to the Charts tab becoming visible. If the tab is always visible at construction time, the 0-dimensions theory doesn't apply, and another cause must be sought — a CSS `display: none` or `visibility: hidden` on a parent, or a parent with explicit `height: 0` — `clientWidth/clientHeight` return 0 for all of these.
+- Whether the margin expansion inside `resizeChartByHeight()` is being passed the correct `fanVisible: true` option consistently. `initializeChart()` currently passes `fanVisible: true` unconditionally (`src/main.js` lines 75–78), then `syncVisibilityState()` CSS-hides the fan afterward if `chartState.fanVisible` is false. If the margin was not expanded (because `fanVisible: false` was the saved value), the fan's annotations would be clipped even when later made visible by toggling the fan-toggle checkbox.
+
+### Relationship to the `plotly_click` issue
+
+The fan drag's `handleMouseDown` uses capture phase on `chartDiv`, which fires before Plotly's bubbling handlers. This is intentional and should work even with `dragmode: "pan"`. The `plotly_click` issue (drag layer consuming click events) does not apply here — the fan drag uses a different mechanism specifically to avoid it. The drag failure is not caused by the Plotly drag layer.
+
+### Fix direction
+
+The fix belongs on the plugin side. `initializeChart()` should detect when the container has 0 or near-0 dimensions and defer the render until dimensions are valid. The most robust approach is a `ResizeObserver` on the `chart-container` element: when the observed size transitions from 0 to a positive value, call `initializeChart()`. This would handle the deferred-visibility case automatically without requiring consumer-side changes.
+
+---
