@@ -41,12 +41,19 @@ export async function initServerSync() {
     let passphrase = await db.get(STORE_NAME, 'passphrase');
 
     if (!passphrase) {
-        if (!window.location.pathname.startsWith('/welcome')) {
-            window.location.href = '/welcome';
-            return;
-        }
-        // On welcome page: don't generate yet, just return early
-        return;
+        // On the welcome page (manual import flow), leave identity creation to the user.
+        if (window.location.pathname.startsWith('/welcome')) return;
+
+        // First visit: silently create an "Unnamed" identity so the app works immediately.
+        // The user can import or change their identity via settings later.
+        passphrase = generatePassphrase();
+        const autoKeyPair = await deriveSigningKeyPair(passphrase);
+        const autoPublicKeyB64 = await exportPublicKey(autoKeyPair.publicKey);
+        await db.put(STORE_NAME, passphrase, 'passphrase');
+        await db.put(STORE_NAME, autoPublicKeyB64, 'publicKey');
+        await db.put(STORE_NAME, 'Unnamed', 'display_name');
+        await db.put(STORE_NAME, 'Both', 'use_case');
+        await db.put(STORE_NAME, { ...DEFAULT_PREFERENCES }, PREFS_KEY);
     }
 
     let prefs = await db.get(STORE_NAME, PREFS_KEY);
