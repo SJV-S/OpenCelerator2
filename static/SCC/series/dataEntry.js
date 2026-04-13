@@ -335,7 +335,8 @@ function init() {
     // Hide indicator when counter overlay closes
     eventBus.subscribe(EVENTS.COUNTER_HIDE, () => {
         removeEntryDateIndicator();
-        dataTabActive = false;  // Disable click-to-set-date when menu closes
+        const dataTabContent = document.getElementById('data-content');
+        dataTabActive = dataTabContent?.classList.contains('active') ?? false;
     });
 
     // Handle tab switching - track state and hide indicator when leaving data tab

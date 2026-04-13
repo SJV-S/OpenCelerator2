@@ -38,12 +38,10 @@ export function compactChart(chart) {
         for (const key of Object.keys(s.misc)) {
             const arr = s.misc[key];
             if (!Array.isArray(arr) || arr.length === 0) continue;
-            if (arr.every(v => v === null)) {
-                delete s.misc[key];
-            } else {
-                const first = arr[0];
-                if (arr.every(v => v === first)) s.misc[key] = first;
-            }
+            // Don't delete all-null misc arrays — their existence is meaningful (user created them).
+            // Only collapse constant non-null arrays to a scalar.
+            const first = arr[0];
+            if (first !== null && arr.every(v => v === first)) s.misc[key] = first;
         }
     }
 }

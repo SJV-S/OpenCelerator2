@@ -6,7 +6,7 @@ REPO="StandardChangeChart"
 BRANCH="master"
 VPS="ubuntu@170.75.171.102"
 VPS_PATH="/srv/$REPO"
-LOCAL_GITEA="https://z4yefqvqqmuj2xwmngldklb2zxyo2ktu4e5revac33idoy2zm333g4qd.local"
+LOCAL_GITEA="https://varsity-max.local:59111"
 TMP="/tmp/deploy"
 DOMAIN_URL="https://scc.pigeondev.net"
 

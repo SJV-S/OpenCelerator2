@@ -6,7 +6,7 @@ REPO="StandardChangeChart"
 BRANCH="master"
 VPS="ubuntu@172.81.179.221"
 VPS_PATH="/srv/$REPO"
-LOCAL_GITEA="https://z4yefqvqqmuj2xwmngldklb2zxyo2ktu4e5revac33idoy2zm333g4qd.local"
+LOCAL_GITEA="https://varsity-max.local:59111"
 TMP="/tmp/deploy-opencelerator"
 DOMAIN_URL="https://opencelerator.pigeondev.net"
 
