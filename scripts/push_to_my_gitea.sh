@@ -25,5 +25,9 @@ if [ -n "$APP_VER" ]; then
 fi
 
 git add -A
-git commit -m "${1:-Update}"
+if git diff --cached --quiet; then
+    echo "Nothing to commit."
+else
+    git commit -m "${1:-Update}"
+fi
 git push
