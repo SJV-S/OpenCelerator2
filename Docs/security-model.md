@@ -43,9 +43,12 @@ The server **never receives**: the passphrase, any raw encryption key, any plain
 
 All cryptographic payloads are stored as `LargeBinary` in SQLAlchemy (non-crypto fields like `user_id`, `chart_uuid`, and timestamps use `String`/`Integer`). API endpoints (`/api/sync`, `/api/share/edit`, `/api/account-link`) accept and return base64-encoded blobs without ever decrypting.
 
-### Signature Verification Is Client-Side Only
+### Signature Verification — Defense in Depth
 
-The server stores signatures but **does not verify them**. `app.py` accepts any signature (or no signature) without checking. All signature verification happens in the client's `verifyPull()` function (`syncClient.js`). This is by design — the server is untrusted in this zero-knowledge architecture.
+Signatures are verified at **both** the server and the client.
+
+- **Server-side**: `require_signature()` in `routes/helpers.py` verifies every upload, delete, and leave request against the submitting user's stored public key in the Identity table. Requests with an invalid or missing signature are rejected at the API boundary before any data is written.
+- **Client-side**: `verifyPull()` in `syncClient.js` is a second, independent trust boundary. Before any pulled chart is loaded into IndexedDB, its signature is verified against the owner's public key. This means a compromised server cannot inject tampered data — the client will reject it even if the server passed it through.
 
 ---
 
